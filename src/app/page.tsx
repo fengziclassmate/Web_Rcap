@@ -330,6 +330,10 @@ export default function Home() {
     setEvents((prev) => prev.map((event) => (event.id === eventId ? { ...event, ...patch } : event)));
   }
 
+  function handleDeleteEvent(eventId: string) {
+    setEvents((prev) => prev.filter((event) => event.id !== eventId));
+  }
+
   if (!isBooted) {
     return (
       <main className="min-h-screen bg-white text-black">
@@ -403,6 +407,7 @@ export default function Home() {
           events={events}
           onCreateEvent={handleCreateEvent}
           onUpdateEvent={handleUpdateEvent}
+          onDeleteEvent={handleDeleteEvent}
           onPrevWeek={handleGoPrevWeek}
           onNextWeek={handleGoNextWeek}
         />

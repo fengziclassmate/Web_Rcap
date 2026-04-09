@@ -36,6 +36,7 @@ type WeeklyTimeGridProps = {
   events: ScheduleEvent[];
   onCreateEvent: (event: ScheduleEvent) => void;
   onUpdateEvent: (eventId: string, patch: Partial<ScheduleEvent>) => void;
+  onDeleteEvent: (eventId: string) => void;
   onPrevWeek: () => void;
   onNextWeek: () => void;
 };
@@ -116,6 +117,7 @@ export function WeeklyTimeGrid({
   events,
   onCreateEvent,
   onUpdateEvent,
+  onDeleteEvent,
   onPrevWeek,
   onNextWeek,
 }: WeeklyTimeGridProps) {
@@ -457,52 +459,94 @@ export function WeeklyTimeGrid({
                       onChange={(event) =>
                         setEditForm((prev) => ({ ...prev, title: event.target.value }))
                       }
+                      placeholder="输入行程标题"
                       className="rounded-sm border-gray-200"
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-notes">备注 / 记录</Label>
+                    <Label>持续时长</Label>
+                    <Select
+                      value={String(editForm.duration)}
+                      onValueChange={(value) =>
+                        setEditForm((prev) => ({ ...prev, duration: Number(value) }))
+                      }
+                    >
+                      <SelectTrigger className="rounded-sm border-gray-200">
+                        <SelectValue placeholder="选择持续时长" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((hour) => (
+                          <SelectItem key={hour} value={String(hour)}>
+                            {hour} 小时
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-notes">备注</Label>
                     <Textarea
                       id="edit-notes"
                       value={editForm.notes}
                       onChange={(event) =>
                         setEditForm((prev) => ({ ...prev, notes: event.target.value }))
                       }
-                      className="min-h-20 rounded-sm border-gray-200"
+                      placeholder="输入备注信息"
+                      className="rounded-sm border-gray-200"
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-requirements">注意事项（每行一条）</Label>
+                    <Label htmlFor="edit-requirements">所需物品/准备事项</Label>
                     <Textarea
                       id="edit-requirements"
                       value={editForm.requirements}
                       onChange={(event) =>
                         setEditForm((prev) => ({ ...prev, requirements: event.target.value }))
                       }
-                      className="min-h-20 rounded-sm border-gray-200"
+                      placeholder="每行一项，例如：笔记本、笔"
+                      className="rounded-sm border-gray-200"
                     />
-                    <ul className="space-y-1 border border-gray-200 p-2 text-xs text-gray-600">
-                      {editForm.requirements
-                        .split("\n")
-                        .map((item) => item.trim())
-                        .filter(Boolean)
-                        .map((item) => (
-                          <li key={item}>- {item}</li>
-                        ))}
-                    </ul>
                   </div>
-                  <div className="flex items-center justify-between rounded-sm border border-gray-200 px-3 py-2">
-                    <span className="text-sm text-black">标记为完成</span>
+                  <div className="flex items-center space-x-2">
                     <Switch
+                      id="edit-completed"
                       checked={editForm.isCompleted}
                       onCheckedChange={(checked) =>
                         setEditForm((prev) => ({ ...prev, isCompleted: checked }))
                       }
                     />
+                    <Label htmlFor="edit-completed">标记为已完成</Label>
                   </div>
-                  <Button onClick={handleSaveEdit} className="w-full rounded-sm bg-black text-white hover:bg-black/90">
-                    保存变更
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button
+                      onClick={() => {
+                        onDeleteEvent(selectedEvent.id);
+                        setEditingEventId(null);
+                      }}
+                      className="flex-1 rounded-sm bg-red-600 text-white hover:bg-red-700"
+                    >
+                      删除行程
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        const endHour = Math.min(24, selectedEvent.startHour + editForm.duration);
+                        onUpdateEvent(selectedEvent.id, {
+                          title: editForm.title.trim(),
+                          endHour,
+                          notes: editForm.notes.trim(),
+                          requirements: editForm.requirements
+                            .split("\n")
+                            .map((item) => item.trim())
+                            .filter(Boolean),
+                          isCompleted: editForm.isCompleted,
+                        });
+                        setEditingEventId(null);
+                      }}
+                      className="flex-1 rounded-sm bg-black text-white hover:bg-black/90"
+                    >
+                      保存修改
+                    </Button>
+                  </div>
                 </div>
               </DialogContent>
             )}
