@@ -43,7 +43,8 @@ type WeeklyTimeGridProps = {
 
 type EventFormState = {
   title: string;
-  duration: number;
+  startHour: number;
+  endHour: number;
   notes: string;
   requirements: string;
   isCompleted: boolean;
@@ -68,14 +69,17 @@ const hourCellHeight = 52;
 
 const defaultForm: EventFormState = {
   title: "",
-  duration: 1,
+  startHour: 8,
+  endHour: 9,
   notes: "",
   requirements: "",
   isCompleted: false,
 };
 
 function formatHour(hour: number) {
-  return `${hour.toString().padStart(2, "0")}:00`;
+  const hours = Math.floor(hour);
+  const minutes = Math.round((hour - hours) * 60);
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 }
 
 function dayTitle(date: Date) {
@@ -141,7 +145,8 @@ export function WeeklyTimeGrid({
     setSelectedCell(cell);
     setCreateForm({
       title: "",
-      duration: 1,
+      startHour: cell.startHour,
+      endHour: Math.min(24, cell.startHour + 1),
       notes: "",
       requirements: "",
       isCompleted: false,
@@ -153,7 +158,8 @@ export function WeeklyTimeGrid({
     setEditingEventId(event.id);
     setEditForm({
       title: event.title,
-      duration: Math.max(1, event.endHour - event.startHour),
+      startHour: event.startHour,
+      endHour: event.endHour,
       notes: event.notes,
       requirements: event.requirements.join("\n"),
       isCompleted: event.isCompleted,
@@ -162,12 +168,13 @@ export function WeeklyTimeGrid({
 
   function handleCreateEvent() {
     if (!selectedCell || !createForm.title.trim()) return;
-    const endHour = Math.min(24, selectedCell.startHour + createForm.duration);
+    const startHour = Math.max(0, Math.min(23.5, createForm.startHour));
+    const endHour = Math.max(startHour + 0.5, Math.min(24, createForm.endHour));
 
     onCreateEvent({
       id: createId("event"),
       date: selectedCell.date,
-      startHour: selectedCell.startHour,
+      startHour,
       endHour,
       title: createForm.title.trim(),
       notes: createForm.notes.trim(),
@@ -182,8 +189,12 @@ export function WeeklyTimeGrid({
 
   function handleSaveEdit() {
     if (!selectedEvent || !editForm.title.trim()) return;
+    const startHour = Math.max(0, Math.min(23.5, editForm.startHour));
+    const endHour = Math.max(startHour + 0.5, Math.min(24, editForm.endHour));
     onUpdateEvent(selectedEvent.id, {
       title: editForm.title.trim(),
+      startHour,
+      endHour,
       notes: editForm.notes.trim(),
       requirements: editForm.requirements
         .split("\n")
@@ -413,25 +424,93 @@ export function WeeklyTimeGrid({
                       className="rounded-sm border-gray-200"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label>持续时长</Label>
-                    <Select
-                      value={String(createForm.duration)}
-                      onValueChange={(value) =>
-                        setCreateForm((prev) => ({ ...prev, duration: Number(value) }))
-                      }
-                    >
-                      <SelectTrigger className="rounded-sm border-gray-200">
-                        <SelectValue placeholder="选择持续时长" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map((hour) => (
-                          <SelectItem key={hour} value={String(hour)}>
-                            {hour} 小时
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label>开始时间</Label>
+                      <div className="flex space-x-2">
+                        <Select
+                          value={String(Math.floor(createForm.startHour))}
+                          onValueChange={(value) => {
+                            const hours = Number(value);
+                            const minutes = createForm.startHour - Math.floor(createForm.startHour);
+                            setCreateForm((prev) => ({ ...prev, startHour: hours + minutes }));
+                          }}
+                        >
+                          <SelectTrigger className="rounded-sm border-gray-200">
+                            <SelectValue placeholder="时" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 24 }, (_, hour) => (
+                              <SelectItem key={hour} value={String(hour)}>
+                                {hour.toString().padStart(2, "0")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={String(Math.round((createForm.startHour - Math.floor(createForm.startHour)) * 60))}
+                          onValueChange={(value) => {
+                            const hours = Math.floor(createForm.startHour);
+                            const minutes = Number(value) / 60;
+                            setCreateForm((prev) => ({ ...prev, startHour: hours + minutes }));
+                          }}
+                        >
+                          <SelectTrigger className="rounded-sm border-gray-200">
+                            <SelectValue placeholder="分" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[0, 15, 30, 45].map((minute) => (
+                              <SelectItem key={minute} value={String(minute)}>
+                                {minute.toString().padStart(2, "0")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>结束时间</Label>
+                      <div className="flex space-x-2">
+                        <Select
+                          value={String(Math.floor(createForm.endHour))}
+                          onValueChange={(value) => {
+                            const hours = Number(value);
+                            const minutes = createForm.endHour - Math.floor(createForm.endHour);
+                            setCreateForm((prev) => ({ ...prev, endHour: hours + minutes }));
+                          }}
+                        >
+                          <SelectTrigger className="rounded-sm border-gray-200">
+                            <SelectValue placeholder="时" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 24 }, (_, hour) => (
+                              <SelectItem key={hour} value={String(hour)}>
+                                {hour.toString().padStart(2, "0")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={String(Math.round((createForm.endHour - Math.floor(createForm.endHour)) * 60))}
+                          onValueChange={(value) => {
+                            const hours = Math.floor(createForm.endHour);
+                            const minutes = Number(value) / 60;
+                            setCreateForm((prev) => ({ ...prev, endHour: hours + minutes }));
+                          }}
+                        >
+                          <SelectTrigger className="rounded-sm border-gray-200">
+                            <SelectValue placeholder="分" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[0, 15, 30, 45].map((minute) => (
+                              <SelectItem key={minute} value={String(minute)}>
+                                {minute.toString().padStart(2, "0")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
                   <Button
                     onClick={handleCreateEvent}
@@ -463,25 +542,93 @@ export function WeeklyTimeGrid({
                       className="rounded-sm border-gray-200"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label>持续时长</Label>
-                    <Select
-                      value={String(editForm.duration)}
-                      onValueChange={(value) =>
-                        setEditForm((prev) => ({ ...prev, duration: Number(value) }))
-                      }
-                    >
-                      <SelectTrigger className="rounded-sm border-gray-200">
-                        <SelectValue placeholder="选择持续时长" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map((hour) => (
-                          <SelectItem key={hour} value={String(hour)}>
-                            {hour} 小时
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label>开始时间</Label>
+                      <div className="flex space-x-2">
+                        <Select
+                          value={String(Math.floor(editForm.startHour))}
+                          onValueChange={(value) => {
+                            const hours = Number(value);
+                            const minutes = editForm.startHour - Math.floor(editForm.startHour);
+                            setEditForm((prev) => ({ ...prev, startHour: hours + minutes }));
+                          }}
+                        >
+                          <SelectTrigger className="rounded-sm border-gray-200">
+                            <SelectValue placeholder="时" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 24 }, (_, hour) => (
+                              <SelectItem key={hour} value={String(hour)}>
+                                {hour.toString().padStart(2, "0")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={String(Math.round((editForm.startHour - Math.floor(editForm.startHour)) * 60))}
+                          onValueChange={(value) => {
+                            const hours = Math.floor(editForm.startHour);
+                            const minutes = Number(value) / 60;
+                            setEditForm((prev) => ({ ...prev, startHour: hours + minutes }));
+                          }}
+                        >
+                          <SelectTrigger className="rounded-sm border-gray-200">
+                            <SelectValue placeholder="分" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[0, 15, 30, 45].map((minute) => (
+                              <SelectItem key={minute} value={String(minute)}>
+                                {minute.toString().padStart(2, "0")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>结束时间</Label>
+                      <div className="flex space-x-2">
+                        <Select
+                          value={String(Math.floor(editForm.endHour))}
+                          onValueChange={(value) => {
+                            const hours = Number(value);
+                            const minutes = editForm.endHour - Math.floor(editForm.endHour);
+                            setEditForm((prev) => ({ ...prev, endHour: hours + minutes }));
+                          }}
+                        >
+                          <SelectTrigger className="rounded-sm border-gray-200">
+                            <SelectValue placeholder="时" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 24 }, (_, hour) => (
+                              <SelectItem key={hour} value={String(hour)}>
+                                {hour.toString().padStart(2, "0")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={String(Math.round((editForm.endHour - Math.floor(editForm.endHour)) * 60))}
+                          onValueChange={(value) => {
+                            const hours = Math.floor(editForm.endHour);
+                            const minutes = Number(value) / 60;
+                            setEditForm((prev) => ({ ...prev, endHour: hours + minutes }));
+                          }}
+                        >
+                          <SelectTrigger className="rounded-sm border-gray-200">
+                            <SelectValue placeholder="分" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[0, 15, 30, 45].map((minute) => (
+                              <SelectItem key={minute} value={String(minute)}>
+                                {minute.toString().padStart(2, "0")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="edit-notes">备注</Label>
@@ -528,20 +675,7 @@ export function WeeklyTimeGrid({
                       删除行程
                     </Button>
                     <Button
-                      onClick={() => {
-                        const endHour = Math.min(24, selectedEvent.startHour + editForm.duration);
-                        onUpdateEvent(selectedEvent.id, {
-                          title: editForm.title.trim(),
-                          endHour,
-                          notes: editForm.notes.trim(),
-                          requirements: editForm.requirements
-                            .split("\n")
-                            .map((item) => item.trim())
-                            .filter(Boolean),
-                          isCompleted: editForm.isCompleted,
-                        });
-                        setEditingEventId(null);
-                      }}
+                      onClick={handleSaveEdit}
                       className="flex-1 rounded-sm bg-black text-white hover:bg-black/90"
                     >
                       保存修改
