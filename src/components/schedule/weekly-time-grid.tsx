@@ -209,8 +209,8 @@ export function WeeklyTimeGrid({
     if (!draggingEventId) return;
     const draggingEvent = events.find((event) => event.id === draggingEventId);
     if (!draggingEvent) return;
-    const duration = Math.max(1, draggingEvent.endHour - draggingEvent.startHour);
-    const nextStartHour = Math.min(23, targetHour);
+    const duration = Math.max(0.0167, draggingEvent.endHour - draggingEvent.startHour);
+    const nextStartHour = Math.min(23.9833, targetHour);
     const nextEndHour = Math.min(24, nextStartHour + duration);
 
     onUpdateEvent(draggingEvent.id, {
@@ -226,17 +226,17 @@ export function WeeklyTimeGrid({
 
     function handleMouseMove(event: MouseEvent) {
       if (!resizeState) return;
-      const deltaHour = Math.round((event.clientY - resizeState.startY) / hourCellHeight);
+      const deltaHour = (event.clientY - resizeState.startY) / hourCellHeight;
       if (resizeState.direction === "end") {
         const nextEndHour = Math.min(
           24,
-          Math.max(resizeState.startHour + 1, resizeState.initialHour + deltaHour),
+          Math.max(resizeState.startHour + 0.0167, resizeState.initialHour + deltaHour),
         );
         onUpdateEvent(resizeState.eventId, { endHour: nextEndHour });
       } else {
         const nextStartHour = Math.max(
           0,
-          Math.min(resizeState.endHour - 1, resizeState.initialHour + deltaHour),
+          Math.min(resizeState.endHour - 0.0167, resizeState.initialHour + deltaHour),
         );
         onUpdateEvent(resizeState.eventId, { startHour: nextStartHour });
       }
@@ -459,7 +459,7 @@ export function WeeklyTimeGrid({
                             <SelectValue placeholder="分" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[0, 15, 30, 45].map((minute) => (
+                            {Array.from({ length: 60 }, (_, minute) => (
                               <SelectItem key={minute} value={String(minute)}>
                                 {minute.toString().padStart(2, "0")}
                               </SelectItem>
@@ -502,7 +502,7 @@ export function WeeklyTimeGrid({
                             <SelectValue placeholder="分" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[0, 15, 30, 45].map((minute) => (
+                            {Array.from({ length: 60 }, (_, minute) => (
                               <SelectItem key={minute} value={String(minute)}>
                                 {minute.toString().padStart(2, "0")}
                               </SelectItem>
@@ -577,7 +577,7 @@ export function WeeklyTimeGrid({
                             <SelectValue placeholder="分" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[0, 15, 30, 45].map((minute) => (
+                            {Array.from({ length: 60 }, (_, minute) => (
                               <SelectItem key={minute} value={String(minute)}>
                                 {minute.toString().padStart(2, "0")}
                               </SelectItem>
@@ -620,7 +620,7 @@ export function WeeklyTimeGrid({
                             <SelectValue placeholder="分" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[0, 15, 30, 45].map((minute) => (
+                            {Array.from({ length: 60 }, (_, minute) => (
                               <SelectItem key={minute} value={String(minute)}>
                                 {minute.toString().padStart(2, "0")}
                               </SelectItem>
