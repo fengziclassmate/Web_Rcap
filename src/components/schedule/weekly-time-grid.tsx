@@ -3,8 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
 import { zhCN } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Clock3, Plus, Smile, Frown, Meh, Angry, Heart } from "lucide-react";
-import type { ScheduleEvent } from "@/app/page";
+import { ChevronLeft, ChevronRight, Clock3, Plus, Smile, Frown, Meh, Angry, Heart, Check, Star, AlertTriangle, AlertCircle } from "lucide-react";
+import type { ScheduleEvent, EventTag } from "@/app/page";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,30 +25,39 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { createId } from "@/lib/id";
 
-const categories = [
-  "个人",
-  "工作提升",
-  "运动健康",
-  "兴趣爱好",
-  "放松休闲",
-  "life&other",
-  "自我提升",
-  "计划复盘"
-];
-
-const categoryColors = {
-  "个人": "bg-blue-100 border-blue-300",
-  "工作提升": "bg-green-100 border-green-300",
-  "运动健康": "bg-red-100 border-red-300",
-  "兴趣爱好": "bg-purple-100 border-purple-300",
-  "放松休闲": "bg-yellow-100 border-yellow-300",
-  "life&other": "bg-gray-100 border-gray-300",
-  "自我提升": "bg-indigo-100 border-indigo-300",
-  "计划复盘": "bg-pink-100 border-pink-300"
+type Category = {
+  id: string;
+  name: string;
+  color: string;
 };
 
-function getCategoryColor(category: string) {
-  return categoryColors[category as keyof typeof categoryColors] || "bg-white border-black";
+const defaultCategories: Category[] = [
+  { id: "1", name: "个人", color: "bg-blue-100 border-blue-300" },
+  { id: "2", name: "工作提升", color: "bg-green-100 border-green-300" },
+  { id: "3", name: "运动健康", color: "bg-red-100 border-red-300" },
+  { id: "4", name: "兴趣爱好", color: "bg-purple-100 border-purple-300" },
+  { id: "5", name: "放松休闲", color: "bg-yellow-100 border-yellow-300" },
+  { id: "6", name: "life&other", color: "bg-gray-100 border-gray-300" },
+  { id: "7", name: "自我提升", color: "bg-indigo-100 border-indigo-300" },
+  { id: "8", name: "计划复盘", color: "bg-pink-100 border-pink-300" }
+];
+
+function getCategoryColor(categories: Category[], categoryName: string) {
+  const category = categories.find(cat => cat.name === categoryName);
+  return category?.color || "bg-white border-black";
+}
+
+function getTagInfo(tag: EventTag) {
+  switch (tag) {
+    case "待定":
+      return { icon: "?", color: "text-yellow-500" };
+    case "不着急":
+      return { icon: "⌛", color: "text-blue-500" };
+    case "不可后退":
+      return { icon: "⚠️", color: "text-red-500" };
+    default:
+      return { icon: "", color: "" };
+  }
 }
 
 type GridCell = {
@@ -75,6 +84,7 @@ type EventFormState = {
   requirements: string;
   isCompleted: boolean;
   category: string;
+  tag: EventTag;
 };
 
 type ResizeState = {
@@ -108,7 +118,14 @@ const moodOptions: { value: Mood; icon: React.ReactNode; label: string }[] = [
   { value: "难过", icon: <Frown className="h-5 w-5 text-blue-500" />, label: "难过" },
   { value: "生气", icon: <Angry className="h-5 w-5 text-red-500" />, label: "生气" },
   { value: "疲惫", icon: <Meh className="h-5 w-5 text-gray-500" />, label: "疲惫" },
+  { value: "兴奋", icon: <Star className="h-5 w-5 text-yellow-500" />, label: "兴奋" },
+  { value: "焦虑", icon: <AlertTriangle className="h-5 w-5 text-orange-500" />, label: "焦虑" },
+  { value: "感激", icon: <Heart className="h-5 w-5 text-green-500" />, label: "感激" },
+  { value: "无聊", icon: <Meh className="h-5 w-5 text-gray-400" />, label: "无聊" },
+  { value: "惊讶", icon: <AlertCircle className="h-5 w-5 text-purple-500" />, label: "惊讶" },
 ];
+
+// 添加缺失的图标导入
 
 const defaultForm: EventFormState = {
   title: "",
@@ -118,6 +135,7 @@ const defaultForm: EventFormState = {
   requirements: "",
   isCompleted: false,
   category: "个人",
+  tag: null,
 };
 
 function formatHour(hour: number) {
@@ -186,6 +204,12 @@ export function WeeklyTimeGrid({
     mood: "平静",
     content: "",
   });
+  const [categories, setCategories] = useState<Category[]>(defaultCategories);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCategory, setNewCategory] = useState<{ name: string; color: string }>({
+    name: "",
+    color: "bg-blue-100 border-blue-300",
+  });
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === editingEventId) ?? null,
@@ -201,6 +225,7 @@ export function WeeklyTimeGrid({
       requirements: "",
       isCompleted: false,
       category: "个人",
+      tag: null,
     });
     setCreateDialogOpen(true);
   }
@@ -215,6 +240,7 @@ export function WeeklyTimeGrid({
       requirements: event.requirements.join("\n"),
       isCompleted: event.isCompleted,
       category: event.category,
+      tag: event.tag,
     });
   }
 
@@ -236,6 +262,7 @@ export function WeeklyTimeGrid({
         .filter(Boolean),
       isCompleted: createForm.isCompleted,
       category: createForm.category,
+      tag: createForm.tag,
     });
     setCreateDialogOpen(false);
   }
@@ -255,6 +282,7 @@ export function WeeklyTimeGrid({
         .filter(Boolean),
       isCompleted: editForm.isCompleted,
       category: editForm.category,
+      tag: editForm.tag,
     });
     setEditingEventId(null);
   }
@@ -305,6 +333,22 @@ export function WeeklyTimeGrid({
       return [...prev, newEntry];
     });
     setEditingDiaryDate(null);
+  }
+
+  function handleAddCategory() {
+    if (!newCategory.name.trim()) return;
+    const categoryExists = categories.some(cat => cat.name === newCategory.name.trim());
+    if (categoryExists) return;
+    setCategories((prev) => [...prev, {
+      id: createId("category"),
+      name: newCategory.name.trim(),
+      color: newCategory.color,
+    }]);
+    setNewCategory({ name: "", color: "bg-blue-100 border-blue-300" });
+  }
+
+  function handleDeleteCategory(categoryId: string) {
+    setCategories((prev) => prev.filter(cat => cat.id !== categoryId));
   }
 
   useEffect(() => {
@@ -358,6 +402,9 @@ export function WeeklyTimeGrid({
           <Button variant="outline" size="sm" className="rounded-sm border-gray-200" onClick={onNextWeek}>
             下一周
             <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" className="rounded-sm border-gray-200" onClick={() => setShowCategoryManager(true)}>
+            分类管理
           </Button>
         </div>
       </header>
@@ -416,7 +463,7 @@ export function WeeklyTimeGrid({
                         className={`pointer-events-auto absolute rounded-sm border px-2 py-1 text-left text-xs ${
                           event.isCompleted
                             ? "border-gray-300 bg-gray-100 text-gray-500"
-                            : getCategoryColor(event.category)
+                            : getCategoryColor(categories, event.category)
                         }`}
                         style={{
                           top: `${event.startHour * hourCellHeight + 4}px`,
@@ -430,10 +477,22 @@ export function WeeklyTimeGrid({
                       >
                         <button
                           type="button"
-                          className={`w-full text-left ${event.isCompleted ? "line-through" : ""}`}
+                          className="w-full text-left"
                           onClick={() => handleOpenEdit(event)}
                         >
-                          <p className="font-medium">{event.title}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{event.title}</p>
+                              {event.tag && (
+                                <span className={`text-xs font-bold ${getTagInfo(event.tag).color}`}>
+                                  {getTagInfo(event.tag).icon}
+                                </span>
+                              )}
+                            </div>
+                            {event.isCompleted && (
+                              <Check className="h-3 w-3 text-green-500" />
+                            )}
+                          </div>
                           <p className="text-[11px] text-gray-500">
                             {formatHour(event.startHour)} - {formatHour(event.endHour)}
                           </p>
@@ -559,10 +618,29 @@ export function WeeklyTimeGrid({
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
+                          <SelectItem key={category.id} value={category.name}>
+                            {category.name}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>标记</Label>
+                    <Select
+                      value={createForm.tag || ""}
+                      onValueChange={(value) =>
+                        setCreateForm((prev) => ({ ...prev, tag: value as EventTag }))
+                      }
+                    >
+                      <SelectTrigger className="rounded-sm border-gray-200">
+                        <SelectValue placeholder="选择标记" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">无标记</SelectItem>
+                        <SelectItem value="待定">待定</SelectItem>
+                        <SelectItem value="不着急">不着急</SelectItem>
+                        <SelectItem value="不可后退">不可后退</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -697,10 +775,29 @@ export function WeeklyTimeGrid({
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
+                          <SelectItem key={category.id} value={category.name}>
+                            {category.name}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>标记</Label>
+                    <Select
+                      value={editForm.tag || ""}
+                      onValueChange={(value) =>
+                        setEditForm((prev) => ({ ...prev, tag: value as EventTag }))
+                      }
+                    >
+                      <SelectTrigger className="rounded-sm border-gray-200">
+                        <SelectValue placeholder="选择标记" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">无标记</SelectItem>
+                        <SelectItem value="待定">待定</SelectItem>
+                        <SelectItem value="不着急">不着急</SelectItem>
+                        <SelectItem value="不可后退">不可后退</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -848,6 +945,85 @@ export function WeeklyTimeGrid({
             )}
           </Dialog>
 
+          {/* 分类管理对话框 */}
+          <Dialog open={showCategoryManager} onOpenChange={setShowCategoryManager}>
+            <DialogContent className="rounded-sm border-gray-200">
+              <DialogHeader>
+                <DialogTitle className="text-sm">分类管理</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <h3 className="text-xs font-medium">现有分类</h3>
+                  <div className="space-y-1">
+                    {categories.map((category) => (
+                      <div key={category.id} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-4 h-4 rounded-sm border ${category.color}`} />
+                          <span className="text-sm">{category.name}</span>
+                        </div>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 rounded-sm"
+                          onClick={() => handleDeleteCategory(category.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xs font-medium">添加新分类</h3>
+                  <div className="space-y-1">
+                    <Label htmlFor="category-name">分类名称</Label>
+                    <Input
+                      id="category-name"
+                      value={newCategory.name}
+                      onChange={(event) => setNewCategory((prev) => ({ ...prev, name: event.target.value }))}
+                      placeholder="输入分类名称"
+                      className="rounded-sm border-gray-200"
+                    />
+                    <Label>分类颜色</Label>
+                    <div className="grid grid-cols-6 gap-2">
+                      {[
+                        "bg-blue-100 border-blue-300",
+                        "bg-green-100 border-green-300",
+                        "bg-red-100 border-red-300",
+                        "bg-purple-100 border-purple-300",
+                        "bg-yellow-100 border-yellow-300",
+                        "bg-gray-100 border-gray-300",
+                        "bg-indigo-100 border-indigo-300",
+                        "bg-pink-100 border-pink-300",
+                        "bg-orange-100 border-orange-300",
+                        "bg-teal-100 border-teal-300",
+                        "bg-lime-100 border-lime-300",
+                        "bg-amber-100 border-amber-300",
+                      ].map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setNewCategory((prev) => ({ ...prev, color }))}
+                          className={`w-8 h-8 rounded-sm border transition-colors ${
+                            newCategory.color === color ? "ring-2 ring-black" : ""
+                          } ${color}`}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleAddCategory}
+                  className="w-full rounded-sm bg-black text-white hover:bg-black/90"
+                >
+                  添加分类
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* 日记编辑对话框 */}
           <Dialog open={Boolean(editingDiaryDate)} onOpenChange={(open) => !open && setEditingDiaryDate(null)}>
             {editingDiaryDate && (
@@ -860,7 +1036,7 @@ export function WeeklyTimeGrid({
                 <div className="space-y-3">
                   <div className="space-y-1">
                     <Label>今天的心情</Label>
-                    <div className="flex justify-center gap-3">
+                    <div className="flex flex-wrap justify-center gap-3">
                       {moodOptions.map((option) => (
                         <button
                           key={option.value}

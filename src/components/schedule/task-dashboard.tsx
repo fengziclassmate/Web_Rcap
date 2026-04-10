@@ -65,9 +65,22 @@ export function TaskDashboard({
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const incompleteTasks = tasks.filter((task) => !task.done);
   const completedTasks = tasks.filter((task) => task.done);
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
+
+  function toggleTaskExpansion(taskId: string) {
+    setExpandedTasks((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId);
+      } else {
+        newSet.add(taskId);
+      }
+      return newSet;
+    });
+  }
 
   function handleAddTask() {
     if (!taskName.trim()) return;
@@ -256,6 +269,23 @@ export function TaskDashboard({
                         <span className={task.done ? "text-gray-500 line-through" : "text-black"}>
                           {task.name}
                         </span>
+                        {task.subtasks.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleTaskExpansion(task.id);
+                            }}
+                            className="ml-2 p-1 rounded-sm hover:bg-gray-100"
+                            aria-label={expandedTasks.has(task.id) ? "折叠子任务" : "展开子任务"}
+                          >
+                            {expandedTasks.has(task.id) ? (
+                              <ChevronDown className="h-4 w-4 text-gray-500" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-gray-500" />
+                            )}
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className={task.done ? "text-gray-500" : "text-black"}>
@@ -289,7 +319,7 @@ export function TaskDashboard({
                       </Button>
                     </TableCell>
                   </TableRow>
-                  {task.subtasks.length > 0 && (
+                  {task.subtasks.length > 0 && expandedTasks.has(task.id) && (
                     <TableRow>
                       <TableCell colSpan={5}>
                         <div className="pl-12 pr-4 py-2 bg-gray-50">

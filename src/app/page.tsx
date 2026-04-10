@@ -13,6 +13,8 @@ import { createId } from "@/lib/id";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
+export type EventTag = "待定" | "不着急" | "不可后退" | null;
+
 export type ScheduleEvent = {
   id: string;
   date: string;
@@ -23,6 +25,7 @@ export type ScheduleEvent = {
   requirements: string[];
   isCompleted: boolean;
   category: string;
+  tag: EventTag;
 };
 
 export type SubTask = {
@@ -103,6 +106,7 @@ const defaultEvents: ScheduleEvent[] = [
     requirements: ["安静环境", "关闭即时通讯"],
     isCompleted: false,
     category: "个人",
+    tag: null,
   },
 ];
 
@@ -152,6 +156,7 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
         : [],
       isCompleted: Boolean(value.isCompleted),
       category: value.category ?? "个人",
+      tag: (value.tag as EventTag) ?? null,
     };
   });
 }
