@@ -297,23 +297,91 @@ export function WeeklyTimeGrid({
     setCreateDialogOpen(true);
   }
 
+  // 状态管理
+  const [editMode, setEditMode] = useState<'single' | 'all' | null>(null);
+  const [deleteMode, setDeleteMode] = useState<'single' | 'all' | null>(null);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [showEditModeDialog, setShowEditModeDialog] = useState(false);
+  const [showDeleteModeDialog, setShowDeleteModeDialog] = useState(false);
+
   function handleOpenEdit(event: ScheduleEvent) {
-    // 对于重复事件的实例，找到原始事件
+    // 检查是否是重复事件的实例
+    const isInstance = event.id.includes('-');
     const originalEventId = event.id.split('-')[0];
     const originalEvent = events.find(e => e.id === originalEventId) || event;
     
-    setEditingEventId(originalEvent.id);
-    setEditForm({
-      title: originalEvent.title,
-      startHour: originalEvent.startHour,
-      endHour: originalEvent.endHour,
-      notes: originalEvent.notes,
-      requirements: originalEvent.requirements.join("\n"),
-      isCompleted: originalEvent.isCompleted,
-      category: originalEvent.category,
-      tag: originalEvent.tag,
-      recurrence: originalEvent.recurrence,
-    });
+    if (isInstance && originalEvent.recurrence.type !== 'none') {
+      // 显示编辑模式选择对话框
+      setSelectedInstanceId(event.id);
+      setShowEditModeDialog(true);
+    } else {
+      // 直接编辑（非重复事件或原始重复事件）
+      setEditingEventId(originalEvent.id);
+      setEditForm({
+        title: originalEvent.title,
+        startHour: originalEvent.startHour,
+        endHour: originalEvent.endHour,
+        notes: originalEvent.notes,
+        requirements: originalEvent.requirements.join("\n"),
+        isCompleted: originalEvent.isCompleted,
+        category: originalEvent.category,
+        tag: originalEvent.tag,
+        recurrence: originalEvent.recurrence,
+      });
+    }
+  }
+
+  function handleEditModeSelect(mode: 'single' | 'all') {
+    if (selectedInstanceId) {
+      const originalEventId = selectedInstanceId.split('-')[0];
+      const originalEvent = events.find(e => e.id === originalEventId);
+      if (originalEvent) {
+        setEditMode(mode);
+        setEditingEventId(originalEvent.id);
+        setEditForm({
+          title: originalEvent.title,
+          startHour: originalEvent.startHour,
+          endHour: originalEvent.endHour,
+          notes: originalEvent.notes,
+          requirements: originalEvent.requirements.join("\n"),
+          isCompleted: originalEvent.isCompleted,
+          category: originalEvent.category,
+          tag: originalEvent.tag,
+          recurrence: originalEvent.recurrence,
+        });
+      }
+    }
+    setShowEditModeDialog(false);
+  }
+
+  function handleDeleteModeSelect(mode: 'single' | 'all') {
+    if (selectedInstanceId) {
+      const originalEventId = selectedInstanceId.split('-')[0];
+      
+      if (mode === 'single') {
+        // 删除单个实例：将该实例从重复事件中排除
+        const instanceDate = selectedInstanceId.split('-')[1];
+        const originalEvent = events.find(e => e.id === originalEventId);
+        
+        if (originalEvent) {
+          const updatedRecurrence = {
+            ...originalEvent.recurrence,
+            exceptions: [...(originalEvent.recurrence.exceptions || []), instanceDate]
+          };
+          onUpdateEvent(originalEventId, {
+            recurrence: updatedRecurrence
+          });
+        }
+      } else {
+        // 删除所有实例：直接删除原始事件
+        onDeleteEvent(originalEventId);
+      }
+    }
+    
+    setShowDeleteModeDialog(false);
+    setEditingEventId(null);
+    setDeleteMode(null);
+    setSelectedInstanceId(null);
   }
 
   function handleCreateEvent() {
@@ -344,21 +412,65 @@ export function WeeklyTimeGrid({
     if (!selectedEvent || !editForm.title.trim()) return;
     const startHour = Math.max(0, Math.min(23.5, editForm.startHour));
     const endHour = Math.max(startHour + 0.5, Math.min(24, editForm.endHour));
-    onUpdateEvent(selectedEvent.id, {
-      title: editForm.title.trim(),
-      startHour,
-      endHour,
-      notes: editForm.notes.trim(),
-      requirements: editForm.requirements
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean),
-      isCompleted: editForm.isCompleted,
-      category: editForm.category,
-      tag: editForm.tag,
-      recurrence: editForm.recurrence,
-    });
+
+    if (editMode === 'single' && selectedInstanceId) {
+      // 编辑单个实例：将该实例从重复事件中排除，然后创建一个新的非重复事件
+      const originalEventId = selectedInstanceId.split('-')[0];
+      const instanceDate = selectedInstanceId.split('-')[1];
+      
+      // 1. 更新原始事件，添加例外日期
+      const updatedRecurrence = {
+        ...selectedEvent.recurrence,
+        exceptions: [...(selectedEvent.recurrence.exceptions || []), instanceDate]
+      };
+      onUpdateEvent(originalEventId, {
+        recurrence: updatedRecurrence
+      });
+
+      // 2. 创建一个新的非重复事件
+      onCreateEvent({
+        id: createId("event"),
+        date: instanceDate,
+        startHour,
+        endHour,
+        title: editForm.title.trim(),
+        notes: editForm.notes.trim(),
+        requirements: editForm.requirements
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        isCompleted: editForm.isCompleted,
+        category: editForm.category,
+        tag: editForm.tag,
+        recurrence: {
+          type: 'none',
+          interval: 1,
+          endType: 'never',
+          exceptions: [],
+          daysOfWeek: []
+        }
+      });
+    } else {
+      // 编辑所有实例：直接更新原始事件
+      onUpdateEvent(selectedEvent.id, {
+        title: editForm.title.trim(),
+        startHour,
+        endHour,
+        notes: editForm.notes.trim(),
+        requirements: editForm.requirements
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        isCompleted: editForm.isCompleted,
+        category: editForm.category,
+        tag: editForm.tag,
+        recurrence: editForm.recurrence,
+      });
+    }
+
     setEditingEventId(null);
+    setEditMode(null);
+    setSelectedInstanceId(null);
   }
 
   function handleDropEvent(targetDate: string, targetHour: number) {
@@ -427,10 +539,12 @@ export function WeeklyTimeGrid({
 
   function handleContextMenu(event: React.MouseEvent, eventId: string) {
     event.preventDefault();
+    // 对于重复事件的实例，使用原始事件的ID
+    const originalEventId = eventId.split('-')[0];
     setContextMenu({
       x: event.clientX,
       y: event.clientY,
-      eventId,
+      eventId: originalEventId,
     });
   }
 
@@ -447,9 +561,11 @@ export function WeeklyTimeGrid({
   }
 
   function handleExtendTime(eventId: string) {
-    const event = events.find(e => e.id === eventId);
+    // 对于重复事件的实例，使用原始事件的ID
+    const originalEventId = eventId.split('-')[0];
+    const event = events.find(e => e.id === originalEventId);
     if (event) {
-      onUpdateEvent(eventId, {
+      onUpdateEvent(originalEventId, {
         endHour: event.endHour + 1,
       });
     }
@@ -457,14 +573,18 @@ export function WeeklyTimeGrid({
   }
 
   function handleSetTag(eventId: string, tag: EventTag) {
-    onUpdateEvent(eventId, { tag });
+    // 对于重复事件的实例，使用原始事件的ID
+    const originalEventId = eventId.split('-')[0];
+    onUpdateEvent(originalEventId, { tag });
     closeContextMenu();
   }
 
   function handleToggleComplete(eventId: string) {
-    const event = events.find(e => e.id === eventId);
+    // 对于重复事件的实例，使用原始事件的ID
+    const originalEventId = eventId.split('-')[0];
+    const event = events.find(e => e.id === originalEventId);
     if (event) {
-      onUpdateEvent(eventId, {
+      onUpdateEvent(originalEventId, {
         isCompleted: !event.isCompleted,
       });
     }
@@ -542,7 +662,13 @@ export function WeeklyTimeGrid({
   // 计算重复事件的所有实例
   const getRecurrenceInstances = (event: ScheduleEvent, startDate: Date, endDate: Date): ScheduleEvent[] => {
     if (event.recurrence.type === 'none') {
-      return [event];
+      // 非重复事件，只在原始日期返回
+      const eventDate = parseISO(event.date);
+      if (isSameDay(eventDate, startDate)) {
+        return [event];
+      } else {
+        return [];
+      }
     }
 
     const instances: ScheduleEvent[] = [];
@@ -556,41 +682,46 @@ export function WeeklyTimeGrid({
         break;
       }
 
-      // 检查是否是例外日期
-      const currentDateStr = format(currentDate, 'yyyy-MM-dd');
-      if (!event.recurrence.exceptions.includes(currentDateStr)) {
-        // 检查是否是原始事件日期或符合重复规则的日期
-        let shouldAdd = false;
-        
-        if (isSameDay(currentDate, eventDate)) {
-          // 原始事件日期，总是添加
-          shouldAdd = true;
-        } else if (count > 0) {
-          // 对于重复事件
-          if (event.recurrence.type === 'weekly') {
-            if (event.recurrence.daysOfWeek && event.recurrence.daysOfWeek.length > 0) {
-              // 每周特定日期重复
-              const dayOfWeek = currentDate.getDay(); // 0-6，0表示周日
-              shouldAdd = event.recurrence.daysOfWeek.includes(dayOfWeek);
-            } else {
-              // 对于没有设置 daysOfWeek 的现有事件，保持原有行为
-              // 只在与原始事件相同的星期几添加
-              const originalDayOfWeek = eventDate.getDay();
-              const currentDayOfWeek = currentDate.getDay();
-              shouldAdd = originalDayOfWeek === currentDayOfWeek;
-            }
-          } else {
-            // 其他类型的重复，直接添加
+      // 检查当前日期是否在范围内
+      if (isBefore(currentDate, startDate)) {
+        // 日期在范围之前，跳过
+      } else {
+        // 检查是否是例外日期
+        const currentDateStr = format(currentDate, 'yyyy-MM-dd');
+        if (!event.recurrence.exceptions.includes(currentDateStr)) {
+          // 检查是否是原始事件日期或符合重复规则的日期
+          let shouldAdd = false;
+          
+          if (isSameDay(currentDate, eventDate)) {
+            // 原始事件日期，总是添加
             shouldAdd = true;
+          } else if (count > 0) {
+            // 对于重复事件
+            if (event.recurrence.type === 'weekly') {
+              if (event.recurrence.daysOfWeek && event.recurrence.daysOfWeek.length > 0) {
+                // 每周特定日期重复
+                const dayOfWeek = currentDate.getDay(); // 0-6，0表示周日
+                shouldAdd = event.recurrence.daysOfWeek.includes(dayOfWeek);
+              } else {
+                // 对于没有设置 daysOfWeek 的现有事件，保持原有行为
+                // 只在与原始事件相同的星期几添加
+                const originalDayOfWeek = eventDate.getDay();
+                const currentDayOfWeek = currentDate.getDay();
+                shouldAdd = originalDayOfWeek === currentDayOfWeek;
+              }
+            } else {
+              // 其他类型的重复，直接添加
+              shouldAdd = true;
+            }
           }
-        }
-        
-        if (shouldAdd) {
-          instances.push({
-            ...event,
-            id: `${event.id}-${currentDateStr}`,
-            date: currentDateStr
-          });
+          
+          if (shouldAdd) {
+            instances.push({
+              ...event,
+              id: `${event.id}-${currentDateStr}`,
+              date: currentDateStr
+            });
+          }
         }
       }
 
@@ -1555,8 +1686,15 @@ export function WeeklyTimeGrid({
                   <div className="flex space-x-4">
                     <Button
                       onClick={() => {
-                        onDeleteEvent(selectedEvent.id);
-                        setEditingEventId(null);
+                        // 检查是否是重复事件
+                        if (selectedEvent.recurrence.type !== 'none' && selectedInstanceId) {
+                          // 显示删除模式选择对话框
+                          setShowDeleteModeDialog(true);
+                        } else {
+                          // 直接删除（非重复事件或原始重复事件）
+                          onDeleteEvent(selectedEvent.id);
+                          setEditingEventId(null);
+                        }
                       }}
                       className="flex-1 rounded-md bg-red-600 text-white hover:bg-red-700 transition-all duration-150 py-2"
                     >
@@ -1572,6 +1710,58 @@ export function WeeklyTimeGrid({
                 </div>
               </DialogContent>
             )}
+          </Dialog>
+
+          {/* 编辑模式选择对话框 */}
+          <Dialog open={showEditModeDialog} onOpenChange={setShowEditModeDialog}>
+            <DialogContent className="rounded-lg border-gray-200 shadow-lg">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-semibold text-gray-900">编辑重复事件</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                <p className="text-sm text-gray-600">您想如何编辑这个重复事件？</p>
+                <div className="space-y-3">
+                  <Button
+                    onClick={() => handleEditModeSelect('single')}
+                    className="w-full rounded-md border border-gray-300 bg-white text-gray-900 hover:bg-gray-50 transition-all duration-150 py-2"
+                  >
+                    仅编辑当前实例
+                  </Button>
+                  <Button
+                    onClick={() => handleEditModeSelect('all')}
+                    className="w-full rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150 py-2"
+                  >
+                    编辑所有重复实例
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* 删除模式选择对话框 */}
+          <Dialog open={showDeleteModeDialog} onOpenChange={setShowDeleteModeDialog}>
+            <DialogContent className="rounded-lg border-gray-200 shadow-lg">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-semibold text-gray-900">删除重复事件</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                <p className="text-sm text-gray-600">您想如何删除这个重复事件？</p>
+                <div className="space-y-3">
+                  <Button
+                    onClick={() => handleDeleteModeSelect('single')}
+                    className="w-full rounded-md border border-gray-300 bg-white text-gray-900 hover:bg-gray-50 transition-all duration-150 py-2"
+                  >
+                    仅删除当前实例
+                  </Button>
+                  <Button
+                    onClick={() => handleDeleteModeSelect('all')}
+                    className="w-full rounded-md bg-red-600 text-white hover:bg-red-700 transition-all duration-150 py-2"
+                  >
+                    删除所有重复实例
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
           </Dialog>
 
           {/* 分类管理对话框 */}

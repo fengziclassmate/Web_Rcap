@@ -198,7 +198,7 @@ export default function Home() {
   const [sendingLink, setSendingLink] = useState(false);
   const [dataReady, setDataReady] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(30);
+  const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(60);
   const weekRange = useMemo(() => {
     const start = format(currentWeekStart, "yyyy/MM/dd", { locale: zhCN });
     const end = format(addDays(currentWeekStart, 6), "yyyy/MM/dd", { locale: zhCN });
