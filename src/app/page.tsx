@@ -339,6 +339,8 @@ export default function Home() {
         notes: "",
         precautions: [],
         completionLog: "",
+        priority: "不紧急不重要",
+        subtasks: [],
       },
     ]);
   }
