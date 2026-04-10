@@ -748,6 +748,8 @@ export function WeeklyTimeGrid({
         break;
       }
 
+      let shouldAdd = false;
+
       // 检查当前日期是否在范围内
       if (isBefore(currentDate, startDate)) {
         // 日期在范围之前，跳过
@@ -756,7 +758,6 @@ export function WeeklyTimeGrid({
         const currentDateStr = format(currentDate, 'yyyy-MM-dd');
         if (!event.recurrence.exceptions.includes(currentDateStr)) {
           // 检查是否是原始事件日期或符合重复规则的日期
-          let shouldAdd = false;
           
           if (isSameDay(currentDate, eventDate)) {
             // 原始事件日期，总是添加
