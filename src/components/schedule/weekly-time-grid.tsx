@@ -65,6 +65,9 @@ type GridCell = {
   startHour: number;
 };
 
+export type ViewMode = 'day' | 'week' | 'month';
+export type TimeGranularity = 5 | 15 | 30 | 60;
+
 type WeeklyTimeGridProps = {
   currentWeekStart: Date;
   weekRange: string;
@@ -74,6 +77,10 @@ type WeeklyTimeGridProps = {
   onDeleteEvent: (eventId: string) => void;
   onPrevWeek: () => void;
   onNextWeek: () => void;
+  onViewModeChange?: (mode: ViewMode) => void;
+  onTimeGranularityChange?: (granularity: TimeGranularity) => void;
+  viewMode?: ViewMode;
+  timeGranularity?: TimeGranularity;
 };
 
 type EventFormState = {
@@ -109,7 +116,6 @@ type DiaryEntry = {
   content: string;
 };
 
-const hours = Array.from({ length: 24 }, (_, hour) => hour);
 const hourCellHeight = 52;
 
 const moodOptions: { value: Mood; icon: React.ReactNode; label: string }[] = [
@@ -186,6 +192,10 @@ export function WeeklyTimeGrid({
   onDeleteEvent,
   onPrevWeek,
   onNextWeek,
+  onViewModeChange,
+  onTimeGranularityChange,
+  viewMode = 'week',
+  timeGranularity = 30,
 }: WeeklyTimeGridProps) {
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(currentWeekStart, index)),
@@ -222,6 +232,28 @@ export function WeeklyTimeGrid({
     y: number;
     eventId: string;
   } | null>(null);
+  
+  const hours = useMemo(() => {
+    const hoursArray: number[] = [];
+    for (let hour = 0; hour < 24; hour++) {
+      hoursArray.push(hour);
+      if (timeGranularity < 60) {
+        const intervals = 60 / timeGranularity;
+        for (let i = 1; i < intervals; i++) {
+          hoursArray.push(hour + (i * timeGranularity) / 60);
+        }
+      }
+    }
+    return hoursArray;
+  }, [timeGranularity]);
+  
+  const handleViewModeChange = (mode: ViewMode) => {
+    onViewModeChange?.(mode);
+  };
+  
+  const handleTimeGranularityChange = (granularity: TimeGranularity) => {
+    onTimeGranularityChange?.(granularity);
+  };
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === editingEventId) ?? null,
@@ -456,17 +488,60 @@ export function WeeklyTimeGrid({
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-900">
             <Clock3 className="h-5 w-5 text-primary" />
-            周视图时间网格
+            {viewMode === 'day' ? '日视图' : viewMode === 'week' ? '周视图' : '月视图'}
           </h2>
           <p className="mt-1 text-sm text-gray-600">{weekRange}</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant={viewMode === 'day' ? 'default' : 'outline'} 
+              size="sm" 
+              className="rounded-md transition-all duration-150"
+              onClick={() => handleViewModeChange('day')}
+            >
+              日
+            </Button>
+            <Button 
+              variant={viewMode === 'week' ? 'default' : 'outline'} 
+              size="sm" 
+              className="rounded-md transition-all duration-150"
+              onClick={() => handleViewModeChange('week')}
+            >
+              周
+            </Button>
+            <Button 
+              variant={viewMode === 'month' ? 'default' : 'outline'} 
+              size="sm" 
+              className="rounded-md transition-all duration-150"
+              onClick={() => handleViewModeChange('month')}
+            >
+              月
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">时间粒度:</span>
+            <Select 
+              value={String(timeGranularity)}
+              onValueChange={(value) => handleTimeGranularityChange(Number(value) as TimeGranularity)}
+            >
+              <SelectTrigger className="w-24 rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
+                <SelectValue placeholder="选择" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5分钟</SelectItem>
+                <SelectItem value="15">15分钟</SelectItem>
+                <SelectItem value="30">30分钟</SelectItem>
+                <SelectItem value="60">60分钟</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button variant="outline" size="sm" className="rounded-md border-gray-300 hover:bg-gray-100 transition-all duration-150" onClick={onPrevWeek}>
             <ChevronLeft className="h-4 w-4" />
-            上一周
+            {viewMode === 'day' ? '上一天' : viewMode === 'week' ? '上一周' : '上一月'}
           </Button>
           <Button variant="outline" size="sm" className="rounded-md border-gray-300 hover:bg-gray-100 transition-all duration-150" onClick={onNextWeek}>
-            下一周
+            {viewMode === 'day' ? '下一天' : viewMode === 'week' ? '下一周' : '下一月'}
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Button variant="default" size="sm" className="rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150" onClick={() => setShowCategoryManager(true)}>
@@ -491,15 +566,22 @@ export function WeeklyTimeGrid({
 
           <div className="grid grid-cols-[88px_repeat(7,minmax(0,1fr))]">
             <div>
-              {hours.map((hour) => (
-                <div
-                  key={`hour-label-${hour}`}
-                  className="border-r border-b border-gray-200 px-3 py-1 text-sm text-gray-500 bg-gray-50"
-                  style={{ height: `${hourCellHeight}px` }}
-                >
-                  {formatHour(hour)}
-                </div>
-              ))}
+              {hours.map((hour) => {
+                const isMainHour = Number.isInteger(hour);
+                return (
+                  <div
+                    key={`hour-label-${hour}`}
+                    className={`border-r border-b border-gray-200 px-3 py-1 text-sm ${isMainHour ? 'text-gray-500 bg-gray-50' : 'text-gray-400'}`}
+                    style={{ 
+                      height: `${hourCellHeight / (isMainHour ? 1 : 60 / timeGranularity)}px`,
+                      borderBottomWidth: isMainHour ? '1px' : '0.5px',
+                      borderBottomStyle: isMainHour ? 'solid' : 'dashed'
+                    }}
+                  >
+                    {isMainHour ? formatHour(hour) : ''}
+                  </div>
+                );
+              })}
             </div>
 
             {weekDays.map((day) => {
@@ -508,18 +590,27 @@ export function WeeklyTimeGrid({
 
               return (
                 <div key={dayIso} className="relative border-r border-gray-200 last:border-r-0">
-                  <div className="grid" style={{ gridTemplateRows: `repeat(24, ${hourCellHeight}px)` }}>
-                    {hours.map((hour) => (
-                      <button
-                        key={`${dayIso}-${hour}`}
-                        type="button"
-                        className="border-b border-gray-200 hover:bg-gray-50 transition-colors duration-150"
-                        style={{ height: `${hourCellHeight}px` }}
-                        onClick={() => resetCreateDialog({ date: dayIso, startHour: hour })}
-                        onDragOver={(event) => event.preventDefault()}
-                        onDrop={() => handleDropEvent(dayIso, hour)}
-                      />
-                    ))}
+                  <div className="grid" style={{ 
+                    gridTemplateRows: `repeat(${hours.length}, ${hourCellHeight / (60 / timeGranularity)}px)` 
+                  }}>
+                    {hours.map((hour) => {
+                      const isMainHour = Number.isInteger(hour);
+                      return (
+                        <button
+                          key={`${dayIso}-${hour}`}
+                          type="button"
+                          className={`border-b transition-colors duration-150 ${isMainHour ? 'border-gray-200' : 'border-gray-100'} hover:bg-gray-50`}
+                          style={{ 
+                            height: `${hourCellHeight / (isMainHour ? 1 : 60 / timeGranularity)}px`,
+                            borderBottomWidth: isMainHour ? '1px' : '0.5px',
+                            borderBottomStyle: isMainHour ? 'solid' : 'dashed'
+                          }}
+                          onClick={() => resetCreateDialog({ date: dayIso, startHour: hour })}
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={() => handleDropEvent(dayIso, hour)}
+                        />
+                      );
+                    })}
                   </div>
 
                   <div className="pointer-events-none absolute inset-0 p-1">

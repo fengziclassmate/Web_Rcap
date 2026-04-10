@@ -6,7 +6,7 @@ import { addDays, addWeeks, format, startOfWeek } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import type { User } from "@supabase/supabase-js";
 import { TaskDashboard } from "@/components/schedule/task-dashboard";
-import { WeeklyTimeGrid } from "@/components/schedule/weekly-time-grid";
+import { WeeklyTimeGrid, ViewMode, TimeGranularity } from "@/components/schedule/weekly-time-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createId } from "@/lib/id";
@@ -170,6 +170,8 @@ export default function Home() {
   const [authEmail, setAuthEmail] = useState("");
   const [sendingLink, setSendingLink] = useState(false);
   const [dataReady, setDataReady] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(30);
   const weekRange = useMemo(() => {
     const start = format(currentWeekStart, "yyyy/MM/dd", { locale: zhCN });
     const end = format(addDays(currentWeekStart, 6), "yyyy/MM/dd", { locale: zhCN });
@@ -318,11 +320,31 @@ export default function Home() {
   }
 
   function handleGoPrevWeek() {
-    setCurrentWeekStart((prev) => addWeeks(prev ?? getCurrentWeekStart(), -1));
+    if (viewMode === 'day') {
+      setCurrentWeekStart((prev) => addDays(prev ?? getCurrentWeekStart(), -1));
+    } else if (viewMode === 'week') {
+      setCurrentWeekStart((prev) => addWeeks(prev ?? getCurrentWeekStart(), -1));
+    } else if (viewMode === 'month') {
+      setCurrentWeekStart((prev) => addWeeks(prev ?? getCurrentWeekStart(), -4));
+    }
   }
 
   function handleGoNextWeek() {
-    setCurrentWeekStart((prev) => addWeeks(prev ?? getCurrentWeekStart(), 1));
+    if (viewMode === 'day') {
+      setCurrentWeekStart((prev) => addDays(prev ?? getCurrentWeekStart(), 1));
+    } else if (viewMode === 'week') {
+      setCurrentWeekStart((prev) => addWeeks(prev ?? getCurrentWeekStart(), 1));
+    } else if (viewMode === 'month') {
+      setCurrentWeekStart((prev) => addWeeks(prev ?? getCurrentWeekStart(), 4));
+    }
+  }
+
+  function handleViewModeChange(mode: ViewMode) {
+    setViewMode(mode);
+  }
+
+  function handleTimeGranularityChange(granularity: TimeGranularity) {
+    setTimeGranularity(granularity);
   }
 
   function handleToggleTask(taskId: string) {
@@ -446,6 +468,10 @@ export default function Home() {
           onDeleteEvent={handleDeleteEvent}
           onPrevWeek={handleGoPrevWeek}
           onNextWeek={handleGoNextWeek}
+          onViewModeChange={handleViewModeChange}
+          onTimeGranularityChange={handleTimeGranularityChange}
+          viewMode={viewMode}
+          timeGranularity={timeGranularity}
         />
         <TaskDashboard
           tasks={tasks}
