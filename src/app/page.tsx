@@ -15,6 +15,10 @@ import { toast } from "sonner";
 
 export type EventTag = "待定" | "不着急" | "不可后退" | null;
 
+export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export type RecurrenceEndType = 'never' | 'on' | 'after';
+
 export type ScheduleEvent = {
   id: string;
   date: string;
@@ -26,6 +30,14 @@ export type ScheduleEvent = {
   isCompleted: boolean;
   category: string;
   tag: EventTag;
+  recurrence: {
+    type: RecurrenceType;
+    interval: number;
+    endType: RecurrenceEndType;
+    endDate?: string;
+    endCount?: number;
+    exceptions: string[];
+  };
 };
 
 export type SubTask = {
@@ -107,6 +119,12 @@ const defaultEvents: ScheduleEvent[] = [
     isCompleted: false,
     category: "个人",
     tag: null,
+    recurrence: {
+      type: 'none',
+      interval: 1,
+      endType: 'never',
+      exceptions: []
+    },
   },
 ];
 
@@ -157,6 +175,12 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
       isCompleted: Boolean(value.isCompleted),
       category: value.category ?? "个人",
       tag: (value.tag as EventTag) ?? null,
+      recurrence: value.recurrence ?? {
+        type: 'none',
+        interval: 1,
+        endType: 'never',
+        exceptions: []
+      },
     };
   });
 }
