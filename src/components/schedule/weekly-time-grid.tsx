@@ -339,7 +339,8 @@ export function WeeklyTimeGrid({
       const originalEvent = events.find(e => e.id === originalEventId) || selectedEventInstance;
       
       setEditMode(mode);
-      setEditingEventId(originalEvent.id);
+      // 始终使用原始事件的 ID，而不是实例的 ID
+      setEditingEventId(originalEventId);
       setEditForm({
         title: originalEvent.title,
         startHour: originalEvent.startHour,
