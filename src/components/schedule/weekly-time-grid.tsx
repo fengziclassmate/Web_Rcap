@@ -101,7 +101,7 @@ type PositionedEvent = ScheduleEvent & {
   laneCount: number;
 };
 
-type Mood = "开心" | "平静" | "难过" | "生气" | "疲惫";
+type Mood = "开心" | "平静" | "难过" | "生气" | "疲惫" | "兴奋" | "焦虑" | "感激" | "无聊" | "惊讶";
 
 type DiaryEntry = {
   date: string;
@@ -210,6 +210,11 @@ export function WeeklyTimeGrid({
     name: "",
     color: "bg-blue-100 border-blue-300",
   });
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    eventId: string;
+  } | null>(null);
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === editingEventId) ?? null,
@@ -351,6 +356,42 @@ export function WeeklyTimeGrid({
     setCategories((prev) => prev.filter(cat => cat.id !== categoryId));
   }
 
+  function handleContextMenu(event: React.MouseEvent, eventId: string) {
+    event.preventDefault();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      eventId,
+    });
+  }
+
+  function closeContextMenu() {
+    setContextMenu(null);
+  }
+
+  function handleReschedule(eventId: string) {
+    const event = events.find(e => e.id === eventId);
+    if (event) {
+      handleOpenEdit(event);
+    }
+    closeContextMenu();
+  }
+
+  function handleExtendTime(eventId: string) {
+    const event = events.find(e => e.id === eventId);
+    if (event) {
+      onUpdateEvent(eventId, {
+        endHour: event.endHour + 1,
+      });
+    }
+    closeContextMenu();
+  }
+
+  function handleSetTag(eventId: string, tag: EventTag) {
+    onUpdateEvent(eventId, { tag });
+    closeContextMenu();
+  }
+
   useEffect(() => {
     if (!resizeState) return;
 
@@ -474,6 +515,7 @@ export function WeeklyTimeGrid({
                         draggable
                         onDragStart={() => setDraggingEventId(event.id)}
                         onDragEnd={() => setDraggingEventId(null)}
+                        onContextMenu={(e) => handleContextMenu(e, event.id)}
                       >
                         <button
                           type="button"
@@ -1086,6 +1128,56 @@ export function WeeklyTimeGrid({
             )}
           </Dialog>
         </div>
+
+        {/* 右键菜单 */}
+        {contextMenu && (
+          <div
+            className="fixed z-50 rounded-sm border border-gray-200 bg-white shadow-lg py-1"
+            style={{
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
+            }}
+            onMouseLeave={closeContextMenu}
+          >
+            <button
+              className="block w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+              onClick={() => handleReschedule(contextMenu.eventId)}
+            >
+              改约
+            </button>
+            <button
+              className="block w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+              onClick={() => handleExtendTime(contextMenu.eventId)}
+            >
+              加时
+            </button>
+            <div className="border-t border-gray-200 my-1"></div>
+            <button
+              className="block w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+              onClick={() => handleSetTag(contextMenu.eventId, "待定")}
+            >
+              标记为待定
+            </button>
+            <button
+              className="block w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+              onClick={() => handleSetTag(contextMenu.eventId, "不着急")}
+            >
+              标记为不着急
+            </button>
+            <button
+              className="block w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+              onClick={() => handleSetTag(contextMenu.eventId, "不可后退")}
+            >
+              标记为不可后退
+            </button>
+            <button
+              className="block w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+              onClick={() => handleSetTag(contextMenu.eventId, null)}
+            >
+              移除标记
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );
