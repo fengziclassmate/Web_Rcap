@@ -198,7 +198,14 @@ export function WeeklyTimeGrid({
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
-  const [diaries, setDiaries] = useState<DiaryEntry[]>([]);
+  const [diaries, setDiaries] = useState<DiaryEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem("schedule-diaries");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [editingDiaryDate, setEditingDiaryDate] = useState<string | null>(null);
   const [diaryForm, setDiaryForm] = useState<{ mood: Mood; content: string }>({
     mood: "平静",
@@ -392,6 +399,16 @@ export function WeeklyTimeGrid({
     closeContextMenu();
   }
 
+  function handleToggleComplete(eventId: string) {
+    const event = events.find(e => e.id === eventId);
+    if (event) {
+      onUpdateEvent(eventId, {
+        isCompleted: !event.isCompleted,
+      });
+    }
+    closeContextMenu();
+  }
+
   useEffect(() => {
     if (!resizeState) return;
 
@@ -424,6 +441,14 @@ export function WeeklyTimeGrid({
       window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [onUpdateEvent, resizeState]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("schedule-diaries", JSON.stringify(diaries));
+    } catch {
+      // 忽略保存错误
+    }
+  }, [diaries]);
 
   return (
     <section className="rounded-sm border border-gray-200 bg-white">
@@ -503,7 +528,7 @@ export function WeeklyTimeGrid({
                         key={event.id}
                         className={`pointer-events-auto absolute rounded-sm border px-2 py-1 text-left text-xs ${
                           event.isCompleted
-                            ? "border-gray-300 bg-gray-100 text-gray-500"
+                            ? "border-gray-300 bg-gray-100 text-gray-500 opacity-70"
                             : getCategoryColor(categories, event.category)
                         }`}
                         style={{
@@ -1150,6 +1175,12 @@ export function WeeklyTimeGrid({
               onClick={() => handleExtendTime(contextMenu.eventId)}
             >
               加时
+            </button>
+            <button
+              className="block w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+              onClick={() => handleToggleComplete(contextMenu.eventId)}
+            >
+              {events.find(e => e.id === contextMenu.eventId)?.isCompleted ? "标记为未完成" : "标记为已完成"}
             </button>
             <div className="border-t border-gray-200 my-1"></div>
             <button

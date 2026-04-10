@@ -186,6 +186,19 @@ export function TaskDashboard({
     toast.success("任务已移回未完成");
   }
 
+  function handleToggleSubtask(taskId: string, subtaskId: string) {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      const updatedSubtasks = task.subtasks.map(subtask => {
+        if (subtask.id === subtaskId) {
+          return { ...subtask, done: !subtask.done };
+        }
+        return subtask;
+      });
+      onUpdateTask(taskId, { subtasks: updatedSubtasks });
+    }
+  }
+
   return (
     <aside className="rounded-sm border border-gray-200 bg-white">
       <div className="px-4 py-3">
@@ -329,10 +342,10 @@ export function TaskDashboard({
                                 <Checkbox
                                   checked={subtask.done}
                                   onCheckedChange={() => {
-                                    // 这里需要更新子任务状态，暂时通过编辑任务来处理
-                                    // 实际应用中可以添加直接更新子任务的函数
-                                    handleOpenEdit(task);
+                                    handleToggleSubtask(task.id, subtask.id);
                                   }}
+                                  onPointerDown={(event) => event.stopPropagation()}
+                                  onClick={(event) => event.stopPropagation()}
                                   className="h-3.5 w-3.5"
                                 />
                                 <span className={subtask.done ? "text-gray-500 line-through text-sm" : "text-black text-sm"}>
