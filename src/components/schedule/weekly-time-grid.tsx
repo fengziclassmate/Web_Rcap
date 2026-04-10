@@ -324,7 +324,7 @@ export function WeeklyTimeGrid({
         startHour: originalEvent.startHour,
         endHour: originalEvent.endHour,
         notes: originalEvent.notes,
-        requirements: originalEvent.requirements.join("\n"),
+        requirements: Array.isArray(originalEvent.requirements) ? originalEvent.requirements.join("\n") : originalEvent.requirements,
         isCompleted: originalEvent.isCompleted,
         category: originalEvent.category,
         tag: originalEvent.tag,
@@ -346,7 +346,7 @@ export function WeeklyTimeGrid({
         startHour: originalEvent.startHour,
         endHour: originalEvent.endHour,
         notes: originalEvent.notes,
-        requirements: originalEvent.requirements.join("\n"),
+        requirements: Array.isArray(originalEvent.requirements) ? originalEvent.requirements.join("\n") : originalEvent.requirements,
         isCompleted: originalEvent.isCompleted,
         category: originalEvent.category,
         tag: originalEvent.tag,
@@ -438,10 +438,10 @@ export function WeeklyTimeGrid({
         endHour,
         title: editForm.title.trim(),
         notes: editForm.notes.trim(),
-        requirements: editForm.requirements
+        requirements: typeof editForm.requirements === 'string' ? editForm.requirements
           .split("\n")
           .map((item) => item.trim())
-          .filter(Boolean),
+          .filter(Boolean) : editForm.requirements,
         isCompleted: editForm.isCompleted,
         category: editForm.category,
         tag: editForm.tag,
@@ -460,10 +460,10 @@ export function WeeklyTimeGrid({
         startHour,
         endHour,
         notes: editForm.notes.trim(),
-        requirements: editForm.requirements
+        requirements: typeof editForm.requirements === 'string' ? editForm.requirements
           .split("\n")
           .map((item) => item.trim())
-          .filter(Boolean),
+          .filter(Boolean) : editForm.requirements,
         isCompleted: editForm.isCompleted,
         category: editForm.category,
         tag: editForm.tag,
@@ -557,7 +557,9 @@ export function WeeklyTimeGrid({
   }
 
   function handleReschedule(eventId: string) {
-    const event = events.find(e => e.id === eventId);
+    // 对于重复事件的实例，使用原始事件的ID
+    const originalEventId = eventId.split('-')[0];
+    const event = events.find(e => e.id === originalEventId);
     if (event) {
       handleOpenEdit(event);
     }
@@ -579,7 +581,11 @@ export function WeeklyTimeGrid({
   function handleSetTag(eventId: string, tag: EventTag) {
     // 对于重复事件的实例，使用原始事件的ID
     const originalEventId = eventId.split('-')[0];
-    onUpdateEvent(originalEventId, { tag });
+    // 确保原始事件存在
+    const originalEvent = events.find(e => e.id === originalEventId);
+    if (originalEvent) {
+      onUpdateEvent(originalEventId, { tag });
+    }
     closeContextMenu();
   }
 
