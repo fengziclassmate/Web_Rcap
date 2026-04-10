@@ -186,7 +186,7 @@ export function TaskDashboard({
     toast.success("任务已移回未完成");
   }
 
-  function handleToggleSubtask(taskId: string, subtaskId: string) {
+  function handleToggleTaskSubtask(taskId: string, subtaskId: string) {
     const task = tasks.find(t => t.id === taskId);
     if (task) {
       const updatedSubtasks = task.subtasks.map(subtask => {
@@ -342,7 +342,7 @@ export function TaskDashboard({
                                 <Checkbox
                                   checked={subtask.done}
                                   onCheckedChange={() => {
-                                    handleToggleSubtask(task.id, subtask.id);
+                                    handleToggleTaskSubtask(task.id, subtask.id);
                                   }}
                                   onPointerDown={(event) => event.stopPropagation()}
                                   onClick={(event) => event.stopPropagation()}
