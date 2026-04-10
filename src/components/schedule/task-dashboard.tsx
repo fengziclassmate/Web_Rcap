@@ -200,36 +200,36 @@ export function TaskDashboard({
   }
 
   return (
-    <aside className="rounded-sm border border-gray-200 bg-white">
-      <div className="px-4 py-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-black">
-          <ListTodo className="h-4 w-4" />
+    <aside className="rounded-lg border border-gray-200 bg-white shadow-md">
+      <div className="px-6 py-4">
+        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-900">
+          <ListTodo className="h-5 w-5 text-primary" />
           任务控制台
         </h2>
       </div>
 
       <Separator />
 
-      <div className="p-4">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-600">新增长期任务</p>
-        <div className="mb-4 space-y-2 rounded-sm border border-gray-200 p-3">
+      <div className="p-6">
+        <p className="mb-4 text-sm font-medium uppercase tracking-wide text-gray-600">新增长期任务</p>
+        <div className="mb-6 space-y-3 rounded-lg border border-gray-200 p-4">
           <Input
             value={taskName}
             onChange={(event) => setTaskName(event.target.value)}
             placeholder="输入任务名称"
-            className="rounded-sm border-gray-200"
+            className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
           />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Input
               type="date"
               value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
-              className="min-w-0 rounded-sm border-gray-200 text-sm"
+              className="min-w-0 rounded-md border-gray-300 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
             />
             <Button
               type="button"
               onClick={handleAddTask}
-              className="rounded-sm bg-black text-white hover:bg-black/90"
+              className="rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150"
             >
               <Plus className="h-4 w-4" />
               添加
@@ -237,15 +237,15 @@ export function TaskDashboard({
           </div>
         </div>
 
-        <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-600">
+        <p className="mb-4 text-sm font-medium uppercase tracking-wide text-gray-600">
           长期任务 / 未完成任务
         </p>
 
-        <div className="overflow-hidden rounded-sm border border-gray-200">
+        <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-white">
-                <TableHead className="w-10" />
+                <TableHead className="w-12" />
                 <TableHead>任务名称</TableHead>
                 <TableHead className="w-[124px]">截止日期</TableHead>
                 <TableHead className="w-[84px]">状态</TableHead>
@@ -257,7 +257,7 @@ export function TaskDashboard({
               {incompleteTasks.map((task) => (
                 <React.Fragment key={task.id}>
                   <TableRow
-                    className="cursor-pointer hover:bg-gray-50"
+                    className="cursor-pointer hover:bg-gray-50 transition-colors duration-150"
                     onClick={(event) => {
                       const target = event.target as HTMLElement;
                       if (target.closest("[data-no-open='true']")) return;
@@ -277,9 +277,9 @@ export function TaskDashboard({
                       />
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         {getPriorityIcon(task.priority)}
-                        <span className={task.done ? "text-gray-500 line-through" : "text-black"}>
+                        <span className={task.done ? "text-gray-500 line-through" : "text-gray-900 font-medium"}>
                           {task.name}
                         </span>
                         {task.subtasks.length > 0 && (
@@ -289,7 +289,7 @@ export function TaskDashboard({
                               event.stopPropagation();
                               toggleTaskExpansion(task.id);
                             }}
-                            className="ml-2 p-1 rounded-sm hover:bg-gray-100"
+                            className="ml-2 p-1 rounded-md hover:bg-gray-100 transition-colors duration-150"
                             aria-label={expandedTasks.has(task.id) ? "折叠子任务" : "展开子任务"}
                           >
                             {expandedTasks.has(task.id) ? (
@@ -301,16 +301,16 @@ export function TaskDashboard({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className={task.done ? "text-gray-500" : "text-black"}>
+                    <TableCell className={task.done ? "text-gray-500" : "text-gray-900"}>
                       {task.dueDate}
                     </TableCell>
                     <TableCell>
                       {task.done ? (
-                        <Badge className="rounded-sm border border-gray-300 bg-white text-black">
+                        <Badge className="rounded-md border border-gray-300 bg-white text-gray-700">
                           已完成
                         </Badge>
                       ) : (
-                        <Badge className="rounded-sm border border-black bg-black text-white">
+                        <Badge className="rounded-md border border-primary bg-primary text-white">
                           未完成
                         </Badge>
                       )}
@@ -320,7 +320,7 @@ export function TaskDashboard({
                         type="button"
                         size="icon"
                         variant="ghost"
-                        className="h-7 w-7 rounded-sm"
+                        className="h-8 w-8 rounded-md hover:bg-red-50 hover:text-red-500 transition-colors duration-150"
                         onClick={(event) => {
                           event.stopPropagation();
                           setPendingDeleteTaskId(task.id);
@@ -335,10 +335,10 @@ export function TaskDashboard({
                   {task.subtasks.length > 0 && expandedTasks.has(task.id) && (
                     <TableRow>
                       <TableCell colSpan={5}>
-                        <div className="pl-12 pr-4 py-2 bg-gray-50">
-                          <ul className="space-y-1">
+                        <div className="pl-12 pr-4 py-3 bg-gray-50">
+                          <ul className="space-y-2">
                             {task.subtasks.map((subtask) => (
-                              <li key={subtask.id} className="flex items-center gap-2">
+                              <li key={subtask.id} className="flex items-center gap-3">
                                 <Checkbox
                                   checked={subtask.done}
                                   onCheckedChange={() => {
@@ -346,9 +346,9 @@ export function TaskDashboard({
                                   }}
                                   onPointerDown={(event) => event.stopPropagation()}
                                   onClick={(event) => event.stopPropagation()}
-                                  className="h-3.5 w-3.5"
+                                  className="h-4 w-4"
                                 />
-                                <span className={subtask.done ? "text-gray-500 line-through text-sm" : "text-black text-sm"}>
+                                <span className={subtask.done ? "text-gray-500 line-through text-sm" : "text-gray-800 text-sm"}>
                                   {subtask.name}
                                 </span>
                               </li>
@@ -364,28 +364,28 @@ export function TaskDashboard({
           </Table>
         </div>
         {incompleteTasks.length === 0 && (
-          <p className="mt-3 border border-gray-200 p-3 text-sm text-gray-500">当前没有未完成长期任务</p>
+          <p className="mt-4 border border-gray-200 rounded-lg p-4 text-sm text-gray-500 text-center">当前没有未完成长期任务</p>
         )}
       </div>
 
       <Separator />
 
-      <Collapsible defaultOpen className="p-4">
-        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-sm border border-gray-200 px-3 py-2 text-xs font-medium text-black hover:bg-gray-50">
+      <Collapsible defaultOpen className="p-6">
+        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors duration-150">
           已完成任务库
           <ChevronDown className="h-4 w-4 text-gray-500" />
         </CollapsibleTrigger>
         <CollapsibleContent>
           {completedTasks.length > 0 ? (
-            <ul className="mt-3 space-y-2 border border-gray-200 p-3 text-sm text-gray-600">
+            <ul className="mt-4 space-y-3 border border-gray-200 rounded-lg p-4 text-sm text-gray-600">
               {completedTasks.map((task) => (
-                <li key={task.id} className="flex items-center justify-between gap-2">
+                <li key={task.id} className="flex items-center justify-between gap-3">
                   <span className="line-through">{task.name}</span>
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-7 rounded-sm border-gray-300 px-2 text-xs"
+                    className="h-8 rounded-md border-gray-300 px-3 text-xs hover:bg-gray-50 transition-colors duration-150"
                     onClick={() => handleMoveBackToIncomplete(task.id)}
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
@@ -395,7 +395,7 @@ export function TaskDashboard({
               ))}
             </ul>
           ) : (
-            <p className="mt-3 border border-gray-200 p-3 text-sm text-gray-500">暂无已归档任务</p>
+            <p className="mt-4 border border-gray-200 rounded-lg p-4 text-sm text-gray-500 text-center">暂无已归档任务</p>
           )}
         </CollapsibleContent>
       </Collapsible>

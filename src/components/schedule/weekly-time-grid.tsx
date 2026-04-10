@@ -451,25 +451,25 @@ export function WeeklyTimeGrid({
   }, [diaries]);
 
   return (
-    <section className="rounded-sm border border-gray-200 bg-white">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+    <section className="rounded-lg border border-gray-200 bg-white shadow-md">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4 bg-gray-50">
         <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-black">
-            <Clock3 className="h-4 w-4" />
+          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-900">
+            <Clock3 className="h-5 w-5 text-primary" />
             周视图时间网格
           </h2>
-          <p className="mt-1 text-xs text-gray-600">{weekRange}</p>
+          <p className="mt-1 text-sm text-gray-600">{weekRange}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="rounded-sm border-gray-200" onClick={onPrevWeek}>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" className="rounded-md border-gray-300 hover:bg-gray-100 transition-all duration-150" onClick={onPrevWeek}>
             <ChevronLeft className="h-4 w-4" />
             上一周
           </Button>
-          <Button variant="outline" size="sm" className="rounded-sm border-gray-200" onClick={onNextWeek}>
+          <Button variant="outline" size="sm" className="rounded-md border-gray-300 hover:bg-gray-100 transition-all duration-150" onClick={onNextWeek}>
             下一周
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" className="rounded-sm border-gray-200" onClick={() => setShowCategoryManager(true)}>
+          <Button variant="primary" size="sm" className="rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150" onClick={() => setShowCategoryManager(true)}>
             分类管理
           </Button>
         </div>
@@ -478,11 +478,11 @@ export function WeeklyTimeGrid({
       <div className="overflow-x-auto">
         <div className="relative min-w-[920px]">
           <div className="grid grid-cols-[88px_repeat(7,minmax(0,1fr))] border-b border-gray-200 bg-white">
-            <div className="border-r border-gray-200 px-3 py-3 text-xs font-medium text-black">时间</div>
+            <div className="border-r border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 bg-gray-50">时间</div>
             {weekDays.map((day) => (
               <div
                 key={day.toISOString()}
-                className="border-r border-gray-200 px-3 py-3 text-center text-xs font-medium text-black last:border-r-0"
+                className="border-r border-gray-200 px-4 py-3 text-center text-sm font-medium text-gray-700 last:border-r-0 bg-gray-50"
               >
                 {dayTitle(day)}
               </div>
@@ -494,7 +494,7 @@ export function WeeklyTimeGrid({
               {hours.map((hour) => (
                 <div
                   key={`hour-label-${hour}`}
-                  className="border-r border-b border-gray-200 px-3 py-1 text-xs text-gray-500"
+                  className="border-r border-b border-gray-200 px-3 py-1 text-sm text-gray-500 bg-gray-50"
                   style={{ height: `${hourCellHeight}px` }}
                 >
                   {formatHour(hour)}
@@ -513,7 +513,7 @@ export function WeeklyTimeGrid({
                       <button
                         key={`${dayIso}-${hour}`}
                         type="button"
-                        className="border-b border-gray-200 hover:bg-gray-50"
+                        className="border-b border-gray-200 hover:bg-gray-50 transition-colors duration-150"
                         style={{ height: `${hourCellHeight}px` }}
                         onClick={() => resetCreateDialog({ date: dayIso, startHour: hour })}
                         onDragOver={(event) => event.preventDefault()}
@@ -526,7 +526,7 @@ export function WeeklyTimeGrid({
                     {dayEvents.map((event) => (
                       <div
                         key={event.id}
-                        className={`pointer-events-auto absolute rounded-sm border px-2 py-1 text-left text-xs ${
+                        className={`pointer-events-auto absolute rounded-lg border px-3 py-2 text-left text-sm shadow-md transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
                           event.isCompleted
                             ? "border-gray-300 bg-gray-100 text-gray-500 opacity-70"
                             : getCategoryColor(categories, event.category)
@@ -547,26 +547,26 @@ export function WeeklyTimeGrid({
                           className="w-full text-left"
                           onClick={() => handleOpenEdit(event)}
                         >
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2">
-                              <p className="font-medium">{event.title}</p>
+                              <p className="font-medium truncate">{event.title}</p>
                               {event.tag && (
-                                <span className={`text-xs font-bold ${getTagInfo(event.tag).color}`}>
+                                <span className={`text-sm font-bold ${getTagInfo(event.tag).color}`}>
                                   {getTagInfo(event.tag).icon}
                                 </span>
                               )}
                             </div>
                             {event.isCompleted && (
-                              <Check className="h-3 w-3 text-green-500" />
+                              <Check className="h-4 w-4 text-green-500" />
                             )}
                           </div>
-                          <p className="text-[11px] text-gray-500">
+                          <p className="text-xs text-gray-600">
                             {formatHour(event.startHour)} - {formatHour(event.endHour)}
                           </p>
                         </button>
                         <button
                           type="button"
-                          className="absolute right-1 top-1 rounded-sm border border-gray-300 bg-white p-0.5 text-black hover:bg-gray-50"
+                          className="absolute right-2 top-2 rounded-full border border-gray-300 bg-white p-1 text-black hover:bg-gray-100 transition-colors duration-150"
                           onClick={(mouseEvent) => {
                             mouseEvent.stopPropagation();
                             resetCreateDialog({ date: event.date, startHour: event.startHour });
@@ -577,7 +577,7 @@ export function WeeklyTimeGrid({
                         </button>
                         <button
                           type="button"
-                          className="absolute left-0 top-0 h-2 w-full cursor-ns-resize bg-transparent"
+                          className="absolute left-0 top-0 h-2 w-full cursor-ns-resize bg-transparent hover:bg-gray-200/50 transition-colors"
                           onMouseDown={(mouseEvent) => {
                             mouseEvent.preventDefault();
                             setResizeState({
@@ -593,7 +593,7 @@ export function WeeklyTimeGrid({
                         />
                         <button
                           type="button"
-                          className="absolute bottom-0 left-0 h-2 w-full cursor-ns-resize border-t border-gray-300 bg-gray-100/80"
+                          className="absolute bottom-0 left-0 h-2 w-full cursor-ns-resize border-t border-gray-300 bg-gray-100/80 hover:bg-gray-200/80 transition-colors"
                           onMouseDown={(mouseEvent) => {
                             mouseEvent.preventDefault();
                             setResizeState({
@@ -616,9 +616,9 @@ export function WeeklyTimeGrid({
           </div>
 
           {/* 日记区域 */}
-          <div className="border-t border-gray-200 mt-4">
+          <div className="border-t border-gray-200 mt-6 bg-gray-50">
             <div className="grid grid-cols-[88px_repeat(7,minmax(0,1fr))]">
-              <div className="border-r border-gray-200 px-3 py-3 text-xs font-medium text-black bg-gray-50">
+              <div className="border-r border-gray-200 px-3 py-4 text-sm font-medium text-gray-700 bg-gray-100">
                 日记
               </div>
               {weekDays.map((day) => {
@@ -629,20 +629,20 @@ export function WeeklyTimeGrid({
                 return (
                   <div
                     key={`diary-${dayIso}`}
-                    className="border-r border-gray-200 last:border-r-0 p-2 min-h-[120px] cursor-pointer hover:bg-gray-50"
+                    className="border-r border-gray-200 last:border-r-0 p-4 min-h-[140px] cursor-pointer hover:bg-gray-100 transition-colors duration-150 rounded-md mx-1 my-2"
                     onClick={() => handleOpenDiary(dayIso)}
                   >
                     {diary ? (
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
                           {moodOption?.icon}
-                          <span className="text-xs text-gray-600">{moodOption?.label}</span>
+                          <span className="text-sm font-medium text-gray-700">{moodOption?.label}</span>
                         </div>
-                        <p className="text-xs text-gray-800 line-clamp-3">{diary.content}</p>
+                        <p className="text-sm text-gray-800 line-clamp-3 leading-relaxed">{diary.content}</p>
                       </div>
                     ) : (
                       <div className="h-full flex items-center justify-center text-gray-400">
-                        <span className="text-xs">点击记录日记</span>
+                        <span className="text-sm">点击记录日记</span>
                       </div>
                     )}
                   </div>
@@ -653,15 +653,15 @@ export function WeeklyTimeGrid({
 
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             {selectedCell && (
-              <DialogContent className="rounded-sm border-gray-200">
+              <DialogContent className="rounded-lg border-gray-200 shadow-lg">
                 <DialogHeader>
-                  <DialogTitle className="text-sm">
+                  <DialogTitle className="text-lg font-semibold text-gray-900">
                     新建行程 - {selectedCell.date} {formatHour(selectedCell.startHour)}
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="create-title">标题</Label>
+                <div className="space-y-5 mt-4">
+                  <div className="space-y-3">
+                    <Label htmlFor="create-title" className="text-sm font-medium text-gray-700">标题</Label>
                     <Input
                       id="create-title"
                       value={createForm.title}
@@ -669,18 +669,18 @@ export function WeeklyTimeGrid({
                         setCreateForm((prev) => ({ ...prev, title: event.target.value }))
                       }
                       placeholder="输入行程标题"
-                      className="rounded-sm border-gray-200"
+                      className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label>分类</Label>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">分类</Label>
                     <Select
                       value={createForm.category}
                       onValueChange={(value) =>
                         value && setCreateForm((prev) => ({ ...prev, category: value }))
                       }
                     >
-                      <SelectTrigger className="rounded-sm border-gray-200">
+                      <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                         <SelectValue placeholder="选择分类" />
                       </SelectTrigger>
                       <SelectContent>
@@ -692,15 +692,15 @@ export function WeeklyTimeGrid({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1">
-                    <Label>标记</Label>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">标记</Label>
                     <Select
                       value={createForm.tag || ""}
                       onValueChange={(value) =>
                         setCreateForm((prev) => ({ ...prev, tag: value as EventTag }))
                       }
                     >
-                      <SelectTrigger className="rounded-sm border-gray-200">
+                      <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                         <SelectValue placeholder="选择标记" />
                       </SelectTrigger>
                       <SelectContent>
@@ -711,10 +711,10 @@ export function WeeklyTimeGrid({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label>开始时间</Label>
-                      <div className="flex space-x-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-gray-700">开始时间</Label>
+                      <div className="flex space-x-3">
                         <Select
                           value={String(Math.floor(createForm.startHour))}
                           onValueChange={(value) => {
@@ -723,7 +723,7 @@ export function WeeklyTimeGrid({
                             setCreateForm((prev) => ({ ...prev, startHour: hours + minutes }));
                           }}
                         >
-                          <SelectTrigger className="rounded-sm border-gray-200">
+                          <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                             <SelectValue placeholder="时" />
                           </SelectTrigger>
                           <SelectContent>
@@ -742,7 +742,7 @@ export function WeeklyTimeGrid({
                             setCreateForm((prev) => ({ ...prev, startHour: hours + minutes }));
                           }}
                         >
-                          <SelectTrigger className="rounded-sm border-gray-200">
+                          <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                             <SelectValue placeholder="分" />
                           </SelectTrigger>
                           <SelectContent>
@@ -755,9 +755,9 @@ export function WeeklyTimeGrid({
                         </Select>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label>结束时间</Label>
-                      <div className="flex space-x-2">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-gray-700">结束时间</Label>
+                      <div className="flex space-x-3">
                         <Select
                           value={String(Math.floor(createForm.endHour))}
                           onValueChange={(value) => {
@@ -766,7 +766,7 @@ export function WeeklyTimeGrid({
                             setCreateForm((prev) => ({ ...prev, endHour: hours + minutes }));
                           }}
                         >
-                          <SelectTrigger className="rounded-sm border-gray-200">
+                          <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                             <SelectValue placeholder="时" />
                           </SelectTrigger>
                           <SelectContent>
@@ -785,7 +785,7 @@ export function WeeklyTimeGrid({
                             setCreateForm((prev) => ({ ...prev, endHour: hours + minutes }));
                           }}
                         >
-                          <SelectTrigger className="rounded-sm border-gray-200">
+                          <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                             <SelectValue placeholder="分" />
                           </SelectTrigger>
                           <SelectContent>
@@ -801,7 +801,7 @@ export function WeeklyTimeGrid({
                   </div>
                   <Button
                     onClick={handleCreateEvent}
-                    className="w-full rounded-sm bg-black text-white hover:bg-black/90"
+                    className="w-full rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150 py-2"
                   >
                     创建行程
                   </Button>
@@ -812,13 +812,13 @@ export function WeeklyTimeGrid({
 
           <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => !open && setEditingEventId(null)}>
             {selectedEvent && (
-              <DialogContent className="rounded-sm border-gray-200">
+              <DialogContent className="rounded-lg border-gray-200 shadow-lg">
                 <DialogHeader>
-                  <DialogTitle className="text-sm">编辑行程详情</DialogTitle>
+                  <DialogTitle className="text-lg font-semibold text-gray-900">编辑行程详情</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="edit-title">标题</Label>
+                <div className="space-y-5 mt-4">
+                  <div className="space-y-3">
+                    <Label htmlFor="edit-title" className="text-sm font-medium text-gray-700">标题</Label>
                     <Input
                       id="edit-title"
                       value={editForm.title}
@@ -826,18 +826,18 @@ export function WeeklyTimeGrid({
                         setEditForm((prev) => ({ ...prev, title: event.target.value }))
                       }
                       placeholder="输入行程标题"
-                      className="rounded-sm border-gray-200"
+                      className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label>分类</Label>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">分类</Label>
                     <Select
                       value={editForm.category}
                       onValueChange={(value) =>
                         value && setEditForm((prev) => ({ ...prev, category: value }))
                       }
                     >
-                      <SelectTrigger className="rounded-sm border-gray-200">
+                      <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                         <SelectValue placeholder="选择分类" />
                       </SelectTrigger>
                       <SelectContent>
@@ -849,15 +849,15 @@ export function WeeklyTimeGrid({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1">
-                    <Label>标记</Label>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">标记</Label>
                     <Select
                       value={editForm.tag || ""}
                       onValueChange={(value) =>
                         setEditForm((prev) => ({ ...prev, tag: value as EventTag }))
                       }
                     >
-                      <SelectTrigger className="rounded-sm border-gray-200">
+                      <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                         <SelectValue placeholder="选择标记" />
                       </SelectTrigger>
                       <SelectContent>
@@ -868,10 +868,10 @@ export function WeeklyTimeGrid({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label>开始时间</Label>
-                      <div className="flex space-x-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-gray-700">开始时间</Label>
+                      <div className="flex space-x-3">
                         <Select
                           value={String(Math.floor(editForm.startHour))}
                           onValueChange={(value) => {
@@ -880,7 +880,7 @@ export function WeeklyTimeGrid({
                             setEditForm((prev) => ({ ...prev, startHour: hours + minutes }));
                           }}
                         >
-                          <SelectTrigger className="rounded-sm border-gray-200">
+                          <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                             <SelectValue placeholder="时" />
                           </SelectTrigger>
                           <SelectContent>
@@ -899,7 +899,7 @@ export function WeeklyTimeGrid({
                             setEditForm((prev) => ({ ...prev, startHour: hours + minutes }));
                           }}
                         >
-                          <SelectTrigger className="rounded-sm border-gray-200">
+                          <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                             <SelectValue placeholder="分" />
                           </SelectTrigger>
                           <SelectContent>
@@ -912,9 +912,9 @@ export function WeeklyTimeGrid({
                         </Select>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label>结束时间</Label>
-                      <div className="flex space-x-2">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-gray-700">结束时间</Label>
+                      <div className="flex space-x-3">
                         <Select
                           value={String(Math.floor(editForm.endHour))}
                           onValueChange={(value) => {
@@ -923,7 +923,7 @@ export function WeeklyTimeGrid({
                             setEditForm((prev) => ({ ...prev, endHour: hours + minutes }));
                           }}
                         >
-                          <SelectTrigger className="rounded-sm border-gray-200">
+                          <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                             <SelectValue placeholder="时" />
                           </SelectTrigger>
                           <SelectContent>
@@ -942,7 +942,7 @@ export function WeeklyTimeGrid({
                             setEditForm((prev) => ({ ...prev, endHour: hours + minutes }));
                           }}
                         >
-                          <SelectTrigger className="rounded-sm border-gray-200">
+                          <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
                             <SelectValue placeholder="分" />
                           </SelectTrigger>
                           <SelectContent>
@@ -956,8 +956,8 @@ export function WeeklyTimeGrid({
                       </div>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="edit-notes">备注</Label>
+                  <div className="space-y-3">
+                    <Label htmlFor="edit-notes" className="text-sm font-medium text-gray-700">备注</Label>
                     <Textarea
                       id="edit-notes"
                       value={editForm.notes}
@@ -965,11 +965,11 @@ export function WeeklyTimeGrid({
                         setEditForm((prev) => ({ ...prev, notes: event.target.value }))
                       }
                       placeholder="输入备注信息"
-                      className="rounded-sm border-gray-200"
+                      className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="edit-requirements">所需物品/准备事项</Label>
+                  <div className="space-y-3">
+                    <Label htmlFor="edit-requirements" className="text-sm font-medium text-gray-700">所需物品/准备事项</Label>
                     <Textarea
                       id="edit-requirements"
                       value={editForm.requirements}
@@ -977,10 +977,10 @@ export function WeeklyTimeGrid({
                         setEditForm((prev) => ({ ...prev, requirements: event.target.value }))
                       }
                       placeholder="每行一项，例如：笔记本、笔"
-                      className="rounded-sm border-gray-200"
+                      className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
                     />
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
                     <Switch
                       id="edit-completed"
                       checked={editForm.isCompleted}
@@ -988,21 +988,21 @@ export function WeeklyTimeGrid({
                         setEditForm((prev) => ({ ...prev, isCompleted: checked }))
                       }
                     />
-                    <Label htmlFor="edit-completed">标记为已完成</Label>
+                    <Label htmlFor="edit-completed" className="text-sm font-medium text-gray-700">标记为已完成</Label>
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-4">
                     <Button
                       onClick={() => {
                         onDeleteEvent(selectedEvent.id);
                         setEditingEventId(null);
                       }}
-                      className="flex-1 rounded-sm bg-red-600 text-white hover:bg-red-700"
+                      className="flex-1 rounded-md bg-red-600 text-white hover:bg-red-700 transition-all duration-150 py-2"
                     >
                       删除行程
                     </Button>
                     <Button
                       onClick={handleSaveEdit}
-                      className="flex-1 rounded-sm bg-black text-white hover:bg-black/90"
+                      className="flex-1 rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150 py-2"
                     >
                       保存修改
                     </Button>
@@ -1014,76 +1014,78 @@ export function WeeklyTimeGrid({
 
           {/* 分类管理对话框 */}
           <Dialog open={showCategoryManager} onOpenChange={setShowCategoryManager}>
-            <DialogContent className="rounded-sm border-gray-200">
+            <DialogContent className="rounded-lg border-gray-200 shadow-lg">
               <DialogHeader>
-                <DialogTitle className="text-sm">分类管理</DialogTitle>
+                <DialogTitle className="text-lg font-semibold text-gray-900">分类管理</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium">现有分类</h3>
-                  <div className="space-y-1">
+              <div className="space-y-5 mt-4">
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wide">现有分类</h3>
+                  <div className="space-y-3">
                     {categories.map((category) => (
-                      <div key={category.id} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-4 h-4 rounded-sm border ${category.color}`} />
-                          <span className="text-sm">{category.name}</span>
+                      <div key={category.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors duration-150">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-6 h-6 rounded-md border ${category.color}`} />
+                          <span className="text-sm font-medium text-gray-800">{category.name}</span>
                         </div>
                         <Button
                           type="button"
                           size="icon"
                           variant="ghost"
-                          className="h-6 w-6 rounded-sm"
+                          className="h-9 w-9 rounded-md hover:bg-red-50 hover:text-red-500 transition-colors duration-150"
                           onClick={() => handleDeleteCategory(category.id)}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium">添加新分类</h3>
-                  <div className="space-y-1">
-                    <Label htmlFor="category-name">分类名称</Label>
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wide">添加新分类</h3>
+                  <div className="space-y-3">
+                    <Label htmlFor="category-name" className="text-sm font-medium text-gray-700">分类名称</Label>
                     <Input
                       id="category-name"
                       value={newCategory.name}
                       onChange={(event) => setNewCategory((prev) => ({ ...prev, name: event.target.value }))}
                       placeholder="输入分类名称"
-                      className="rounded-sm border-gray-200"
+                      className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
                     />
-                    <Label>分类颜色</Label>
-                    <div className="grid grid-cols-6 gap-2">
-                      {[
-                        "bg-blue-100 border-blue-300",
-                        "bg-green-100 border-green-300",
-                        "bg-red-100 border-red-300",
-                        "bg-purple-100 border-purple-300",
-                        "bg-yellow-100 border-yellow-300",
-                        "bg-gray-100 border-gray-300",
-                        "bg-indigo-100 border-indigo-300",
-                        "bg-pink-100 border-pink-300",
-                        "bg-orange-100 border-orange-300",
-                        "bg-teal-100 border-teal-300",
-                        "bg-lime-100 border-lime-300",
-                        "bg-amber-100 border-amber-300",
-                      ].map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          onClick={() => setNewCategory((prev) => ({ ...prev, color }))}
-                          className={`w-8 h-8 rounded-sm border transition-colors ${
-                            newCategory.color === color ? "ring-2 ring-black" : ""
-                          } ${color}`}
-                          title={color}
-                        />
-                      ))}
+                    <Label className="text-sm font-medium text-gray-700">分类颜色</Label>
+                    <div className="grid grid-cols-6 gap-4">
+                      {
+                        [
+                          "bg-blue-100 border-blue-300",
+                          "bg-green-100 border-green-300",
+                          "bg-red-100 border-red-300",
+                          "bg-purple-100 border-purple-300",
+                          "bg-yellow-100 border-yellow-300",
+                          "bg-gray-100 border-gray-300",
+                          "bg-indigo-100 border-indigo-300",
+                          "bg-pink-100 border-pink-300",
+                          "bg-orange-100 border-orange-300",
+                          "bg-teal-100 border-teal-300",
+                          "bg-lime-100 border-lime-300",
+                          "bg-amber-100 border-amber-300",
+                        ].map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setNewCategory((prev) => ({ ...prev, color }))}
+                            className={`w-12 h-12 rounded-md border transition-all duration-200 ${
+                              newCategory.color === color ? "ring-2 ring-primary ring-offset-2 scale-110" : "hover:ring-1 hover:ring-gray-300 hover:scale-105"
+                            } ${color}`}
+                            title={color}
+                          />
+                        ))
+                      }
                     </div>
                   </div>
                 </div>
                 <Button
                   onClick={handleAddCategory}
-                  className="w-full rounded-sm bg-black text-white hover:bg-black/90"
+                  className="w-full rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150 py-2"
                 >
                   添加分类
                 </Button>
@@ -1094,25 +1096,25 @@ export function WeeklyTimeGrid({
           {/* 日记编辑对话框 */}
           <Dialog open={Boolean(editingDiaryDate)} onOpenChange={(open) => !open && setEditingDiaryDate(null)}>
             {editingDiaryDate && (
-              <DialogContent className="rounded-sm border-gray-200">
+              <DialogContent className="rounded-lg border-gray-200 shadow-lg">
                 <DialogHeader>
-                  <DialogTitle className="text-sm">
+                  <DialogTitle className="text-lg font-semibold text-gray-900">
                     日记 - {editingDiaryDate}
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label>今天的心情</Label>
-                    <div className="flex flex-wrap justify-center gap-3">
+                <div className="space-y-5 mt-4">
+                  <div className="space-y-4">
+                    <Label className="text-sm font-medium text-gray-700">今天的心情</Label>
+                    <div className="flex flex-wrap justify-center gap-5">
                       {moodOptions.map((option) => (
                         <button
                           key={option.value}
                           type="button"
                           onClick={() => setDiaryForm((prev) => ({ ...prev, mood: option.value }))}
-                          className={`p-2 rounded-sm border transition-colors ${
+                          className={`p-4 rounded-lg border transition-all duration-300 ${
                             diaryForm.mood === option.value
-                              ? "border-black bg-gray-100"
-                              : "border-gray-200 hover:border-gray-300"
+                              ? "border-primary bg-primary/5 ring-2 ring-primary/20 scale-105"
+                              : "border-gray-200 hover:border-gray-300 hover:bg-gray-50 hover:scale-105"
                           }`}
                           title={option.label}
                         >
@@ -1121,8 +1123,8 @@ export function WeeklyTimeGrid({
                       ))}
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="diary-content">日记内容</Label>
+                  <div className="space-y-3">
+                    <Label htmlFor="diary-content" className="text-sm font-medium text-gray-700">日记内容</Label>
                     <Textarea
                       id="diary-content"
                       value={diaryForm.content}
@@ -1130,20 +1132,20 @@ export function WeeklyTimeGrid({
                         setDiaryForm((prev) => ({ ...prev, content: event.target.value }))
                       }
                       placeholder="记录今天的心情和想法..."
-                      className="rounded-sm border-gray-200 min-h-[120px]"
+                      className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150 min-h-[180px]"
                     />
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-4">
                     <Button
                       onClick={() => setEditingDiaryDate(null)}
                       variant="outline"
-                      className="flex-1 rounded-sm border-gray-300"
+                      className="flex-1 rounded-md border-gray-300 hover:bg-gray-50 transition-all duration-150 py-2"
                     >
                       取消
                     </Button>
                     <Button
                       onClick={handleSaveDiary}
-                      className="flex-1 rounded-sm bg-black text-white hover:bg-black/90"
+                      className="flex-1 rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150 py-2"
                     >
                       保存日记
                     </Button>
