@@ -550,7 +550,7 @@ export function WeeklyTimeGrid({
                     <Label>分类</Label>
                     <Select
                       value={createForm.category}
-                      onValueChange={(value) =>
+                      onValueChange={(value: string) =>
                         setCreateForm((prev) => ({ ...prev, category: value }))
                       }
                     >
@@ -688,7 +688,7 @@ export function WeeklyTimeGrid({
                     <Label>分类</Label>
                     <Select
                       value={editForm.category}
-                      onValueChange={(value) =>
+                      onValueChange={(value: string) =>
                         setEditForm((prev) => ({ ...prev, category: value }))
                       }
                     >
