@@ -22,7 +22,16 @@ export type ScheduleEvent = {
   notes: string;
   requirements: string[];
   isCompleted: boolean;
+  category: string;
 };
+
+export type SubTask = {
+  id: string;
+  name: string;
+  done: boolean;
+};
+
+export type Priority = '紧急且重要' | '紧急不重要' | '不紧急重要' | '不紧急不重要';
 
 export type LongTask = {
   id: string;
@@ -32,6 +41,8 @@ export type LongTask = {
   notes: string;
   precautions: string[];
   completionLog: string;
+  priority: Priority;
+  subtasks: SubTask[];
 };
 
 const defaultTasks: LongTask[] = [
@@ -43,6 +54,8 @@ const defaultTasks: LongTask[] = [
     notes: "",
     precautions: [],
     completionLog: "",
+    priority: "不紧急重要",
+    subtasks: [],
   },
   {
     id: "task-2",
@@ -52,6 +65,8 @@ const defaultTasks: LongTask[] = [
     notes: "已完成初版梳理，待归档。",
     precautions: ["避免重复分类"],
     completionLog: "2026-04-08 完成并同步到知识库",
+    priority: "不紧急不重要",
+    subtasks: [],
   },
   {
     id: "task-3",
@@ -61,6 +76,8 @@ const defaultTasks: LongTask[] = [
     notes: "",
     precautions: [],
     completionLog: "",
+    priority: "紧急且重要",
+    subtasks: [],
   },
   {
     id: "task-4",
@@ -70,6 +87,8 @@ const defaultTasks: LongTask[] = [
     notes: "",
     precautions: [],
     completionLog: "",
+    priority: "紧急不重要",
+    subtasks: [],
   },
 ];
 
@@ -83,6 +102,7 @@ const defaultEvents: ScheduleEvent[] = [
     notes: "明确今日优先级，更新待办。",
     requirements: ["安静环境", "关闭即时通讯"],
     isCompleted: false,
+    category: "个人",
   },
 ];
 
@@ -104,6 +124,14 @@ function normalizeTasks(payload: unknown): LongTask[] {
         ? value.precautions.filter((item): item is string => typeof item === "string")
         : [],
       completionLog: value.completionLog ?? "",
+      priority: (value.priority as Priority) ?? "不紧急不重要",
+      subtasks: Array.isArray(value.subtasks)
+        ? value.subtasks.map((subtask, subIndex) => ({
+            id: subtask.id ?? `subtask-${index}-${subIndex}`,
+            name: subtask.name ?? `子任务 ${subIndex + 1}`,
+            done: Boolean(subtask.done),
+          }))
+        : [],
     };
   });
 }
@@ -123,6 +151,7 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
         ? value.requirements.filter((item): item is string => typeof item === "string")
         : [],
       isCompleted: Boolean(value.isCompleted),
+      category: value.category ?? "个人",
     };
   });
 }

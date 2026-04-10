@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ListTodo, Plus, RotateCcw, Trash2 } from "lucide-react";
+import React, { useState } from "react";
+import { ChevronDown, ChevronRight, ListTodo, Plus, RotateCcw, Trash2, AlertTriangle, Clock, Star, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { LongTask } from "@/app/page";
+import type { LongTask, Priority, SubTask } from "@/app/page";
 import {
   Collapsible,
   CollapsibleContent,
@@ -43,6 +43,9 @@ type TaskDraft = {
   precautionsText: string;
   completionLog: string;
   done: boolean;
+  priority: Priority;
+  subtasks: SubTask[];
+  newSubtaskName: string;
 };
 
 function getTodayISODate() {
@@ -83,6 +86,9 @@ export function TaskDashboard({
       precautionsText: (task.precautions ?? []).join("\n"),
       completionLog: task.completionLog ?? "",
       done: task.done,
+      priority: task.priority ?? "不紧急不重要",
+      subtasks: task.subtasks ?? [],
+      newSubtaskName: "",
     });
   }
 
@@ -98,10 +104,58 @@ export function TaskDashboard({
         .filter(Boolean),
       completionLog: taskDraft.completionLog.trim(),
       done: taskDraft.done,
+      priority: taskDraft.priority,
+      subtasks: taskDraft.subtasks,
     });
     setEditingTaskId(null);
     setTaskDraft(null);
     toast.success("任务已保存");
+  }
+
+  function handleAddSubtask() {
+    if (!taskDraft || !taskDraft.newSubtaskName.trim()) return;
+    setTaskDraft(prev => prev ? {
+      ...prev,
+      subtasks: [...prev.subtasks, {
+        id: `subtask-${Date.now()}`,
+        name: prev.newSubtaskName.trim(),
+        done: false,
+      }],
+      newSubtaskName: "",
+    } : prev);
+  }
+
+  function handleToggleSubtask(subtaskId: string) {
+    if (!taskDraft) return;
+    setTaskDraft(prev => prev ? {
+      ...prev,
+      subtasks: prev.subtasks.map(subtask => 
+        subtask.id === subtaskId ? { ...subtask, done: !subtask.done } : subtask
+      ),
+    } : prev);
+  }
+
+  function handleDeleteSubtask(subtaskId: string) {
+    if (!taskDraft) return;
+    setTaskDraft(prev => prev ? {
+      ...prev,
+      subtasks: prev.subtasks.filter(subtask => subtask.id !== subtaskId),
+    } : prev);
+  }
+
+  function getPriorityIcon(priority: Priority) {
+    switch (priority) {
+      case "紧急且重要":
+        return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      case "紧急不重要":
+        return <Clock className="h-4 w-4 text-orange-500" />;
+      case "不紧急重要":
+        return <Star className="h-4 w-4 text-blue-500" />;
+      case "不紧急不重要":
+        return <CheckCircle className="h-4 w-4 text-gray-500" />;
+      default:
+        return null;
+    }
   }
 
   function handleConfirmDeleteTask() {
@@ -175,63 +229,93 @@ export function TaskDashboard({
 
             <TableBody>
               {incompleteTasks.map((task) => (
-                <TableRow
-                  key={task.id}
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={(event) => {
-                    const target = event.target as HTMLElement;
-                    if (target.closest("[data-no-open='true']")) return;
-                    handleOpenEdit(task);
-                  }}
-                >
-                  <TableCell data-no-open="true">
-                    <Checkbox
-                      checked={task.done}
-                      onCheckedChange={() => {
-                        onToggleTask(task.id);
-                        toast.success("任务已标记为完成");
-                      }}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => event.stopPropagation()}
-                      aria-label={`任务 ${task.name} 的完成状态`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <span className={task.done ? "text-gray-500 line-through" : "text-black"}>
-                      {task.name}
-                    </span>
-                  </TableCell>
-                  <TableCell className={task.done ? "text-gray-500" : "text-black"}>
-                    {task.dueDate}
-                  </TableCell>
-                  <TableCell>
-                    {task.done ? (
-                      <Badge className="rounded-sm border border-gray-300 bg-white text-black">
-                        已完成
-                      </Badge>
-                    ) : (
-                      <Badge className="rounded-sm border border-black bg-black text-white">
-                        未完成
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right" data-no-open="true">
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 rounded-sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setPendingDeleteTaskId(task.id);
-                        setConfirmDeleteOpen(true);
-                      }}
-                      aria-label={`删除任务 ${task.name}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                <React.Fragment key={task.id}>
+                  <TableRow
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={(event) => {
+                      const target = event.target as HTMLElement;
+                      if (target.closest("[data-no-open='true']")) return;
+                      handleOpenEdit(task);
+                    }}
+                  >
+                    <TableCell data-no-open="true">
+                      <Checkbox
+                        checked={task.done}
+                        onCheckedChange={() => {
+                          onToggleTask(task.id);
+                          toast.success("任务已标记为完成");
+                        }}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
+                        aria-label={`任务 ${task.name} 的完成状态`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getPriorityIcon(task.priority)}
+                        <span className={task.done ? "text-gray-500 line-through" : "text-black"}>
+                          {task.name}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className={task.done ? "text-gray-500" : "text-black"}>
+                      {task.dueDate}
+                    </TableCell>
+                    <TableCell>
+                      {task.done ? (
+                        <Badge className="rounded-sm border border-gray-300 bg-white text-black">
+                          已完成
+                        </Badge>
+                      ) : (
+                        <Badge className="rounded-sm border border-black bg-black text-white">
+                          未完成
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right" data-no-open="true">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 rounded-sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setPendingDeleteTaskId(task.id);
+                          setConfirmDeleteOpen(true);
+                        }}
+                        aria-label={`删除任务 ${task.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  {task.subtasks.length > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5}>
+                        <div className="pl-12 pr-4 py-2 bg-gray-50">
+                          <ul className="space-y-1">
+                            {task.subtasks.map((subtask) => (
+                              <li key={subtask.id} className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={subtask.done}
+                                  onCheckedChange={() => {
+                                    // 这里需要更新子任务状态，暂时通过编辑任务来处理
+                                    // 实际应用中可以添加直接更新子任务的函数
+                                    handleOpenEdit(task);
+                                  }}
+                                  className="h-3.5 w-3.5"
+                                />
+                                <span className={subtask.done ? "text-gray-500 line-through text-sm" : "text-black text-sm"}>
+                                  {subtask.name}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>
@@ -310,6 +394,75 @@ export function TaskDashboard({
                   }
                   className="rounded-sm border-gray-200"
                 />
+              </div>
+              <div className="space-y-1">
+                <Label>任务优先级</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: "紧急且重要" as Priority, label: "紧急且重要" },
+                    { value: "紧急不重要" as Priority, label: "紧急不重要" },
+                    { value: "不紧急重要" as Priority, label: "不紧急重要" },
+                    { value: "不紧急不重要" as Priority, label: "不紧急不重要" },
+                  ].map((option) => (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      variant={taskDraft.priority === option.value ? "default" : "outline"}
+                      className={`rounded-sm ${taskDraft.priority === option.value ? "bg-black text-white" : "border-gray-300"}`}
+                      onClick={() =>
+                        setTaskDraft((prev) => (prev ? { ...prev, priority: option.value } : prev))
+                      }
+                    >
+                      <div className="flex items-center gap-2">
+                        {getPriorityIcon(option.value)}
+                        <span>{option.label}</span>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>子任务</Label>
+                <div className="space-y-2 border border-gray-200 p-3 rounded-sm">
+                  {taskDraft.subtasks.map((subtask) => (
+                    <div key={subtask.id} className="flex items-center gap-2">
+                      <Checkbox
+                        checked={subtask.done}
+                        onCheckedChange={() => handleToggleSubtask(subtask.id)}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className={subtask.done ? "text-gray-500 line-through text-sm" : "text-black text-sm"}>
+                        {subtask.name}
+                      </span>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 rounded-sm ml-auto"
+                        onClick={() => handleDeleteSubtask(subtask.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2 mt-2">
+                    <Input
+                      value={taskDraft.newSubtaskName}
+                      onChange={(event) =>
+                        setTaskDraft((prev) => (prev ? { ...prev, newSubtaskName: event.target.value } : prev))
+                      }
+                      placeholder="输入子任务名称"
+                      className="rounded-sm border-gray-200 text-sm"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleAddSubtask}
+                      className="rounded-sm bg-black text-white hover:bg-black/90"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="task-edit-notes">记录情况</Label>

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
 import { zhCN } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Clock3, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3, Plus, Smile, Frown, Meh, Angry, Heart } from "lucide-react";
 import type { ScheduleEvent } from "@/app/page";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,32 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { createId } from "@/lib/id";
+
+const categories = [
+  "个人",
+  "工作提升",
+  "运动健康",
+  "兴趣爱好",
+  "放松休闲",
+  "life&other",
+  "自我提升",
+  "计划复盘"
+];
+
+const categoryColors = {
+  "个人": "bg-blue-100 border-blue-300",
+  "工作提升": "bg-green-100 border-green-300",
+  "运动健康": "bg-red-100 border-red-300",
+  "兴趣爱好": "bg-purple-100 border-purple-300",
+  "放松休闲": "bg-yellow-100 border-yellow-300",
+  "life&other": "bg-gray-100 border-gray-300",
+  "自我提升": "bg-indigo-100 border-indigo-300",
+  "计划复盘": "bg-pink-100 border-pink-300"
+};
+
+function getCategoryColor(category: string) {
+  return categoryColors[category as keyof typeof categoryColors] || "bg-white border-black";
+}
 
 type GridCell = {
   date: string;
@@ -48,6 +74,7 @@ type EventFormState = {
   notes: string;
   requirements: string;
   isCompleted: boolean;
+  category: string;
 };
 
 type ResizeState = {
@@ -64,8 +91,24 @@ type PositionedEvent = ScheduleEvent & {
   laneCount: number;
 };
 
+type Mood = "开心" | "平静" | "难过" | "生气" | "疲惫";
+
+type DiaryEntry = {
+  date: string;
+  mood: Mood;
+  content: string;
+};
+
 const hours = Array.from({ length: 24 }, (_, hour) => hour);
 const hourCellHeight = 52;
+
+const moodOptions: { value: Mood; icon: React.ReactNode; label: string }[] = [
+  { value: "开心", icon: <Smile className="h-5 w-5 text-yellow-500" />, label: "开心" },
+  { value: "平静", icon: <Heart className="h-5 w-5 text-pink-500" />, label: "平静" },
+  { value: "难过", icon: <Frown className="h-5 w-5 text-blue-500" />, label: "难过" },
+  { value: "生气", icon: <Angry className="h-5 w-5 text-red-500" />, label: "生气" },
+  { value: "疲惫", icon: <Meh className="h-5 w-5 text-gray-500" />, label: "疲惫" },
+];
 
 const defaultForm: EventFormState = {
   title: "",
@@ -74,6 +117,7 @@ const defaultForm: EventFormState = {
   notes: "",
   requirements: "",
   isCompleted: false,
+  category: "个人",
 };
 
 function formatHour(hour: number) {
@@ -136,6 +180,12 @@ export function WeeklyTimeGrid({
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
+  const [diaries, setDiaries] = useState<DiaryEntry[]>([]);
+  const [editingDiaryDate, setEditingDiaryDate] = useState<string | null>(null);
+  const [diaryForm, setDiaryForm] = useState<{ mood: Mood; content: string }>({
+    mood: "平静",
+    content: "",
+  });
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === editingEventId) ?? null,
@@ -150,6 +200,7 @@ export function WeeklyTimeGrid({
       notes: "",
       requirements: "",
       isCompleted: false,
+      category: "个人",
     });
     setCreateDialogOpen(true);
   }
@@ -163,6 +214,7 @@ export function WeeklyTimeGrid({
       notes: event.notes,
       requirements: event.requirements.join("\n"),
       isCompleted: event.isCompleted,
+      category: event.category,
     });
   }
 
@@ -183,6 +235,7 @@ export function WeeklyTimeGrid({
         .map((item) => item.trim())
         .filter(Boolean),
       isCompleted: createForm.isCompleted,
+      category: createForm.category,
     });
     setCreateDialogOpen(false);
   }
@@ -201,6 +254,7 @@ export function WeeklyTimeGrid({
         .map((item) => item.trim())
         .filter(Boolean),
       isCompleted: editForm.isCompleted,
+      category: editForm.category,
     });
     setEditingEventId(null);
   }
@@ -219,6 +273,38 @@ export function WeeklyTimeGrid({
       endHour: nextEndHour,
     });
     setDraggingEventId(null);
+  }
+
+  function getDiary(date: string): DiaryEntry | undefined {
+    return diaries.find((d) => d.date === date);
+  }
+
+  function handleOpenDiary(date: string) {
+    const existingDiary = getDiary(date);
+    setEditingDiaryDate(date);
+    setDiaryForm({
+      mood: existingDiary?.mood ?? "平静",
+      content: existingDiary?.content ?? "",
+    });
+  }
+
+  function handleSaveDiary() {
+    if (!editingDiaryDate) return;
+    setDiaries((prev) => {
+      const existingIndex = prev.findIndex((d) => d.date === editingDiaryDate);
+      const newEntry: DiaryEntry = {
+        date: editingDiaryDate,
+        mood: diaryForm.mood,
+        content: diaryForm.content,
+      };
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = newEntry;
+        return updated;
+      }
+      return [...prev, newEntry];
+    });
+    setEditingDiaryDate(null);
   }
 
   useEffect(() => {
@@ -330,7 +416,7 @@ export function WeeklyTimeGrid({
                         className={`pointer-events-auto absolute rounded-sm border px-2 py-1 text-left text-xs ${
                           event.isCompleted
                             ? "border-gray-300 bg-gray-100 text-gray-500"
-                            : "border-black bg-white text-black"
+                            : getCategoryColor(event.category)
                         }`}
                         style={{
                           top: `${event.startHour * hourCellHeight + 4}px`,
@@ -403,6 +489,42 @@ export function WeeklyTimeGrid({
             })}
           </div>
 
+          {/* 日记区域 */}
+          <div className="border-t border-gray-200 mt-4">
+            <div className="grid grid-cols-[88px_repeat(7,minmax(0,1fr))]">
+              <div className="border-r border-gray-200 px-3 py-3 text-xs font-medium text-black bg-gray-50">
+                日记
+              </div>
+              {weekDays.map((day) => {
+                const dayIso = format(day, "yyyy-MM-dd");
+                const diary = getDiary(dayIso);
+                const moodOption = moodOptions.find((m) => m.value === diary?.mood);
+
+                return (
+                  <div
+                    key={`diary-${dayIso}`}
+                    className="border-r border-gray-200 last:border-r-0 p-2 min-h-[120px] cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleOpenDiary(dayIso)}
+                  >
+                    {diary ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1">
+                          {moodOption?.icon}
+                          <span className="text-xs text-gray-600">{moodOption?.label}</span>
+                        </div>
+                        <p className="text-xs text-gray-800 line-clamp-3">{diary.content}</p>
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-gray-400">
+                        <span className="text-xs">点击记录日记</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             {selectedCell && (
               <DialogContent className="rounded-sm border-gray-200">
@@ -423,6 +545,26 @@ export function WeeklyTimeGrid({
                       placeholder="输入行程标题"
                       className="rounded-sm border-gray-200"
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>分类</Label>
+                    <Select
+                      value={createForm.category}
+                      onValueChange={(value) =>
+                        setCreateForm((prev) => ({ ...prev, category: value }))
+                      }
+                    >
+                      <SelectTrigger className="rounded-sm border-gray-200">
+                        <SelectValue placeholder="选择分类" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
@@ -541,6 +683,26 @@ export function WeeklyTimeGrid({
                       placeholder="输入行程标题"
                       className="rounded-sm border-gray-200"
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>分类</Label>
+                    <Select
+                      value={editForm.category}
+                      onValueChange={(value) =>
+                        setEditForm((prev) => ({ ...prev, category: value }))
+                      }
+                    >
+                      <SelectTrigger className="rounded-sm border-gray-200">
+                        <SelectValue placeholder="选择分类" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
@@ -679,6 +841,68 @@ export function WeeklyTimeGrid({
                       className="flex-1 rounded-sm bg-black text-white hover:bg-black/90"
                     >
                       保存修改
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            )}
+          </Dialog>
+
+          {/* 日记编辑对话框 */}
+          <Dialog open={Boolean(editingDiaryDate)} onOpenChange={(open) => !open && setEditingDiaryDate(null)}>
+            {editingDiaryDate && (
+              <DialogContent className="rounded-sm border-gray-200">
+                <DialogHeader>
+                  <DialogTitle className="text-sm">
+                    日记 - {editingDiaryDate}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label>今天的心情</Label>
+                    <div className="flex justify-center gap-3">
+                      {moodOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setDiaryForm((prev) => ({ ...prev, mood: option.value }))}
+                          className={`p-2 rounded-sm border transition-colors ${
+                            diaryForm.mood === option.value
+                              ? "border-black bg-gray-100"
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                          title={option.label}
+                        >
+                          {option.icon}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="diary-content">日记内容</Label>
+                    <Textarea
+                      id="diary-content"
+                      value={diaryForm.content}
+                      onChange={(event) =>
+                        setDiaryForm((prev) => ({ ...prev, content: event.target.value }))
+                      }
+                      placeholder="记录今天的心情和想法..."
+                      className="rounded-sm border-gray-200 min-h-[120px]"
+                    />
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      onClick={() => setEditingDiaryDate(null)}
+                      variant="outline"
+                      className="flex-1 rounded-sm border-gray-300"
+                    >
+                      取消
+                    </Button>
+                    <Button
+                      onClick={handleSaveDiary}
+                      className="flex-1 rounded-sm bg-black text-white hover:bg-black/90"
+                    >
+                      保存日记
                     </Button>
                   </div>
                 </div>
