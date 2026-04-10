@@ -739,92 +739,139 @@ export function WeeklyTimeGrid({
 
     const instances: ScheduleEvent[] = [];
     const eventDate = parseISO(event.date);
-    let currentDate = eventDate;
-    let count = 0;
-
-    while (true) {
-      // 检查当前日期是否在范围内
-      if (isAfter(currentDate, endDate)) {
-        break;
-      }
-
-      let shouldAdd = false;
-
-      // 检查当前日期是否在范围内
-      if (isBefore(currentDate, startDate)) {
-        // 日期在范围之前，跳过
-      } else {
-        // 检查是否是例外日期
-        const currentDateStr = format(currentDate, 'yyyy-MM-dd');
-        if (!event.recurrence.exceptions.includes(currentDateStr)) {
-          // 检查是否是原始事件日期或符合重复规则的日期
-          
-          if (isSameDay(currentDate, eventDate)) {
-            // 原始事件日期，总是添加
-            shouldAdd = true;
-          } else if (count > 0) {
-            // 对于重复事件
-            if (event.recurrence.type === 'weekly') {
-              if (event.recurrence.daysOfWeek && event.recurrence.daysOfWeek.length > 0) {
-                // 每周特定日期重复
-                const dayOfWeek = currentDate.getDay(); // 0-6，0表示周日
-                shouldAdd = event.recurrence.daysOfWeek.includes(dayOfWeek);
-              } else {
-                // 对于没有设置 daysOfWeek 的现有事件，保持原有行为
-                // 只在与原始事件相同的星期几添加
-                const originalDayOfWeek = eventDate.getDay();
-                const currentDayOfWeek = currentDate.getDay();
-                shouldAdd = originalDayOfWeek === currentDayOfWeek;
+    
+    // 对于每周重复的事件，需要特殊处理
+    if (event.recurrence.type === 'weekly') {
+      // 检查当前日期是否是重复日期
+      const dayOfWeek = startDate.getDay(); // 0-6，0表示周日
+      
+      // 检查是否设置了重复日期
+      if (event.recurrence.daysOfWeek && event.recurrence.daysOfWeek.length > 0) {
+        // 检查当前日期是否在重复日期列表中
+        if (event.recurrence.daysOfWeek.includes(dayOfWeek)) {
+          // 检查是否是例外日期
+          const currentDateStr = format(startDate, 'yyyy-MM-dd');
+          if (!event.recurrence.exceptions.includes(currentDateStr)) {
+            // 检查是否达到结束条件
+            let shouldAdd = true;
+            
+            // 检查是否在结束日期之前
+            if (event.recurrence.endType === 'on' && event.recurrence.endDate) {
+              const endDateObj = parseISO(event.recurrence.endDate);
+              if (isAfter(startDate, endDateObj)) {
+                shouldAdd = false;
               }
-            } else {
-              // 其他类型的重复，直接添加
-              shouldAdd = true;
+            }
+            
+            if (shouldAdd) {
+              instances.push({
+                ...event,
+                id: `${event.id}-${currentDateStr}`,
+                date: currentDateStr
+              });
             }
           }
-          
-          if (shouldAdd) {
-            instances.push({
-              ...event,
-              id: `${event.id}-${currentDateStr}`,
-              date: currentDateStr
-            });
+        }
+      } else {
+        // 对于没有设置 daysOfWeek 的现有事件，保持原有行为
+        // 只在与原始事件相同的星期几添加
+        const originalDayOfWeek = eventDate.getDay();
+        if (originalDayOfWeek === dayOfWeek) {
+          // 检查是否是例外日期
+          const currentDateStr = format(startDate, 'yyyy-MM-dd');
+          if (!event.recurrence.exceptions.includes(currentDateStr)) {
+            // 检查是否达到结束条件
+            let shouldAdd = true;
+            
+            // 检查是否在结束日期之前
+            if (event.recurrence.endType === 'on' && event.recurrence.endDate) {
+              const endDateObj = parseISO(event.recurrence.endDate);
+              if (isAfter(startDate, endDateObj)) {
+                shouldAdd = false;
+              }
+            }
+            
+            if (shouldAdd) {
+              instances.push({
+                ...event,
+                id: `${event.id}-${currentDateStr}`,
+                date: currentDateStr
+              });
+            }
           }
         }
       }
+    } else {
+      // 其他类型的重复事件
+      let currentDate = eventDate;
+      let count = 0;
 
-      // 只在添加事件实例时增加计数
-      if (shouldAdd) {
-        count++;
-      }
-
-      // 检查是否达到结束条件
-      if (event.recurrence.endType === 'after' && count >= (event.recurrence.endCount || 0)) {
-        break;
-      }
-
-      if (event.recurrence.endType === 'on' && event.recurrence.endDate) {
-        const endDateObj = parseISO(event.recurrence.endDate);
-        if (isAfter(currentDate, endDateObj)) {
+      while (true) {
+        // 检查当前日期是否在范围内
+        if (isAfter(currentDate, endDate)) {
           break;
         }
-      }
 
-      // 计算下一个重复日期
-      switch (event.recurrence.type) {
-        case 'daily':
-          currentDate = addDays(currentDate, event.recurrence.interval);
+        let shouldAdd = false;
+
+        // 检查当前日期是否在范围内
+        if (isBefore(currentDate, startDate)) {
+          // 日期在范围之前，跳过
+        } else {
+          // 检查是否是例外日期
+          const currentDateStr = format(currentDate, 'yyyy-MM-dd');
+          if (!event.recurrence.exceptions.includes(currentDateStr)) {
+            // 检查是否是原始事件日期或符合重复规则的日期
+            
+            if (isSameDay(currentDate, eventDate)) {
+              // 原始事件日期，总是添加
+              shouldAdd = true;
+            } else if (count > 0) {
+              // 对于重复事件，直接添加
+              shouldAdd = true;
+            }
+            
+            if (shouldAdd) {
+              instances.push({
+                ...event,
+                id: `${event.id}-${currentDateStr}`,
+                date: currentDateStr
+              });
+            }
+          }
+        }
+
+        // 只在添加事件实例时增加计数
+        if (shouldAdd) {
+          count++;
+        }
+
+        // 检查是否达到结束条件
+        if (event.recurrence.endType === 'after' && count >= (event.recurrence.endCount || 0)) {
           break;
-        case 'weekly':
-          currentDate = addWeeks(currentDate, event.recurrence.interval);
-          break;
-        case 'monthly':
-          currentDate = addMonths(currentDate, event.recurrence.interval);
-          break;
-        case 'yearly':
-          currentDate = addYears(currentDate, event.recurrence.interval);
-          break;
-        default:
-          break;
+        }
+
+        if (event.recurrence.endType === 'on' && event.recurrence.endDate) {
+          const endDateObj = parseISO(event.recurrence.endDate);
+          if (isAfter(currentDate, endDateObj)) {
+            break;
+          }
+        }
+
+        // 计算下一个重复日期
+        switch (event.recurrence.type) {
+          case 'daily':
+            currentDate = addDays(currentDate, event.recurrence.interval);
+            break;
+          case 'monthly':
+            currentDate = addMonths(currentDate, event.recurrence.interval);
+            break;
+          case 'yearly':
+            currentDate = addYears(currentDate, event.recurrence.interval);
+            break;
+          default:
+            break;
+        }
       }
     }
 
