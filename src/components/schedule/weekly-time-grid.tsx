@@ -99,6 +99,7 @@ type EventFormState = {
     endDate?: string;
     endCount?: number;
     exceptions: string[];
+    daysOfWeek?: number[];
   };
 };
 
@@ -154,7 +155,8 @@ const defaultForm: EventFormState = {
     type: 'none',
     interval: 1,
     endType: 'never',
-    exceptions: []
+    exceptions: [],
+    daysOfWeek: []
   },
 };
 
@@ -288,7 +290,8 @@ export function WeeklyTimeGrid({
         type: 'none',
         interval: 1,
         endType: 'never',
-        exceptions: []
+        exceptions: [],
+        daysOfWeek: []
       },
     });
     setCreateDialogOpen(true);
@@ -557,7 +560,32 @@ export function WeeklyTimeGrid({
       const currentDateStr = format(currentDate, 'yyyy-MM-dd');
       if (!event.recurrence.exceptions.includes(currentDateStr)) {
         // 检查是否是原始事件日期或符合重复规则的日期
-        if (isSameDay(currentDate, eventDate) || count > 0) {
+        let shouldAdd = false;
+        
+        if (isSameDay(currentDate, eventDate)) {
+          // 原始事件日期，总是添加
+          shouldAdd = true;
+        } else if (count > 0) {
+          // 对于重复事件
+          if (event.recurrence.type === 'weekly') {
+            if (event.recurrence.daysOfWeek && event.recurrence.daysOfWeek.length > 0) {
+              // 每周特定日期重复
+              const dayOfWeek = currentDate.getDay(); // 0-6，0表示周日
+              shouldAdd = event.recurrence.daysOfWeek.includes(dayOfWeek);
+            } else {
+              // 对于没有设置 daysOfWeek 的现有事件，保持原有行为
+              // 只在与原始事件相同的星期几添加
+              const originalDayOfWeek = eventDate.getDay();
+              const currentDayOfWeek = currentDate.getDay();
+              shouldAdd = originalDayOfWeek === currentDayOfWeek;
+            }
+          } else {
+            // 其他类型的重复，直接添加
+            shouldAdd = true;
+          }
+        }
+        
+        if (shouldAdd) {
           instances.push({
             ...event,
             id: `${event.id}-${currentDateStr}`,
@@ -1098,6 +1126,39 @@ export function WeeklyTimeGrid({
                              createForm.recurrence.type === 'monthly' ? '月' : '年'}
                           </span>
                         </div>
+                        {createForm.recurrence.type === 'weekly' && (
+                          <div className="space-y-3">
+                            <Label className="text-sm font-medium text-gray-700">重复日期</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {['周日', '周一', '周二', '周三', '周四', '周五', '周六'].map((day, index) => (
+                                <Button
+                                  key={index}
+                                  type="button"
+                                  variant={createForm.recurrence.daysOfWeek?.includes(index) ? 'default' : 'outline'}
+                                  className={`rounded-md ${createForm.recurrence.daysOfWeek?.includes(index) ? 'bg-primary text-white' : 'border-gray-300'}`}
+                                  onClick={() => {
+                                    const currentDays = createForm.recurrence.daysOfWeek || [];
+                                    let newDays;
+                                    if (currentDays.includes(index)) {
+                                      newDays = currentDays.filter(d => d !== index);
+                                    } else {
+                                      newDays = [...currentDays, index];
+                                    }
+                                    setCreateForm((prev) => ({
+                                      ...prev,
+                                      recurrence: {
+                                        ...prev.recurrence,
+                                        daysOfWeek: newDays
+                                      }
+                                    }));
+                                  }}
+                                >
+                                  {day}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <div className="space-y-3">
                           <Label className="text-sm font-medium text-gray-700">结束方式</Label>
                           <Select
@@ -1355,6 +1416,39 @@ export function WeeklyTimeGrid({
                              editForm.recurrence.type === 'monthly' ? '月' : '年'}
                           </span>
                         </div>
+                        {editForm.recurrence.type === 'weekly' && (
+                          <div className="space-y-3">
+                            <Label className="text-sm font-medium text-gray-700">重复日期</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {['周日', '周一', '周二', '周三', '周四', '周五', '周六'].map((day, index) => (
+                                <Button
+                                  key={index}
+                                  type="button"
+                                  variant={editForm.recurrence.daysOfWeek?.includes(index) ? 'default' : 'outline'}
+                                  className={`rounded-md ${editForm.recurrence.daysOfWeek?.includes(index) ? 'bg-primary text-white' : 'border-gray-300'}`}
+                                  onClick={() => {
+                                    const currentDays = editForm.recurrence.daysOfWeek || [];
+                                    let newDays;
+                                    if (currentDays.includes(index)) {
+                                      newDays = currentDays.filter(d => d !== index);
+                                    } else {
+                                      newDays = [...currentDays, index];
+                                    }
+                                    setEditForm((prev) => ({
+                                      ...prev,
+                                      recurrence: {
+                                        ...prev.recurrence,
+                                        daysOfWeek: newDays
+                                      }
+                                    }));
+                                  }}
+                                >
+                                  {day}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <div className="space-y-3">
                           <Label className="text-sm font-medium text-gray-700">结束方式</Label>
                           <Select

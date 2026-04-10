@@ -37,6 +37,7 @@ export type ScheduleEvent = {
     endDate?: string;
     endCount?: number;
     exceptions: string[];
+    daysOfWeek?: number[]; // 0-6，0表示周日，1-6表示周一到周六
   };
 };
 
@@ -123,7 +124,8 @@ const defaultEvents: ScheduleEvent[] = [
       type: 'none',
       interval: 1,
       endType: 'never',
-      exceptions: []
+      exceptions: [],
+      daysOfWeek: []
     },
   },
 ];
@@ -179,7 +181,8 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
         type: 'none',
         interval: 1,
         endType: 'never',
-        exceptions: []
+        exceptions: [],
+        daysOfWeek: []
       },
     };
   });
