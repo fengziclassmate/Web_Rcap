@@ -550,8 +550,8 @@ export function WeeklyTimeGrid({
                     <Label>分类</Label>
                     <Select
                       value={createForm.category}
-                      onValueChange={(value: string) =>
-                        setCreateForm((prev) => ({ ...prev, category: value }))
+                      onValueChange={(value) =>
+                        value && setCreateForm((prev) => ({ ...prev, category: value }))
                       }
                     >
                       <SelectTrigger className="rounded-sm border-gray-200">
@@ -688,8 +688,8 @@ export function WeeklyTimeGrid({
                     <Label>分类</Label>
                     <Select
                       value={editForm.category}
-                      onValueChange={(value: string) =>
-                        setEditForm((prev) => ({ ...prev, category: value }))
+                      onValueChange={(value) =>
+                        value && setEditForm((prev) => ({ ...prev, category: value }))
                       }
                     >
                       <SelectTrigger className="rounded-sm border-gray-200">
