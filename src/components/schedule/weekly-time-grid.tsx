@@ -469,7 +469,7 @@ export function WeeklyTimeGrid({
             下一周
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button variant="primary" size="sm" className="rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150" onClick={() => setShowCategoryManager(true)}>
+          <Button variant="default" size="sm" className="rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150" onClick={() => setShowCategoryManager(true)}>
             分类管理
           </Button>
         </div>
