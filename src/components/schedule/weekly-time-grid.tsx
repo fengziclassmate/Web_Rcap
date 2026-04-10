@@ -301,6 +301,7 @@ export function WeeklyTimeGrid({
   const [editMode, setEditMode] = useState<'single' | 'all' | null>(null);
   const [deleteMode, setDeleteMode] = useState<'single' | 'all' | null>(null);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [selectedEventInstance, setSelectedEventInstance] = useState<ScheduleEvent | null>(null);
   const [showEditModeDialog, setShowEditModeDialog] = useState(false);
   const [showDeleteModeDialog, setShowDeleteModeDialog] = useState(false);
 
@@ -313,6 +314,7 @@ export function WeeklyTimeGrid({
     if (isInstance && originalEvent.recurrence.type !== 'none') {
       // 显示编辑模式选择对话框
       setSelectedInstanceId(event.id);
+      setSelectedEventInstance(event);
       setShowEditModeDialog(true);
     } else {
       // 直接编辑（非重复事件或原始重复事件）
@@ -332,24 +334,23 @@ export function WeeklyTimeGrid({
   }
 
   function handleEditModeSelect(mode: 'single' | 'all') {
-    if (selectedInstanceId) {
+    if (selectedInstanceId && selectedEventInstance) {
       const originalEventId = selectedInstanceId.split('-')[0];
-      const originalEvent = events.find(e => e.id === originalEventId);
-      if (originalEvent) {
-        setEditMode(mode);
-        setEditingEventId(originalEvent.id);
-        setEditForm({
-          title: originalEvent.title,
-          startHour: originalEvent.startHour,
-          endHour: originalEvent.endHour,
-          notes: originalEvent.notes,
-          requirements: originalEvent.requirements.join("\n"),
-          isCompleted: originalEvent.isCompleted,
-          category: originalEvent.category,
-          tag: originalEvent.tag,
-          recurrence: originalEvent.recurrence,
-        });
-      }
+      const originalEvent = events.find(e => e.id === originalEventId) || selectedEventInstance;
+      
+      setEditMode(mode);
+      setEditingEventId(originalEvent.id);
+      setEditForm({
+        title: originalEvent.title,
+        startHour: originalEvent.startHour,
+        endHour: originalEvent.endHour,
+        notes: originalEvent.notes,
+        requirements: originalEvent.requirements.join("\n"),
+        isCompleted: originalEvent.isCompleted,
+        category: originalEvent.category,
+        tag: originalEvent.tag,
+        recurrence: originalEvent.recurrence,
+      });
     }
     setShowEditModeDialog(false);
   }
@@ -382,6 +383,7 @@ export function WeeklyTimeGrid({
     setEditingEventId(null);
     setDeleteMode(null);
     setSelectedInstanceId(null);
+    setSelectedEventInstance(null);
   }
 
   function handleCreateEvent() {
@@ -471,6 +473,7 @@ export function WeeklyTimeGrid({
     setEditingEventId(null);
     setEditMode(null);
     setSelectedInstanceId(null);
+    setSelectedEventInstance(null);
   }
 
   function handleDropEvent(targetDate: string, targetHour: number) {
