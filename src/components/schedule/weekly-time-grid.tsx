@@ -482,6 +482,33 @@ export function WeeklyTimeGrid({
     }
   }, [diaries]);
 
+  // 计算时间网格的高度和间隔
+  const cellHeight = hourCellHeight / (60 / timeGranularity);
+  
+  // 根据视图模式获取显示的日期
+  const displayDates = useMemo(() => {
+    if (viewMode === 'day') {
+      return [currentWeekStart];
+    } else if (viewMode === 'week') {
+      return Array.from({ length: 7 }, (_, index) => addDays(currentWeekStart, index));
+    } else { // month
+      // 简单实现：显示4周
+      return Array.from({ length: 28 }, (_, index) => addDays(currentWeekStart, index));
+    }
+  }, [currentWeekStart, viewMode]);
+  
+  // 计算事件的位置和高度
+  const getEventStyle = (event: PositionedEvent) => {
+    const top = event.startHour * hourCellHeight + 4;
+    const height = (event.endHour - event.startHour) * hourCellHeight - 8;
+    return {
+      top: `${top}px`,
+      height: `${height}px`,
+      left: `calc(${(event.lane / event.laneCount) * 100}% + 4px)`,
+      width: `calc(${100 / event.laneCount}% - 8px)`,
+    };
+  };
+
   return (
     <section className="rounded-lg border border-gray-200 bg-white shadow-md">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4 bg-gray-50">
@@ -519,23 +546,25 @@ export function WeeklyTimeGrid({
               月
             </Button>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">时间粒度:</span>
-            <Select 
-              value={String(timeGranularity)}
-              onValueChange={(value) => handleTimeGranularityChange(Number(value) as TimeGranularity)}
-            >
-              <SelectTrigger className="w-24 rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
-                <SelectValue placeholder="选择" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5分钟</SelectItem>
-                <SelectItem value="15">15分钟</SelectItem>
-                <SelectItem value="30">30分钟</SelectItem>
-                <SelectItem value="60">60分钟</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {viewMode !== 'month' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">时间粒度:</span>
+              <Select 
+                value={String(timeGranularity)}
+                onValueChange={(value) => handleTimeGranularityChange(Number(value) as TimeGranularity)}
+              >
+                <SelectTrigger className="w-24 rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
+                  <SelectValue placeholder="选择" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5分钟</SelectItem>
+                  <SelectItem value="15">15分钟</SelectItem>
+                  <SelectItem value="30">30分钟</SelectItem>
+                  <SelectItem value="60">60分钟</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <Button variant="outline" size="sm" className="rounded-md border-gray-300 hover:bg-gray-100 transition-all duration-150" onClick={onPrevWeek}>
             <ChevronLeft className="h-4 w-4" />
             {viewMode === 'day' ? '上一天' : viewMode === 'week' ? '上一周' : '上一月'}
@@ -552,164 +581,210 @@ export function WeeklyTimeGrid({
 
       <div className="overflow-x-auto">
         <div className="relative min-w-[920px]">
-          <div className="grid grid-cols-[88px_repeat(7,minmax(0,1fr))] border-b border-gray-200 bg-white">
-            <div className="border-r border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 bg-gray-50">时间</div>
-            {weekDays.map((day) => (
-              <div
-                key={day.toISOString()}
-                className="border-r border-gray-200 px-4 py-3 text-center text-sm font-medium text-gray-700 last:border-r-0 bg-gray-50"
-              >
-                {dayTitle(day)}
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-[88px_repeat(7,minmax(0,1fr))]">
-            <div>
-              {hours.map((hour) => {
-                const isMainHour = Number.isInteger(hour);
-                return (
+          {/* 日视图和周视图 */}
+          {viewMode !== 'month' && (
+            <>
+              <div className="grid grid-cols-[88px_repeat(auto-fit,minmax(120px,1fr))] border-b border-gray-200 bg-white">
+                <div className="border-r border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 bg-gray-50">时间</div>
+                {displayDates.map((day) => (
                   <div
-                    key={`hour-label-${hour}`}
-                    className={`border-r border-b border-gray-200 px-3 py-1 text-sm ${isMainHour ? 'text-gray-500 bg-gray-50' : 'text-gray-400'}`}
-                    style={{ 
-                      height: `${hourCellHeight / (isMainHour ? 1 : 60 / timeGranularity)}px`,
-                      borderBottomWidth: isMainHour ? '1px' : '0.5px',
-                      borderBottomStyle: isMainHour ? 'solid' : 'dashed'
-                    }}
+                    key={day.toISOString()}
+                    className="border-r border-gray-200 px-4 py-3 text-center text-sm font-medium text-gray-700 last:border-r-0 bg-gray-50"
                   >
-                    {isMainHour ? formatHour(hour) : ''}
+                    {dayTitle(day)}
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
 
-            {weekDays.map((day) => {
-              const dayIso = format(day, "yyyy-MM-dd");
-              const dayEvents = layoutDayEvents(events.filter((event) => event.date === dayIso));
-
-              return (
-                <div key={dayIso} className="relative border-r border-gray-200 last:border-r-0">
-                  <div className="grid" style={{ 
-                    gridTemplateRows: `repeat(${hours.length}, ${hourCellHeight / (60 / timeGranularity)}px)` 
-                  }}>
-                    {hours.map((hour) => {
-                      const isMainHour = Number.isInteger(hour);
-                      return (
-                        <button
-                          key={`${dayIso}-${hour}`}
-                          type="button"
-                          className={`border-b transition-colors duration-150 ${isMainHour ? 'border-gray-200' : 'border-gray-100'} hover:bg-gray-50`}
-                          style={{ 
-                            height: `${hourCellHeight / (isMainHour ? 1 : 60 / timeGranularity)}px`,
-                            borderBottomWidth: isMainHour ? '1px' : '0.5px',
-                            borderBottomStyle: isMainHour ? 'solid' : 'dashed'
-                          }}
-                          onClick={() => resetCreateDialog({ date: dayIso, startHour: hour })}
-                          onDragOver={(event) => event.preventDefault()}
-                          onDrop={() => handleDropEvent(dayIso, hour)}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  <div className="pointer-events-none absolute inset-0 p-1">
-                    {dayEvents.map((event) => (
+              <div className="grid grid-cols-[88px_repeat(auto-fit,minmax(120px,1fr))]">
+                <div>
+                  {hours.map((hour) => {
+                    const isMainHour = Number.isInteger(hour);
+                    return (
                       <div
-                        key={event.id}
-                        className={`pointer-events-auto absolute rounded-lg border px-3 py-2 text-left text-sm shadow-md transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
-                          event.isCompleted
-                            ? "border-gray-300 bg-gray-100 text-gray-500 opacity-70"
-                            : getCategoryColor(categories, event.category)
-                        }`}
-                        style={{
-                          top: `${event.startHour * hourCellHeight + 4}px`,
-                          height: `${(event.endHour - event.startHour) * hourCellHeight - 8}px`,
-                          left: `calc(${(event.lane / event.laneCount) * 100}% + 4px)`,
-                          width: `calc(${100 / event.laneCount}% - 8px)`,
+                        key={`hour-label-${hour}`}
+                        className={`border-r border-b border-gray-200 px-3 py-1 text-sm ${isMainHour ? 'text-gray-500 bg-gray-50' : 'text-gray-400'}`}
+                        style={{ 
+                          height: `${cellHeight}px`,
+                          borderBottomWidth: isMainHour ? '1px' : '0.5px',
+                          borderBottomStyle: isMainHour ? 'solid' : 'dashed'
                         }}
-                        draggable
-                        onDragStart={() => setDraggingEventId(event.id)}
-                        onDragEnd={() => setDraggingEventId(null)}
-                        onContextMenu={(e) => handleContextMenu(e, event.id)}
                       >
-                        <button
-                          type="button"
-                          className="w-full text-left"
-                          onClick={() => handleOpenEdit(event)}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium truncate">{event.title}</p>
-                              {event.tag && (
-                                <span className={`text-sm font-bold ${getTagInfo(event.tag).color}`}>
-                                  {getTagInfo(event.tag).icon}
-                                </span>
-                              )}
-                            </div>
-                            {event.isCompleted && (
-                              <Check className="h-4 w-4 text-green-500" />
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-600">
-                            {formatHour(event.startHour)} - {formatHour(event.endHour)}
-                          </p>
-                        </button>
-                        <button
-                          type="button"
-                          className="absolute right-2 top-2 rounded-full border border-gray-300 bg-white p-1 text-black hover:bg-gray-100 transition-colors duration-150"
-                          onClick={(mouseEvent) => {
-                            mouseEvent.stopPropagation();
-                            resetCreateDialog({ date: event.date, startHour: event.startHour });
-                          }}
-                          aria-label={`在 ${event.title} 同时段新增行程`}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-
+                        {isMainHour ? formatHour(hour) : ''}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
 
-          {/* 日记区域 */}
-          <div className="border-t border-gray-200 mt-6 bg-gray-50">
-            <div className="grid grid-cols-[88px_repeat(7,minmax(0,1fr))]">
-              <div className="border-r border-gray-200 px-3 py-4 text-sm font-medium text-gray-700 bg-gray-100">
-                日记
+                {displayDates.map((day) => {
+                  const dayIso = format(day, "yyyy-MM-dd");
+                  const dayEvents = layoutDayEvents(events.filter((event) => event.date === dayIso));
+
+                  return (
+                    <div key={dayIso} className="relative border-r border-gray-200 last:border-r-0">
+                      <div className="grid" style={{ 
+                        gridTemplateRows: `repeat(${hours.length}, ${cellHeight}px)` 
+                      }}>
+                        {hours.map((hour) => {
+                          const isMainHour = Number.isInteger(hour);
+                          return (
+                            <button
+                              key={`${dayIso}-${hour}`}
+                              type="button"
+                              className={`border-b transition-colors duration-150 ${isMainHour ? 'border-gray-200' : 'border-gray-100'} hover:bg-gray-50`}
+                              style={{ 
+                                height: `${cellHeight}px`,
+                                borderBottomWidth: isMainHour ? '1px' : '0.5px',
+                                borderBottomStyle: isMainHour ? 'solid' : 'dashed'
+                              }}
+                              onClick={() => resetCreateDialog({ date: dayIso, startHour: hour })}
+                              onDragOver={(event) => event.preventDefault()}
+                              onDrop={() => handleDropEvent(dayIso, hour)}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      <div className="pointer-events-none absolute inset-0 p-1">
+                        {dayEvents.map((event) => (
+                          <div
+                            key={event.id}
+                            className={`pointer-events-auto absolute rounded-lg border px-3 py-2 text-left text-sm shadow-md transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
+                              event.isCompleted
+                                ? "border-gray-300 bg-gray-100 text-gray-500 opacity-70"
+                                : getCategoryColor(categories, event.category)
+                            }`}
+                            style={getEventStyle(event)}
+                            draggable
+                            onDragStart={() => setDraggingEventId(event.id)}
+                            onDragEnd={() => setDraggingEventId(null)}
+                            onContextMenu={(e) => handleContextMenu(e, event.id)}
+                          >
+                            <button
+                              type="button"
+                              className="w-full text-left"
+                              onClick={() => handleOpenEdit(event)}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium truncate">{event.title}</p>
+                                  {event.tag && (
+                                    <span className={`text-sm font-bold ${getTagInfo(event.tag).color}`}>
+                                      {getTagInfo(event.tag).icon}
+                                    </span>
+                                  )}
+                                </div>
+                                {event.isCompleted && (
+                                  <Check className="h-4 w-4 text-green-500" />
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-600">
+                                {formatHour(event.startHour)} - {formatHour(event.endHour)}
+                              </p>
+                            </button>
+                            <button
+                              type="button"
+                              className="absolute right-2 top-2 rounded-full border border-gray-300 bg-white p-1 text-black hover:bg-gray-100 transition-colors duration-150"
+                              onClick={(mouseEvent) => {
+                                mouseEvent.stopPropagation();
+                                resetCreateDialog({ date: event.date, startHour: event.startHour });
+                              }}
+                              aria-label={`在 ${event.title} 同时段新增行程`}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              {weekDays.map((day) => {
-                const dayIso = format(day, "yyyy-MM-dd");
-                const diary = getDiary(dayIso);
-                const moodOption = moodOptions.find((m) => m.value === diary?.mood);
 
-                return (
-                  <div
-                    key={`diary-${dayIso}`}
-                    className="border-r border-gray-200 last:border-r-0 p-4 min-h-[140px] cursor-pointer hover:bg-gray-100 transition-colors duration-150 rounded-md mx-1 my-2"
-                    onClick={() => handleOpenDiary(dayIso)}
-                  >
-                    {diary ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          {moodOption?.icon}
-                          <span className="text-sm font-medium text-gray-700">{moodOption?.label}</span>
-                        </div>
-                        <p className="text-sm text-gray-800 line-clamp-3 leading-relaxed">{diary.content}</p>
-                      </div>
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-gray-400">
-                        <span className="text-sm">点击记录日记</span>
-                      </div>
-                    )}
+              {/* 日记区域 */}
+              <div className="border-t border-gray-200 mt-6 bg-gray-50">
+                <div className="grid grid-cols-[88px_repeat(auto-fit,minmax(120px,1fr))]">
+                  <div className="border-r border-gray-200 px-3 py-4 text-sm font-medium text-gray-700 bg-gray-100">
+                    日记
                   </div>
-                );
-              })}
+                  {displayDates.map((day) => {
+                    const dayIso = format(day, "yyyy-MM-dd");
+                    const diary = getDiary(dayIso);
+                    const moodOption = moodOptions.find((m) => m.value === diary?.mood);
+
+                    return (
+                      <div
+                        key={`diary-${dayIso}`}
+                        className="border-r border-gray-200 last:border-r-0 p-4 min-h-[140px] cursor-pointer hover:bg-gray-100 transition-colors duration-150 rounded-md mx-1 my-2"
+                        onClick={() => handleOpenDiary(dayIso)}
+                      >
+                        {diary ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              {moodOption?.icon}
+                              <span className="text-sm font-medium text-gray-700">{moodOption?.label}</span>
+                            </div>
+                            <p className="text-sm text-gray-800 line-clamp-3 leading-relaxed">{diary.content}</p>
+                          </div>
+                        ) : (
+                          <div className="h-full flex items-center justify-center text-gray-400">
+                            <span className="text-sm">点击记录日记</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+          
+          {/* 月视图 */}
+          {viewMode === 'month' && (
+            <div className="p-4">
+              <div className="grid grid-cols-7 gap-2">
+                {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
+                  <div key={day} className="text-center text-sm font-medium text-gray-700 p-2">
+                    {day}
+                  </div>
+                ))}
+                {displayDates.map((day, index) => {
+                  const dayIso = format(day, "yyyy-MM-dd");
+                  const dayEvents = events.filter((event) => event.date === dayIso);
+                  const diary = getDiary(dayIso);
+                  
+                  return (
+                    <div 
+                      key={dayIso} 
+                      className="border border-gray-200 rounded-lg p-2 min-h-[100px] hover:bg-gray-50 transition-colors duration-150"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium">{format(day, 'd')}</span>
+                        {diary && (
+                          <span className="text-xs text-gray-600">有日记</span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {dayEvents.slice(0, 3).map((event) => (
+                          <div 
+                            key={event.id}
+                            className={`text-xs p-1 rounded ${getCategoryColor(categories, event.category)} truncate`}
+                            onClick={() => handleOpenEdit(event)}
+                          >
+                            {event.title}
+                          </div>
+                        ))}
+                        {dayEvents.length > 3 && (
+                          <div className="text-xs text-gray-500">+{dayEvents.length - 3} 更多</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             {selectedCell && (
