@@ -575,38 +575,7 @@ export function WeeklyTimeGrid({
                         >
                           <Plus className="h-3 w-3" />
                         </button>
-                        <button
-                          type="button"
-                          className="absolute left-0 top-0 h-2 w-full cursor-ns-resize bg-transparent hover:bg-gray-200/50 transition-colors"
-                          onMouseDown={(mouseEvent) => {
-                            mouseEvent.preventDefault();
-                            setResizeState({
-                              eventId: event.id,
-                              startY: mouseEvent.clientY,
-                              initialHour: event.startHour,
-                              startHour: event.startHour,
-                              endHour: event.endHour,
-                              direction: "start",
-                            });
-                          }}
-                          aria-label={`调整 ${event.title} 开始时间`}
-                        />
-                        <button
-                          type="button"
-                          className="absolute bottom-0 left-0 h-2 w-full cursor-ns-resize border-t border-gray-300 bg-gray-100/80 hover:bg-gray-200/80 transition-colors"
-                          onMouseDown={(mouseEvent) => {
-                            mouseEvent.preventDefault();
-                            setResizeState({
-                              eventId: event.id,
-                              startY: mouseEvent.clientY,
-                              initialHour: event.endHour,
-                              startHour: event.startHour,
-                              endHour: event.endHour,
-                              direction: "end",
-                            });
-                          }}
-                          aria-label={`调整 ${event.title} 时长`}
-                        />
+
                       </div>
                     ))}
                   </div>
