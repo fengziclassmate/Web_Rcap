@@ -310,6 +310,7 @@ export function WeeklyTimeGrid({
   const [selectedEventInstance, setSelectedEventInstance] = useState<ScheduleEvent | null>(null);
   const [showEditModeDialog, setShowEditModeDialog] = useState(false);
   const [showDeleteModeDialog, setShowDeleteModeDialog] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   function handleOpenEdit(event: ScheduleEvent) {
     // 检查是否是重复事件的实例
@@ -336,6 +337,7 @@ export function WeeklyTimeGrid({
         tag: originalEvent.tag,
         recurrence: originalEvent.recurrence,
       });
+      setEditDialogOpen(true);
     }
   }
 
@@ -345,8 +347,7 @@ export function WeeklyTimeGrid({
       const originalEvent = events.find(e => e.id === originalEventId) || selectedEventInstance;
       
       setEditMode(mode);
-      // 直接使用实例的 ID，这样 selectedEvent 就能找到对应的事件
-      setEditingEventId(selectedEventInstance.id);
+      setEditingEventId(originalEventId);
       setEditForm({
         title: originalEvent.title,
         startHour: originalEvent.startHour,
@@ -358,6 +359,7 @@ export function WeeklyTimeGrid({
         tag: originalEvent.tag,
         recurrence: originalEvent.recurrence,
       });
+      setEditDialogOpen(true);
     }
     setShowEditModeDialog(false);
   }
@@ -480,6 +482,7 @@ export function WeeklyTimeGrid({
       }
     }
 
+    setEditDialogOpen(false);
     setEditingEventId(null);
     setEditMode(null);
     setSelectedInstanceId(null);
@@ -1371,7 +1374,12 @@ export function WeeklyTimeGrid({
             )}
           </Dialog>
 
-          <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => !open && setEditingEventId(null)}>
+          <Dialog open={editDialogOpen} onOpenChange={(open) => {
+            if (!open) {
+              setEditDialogOpen(false);
+              setEditingEventId(null);
+            }
+          }}>
             {selectedEvent && (
               <DialogContent className="rounded-lg border-gray-200 shadow-lg">
                 <DialogHeader>
@@ -1709,6 +1717,7 @@ export function WeeklyTimeGrid({
                         } else {
                           // 直接删除（非重复事件或原始重复事件）
                           onDeleteEvent(selectedEvent.id);
+                          setEditDialogOpen(false);
                           setEditingEventId(null);
                         }
                       }}
@@ -1950,7 +1959,11 @@ export function WeeklyTimeGrid({
               className="block w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
               onClick={() => handleToggleComplete(contextMenu.eventId)}
             >
-              {events.find(e => e.id === contextMenu.eventId)?.isCompleted ? "标记为未完成" : "标记为已完成"}
+              {(() => {
+                const eventId = contextMenu.eventId.includes('-') ? contextMenu.eventId.split('-')[0] : contextMenu.eventId;
+                const event = events.find(e => e.id === eventId);
+                return event?.isCompleted ? "标记为未完成" : "标记为已完成";
+              })()}
             </button>
             <div className="border-t border-gray-200 my-1"></div>
             <button
