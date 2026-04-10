@@ -326,6 +326,7 @@ export function WeeklyTimeGrid({
     } else {
       // 直接编辑（非重复事件或原始重复事件）
       setEditingEventId(originalEvent.id);
+      setSelectedEventInstance(originalEvent);
       setEditForm({
         title: originalEvent.title,
         startHour: originalEvent.startHour,
@@ -420,7 +421,7 @@ export function WeeklyTimeGrid({
   }
 
   function handleSaveEdit() {
-    if (!selectedEvent || !editForm.title.trim()) return;
+    if (!editingEventId || !editForm.title.trim()) return;
     const startHour = Math.max(0, Math.min(23.5, editForm.startHour));
     const endHour = Math.max(startHour + 0.5, Math.min(24, editForm.endHour));
 
@@ -429,14 +430,18 @@ export function WeeklyTimeGrid({
       const originalEventId = selectedInstanceId.split('-')[0];
       const instanceDate = selectedInstanceId.split('-')[1];
       
-      // 1. 更新原始事件，添加例外日期
-      const updatedRecurrence = {
-        ...selectedEvent.recurrence,
-        exceptions: [...(selectedEvent.recurrence.exceptions || []), instanceDate]
-      };
-      onUpdateEvent(originalEventId, {
-        recurrence: updatedRecurrence
-      });
+      // 1. 查找原始事件
+      const originalEvent = events.find(e => e.id === originalEventId);
+      if (originalEvent) {
+        // 更新原始事件，添加例外日期
+        const updatedRecurrence = {
+          ...originalEvent.recurrence,
+          exceptions: [...(originalEvent.recurrence.exceptions || []), instanceDate]
+        };
+        onUpdateEvent(originalEventId, {
+          recurrence: updatedRecurrence
+        });
+      }
 
       // 2. 创建一个新的非重复事件
       onCreateEvent({
@@ -463,7 +468,7 @@ export function WeeklyTimeGrid({
       });
     } else {
       // 编辑所有实例：直接更新原始事件
-      const eventId = editingEventId?.includes('-') ? editingEventId.split('-')[0] : editingEventId;
+      const eventId = editingEventId.includes('-') ? editingEventId.split('-')[0] : editingEventId;
       if (eventId) {
         onUpdateEvent(eventId, {
           title: editForm.title.trim(),
@@ -491,17 +496,59 @@ export function WeeklyTimeGrid({
 
   function handleDropEvent(targetDate: string, targetHour: number) {
     if (!draggingEventId) return;
-    const draggingEvent = events.find((event) => event.id === draggingEventId);
+    
+    // 对于重复事件的实例，使用原始事件的ID
+    const originalEventId = draggingEventId.split('-')[0];
+    const draggingEvent = events.find((event) => event.id === originalEventId);
+    
     if (!draggingEvent) return;
     const duration = Math.max(0.0167, draggingEvent.endHour - draggingEvent.startHour);
     const nextStartHour = Math.min(23.9833, targetHour);
     const nextEndHour = Math.min(24, nextStartHour + duration);
 
-    onUpdateEvent(draggingEvent.id, {
-      date: targetDate,
-      startHour: nextStartHour,
-      endHour: nextEndHour,
-    });
+    // 检查是否是重复事件的实例
+    if (draggingEventId !== originalEventId) {
+      // 拖拽的是重复事件实例：将该实例从重复事件中排除，然后创建一个新的非重复事件
+      const instanceDate = draggingEventId.split('-')[1];
+      
+      // 1. 更新原始事件，添加例外日期
+      const updatedRecurrence = {
+        ...draggingEvent.recurrence,
+        exceptions: [...(draggingEvent.recurrence.exceptions || []), instanceDate]
+      };
+      onUpdateEvent(originalEventId, {
+        recurrence: updatedRecurrence
+      });
+
+      // 2. 创建一个新的非重复事件
+      onCreateEvent({
+        id: createId("event"),
+        date: targetDate,
+        startHour: nextStartHour,
+        endHour: nextEndHour,
+        title: draggingEvent.title,
+        notes: draggingEvent.notes,
+        requirements: draggingEvent.requirements,
+        isCompleted: draggingEvent.isCompleted,
+        category: draggingEvent.category,
+        tag: draggingEvent.tag,
+        recurrence: {
+          type: 'none',
+          interval: 1,
+          endType: 'never',
+          exceptions: [],
+          daysOfWeek: []
+        }
+      });
+    } else {
+      // 拖拽的是原始事件：直接更新
+      onUpdateEvent(originalEventId, {
+        date: targetDate,
+        startHour: nextStartHour,
+        endHour: nextEndHour,
+      });
+    }
+    
     setDraggingEventId(null);
   }
 
@@ -744,8 +791,10 @@ export function WeeklyTimeGrid({
         }
       }
 
-      // 增加计数
-      count++;
+      // 只在添加事件实例时增加计数
+      if (shouldAdd) {
+        count++;
+      }
 
       // 检查是否达到结束条件
       if (event.recurrence.endType === 'after' && count >= (event.recurrence.endCount || 0)) {
@@ -1380,8 +1429,7 @@ export function WeeklyTimeGrid({
               setEditingEventId(null);
             }
           }}>
-            {selectedEvent && (
-              <DialogContent className="rounded-lg border-gray-200 shadow-lg">
+            <DialogContent className="rounded-lg border-gray-200 shadow-lg">
                 <DialogHeader>
                   <DialogTitle className="text-lg font-semibold text-gray-900">编辑行程详情</DialogTitle>
                 </DialogHeader>
@@ -1711,14 +1759,17 @@ export function WeeklyTimeGrid({
                     <Button
                       onClick={() => {
                         // 检查是否是重复事件
-                        if (selectedEvent.recurrence.type !== 'none' && selectedInstanceId) {
+                        if (editForm.recurrence.type !== 'none' && selectedInstanceId) {
                           // 显示删除模式选择对话框
                           setShowDeleteModeDialog(true);
                         } else {
                           // 直接删除（非重复事件或原始重复事件）
-                          onDeleteEvent(selectedEvent.id);
-                          setEditDialogOpen(false);
-                          setEditingEventId(null);
+                          const eventId = editingEventId?.includes('-') ? editingEventId.split('-')[0] : editingEventId;
+                          if (eventId) {
+                            onDeleteEvent(eventId);
+                            setEditDialogOpen(false);
+                            setEditingEventId(null);
+                          }
                         }
                       }}
                       className="flex-1 rounded-md bg-red-600 text-white hover:bg-red-700 transition-all duration-150 py-2"
@@ -1734,7 +1785,6 @@ export function WeeklyTimeGrid({
                   </div>
                 </div>
               </DialogContent>
-            )}
           </Dialog>
 
           {/* 编辑模式选择对话框 */}
