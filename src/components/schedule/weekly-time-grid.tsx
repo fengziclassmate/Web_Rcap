@@ -272,7 +272,13 @@ export function WeeklyTimeGrid({
   };
 
   const selectedEvent = useMemo(
-    () => events.find((event) => event.id === editingEventId) ?? null,
+    () => {
+      if (!editingEventId) return null;
+      // 检查是否是重复事件的实例
+      const isInstance = editingEventId.includes('-');
+      const eventId = isInstance ? editingEventId.split('-')[0] : editingEventId;
+      return events.find((event) => event.id === eventId) ?? null;
+    },
     [events, editingEventId],
   );
   function resetCreateDialog(cell: GridCell) {
@@ -339,8 +345,8 @@ export function WeeklyTimeGrid({
       const originalEvent = events.find(e => e.id === originalEventId) || selectedEventInstance;
       
       setEditMode(mode);
-      // 始终使用原始事件的 ID，而不是实例的 ID
-      setEditingEventId(originalEventId);
+      // 直接使用实例的 ID，这样 selectedEvent 就能找到对应的事件
+      setEditingEventId(selectedEventInstance.id);
       setEditForm({
         title: originalEvent.title,
         startHour: originalEvent.startHour,
@@ -455,20 +461,23 @@ export function WeeklyTimeGrid({
       });
     } else {
       // 编辑所有实例：直接更新原始事件
-      onUpdateEvent(selectedEvent.id, {
-        title: editForm.title.trim(),
-        startHour,
-        endHour,
-        notes: editForm.notes.trim(),
-        requirements: typeof editForm.requirements === 'string' ? editForm.requirements
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean) : editForm.requirements,
-        isCompleted: editForm.isCompleted,
-        category: editForm.category,
-        tag: editForm.tag,
-        recurrence: editForm.recurrence,
-      });
+      const eventId = editingEventId?.includes('-') ? editingEventId.split('-')[0] : editingEventId;
+      if (eventId) {
+        onUpdateEvent(eventId, {
+          title: editForm.title.trim(),
+          startHour,
+          endHour,
+          notes: editForm.notes.trim(),
+          requirements: typeof editForm.requirements === 'string' ? editForm.requirements
+            .split("\n")
+            .map((item) => item.trim())
+            .filter(Boolean) : editForm.requirements,
+          isCompleted: editForm.isCompleted,
+          category: editForm.category,
+          tag: editForm.tag,
+          recurrence: editForm.recurrence,
+        });
+      }
     }
 
     setEditingEventId(null);
@@ -581,11 +590,8 @@ export function WeeklyTimeGrid({
   function handleSetTag(eventId: string, tag: EventTag) {
     // 对于重复事件的实例，使用原始事件的ID
     const originalEventId = eventId.split('-')[0];
-    // 确保原始事件存在
-    const originalEvent = events.find(e => e.id === originalEventId);
-    if (originalEvent) {
-      onUpdateEvent(originalEventId, { tag });
-    }
+    // 直接调用 onUpdateEvent，不需要检查原始事件是否存在
+    onUpdateEvent(originalEventId, { tag });
     closeContextMenu();
   }
 
