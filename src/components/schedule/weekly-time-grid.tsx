@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
 import { zhCN } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Clock3, Plus, Smile, Frown, Meh, Angry, Heart, Check, Star, AlertTriangle, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3, Plus, Smile, Frown, Meh, Angry, Heart, Check, Star, AlertTriangle, AlertCircle, Trash2 } from "lucide-react";
 import type { ScheduleEvent, EventTag } from "@/app/page";
 import { Button } from "@/components/ui/button";
 import {
