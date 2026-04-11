@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { addDays, addWeeks, addMonths, addYears, format, isAfter, isBefore, isSameDay, parseISO } from "date-fns";
+import { addDays, format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Clock3, Plus, Smile, Frown, Meh, Angry, Heart, Check, Star, AlertTriangle, AlertCircle, Trash2 } from "lucide-react";
-import type { ScheduleEvent, EventTag, RecurrenceType, RecurrenceEndType } from "@/app/page";
+import type { ScheduleEvent, EventTag } from "@/app/page";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -92,15 +92,6 @@ type EventFormState = {
   isCompleted: boolean;
   category: string;
   tag: EventTag;
-  recurrence: {
-    type: RecurrenceType;
-    interval: number;
-    endType: RecurrenceEndType;
-    endDate?: string;
-    endCount?: number;
-    exceptions: string[];
-    daysOfWeek?: number[];
-  };
 };
 
 type ResizeState = {
@@ -151,13 +142,6 @@ const defaultForm: EventFormState = {
   isCompleted: false,
   category: "个人",
   tag: null,
-  recurrence: {
-    type: 'none',
-    interval: 1,
-    endType: 'never',
-    exceptions: [],
-    daysOfWeek: []
-  },
 };
 
 function formatHour(hour: number) {
@@ -272,13 +256,7 @@ export function WeeklyTimeGrid({
   };
 
   const selectedEvent = useMemo(
-    () => {
-      if (!editingEventId) return null;
-      // 检查是否是重复事件的实例
-      const isInstance = editingEventId.includes('-');
-      const eventId = isInstance ? editingEventId.split('-')[0] : editingEventId;
-      return events.find((event) => event.id === eventId) ?? null;
-    },
+    () => events.find((event) => event.id === editingEventId) ?? null,
     [events, editingEventId],
   );
   function resetCreateDialog(cell: GridCell) {
@@ -292,108 +270,22 @@ export function WeeklyTimeGrid({
       isCompleted: false,
       category: "个人",
       tag: null,
-      recurrence: {
-        type: 'none',
-        interval: 1,
-        endType: 'never',
-        exceptions: [],
-        daysOfWeek: []
-      },
     });
     setCreateDialogOpen(true);
   }
 
-  // 状态管理
-  const [editMode, setEditMode] = useState<'single' | 'all' | null>(null);
-  const [deleteMode, setDeleteMode] = useState<'single' | 'all' | null>(null);
-  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
-  const [selectedEventInstance, setSelectedEventInstance] = useState<ScheduleEvent | null>(null);
-  const [showEditModeDialog, setShowEditModeDialog] = useState(false);
-  const [showDeleteModeDialog, setShowDeleteModeDialog] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-
   function handleOpenEdit(event: ScheduleEvent) {
-    // 检查是否是重复事件的实例
-    const isInstance = event.id.includes('-');
-    const originalEventId = event.id.split('-')[0];
-    const originalEvent = events.find(e => e.id === originalEventId) || event;
-    
-    if (isInstance && originalEvent.recurrence.type !== 'none') {
-      // 显示编辑模式选择对话框
-      setSelectedInstanceId(event.id);
-      setSelectedEventInstance(event);
-      setShowEditModeDialog(true);
-    } else {
-      // 直接编辑（非重复事件或原始重复事件）
-      setEditingEventId(originalEvent.id);
-      setSelectedEventInstance(originalEvent);
-      setEditForm({
-        title: originalEvent.title,
-        startHour: originalEvent.startHour,
-        endHour: originalEvent.endHour,
-        notes: originalEvent.notes,
-        requirements: Array.isArray(originalEvent.requirements) ? originalEvent.requirements.join("\n") : originalEvent.requirements,
-        isCompleted: originalEvent.isCompleted,
-        category: originalEvent.category,
-        tag: originalEvent.tag,
-        recurrence: originalEvent.recurrence,
-      });
-      setEditDialogOpen(true);
-    }
-  }
-
-  function handleEditModeSelect(mode: 'single' | 'all') {
-    if (selectedInstanceId && selectedEventInstance) {
-      const originalEventId = selectedInstanceId.split('-')[0];
-      const originalEvent = events.find(e => e.id === originalEventId) || selectedEventInstance;
-      
-      setEditMode(mode);
-      setEditingEventId(originalEventId);
-      setEditForm({
-        title: originalEvent.title,
-        startHour: originalEvent.startHour,
-        endHour: originalEvent.endHour,
-        notes: originalEvent.notes,
-        requirements: Array.isArray(originalEvent.requirements) ? originalEvent.requirements.join("\n") : originalEvent.requirements,
-        isCompleted: originalEvent.isCompleted,
-        category: originalEvent.category,
-        tag: originalEvent.tag,
-        recurrence: originalEvent.recurrence,
-      });
-      setEditDialogOpen(true);
-    }
-    setShowEditModeDialog(false);
-  }
-
-  function handleDeleteModeSelect(mode: 'single' | 'all') {
-    if (selectedInstanceId) {
-      const originalEventId = selectedInstanceId.split('-')[0];
-      
-      if (mode === 'single') {
-        // 删除单个实例：将该实例从重复事件中排除
-        const instanceDate = selectedInstanceId.split('-')[1];
-        const originalEvent = events.find(e => e.id === originalEventId);
-        
-        if (originalEvent) {
-          const updatedRecurrence = {
-            ...originalEvent.recurrence,
-            exceptions: [...(originalEvent.recurrence.exceptions || []), instanceDate]
-          };
-          onUpdateEvent(originalEventId, {
-            recurrence: updatedRecurrence
-          });
-        }
-      } else {
-        // 删除所有实例：直接删除原始事件
-        onDeleteEvent(originalEventId);
-      }
-    }
-    
-    setShowDeleteModeDialog(false);
-    setEditingEventId(null);
-    setDeleteMode(null);
-    setSelectedInstanceId(null);
-    setSelectedEventInstance(null);
+    setEditingEventId(event.id);
+    setEditForm({
+      title: event.title,
+      startHour: event.startHour,
+      endHour: event.endHour,
+      notes: event.notes,
+      requirements: event.requirements.join("\n"),
+      isCompleted: event.isCompleted,
+      category: event.category,
+      tag: event.tag,
+    });
   }
 
   function handleCreateEvent() {
@@ -415,140 +307,43 @@ export function WeeklyTimeGrid({
       isCompleted: createForm.isCompleted,
       category: createForm.category,
       tag: createForm.tag,
-      recurrence: createForm.recurrence,
     });
     setCreateDialogOpen(false);
   }
 
   function handleSaveEdit() {
-    if (!editingEventId || !editForm.title.trim()) return;
+    if (!selectedEvent || !editForm.title.trim()) return;
     const startHour = Math.max(0, Math.min(23.5, editForm.startHour));
     const endHour = Math.max(startHour + 0.5, Math.min(24, editForm.endHour));
-
-    if (editMode === 'single' && selectedInstanceId) {
-      // 编辑单个实例：将该实例从重复事件中排除，然后创建一个新的非重复事件
-      const originalEventId = selectedInstanceId.split('-')[0];
-      const instanceDate = selectedInstanceId.split('-')[1];
-      
-      // 1. 查找原始事件
-      const originalEvent = events.find(e => e.id === originalEventId);
-      if (originalEvent) {
-        // 更新原始事件，添加例外日期
-        const updatedRecurrence = {
-          ...originalEvent.recurrence,
-          exceptions: [...(originalEvent.recurrence.exceptions || []), instanceDate]
-        };
-        onUpdateEvent(originalEventId, {
-          recurrence: updatedRecurrence
-        });
-      }
-
-      // 2. 创建一个新的非重复事件
-      onCreateEvent({
-        id: createId("event"),
-        date: instanceDate,
-        startHour,
-        endHour,
-        title: editForm.title.trim(),
-        notes: editForm.notes.trim(),
-        requirements: typeof editForm.requirements === 'string' ? editForm.requirements
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean) : editForm.requirements,
-        isCompleted: editForm.isCompleted,
-        category: editForm.category,
-        tag: editForm.tag,
-        recurrence: {
-          type: 'none',
-          interval: 1,
-          endType: 'never',
-          exceptions: [],
-          daysOfWeek: []
-        }
-      });
-    } else {
-      // 编辑所有实例：直接更新原始事件
-      const eventId = editingEventId;
-      if (eventId) {
-        onUpdateEvent(eventId, {
-          title: editForm.title.trim(),
-          startHour,
-          endHour,
-          notes: editForm.notes.trim(),
-          requirements: typeof editForm.requirements === 'string' ? editForm.requirements
-            .split("\n")
-            .map((item) => item.trim())
-            .filter(Boolean) : editForm.requirements,
-          isCompleted: editForm.isCompleted,
-          category: editForm.category,
-          tag: editForm.tag,
-          recurrence: editForm.recurrence,
-        });
-      }
-    }
-
-    setEditDialogOpen(false);
+    onUpdateEvent(selectedEvent.id, {
+      title: editForm.title.trim(),
+      startHour,
+      endHour,
+      notes: editForm.notes.trim(),
+      requirements: editForm.requirements
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      isCompleted: editForm.isCompleted,
+      category: editForm.category,
+      tag: editForm.tag,
+    });
     setEditingEventId(null);
-    setEditMode(null);
-    setSelectedInstanceId(null);
-    setSelectedEventInstance(null);
   }
 
   function handleDropEvent(targetDate: string, targetHour: number) {
     if (!draggingEventId) return;
-    
-    // 对于重复事件的实例，使用原始事件的ID
-    const originalEventId = draggingEventId.split('-')[0];
-    const draggingEvent = events.find((event) => event.id === originalEventId);
-    
+    const draggingEvent = events.find((event) => event.id === draggingEventId);
     if (!draggingEvent) return;
     const duration = Math.max(0.0167, draggingEvent.endHour - draggingEvent.startHour);
     const nextStartHour = Math.min(23.9833, targetHour);
     const nextEndHour = Math.min(24, nextStartHour + duration);
 
-    // 检查是否是重复事件的实例
-    if (draggingEventId !== originalEventId) {
-      // 拖拽的是重复事件实例：将该实例从重复事件中排除，然后创建一个新的非重复事件
-      const instanceDate = draggingEventId.split('-')[1];
-      
-      // 1. 更新原始事件，添加例外日期
-      const updatedRecurrence = {
-        ...draggingEvent.recurrence,
-        exceptions: [...(draggingEvent.recurrence.exceptions || []), instanceDate]
-      };
-      onUpdateEvent(originalEventId, {
-        recurrence: updatedRecurrence
-      });
-
-      // 2. 创建一个新的非重复事件
-      onCreateEvent({
-        id: createId("event"),
-        date: targetDate,
-        startHour: nextStartHour,
-        endHour: nextEndHour,
-        title: draggingEvent.title,
-        notes: draggingEvent.notes,
-        requirements: draggingEvent.requirements,
-        isCompleted: draggingEvent.isCompleted,
-        category: draggingEvent.category,
-        tag: draggingEvent.tag,
-        recurrence: {
-          type: 'none',
-          interval: 1,
-          endType: 'never',
-          exceptions: [],
-          daysOfWeek: []
-        }
-      });
-    } else {
-      // 拖拽的是原始事件：直接更新
-      onUpdateEvent(originalEventId, {
-        date: targetDate,
-        startHour: nextStartHour,
-        endHour: nextEndHour,
-      });
-    }
-    
+    onUpdateEvent(draggingEvent.id, {
+      date: targetDate,
+      startHour: nextStartHour,
+      endHour: nextEndHour,
+    });
     setDraggingEventId(null);
   }
 
@@ -602,12 +397,10 @@ export function WeeklyTimeGrid({
 
   function handleContextMenu(event: React.MouseEvent, eventId: string) {
     event.preventDefault();
-    // 对于重复事件的实例，使用原始事件的ID
-    const originalEventId = eventId.split('-')[0];
     setContextMenu({
       x: event.clientX,
       y: event.clientY,
-      eventId: originalEventId,
+      eventId,
     });
   }
 
@@ -616,9 +409,7 @@ export function WeeklyTimeGrid({
   }
 
   function handleReschedule(eventId: string) {
-    // 对于重复事件的实例，使用原始事件的ID
-    const originalEventId = eventId.split('-')[0];
-    const event = events.find(e => e.id === originalEventId);
+    const event = events.find(e => e.id === eventId);
     if (event) {
       handleOpenEdit(event);
     }
@@ -626,11 +417,9 @@ export function WeeklyTimeGrid({
   }
 
   function handleExtendTime(eventId: string) {
-    // 对于重复事件的实例，使用原始事件的ID
-    const originalEventId = eventId.split('-')[0];
-    const event = events.find(e => e.id === originalEventId);
+    const event = events.find(e => e.id === eventId);
     if (event) {
-      onUpdateEvent(originalEventId, {
+      onUpdateEvent(eventId, {
         endHour: event.endHour + 1,
       });
     }
@@ -638,19 +427,14 @@ export function WeeklyTimeGrid({
   }
 
   function handleSetTag(eventId: string, tag: EventTag) {
-    // 对于重复事件的实例，使用原始事件的ID
-    const originalEventId = eventId.split('-')[0];
-    // 直接调用 onUpdateEvent，不需要检查原始事件是否存在
-    onUpdateEvent(originalEventId, { tag });
+    onUpdateEvent(eventId, { tag });
     closeContextMenu();
   }
 
   function handleToggleComplete(eventId: string) {
-    // 对于重复事件的实例，使用原始事件的ID
-    const originalEventId = eventId.split('-')[0];
-    const event = events.find(e => e.id === originalEventId);
+    const event = events.find(e => e.id === eventId);
     if (event) {
-      onUpdateEvent(originalEventId, {
+      onUpdateEvent(eventId, {
         isCompleted: !event.isCompleted,
       });
     }
@@ -723,159 +507,6 @@ export function WeeklyTimeGrid({
       left: `calc(${(event.lane / event.laneCount) * 100}% + 4px)`,
       width: `calc(${100 / event.laneCount}% - 8px)`,
     };
-  };
-
-  // 计算重复事件的所有实例
-  const getRecurrenceInstances = (event: ScheduleEvent, startDate: Date, endDate: Date): ScheduleEvent[] => {
-    if (event.recurrence.type === 'none') {
-      // 非重复事件，只在原始日期返回
-      const eventDate = parseISO(event.date);
-      if (isSameDay(eventDate, startDate)) {
-        return [event];
-      } else {
-        return [];
-      }
-    }
-
-    const instances: ScheduleEvent[] = [];
-    const eventDate = parseISO(event.date);
-    
-    // 对于每周重复的事件，需要特殊处理
-    if (event.recurrence.type === 'weekly') {
-      // 检查当前日期是否是重复日期
-      const dayOfWeek = startDate.getDay(); // 0-6，0表示周日
-      
-      // 检查是否设置了重复日期
-      if (event.recurrence.daysOfWeek && event.recurrence.daysOfWeek.length > 0) {
-        // 检查当前日期是否在重复日期列表中
-        if (event.recurrence.daysOfWeek.includes(dayOfWeek)) {
-          // 检查是否是例外日期
-          const currentDateStr = format(startDate, 'yyyy-MM-dd');
-          if (!event.recurrence.exceptions.includes(currentDateStr)) {
-            // 检查是否达到结束条件
-            let shouldAdd = true;
-            
-            // 检查是否在结束日期之前
-            if (event.recurrence.endType === 'on' && event.recurrence.endDate) {
-              const endDateObj = parseISO(event.recurrence.endDate);
-              if (isAfter(startDate, endDateObj)) {
-                shouldAdd = false;
-              }
-            }
-            
-            if (shouldAdd) {
-              instances.push({
-                ...event,
-                id: `${event.id}-${currentDateStr}`,
-                date: currentDateStr
-              });
-            }
-          }
-        }
-      } else {
-        // 对于没有设置 daysOfWeek 的现有事件，保持原有行为
-        // 只在与原始事件相同的星期几添加
-        const originalDayOfWeek = eventDate.getDay();
-        if (originalDayOfWeek === dayOfWeek) {
-          // 检查是否是例外日期
-          const currentDateStr = format(startDate, 'yyyy-MM-dd');
-          if (!event.recurrence.exceptions.includes(currentDateStr)) {
-            // 检查是否达到结束条件
-            let shouldAdd = true;
-            
-            // 检查是否在结束日期之前
-            if (event.recurrence.endType === 'on' && event.recurrence.endDate) {
-              const endDateObj = parseISO(event.recurrence.endDate);
-              if (isAfter(startDate, endDateObj)) {
-                shouldAdd = false;
-              }
-            }
-            
-            if (shouldAdd) {
-              instances.push({
-                ...event,
-                id: `${event.id}-${currentDateStr}`,
-                date: currentDateStr
-              });
-            }
-          }
-        }
-      }
-    } else {
-      // 其他类型的重复事件
-      let currentDate = eventDate;
-      let count = 0;
-
-      while (true) {
-        // 检查当前日期是否在范围内
-        if (isAfter(currentDate, endDate)) {
-          break;
-        }
-
-        let shouldAdd = false;
-
-        // 检查当前日期是否在范围内
-        if (isBefore(currentDate, startDate)) {
-          // 日期在范围之前，跳过
-        } else {
-          // 检查是否是例外日期
-          const currentDateStr = format(currentDate, 'yyyy-MM-dd');
-          if (!event.recurrence.exceptions.includes(currentDateStr)) {
-            // 检查是否是原始事件日期或符合重复规则的日期
-            
-            if (isSameDay(currentDate, eventDate)) {
-              // 原始事件日期，总是添加
-              shouldAdd = true;
-            } else if (count > 0) {
-              // 对于重复事件，直接添加
-              shouldAdd = true;
-            }
-            
-            if (shouldAdd) {
-              instances.push({
-                ...event,
-                id: `${event.id}-${currentDateStr}`,
-                date: currentDateStr
-              });
-            }
-          }
-        }
-
-        // 只在添加事件实例时增加计数
-        if (shouldAdd) {
-          count++;
-        }
-
-        // 检查是否达到结束条件
-        if (event.recurrence.endType === 'after' && count >= (event.recurrence.endCount || 0)) {
-          break;
-        }
-
-        if (event.recurrence.endType === 'on' && event.recurrence.endDate) {
-          const endDateObj = parseISO(event.recurrence.endDate);
-          if (isAfter(currentDate, endDateObj)) {
-            break;
-          }
-        }
-
-        // 计算下一个重复日期
-        switch (event.recurrence.type) {
-          case 'daily':
-            currentDate = addDays(currentDate, event.recurrence.interval);
-            break;
-          case 'monthly':
-            currentDate = addMonths(currentDate, event.recurrence.interval);
-            break;
-          case 'yearly':
-            currentDate = addYears(currentDate, event.recurrence.interval);
-            break;
-          default:
-            break;
-        }
-      }
-    }
-
-    return instances;
   };
 
   return (
@@ -987,15 +618,7 @@ export function WeeklyTimeGrid({
 
                 {displayDates.map((day) => {
                   const dayIso = format(day, "yyyy-MM-dd");
-                  
-                  // 计算该日期的所有事件（包括重复事件的实例）
-                  const allDayEvents: ScheduleEvent[] = [];
-                  events.forEach(event => {
-                    const instances = getRecurrenceInstances(event, day, day);
-                    allDayEvents.push(...instances);
-                  });
-                  
-                  const dayEvents = layoutDayEvents(allDayEvents);
+                  const dayEvents = layoutDayEvents(events.filter((event) => event.date === dayIso));
 
                   return (
                     <div key={dayIso} className="relative border-r border-gray-200 last:border-r-0">
@@ -1049,9 +672,6 @@ export function WeeklyTimeGrid({
                                     <span className={`text-sm font-bold ${getTagInfo(event.tag).color}`}>
                                       {getTagInfo(event.tag).icon}
                                     </span>
-                                  )}
-                                  {event.recurrence.type !== 'none' && (
-                                    <span className="text-xs text-gray-500 tooltip" title="重复事件">🔄</span>
                                   )}
                                 </div>
                                 {event.isCompleted && (
@@ -1131,15 +751,7 @@ export function WeeklyTimeGrid({
                 ))}
                 {displayDates.map((day, index) => {
                   const dayIso = format(day, "yyyy-MM-dd");
-                  
-                  // 计算该日期的所有事件（包括重复事件的实例）
-                  const allDayEvents: ScheduleEvent[] = [];
-                  events.forEach(event => {
-                    const instances = getRecurrenceInstances(event, day, day);
-                    allDayEvents.push(...instances);
-                  });
-                  
-                  const dayEvents = allDayEvents;
+                  const dayEvents = events.filter((event) => event.date === dayIso);
                   const diary = getDiary(dayIso);
                   
                   return (
@@ -1160,12 +772,7 @@ export function WeeklyTimeGrid({
                             className={`text-xs p-1 rounded ${getCategoryColor(categories, event.category)} truncate`}
                             onClick={() => handleOpenEdit(event)}
                           >
-                            <div className="flex items-center gap-1">
-                              {event.recurrence.type !== 'none' && (
-                                <span className="text-xs">🔄</span>
-                              )}
-                              {event.title}
-                            </div>
+                            {event.title}
                           </div>
                         ))}
                         {dayEvents.length > 3 && (
@@ -1327,139 +934,6 @@ export function WeeklyTimeGrid({
                       </div>
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium text-gray-700">重复设置</Label>
-                    <Select
-                      value={createForm.recurrence.type}
-                      onValueChange={(value) => setCreateForm((prev) => ({
-                        ...prev,
-                        recurrence: {
-                          ...prev.recurrence,
-                          type: value as RecurrenceType
-                        }
-                      }))}
-                    >
-                      <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
-                        <SelectValue placeholder="选择重复类型" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">不重复</SelectItem>
-                        <SelectItem value="daily">每天</SelectItem>
-                        <SelectItem value="weekly">每周</SelectItem>
-                        <SelectItem value="monthly">每月</SelectItem>
-                        <SelectItem value="yearly">每年</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {createForm.recurrence.type !== 'none' && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <Label className="text-sm font-medium text-gray-700">重复间隔</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={createForm.recurrence.interval}
-                            onChange={(event) => setCreateForm((prev) => ({
-                              ...prev,
-                              recurrence: {
-                                ...prev.recurrence,
-                                interval: Number(event.target.value) || 1
-                              }
-                            }))}
-                            className="w-20 rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                          />
-                          <span className="text-sm text-gray-600">
-                            {createForm.recurrence.type === 'daily' ? '天' :
-                             createForm.recurrence.type === 'weekly' ? '周' :
-                             createForm.recurrence.type === 'monthly' ? '月' : '年'}
-                          </span>
-                        </div>
-                        {createForm.recurrence.type === 'weekly' && (
-                          <div className="space-y-3">
-                            <Label className="text-sm font-medium text-gray-700">重复日期</Label>
-                            <div className="flex flex-wrap gap-2">
-                              {['周日', '周一', '周二', '周三', '周四', '周五', '周六'].map((day, index) => (
-                                <Button
-                                  key={index}
-                                  type="button"
-                                  variant={createForm.recurrence.daysOfWeek?.includes(index) ? 'default' : 'outline'}
-                                  className={`rounded-md ${createForm.recurrence.daysOfWeek?.includes(index) ? 'bg-primary text-white' : 'border-gray-300'}`}
-                                  onClick={() => {
-                                    const currentDays = createForm.recurrence.daysOfWeek || [];
-                                    let newDays;
-                                    if (currentDays.includes(index)) {
-                                      newDays = currentDays.filter(d => d !== index);
-                                    } else {
-                                      newDays = [...currentDays, index];
-                                    }
-                                    setCreateForm((prev) => ({
-                                      ...prev,
-                                      recurrence: {
-                                        ...prev.recurrence,
-                                        daysOfWeek: newDays
-                                      }
-                                    }));
-                                  }}
-                                >
-                                  {day}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">结束方式</Label>
-                          <Select
-                            value={createForm.recurrence.endType}
-                            onValueChange={(value) => setCreateForm((prev) => ({
-                              ...prev,
-                              recurrence: {
-                                ...prev.recurrence,
-                                endType: value as RecurrenceEndType
-                              }
-                            }))}
-                          >
-                            <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
-                              <SelectValue placeholder="选择结束方式" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="never">永不结束</SelectItem>
-                              <SelectItem value="on">在特定日期结束</SelectItem>
-                              <SelectItem value="after">重复特定次数后结束</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          {createForm.recurrence.endType === 'on' && (
-                            <Input
-                              type="date"
-                              value={createForm.recurrence.endDate || ''}
-                              onChange={(event) => setCreateForm((prev) => ({
-                                ...prev,
-                                recurrence: {
-                                  ...prev.recurrence,
-                                  endDate: event.target.value
-                                }
-                              }))}
-                              className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                            />
-                          )}
-                          {createForm.recurrence.endType === 'after' && (
-                            <Input
-                              type="number"
-                              min="1"
-                              value={createForm.recurrence.endCount || 1}
-                              onChange={(event) => setCreateForm((prev) => ({
-                                ...prev,
-                                recurrence: {
-                                  ...prev.recurrence,
-                                  endCount: Number(event.target.value) || 1
-                                }
-                              }))}
-                              className="w-20 rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                            />
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
                   <Button
                     onClick={handleCreateEvent}
                     className="w-full rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150 py-2"
@@ -1471,13 +945,9 @@ export function WeeklyTimeGrid({
             )}
           </Dialog>
 
-          <Dialog open={editDialogOpen} onOpenChange={(open) => {
-            if (!open) {
-              setEditDialogOpen(false);
-              setEditingEventId(null);
-            }
-          }}>
-            <DialogContent className="rounded-lg border-gray-200 shadow-lg">
+          <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => !open && setEditingEventId(null)}>
+            {selectedEvent && (
+              <DialogContent className="rounded-lg border-gray-200 shadow-lg">
                 <DialogHeader>
                   <DialogTitle className="text-lg font-semibold text-gray-900">编辑行程详情</DialogTitle>
                 </DialogHeader>
@@ -1622,154 +1092,6 @@ export function WeeklyTimeGrid({
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <Label className="text-sm font-medium text-gray-700">重复设置</Label>
-                    <Select
-                      value={editForm.recurrence.type}
-                      onValueChange={(value) => setEditForm((prev) => ({
-                        ...prev,
-                        recurrence: {
-                          ...prev.recurrence,
-                          type: value as RecurrenceType
-                        }
-                      }))}
-                    >
-                      <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
-                        <SelectValue placeholder="选择重复类型" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">不重复</SelectItem>
-                        <SelectItem value="daily">每天</SelectItem>
-                        <SelectItem value="weekly">每周</SelectItem>
-                        <SelectItem value="monthly">每月</SelectItem>
-                        <SelectItem value="yearly">每年</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {editForm.recurrence.type !== 'none' && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <Label className="text-sm font-medium text-gray-700">重复间隔</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={editForm.recurrence.interval}
-                            onChange={(event) => setEditForm((prev) => ({
-                              ...prev,
-                              recurrence: {
-                                ...prev.recurrence,
-                                interval: Number(event.target.value) || 1
-                              }
-                            }))}
-                            className="w-20 rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                          />
-                          <span className="text-sm text-gray-600">
-                            {editForm.recurrence.type === 'daily' ? '天' :
-                             editForm.recurrence.type === 'weekly' ? '周' :
-                             editForm.recurrence.type === 'monthly' ? '月' : '年'}
-                          </span>
-                        </div>
-                        {editForm.recurrence.type === 'weekly' && (
-                          <div className="space-y-3">
-                            <Label className="text-sm font-medium text-gray-700">重复日期</Label>
-                            <div className="flex flex-wrap gap-2">
-                              {['周日', '周一', '周二', '周三', '周四', '周五', '周六'].map((day, index) => (
-                                <Button
-                                  key={index}
-                                  type="button"
-                                  variant={editForm.recurrence.daysOfWeek?.includes(index) ? 'default' : 'outline'}
-                                  className={`rounded-md ${editForm.recurrence.daysOfWeek?.includes(index) ? 'bg-primary text-white' : 'border-gray-300'}`}
-                                  onClick={() => {
-                                    const currentDays = editForm.recurrence.daysOfWeek || [];
-                                    let newDays;
-                                    if (currentDays.includes(index)) {
-                                      newDays = currentDays.filter(d => d !== index);
-                                    } else {
-                                      newDays = [...currentDays, index];
-                                    }
-                                    setEditForm((prev) => ({
-                                      ...prev,
-                                      recurrence: {
-                                        ...prev.recurrence,
-                                        daysOfWeek: newDays
-                                      }
-                                    }));
-                                  }}
-                                >
-                                  {day}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">结束方式</Label>
-                          <Select
-                            value={editForm.recurrence.endType}
-                            onValueChange={(value) => setEditForm((prev) => ({
-                              ...prev,
-                              recurrence: {
-                                ...prev.recurrence,
-                                endType: value as RecurrenceEndType
-                              }
-                            }))}
-                          >
-                            <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
-                              <SelectValue placeholder="选择结束方式" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="never">永不结束</SelectItem>
-                              <SelectItem value="on">在特定日期结束</SelectItem>
-                              <SelectItem value="after">重复特定次数后结束</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          {editForm.recurrence.endType === 'on' && (
-                            <Input
-                              type="date"
-                              value={editForm.recurrence.endDate || ''}
-                              onChange={(event) => setEditForm((prev) => ({
-                                ...prev,
-                                recurrence: {
-                                  ...prev.recurrence,
-                                  endDate: event.target.value
-                                }
-                              }))}
-                              className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                            />
-                          )}
-                          {editForm.recurrence.endType === 'after' && (
-                            <Input
-                              type="number"
-                              min="1"
-                              value={editForm.recurrence.endCount || 1}
-                              onChange={(event) => setEditForm((prev) => ({
-                                ...prev,
-                                recurrence: {
-                                  ...prev.recurrence,
-                                  endCount: Number(event.target.value) || 1
-                                }
-                              }))}
-                              className="w-20 rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                            />
-                          )}
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">例外日期</Label>
-                          <Textarea
-                            value={editForm.recurrence.exceptions.join('\n')}
-                            onChange={(event) => setEditForm((prev) => ({
-                              ...prev,
-                              recurrence: {
-                                ...prev.recurrence,
-                                exceptions: event.target.value.split('\n').filter(Boolean)
-                              }
-                            }))}
-                            placeholder="每行输入一个例外日期，格式：YYYY-MM-DD"
-                            className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-3">
                     <Label htmlFor="edit-notes" className="text-sm font-medium text-gray-700">备注</Label>
                     <Textarea
                       id="edit-notes"
@@ -1806,19 +1128,8 @@ export function WeeklyTimeGrid({
                   <div className="flex space-x-4">
                     <Button
                       onClick={() => {
-                        // 检查是否是重复事件
-                        if (editForm.recurrence.type !== 'none' && selectedInstanceId) {
-                          // 显示删除模式选择对话框
-                          setShowDeleteModeDialog(true);
-                        } else {
-                          // 直接删除（非重复事件或原始重复事件）
-                          const eventId = editingEventId?.includes('-') ? editingEventId.split('-')[0] : editingEventId;
-                          if (eventId) {
-                            onDeleteEvent(eventId);
-                            setEditDialogOpen(false);
-                            setEditingEventId(null);
-                          }
-                        }
+                        onDeleteEvent(selectedEvent.id);
+                        setEditingEventId(null);
                       }}
                       className="flex-1 rounded-md bg-red-600 text-white hover:bg-red-700 transition-all duration-150 py-2"
                     >
@@ -1833,58 +1144,7 @@ export function WeeklyTimeGrid({
                   </div>
                 </div>
               </DialogContent>
-          </Dialog>
-
-          {/* 编辑模式选择对话框 */}
-          <Dialog open={showEditModeDialog} onOpenChange={setShowEditModeDialog}>
-            <DialogContent className="rounded-lg border-gray-200 shadow-lg">
-              <DialogHeader>
-                <DialogTitle className="text-lg font-semibold text-gray-900">编辑重复事件</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <p className="text-sm text-gray-600">您想如何编辑这个重复事件？</p>
-                <div className="space-y-3">
-                  <Button
-                    onClick={() => handleEditModeSelect('single')}
-                    className="w-full rounded-md border border-gray-300 bg-white text-gray-900 hover:bg-gray-50 transition-all duration-150 py-2"
-                  >
-                    仅编辑当前实例
-                  </Button>
-                  <Button
-                    onClick={() => handleEditModeSelect('all')}
-                    className="w-full rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150 py-2"
-                  >
-                    编辑所有重复实例
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* 删除模式选择对话框 */}
-          <Dialog open={showDeleteModeDialog} onOpenChange={setShowDeleteModeDialog}>
-            <DialogContent className="rounded-lg border-gray-200 shadow-lg">
-              <DialogHeader>
-                <DialogTitle className="text-lg font-semibold text-gray-900">删除重复事件</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <p className="text-sm text-gray-600">您想如何删除这个重复事件？</p>
-                <div className="space-y-3">
-                  <Button
-                    onClick={() => handleDeleteModeSelect('single')}
-                    className="w-full rounded-md border border-gray-300 bg-white text-gray-900 hover:bg-gray-50 transition-all duration-150 py-2"
-                  >
-                    仅删除当前实例
-                  </Button>
-                  <Button
-                    onClick={() => handleDeleteModeSelect('all')}
-                    className="w-full rounded-md bg-red-600 text-white hover:bg-red-700 transition-all duration-150 py-2"
-                  >
-                    删除所有重复实例
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
+            )}
           </Dialog>
 
           {/* 分类管理对话框 */}
@@ -2057,11 +1317,7 @@ export function WeeklyTimeGrid({
               className="block w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
               onClick={() => handleToggleComplete(contextMenu.eventId)}
             >
-              {(() => {
-                const eventId = contextMenu.eventId.includes('-') ? contextMenu.eventId.split('-')[0] : contextMenu.eventId;
-                const event = events.find(e => e.id === eventId);
-                return event?.isCompleted ? "标记为未完成" : "标记为已完成";
-              })()}
+              {events.find(e => e.id === contextMenu.eventId)?.isCompleted ? "标记为未完成" : "标记为已完成"}
             </button>
             <div className="border-t border-gray-200 my-1"></div>
             <button

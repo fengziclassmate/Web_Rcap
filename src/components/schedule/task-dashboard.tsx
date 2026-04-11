@@ -171,29 +171,6 @@ export function TaskDashboard({
     }
   }
 
-  function getPriorityColor(priority: Priority) {
-    switch (priority) {
-      case "紧急且重要":
-        return "bg-red-100 border-red-300 text-red-800";
-      case "紧急不重要":
-        return "bg-orange-100 border-orange-300 text-orange-800";
-      case "不紧急重要":
-        return "bg-blue-100 border-blue-300 text-blue-800";
-      case "不紧急不重要":
-        return "bg-gray-100 border-gray-300 text-gray-800";
-      default:
-        return "bg-gray-100 border-gray-300 text-gray-800";
-    }
-  }
-
-  function getPriorityBadge(priority: Priority) {
-    return (
-      <Badge className={`rounded-md ${getPriorityColor(priority)}`}>
-        {priority}
-      </Badge>
-    );
-  }
-
   function handleConfirmDeleteTask() {
     if (!pendingDeleteTaskId) return;
     onDeleteTask(pendingDeleteTaskId);
@@ -300,33 +277,28 @@ export function TaskDashboard({
                       />
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-3">
-                          {getPriorityIcon(task.priority)}
-                          <span className={task.done ? "text-gray-500 line-through" : "text-gray-900 font-medium"}>
-                            {task.name}
-                          </span>
-                          {task.subtasks.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                toggleTaskExpansion(task.id);
-                              }}
-                              className="ml-2 p-1 rounded-md hover:bg-gray-100 transition-colors duration-150"
-                              aria-label={expandedTasks.has(task.id) ? "折叠子任务" : "展开子任务"}
-                            >
-                              {expandedTasks.has(task.id) ? (
-                                <ChevronDown className="h-4 w-4 text-gray-500" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-gray-500" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getPriorityBadge(task.priority)}
-                        </div>
+                      <div className="flex items-center gap-3">
+                        {getPriorityIcon(task.priority)}
+                        <span className={task.done ? "text-gray-500 line-through" : "text-gray-900 font-medium"}>
+                          {task.name}
+                        </span>
+                        {task.subtasks.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleTaskExpansion(task.id);
+                            }}
+                            className="ml-2 p-1 rounded-md hover:bg-gray-100 transition-colors duration-150"
+                            aria-label={expandedTasks.has(task.id) ? "折叠子任务" : "展开子任务"}
+                          >
+                            {expandedTasks.has(task.id) ? (
+                              <ChevronDown className="h-4 w-4 text-gray-500" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-gray-500" />
+                            )}
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className={task.done ? "text-gray-500" : "text-gray-900"}>
@@ -407,23 +379,18 @@ export function TaskDashboard({
           {completedTasks.length > 0 ? (
             <ul className="mt-4 space-y-3 border border-gray-200 rounded-lg p-4 text-sm text-gray-600">
               {completedTasks.map((task) => (
-                <li key={task.id} className="flex flex-col items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 w-full">
-                    <span className="line-through flex-1">{task.name}</span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-8 rounded-md border-gray-300 px-3 text-xs hover:bg-gray-50 transition-colors duration-150"
-                      onClick={() => handleMoveBackToIncomplete(task.id)}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      移回未完成
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-2 w-full">
-                    {getPriorityBadge(task.priority)}
-                  </div>
+                <li key={task.id} className="flex items-center justify-between gap-3">
+                  <span className="line-through">{task.name}</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 rounded-md border-gray-300 px-3 text-xs hover:bg-gray-50 transition-colors duration-150"
+                    onClick={() => handleMoveBackToIncomplete(task.id)}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    移回未完成
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -474,29 +441,27 @@ export function TaskDashboard({
               <div className="space-y-1">
                 <Label>任务优先级</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {
-                    [
-                      { value: "紧急且重要" as Priority, label: "紧急且重要" },
-                      { value: "紧急不重要" as Priority, label: "紧急不重要" },
-                      { value: "不紧急重要" as Priority, label: "不紧急重要" },
-                      { value: "不紧急不重要" as Priority, label: "不紧急不重要" },
-                    ].map((option) => (
-                      <Button
-                        key={option.value}
-                        type="button"
-                        variant={taskDraft.priority === option.value ? "default" : "outline"}
-                        className={`rounded-sm ${taskDraft.priority === option.value ? getPriorityColor(option.value) : "border-gray-300"}`}
-                        onClick={() =>
-                          setTaskDraft((prev) => (prev ? { ...prev, priority: option.value } : prev))
-                        }
-                      >
-                        <div className="flex items-center gap-2">
-                          {getPriorityIcon(option.value)}
-                          <span>{option.label}</span>
-                        </div>
-                      </Button>
-                    ))
-                  }
+                  {[
+                    { value: "紧急且重要" as Priority, label: "紧急且重要" },
+                    { value: "紧急不重要" as Priority, label: "紧急不重要" },
+                    { value: "不紧急重要" as Priority, label: "不紧急重要" },
+                    { value: "不紧急不重要" as Priority, label: "不紧急不重要" },
+                  ].map((option) => (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      variant={taskDraft.priority === option.value ? "default" : "outline"}
+                      className={`rounded-sm ${taskDraft.priority === option.value ? "bg-black text-white" : "border-gray-300"}`}
+                      onClick={() =>
+                        setTaskDraft((prev) => (prev ? { ...prev, priority: option.value } : prev))
+                      }
+                    >
+                      <div className="flex items-center gap-2">
+                        {getPriorityIcon(option.value)}
+                        <span>{option.label}</span>
+                      </div>
+                    </Button>
+                  ))}
                 </div>
               </div>
               <div className="space-y-2">

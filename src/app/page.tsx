@@ -15,10 +15,6 @@ import { toast } from "sonner";
 
 export type EventTag = "待定" | "不着急" | "不可后退" | null;
 
-export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
-
-export type RecurrenceEndType = 'never' | 'on' | 'after';
-
 export type ScheduleEvent = {
   id: string;
   date: string;
@@ -30,15 +26,6 @@ export type ScheduleEvent = {
   isCompleted: boolean;
   category: string;
   tag: EventTag;
-  recurrence: {
-    type: RecurrenceType;
-    interval: number;
-    endType: RecurrenceEndType;
-    endDate?: string;
-    endCount?: number;
-    exceptions: string[];
-    daysOfWeek?: number[]; // 0-6，0表示周日，1-6表示周一到周六
-  };
 };
 
 export type SubTask = {
@@ -120,13 +107,6 @@ const defaultEvents: ScheduleEvent[] = [
     isCompleted: false,
     category: "个人",
     tag: null,
-    recurrence: {
-      type: 'none',
-      interval: 1,
-      endType: 'never',
-      exceptions: [],
-      daysOfWeek: []
-    },
   },
 ];
 
@@ -177,15 +157,6 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
       isCompleted: Boolean(value.isCompleted),
       category: value.category ?? "个人",
       tag: (value.tag as EventTag) ?? null,
-      recurrence: {
-        type: (value.recurrence?.type as RecurrenceType) ?? 'none',
-        interval: value.recurrence?.interval ?? 1,
-        endType: (value.recurrence?.endType as RecurrenceEndType) ?? 'never',
-        endDate: value.recurrence?.endDate,
-        endCount: value.recurrence?.endCount,
-        exceptions: value.recurrence?.exceptions ?? [],
-        daysOfWeek: value.recurrence?.daysOfWeek ?? []
-      },
     };
   });
 }
@@ -200,7 +171,7 @@ export default function Home() {
   const [sendingLink, setSendingLink] = useState(false);
   const [dataReady, setDataReady] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(60);
+  const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(30);
   const weekRange = useMemo(() => {
     const start = format(currentWeekStart, "yyyy/MM/dd", { locale: zhCN });
     const end = format(addDays(currentWeekStart, 6), "yyyy/MM/dd", { locale: zhCN });
