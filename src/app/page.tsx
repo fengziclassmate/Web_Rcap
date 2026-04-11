@@ -177,12 +177,14 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
       isCompleted: Boolean(value.isCompleted),
       category: value.category ?? "个人",
       tag: (value.tag as EventTag) ?? null,
-      recurrence: value.recurrence ?? {
-        type: 'none',
-        interval: 1,
-        endType: 'never',
-        exceptions: [],
-        daysOfWeek: []
+      recurrence: {
+        type: (value.recurrence?.type as RecurrenceType) ?? 'none',
+        interval: value.recurrence?.interval ?? 1,
+        endType: (value.recurrence?.endType as RecurrenceEndType) ?? 'never',
+        endDate: value.recurrence?.endDate,
+        endCount: value.recurrence?.endCount,
+        exceptions: value.recurrence?.exceptions ?? [],
+        daysOfWeek: value.recurrence?.daysOfWeek ?? []
       },
     };
   });

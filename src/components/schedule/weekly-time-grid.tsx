@@ -468,7 +468,7 @@ export function WeeklyTimeGrid({
       });
     } else {
       // 编辑所有实例：直接更新原始事件
-      const eventId = editingEventId.includes('-') ? editingEventId.split('-')[0] : editingEventId;
+      const eventId = editingEventId;
       if (eventId) {
         onUpdateEvent(eventId, {
           title: editForm.title.trim(),
