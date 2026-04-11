@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { addDays, format, isSameDay, isAfter, isBefore, parseISO, addWeeks, addMonths } from "date-fns";
+import { addDays, format, parse } from "date-fns";
 import { zhCN } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Clock3, Plus, Smile, Frown, Meh, Angry, Heart, Check, Star, AlertTriangle, AlertCircle, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3, Plus, Smile, Frown, Meh, Angry, Heart, Check, Star, AlertTriangle, AlertCircle, Trash2, Repeat } from "lucide-react";
 import type { ScheduleEvent, EventTag } from "@/app/page";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,14 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { createId } from "@/lib/id";
+import {
+  expandScheduleEvents,
+  parseExceptionDateList,
+  parseSyntheticEventId,
+  WEEKDAY_SHORT_LABEL,
+  WEEKDAY_UI_ORDER,
+} from "@/lib/recurrence";
+import { toast } from "sonner";
 
 type Category = {
   id: string;
@@ -73,8 +81,12 @@ type WeeklyTimeGridProps = {
   weekRange: string;
   events: ScheduleEvent[];
   onCreateEvent: (event: ScheduleEvent) => void;
-  onUpdateEvent: (eventId: string, patch: Partial<ScheduleEvent>) => void;
-  onDeleteEvent: (eventId: string) => void;
+  onUpdateEvent: (
+    eventId: string,
+    patch: Partial<ScheduleEvent>,
+    options?: { scope?: "occurrence" | "series" },
+  ) => void;
+  onDeleteEvent: (eventId: string, options?: { mode?: "single" | "future" | "all" }) => void;
   onPrevWeek: () => void;
   onNextWeek: () => void;
   onViewModeChange?: (mode: ViewMode) => void;
@@ -92,13 +104,6 @@ type EventFormState = {
   isCompleted: boolean;
   category: string;
   tag: EventTag;
-  recurrence: boolean;
-  recurrenceType: "daily" | "weekly" | "monthly";
-  interval: number;
-  weekdays: number[];
-  endDate: string;
-  endCount: number;
-  exceptionDates: string;
 };
 
 type ResizeState = {
@@ -149,13 +154,6 @@ const defaultForm: EventFormState = {
   isCompleted: false,
   category: "个人",
   tag: null,
-  recurrence: false,
-  recurrenceType: "daily",
-  interval: 1,
-  weekdays: [],
-  endDate: "",
-  endCount: 0,
-  exceptionDates: "",
 };
 
 function formatHour(hour: number) {
@@ -171,123 +169,6 @@ function dayTitle(date: Date) {
 
 function isOverlap(a: ScheduleEvent, b: ScheduleEvent) {
   return a.startHour < b.endHour && b.startHour < a.endHour;
-}
-
-function generateRecurrenceEvents(event: ScheduleEvent, startDate: Date, endDate: Date): ScheduleEvent[] {
-  const result: ScheduleEvent[] = [];
-  
-  // 如果没有循环规则，只返回原始事件
-  if (!event.recurrence) {
-    return [event];
-  }
-  
-  // 如果是循环事件的实例（有originalId），不再次生成循环事件
-  if (event.originalId) {
-    return [event];
-  }
-  
-  try {
-    // 验证日期格式
-    if (!event.date) {
-      console.error('Event missing date:', event);
-      return [event];
-    }
-    
-    const originalDate = parseISO(event.date);
-    let currentDate = originalDate;
-    let count = 0;
-    
-    // 生成循环事件实例
-    while (currentDate <= endDate) {
-      // 检查是否在视图范围内
-      if (currentDate >= startDate) {
-        // 检查是否是例外日期
-        const currentDateStr = format(currentDate, 'yyyy-MM-dd');
-        const isException = event.exceptionDates?.includes(currentDateStr);
-        if (!isException) {
-          // 对于每周循环，检查是否是指定的星期几
-          if (event.recurrence.type === 'weekly' && event.recurrence.weekdays) {
-            const dayOfWeek = currentDate.getDay(); // 0-6, 0 是周日
-            if (event.recurrence.weekdays.includes(dayOfWeek)) {
-              result.push({
-                ...event,
-                id: `${event.id}-${currentDateStr}`,
-                date: currentDateStr,
-                originalId: event.id
-              });
-            }
-          } else {
-            // 每天或每月循环
-            result.push({
-              ...event,
-              id: `${event.id}-${currentDateStr}`,
-              date: currentDateStr,
-              originalId: event.id
-            });
-          }
-        }
-      }
-      
-      // 计算下一个循环日期
-      currentDate = getNextRecurrenceDate(currentDate, event.recurrence);
-      count++;
-      
-      // 检查循环结束条件
-      if (event.recurrence.endCount && count >= event.recurrence.endCount) {
-        break;
-      }
-      if (event.recurrence.endDate) {
-        try {
-          if (currentDate > parseISO(event.recurrence.endDate)) {
-            break;
-          }
-        } catch (e) {
-          console.error('Invalid endDate format:', event.recurrence.endDate);
-          break;
-        }
-      }
-      
-      // 防止无限循环
-      if (count > 1000) {
-        console.warn('Recurrence event generation limit reached');
-        break;
-      }
-    }
-    
-    // 如果没有生成任何事件，返回原始事件
-    return result.length > 0 ? result : [event];
-  } catch (error) {
-    // 如果出错，返回原始事件
-    console.error('Error generating recurrence events:', error);
-    return [event];
-  }
-}
-
-function getNextRecurrenceDate(currentDate: Date, recurrence: any): Date {
-  // 验证参数
-  if (!(currentDate instanceof Date) || isNaN(currentDate.getTime())) {
-    console.error('Invalid currentDate:', currentDate);
-    return new Date();
-  }
-  
-  if (!recurrence || typeof recurrence !== 'object') {
-    console.error('Invalid recurrence:', recurrence);
-    return addDays(currentDate, 1);
-  }
-  
-  const interval = typeof recurrence.interval === 'number' && recurrence.interval > 0 ? recurrence.interval : 1;
-  
-  switch (recurrence.type) {
-    case "daily":
-      return addDays(currentDate, interval);
-    case "weekly":
-      return addWeeks(currentDate, interval);
-    case "monthly":
-      return addMonths(currentDate, interval);
-    default:
-      console.warn('Unknown recurrence type:', recurrence.type);
-      return addDays(currentDate, 1);
-  }
 }
 
 function layoutDayEvents(dayEvents: ScheduleEvent[]): PositionedEvent[] {
@@ -328,40 +209,23 @@ export function WeeklyTimeGrid({
   viewMode = 'week',
   timeGranularity = 30,
 }: WeeklyTimeGridProps) {
-  const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, index) => addDays(currentWeekStart, index)),
-    [currentWeekStart],
-  );
-  
-  // 计算当前视图的开始和结束日期
-  const viewStartDate = useMemo(() => {
-    if (viewMode === 'day') return currentWeekStart;
-    if (viewMode === 'week') return currentWeekStart;
-    if (viewMode === 'month') return currentWeekStart;
-    return currentWeekStart;
-  }, [currentWeekStart, viewMode]);
-  
-  const viewEndDate = useMemo(() => {
-    if (viewMode === 'day') return addDays(currentWeekStart, 1);
-    if (viewMode === 'week') return addDays(currentWeekStart, 7);
-    if (viewMode === 'month') return addDays(currentWeekStart, 28);
-    return addDays(currentWeekStart, 7);
-  }, [currentWeekStart, viewMode]);
-  
-  // 生成所有循环事件的实例
-  const allEvents = useMemo(() => {
-    const result: ScheduleEvent[] = [];
-    events.forEach(event => {
-      const recurrenceEvents = generateRecurrenceEvents(event, viewStartDate, viewEndDate);
-      result.push(...recurrenceEvents);
-    });
-    return result;
-  }, [events, viewStartDate, viewEndDate]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [selectedCell, setSelectedCell] = useState<GridCell | null>(null);
   const [createForm, setCreateForm] = useState<EventFormState>(defaultForm);
+  const [createRecurrence, setCreateRecurrence] = useState<{
+    enabled: boolean;
+    kind: "daily" | "weekly";
+    weekdays: number[];
+    exceptionText: string;
+  }>({
+    enabled: false,
+    kind: "daily",
+    weekdays: [],
+    exceptionText: "",
+  });
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
+  const [editScope, setEditScope] = useState<"occurrence" | "series">("occurrence");
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [diaries, setDiaries] = useState<DiaryEntry[]>(() => {
@@ -389,10 +253,6 @@ export function WeeklyTimeGrid({
     eventId: string;
   } | null>(null);
   
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
-  const [deleteOption, setDeleteOption] = useState<'only' | 'all-future' | 'all'>('only');
-  
   const hours = useMemo(() => {
     const hoursArray: number[] = [];
     for (let hour = 0; hour < 24; hour++) {
@@ -406,7 +266,24 @@ export function WeeklyTimeGrid({
     }
     return hoursArray;
   }, [timeGranularity]);
-  
+
+  const displayDates = useMemo(() => {
+    if (viewMode === "day") {
+      return [currentWeekStart];
+    }
+    if (viewMode === "week") {
+      return Array.from({ length: 7 }, (_, index) => addDays(currentWeekStart, index));
+    }
+    return Array.from({ length: 28 }, (_, index) => addDays(currentWeekStart, index));
+  }, [currentWeekStart, viewMode]);
+
+  const expandedEvents = useMemo(() => {
+    if (displayDates.length === 0) return [] as ScheduleEvent[];
+    const first = format(displayDates[0], "yyyy-MM-dd");
+    const last = format(displayDates[displayDates.length - 1], "yyyy-MM-dd");
+    return expandScheduleEvents(events, first, last) as ScheduleEvent[];
+  }, [events, displayDates]);
+
   const handleViewModeChange = (mode: ViewMode) => {
     onViewModeChange?.(mode);
   };
@@ -416,11 +293,18 @@ export function WeeklyTimeGrid({
   };
 
   const selectedEvent = useMemo(
-    () => allEvents.find((event) => event.id === editingEventId) ?? null,
-    [allEvents, editingEventId],
+    () => expandedEvents.find((event) => event.id === editingEventId) ?? null,
+    [expandedEvents, editingEventId],
   );
   function resetCreateDialog(cell: GridCell) {
     setSelectedCell(cell);
+    const day = parse(cell.date, "yyyy-MM-dd", new Date());
+    setCreateRecurrence({
+      enabled: false,
+      kind: "daily",
+      weekdays: [day.getDay()],
+      exceptionText: "",
+    });
     setCreateForm({
       title: "",
       startHour: cell.startHour,
@@ -430,21 +314,13 @@ export function WeeklyTimeGrid({
       isCompleted: false,
       category: "个人",
       tag: null,
-      recurrence: false,
-      recurrenceType: "daily",
-      interval: 1,
-      weekdays: [],
-      endDate: "",
-      endCount: 0,
-      exceptionDates: "",
     });
     setCreateDialogOpen(true);
   }
 
   function handleOpenEdit(event: ScheduleEvent) {
     setEditingEventId(event.id);
-    // 查找原始事件（如果是循环事件的实例）
-    const originalEvent = events.find(e => e.id === event.originalId || e.id === event.id);
+    setEditScope("occurrence");
     setEditForm({
       title: event.title,
       startHour: event.startHour,
@@ -454,13 +330,6 @@ export function WeeklyTimeGrid({
       isCompleted: event.isCompleted,
       category: event.category,
       tag: event.tag,
-      recurrence: !!originalEvent?.recurrence,
-      recurrenceType: originalEvent?.recurrence?.type || "daily",
-      interval: originalEvent?.recurrence?.interval || 1,
-      weekdays: originalEvent?.recurrence?.weekdays || [],
-      endDate: originalEvent?.recurrence?.endDate || "",
-      endCount: originalEvent?.recurrence?.endCount || 0,
-      exceptionDates: originalEvent?.exceptionDates?.join("\n") || "",
     });
   }
 
@@ -468,39 +337,58 @@ export function WeeklyTimeGrid({
     if (!selectedCell || !createForm.title.trim()) return;
     const startHour = Math.max(0, Math.min(23.5, createForm.startHour));
     const endHour = Math.max(startHour + 0.5, Math.min(24, createForm.endHour));
-    const originalId = createId("event");
 
-    const recurrenceRule = createForm.recurrence ? {
-      type: createForm.recurrenceType,
-      interval: createForm.interval,
-      endDate: createForm.endDate || undefined,
-      endCount: createForm.endCount > 0 ? createForm.endCount : undefined,
-      weekdays: createForm.recurrenceType === "weekly" ? createForm.weekdays : undefined,
-    } : undefined;
-
-    const exceptionDates = createForm.exceptionDates
-      .split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-    onCreateEvent({
-      id: originalId,
-      date: selectedCell.date,
-      startHour,
-      endHour,
-      title: createForm.title.trim(),
-      notes: createForm.notes.trim(),
-      requirements: createForm.requirements
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean),
-      isCompleted: createForm.isCompleted,
-      category: createForm.category,
-      tag: createForm.tag,
-      recurrence: recurrenceRule,
-      exceptionDates: exceptionDates.length > 0 ? exceptionDates : undefined,
-      originalId: recurrenceRule ? originalId : undefined,
-    });
+    if (createRecurrence.enabled) {
+      if (createRecurrence.kind === "weekly") {
+        if (createRecurrence.weekdays.length === 0) {
+          toast.error("每周重复请至少选择一个星期");
+          return;
+        }
+      }
+      const exceptionDates = parseExceptionDateList(createRecurrence.exceptionText);
+      const weekdays =
+        createRecurrence.kind === "weekly"
+          ? [...createRecurrence.weekdays].sort((a, b) => a - b)
+          : undefined;
+      onCreateEvent({
+        id: createId("event"),
+        date: selectedCell.date,
+        startHour,
+        endHour,
+        title: createForm.title.trim(),
+        notes: createForm.notes.trim(),
+        requirements: createForm.requirements
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        isCompleted: createForm.isCompleted,
+        category: createForm.category,
+        tag: createForm.tag,
+        recurrence:
+          createRecurrence.kind === "daily"
+            ? { kind: "daily" }
+            : { kind: "weekly", weekdays: weekdays ?? [] },
+        exceptionDates,
+        recurrenceOverrides: {},
+        recurrenceEndExclusive: null,
+      });
+    } else {
+      onCreateEvent({
+        id: createId("event"),
+        date: selectedCell.date,
+        startHour,
+        endHour,
+        title: createForm.title.trim(),
+        notes: createForm.notes.trim(),
+        requirements: createForm.requirements
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        isCompleted: createForm.isCompleted,
+        category: createForm.category,
+        tag: createForm.tag,
+      });
+    }
     setCreateDialogOpen(false);
   }
 
@@ -508,62 +396,38 @@ export function WeeklyTimeGrid({
     if (!selectedEvent || !editForm.title.trim()) return;
     const startHour = Math.max(0, Math.min(23.5, editForm.startHour));
     const endHour = Math.max(startHour + 0.5, Math.min(24, editForm.endHour));
-    
-    const recurrenceRule = editForm.recurrence ? {
-      type: editForm.recurrenceType,
-      interval: editForm.interval,
-      endDate: editForm.endDate || undefined,
-      endCount: editForm.endCount > 0 ? editForm.endCount : undefined,
-      weekdays: editForm.recurrenceType === "weekly" ? editForm.weekdays : undefined,
-    } : undefined;
-
-    const exceptionDates = editForm.exceptionDates
-      .split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-    // 检查是否是循环事件的实例
-    if (selectedEvent.originalId) {
-      // 对于循环事件的实例，我们只修改该实例，不影响整个循环系列
-      onUpdateEvent(selectedEvent.id, {
-        title: editForm.title.trim(),
-        startHour,
-        endHour,
-        notes: editForm.notes.trim(),
-        requirements: editForm.requirements
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        isCompleted: editForm.isCompleted,
-        category: editForm.category,
-        tag: editForm.tag,
-        // 对于实例，不修改循环规则，保持独立
+    const patch: Partial<ScheduleEvent> = {
+      title: editForm.title.trim(),
+      startHour,
+      endHour,
+      notes: editForm.notes.trim(),
+      requirements: editForm.requirements
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      isCompleted: editForm.isCompleted,
+      category: editForm.category,
+      tag: editForm.tag,
+    };
+    const parsed = parseSyntheticEventId(selectedEvent.id);
+    if (parsed) {
+      onUpdateEvent(selectedEvent.id, patch, {
+        scope: editScope === "series" ? "series" : "occurrence",
       });
     } else {
-      // 对于原始事件，修改整个循环系列
-      onUpdateEvent(selectedEvent.id, {
-        title: editForm.title.trim(),
-        startHour,
-        endHour,
-        notes: editForm.notes.trim(),
-        requirements: editForm.requirements
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        isCompleted: editForm.isCompleted,
-        category: editForm.category,
-        tag: editForm.tag,
-        recurrence: recurrenceRule,
-        exceptionDates: exceptionDates.length > 0 ? exceptionDates : undefined,
-        originalId: recurrenceRule ? selectedEvent.id : undefined,
-      });
+      onUpdateEvent(selectedEvent.id, patch);
     }
     setEditingEventId(null);
   }
 
   function handleDropEvent(targetDate: string, targetHour: number) {
     if (!draggingEventId) return;
-    const draggingEvent = events.find((event) => event.id === draggingEventId);
+    if (parseSyntheticEventId(draggingEventId)) {
+      toast.info("循环行程请使用编辑修改时间；拖拽移动暂未支持。");
+      setDraggingEventId(null);
+      return;
+    }
+    const draggingEvent = expandedEvents.find((event) => event.id === draggingEventId);
     if (!draggingEvent) return;
     const duration = Math.max(0.0167, draggingEvent.endHour - draggingEvent.startHour);
     const nextStartHour = Math.min(23.9833, targetHour);
@@ -639,7 +503,7 @@ export function WeeklyTimeGrid({
   }
 
   function handleReschedule(eventId: string) {
-    const event = events.find(e => e.id === eventId);
+    const event = expandedEvents.find((e) => e.id === eventId);
     if (event) {
       handleOpenEdit(event);
     }
@@ -647,7 +511,7 @@ export function WeeklyTimeGrid({
   }
 
   function handleExtendTime(eventId: string) {
-    const event = events.find(e => e.id === eventId);
+    const event = expandedEvents.find((e) => e.id === eventId);
     if (event) {
       onUpdateEvent(eventId, {
         endHour: event.endHour + 1,
@@ -662,54 +526,13 @@ export function WeeklyTimeGrid({
   }
 
   function handleToggleComplete(eventId: string) {
-    const event = events.find(e => e.id === eventId);
+    const event = expandedEvents.find((e) => e.id === eventId);
     if (event) {
       onUpdateEvent(eventId, {
         isCompleted: !event.isCompleted,
       });
     }
     closeContextMenu();
-  }
-  
-  function handleDeleteEventClick(eventId: string) {
-    setDeleteEventId(eventId);
-    setDeleteOption('only');
-    setDeleteDialogOpen(true);
-  }
-  
-  function handleConfirmDelete() {
-    if (!deleteEventId) return;
-    
-    const event = allEvents.find(e => e.id === deleteEventId);
-    if (!event) return;
-    
-    switch (deleteOption) {
-      case 'only':
-        // 只删除当前实例
-        onDeleteEvent(deleteEventId);
-        break;
-      case 'all-future':
-        // 删除当前实例及未来的所有循环事件
-        // 这里需要实现逻辑，将当前日期及之后的日期添加到例外日期
-        const originalEvent = events.find(e => e.id === event.originalId || e.id === event.id);
-        if (originalEvent && originalEvent.recurrence) {
-          const exceptionDates = [...(originalEvent.exceptionDates || []), event.date];
-          onUpdateEvent(originalEvent.id, {
-            exceptionDates,
-          });
-        }
-        break;
-      case 'all':
-        // 删除整个循环系列
-        const eventToDelete = events.find(e => e.id === event.originalId || e.id === event.id);
-        if (eventToDelete) {
-          onDeleteEvent(eventToDelete.id);
-        }
-        break;
-    }
-    
-    setDeleteDialogOpen(false);
-    setDeleteEventId(null);
   }
 
   useEffect(() => {
@@ -755,18 +578,6 @@ export function WeeklyTimeGrid({
 
   // 计算时间网格的高度和间隔
   const cellHeight = hourCellHeight / (60 / timeGranularity);
-  
-  // 根据视图模式获取显示的日期
-  const displayDates = useMemo(() => {
-    if (viewMode === 'day') {
-      return [currentWeekStart];
-    } else if (viewMode === 'week') {
-      return Array.from({ length: 7 }, (_, index) => addDays(currentWeekStart, index));
-    } else { // month
-      // 简单实现：显示4周
-      return Array.from({ length: 28 }, (_, index) => addDays(currentWeekStart, index));
-    }
-  }, [currentWeekStart, viewMode]);
   
   // 计算事件的位置和高度
   const getEventStyle = (event: PositionedEvent) => {
@@ -889,7 +700,7 @@ export function WeeklyTimeGrid({
 
                 {displayDates.map((day) => {
                   const dayIso = format(day, "yyyy-MM-dd");
-                  const dayEvents = layoutDayEvents(allEvents.filter((event) => event.date === dayIso));
+                  const dayEvents = layoutDayEvents(expandedEvents.filter((event) => event.date === dayIso));
 
                   return (
                     <div key={dayIso} className="relative border-r border-gray-200 last:border-r-0">
@@ -926,7 +737,7 @@ export function WeeklyTimeGrid({
                                 : getCategoryColor(categories, event.category)
                             }`}
                             style={getEventStyle(event)}
-                            draggable
+                            draggable={!parseSyntheticEventId(event.id)}
                             onDragStart={() => setDraggingEventId(event.id)}
                             onDragEnd={() => setDraggingEventId(null)}
                             onContextMenu={(e) => handleContextMenu(e, event.id)}
@@ -938,6 +749,9 @@ export function WeeklyTimeGrid({
                             >
                               <div className="flex items-center justify-between mb-1">
                                 <div className="flex items-center gap-2">
+                                  {parseSyntheticEventId(event.id) ? (
+                                    <Repeat className="h-3.5 w-3.5 shrink-0 text-gray-500" aria-hidden />
+                                  ) : null}
                                   <p className="font-medium truncate">{event.title}</p>
                                   {event.tag && (
                                     <span className={`text-sm font-bold ${getTagInfo(event.tag).color}`}>
@@ -1020,9 +834,9 @@ export function WeeklyTimeGrid({
                     {day}
                   </div>
                 ))}
-                {displayDates.map((day, index) => {
+                {displayDates.map((day) => {
                   const dayIso = format(day, "yyyy-MM-dd");
-                  const dayEvents = allEvents.filter((event) => event.date === dayIso);
+                  const dayEvents = expandedEvents.filter((event) => event.date === dayIso);
                   const diary = getDiary(dayIso);
                   
                   return (
@@ -1117,6 +931,107 @@ export function WeeklyTimeGrid({
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-3 rounded-lg border border-gray-100 bg-gray-50/80 p-4">
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        id="create-recurring"
+                        checked={createRecurrence.enabled}
+                        onCheckedChange={(checked) =>
+                          setCreateRecurrence((prev) => {
+                            const next = { ...prev, enabled: checked };
+                            if (
+                              checked &&
+                              prev.kind === "weekly" &&
+                              prev.weekdays.length === 0 &&
+                              selectedCell
+                            ) {
+                              next.weekdays = [
+                                parse(selectedCell.date, "yyyy-MM-dd", new Date()).getDay(),
+                              ];
+                            }
+                            return next;
+                          })
+                        }
+                      />
+                      <Label htmlFor="create-recurring" className="text-sm font-medium text-gray-800">
+                        循环行程
+                      </Label>
+                    </div>
+                    {createRecurrence.enabled ? (
+                      <div className="space-y-4 pt-1">
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium text-gray-700">重复方式</Label>
+                          <Select
+                            value={createRecurrence.kind}
+                            onValueChange={(value) =>
+                              value &&
+                              setCreateRecurrence((prev) => ({
+                                ...prev,
+                                kind: value as "daily" | "weekly",
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="rounded-md border-gray-300">
+                              <SelectValue placeholder="选择" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="daily">每天</SelectItem>
+                              <SelectItem value="weekly">每周指定星期</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {createRecurrence.kind === "weekly" ? (
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-gray-700">重复的星期</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {WEEKDAY_UI_ORDER.map((d) => (
+                                <Button
+                                  key={d}
+                                  type="button"
+                                  size="sm"
+                                  variant={createRecurrence.weekdays.includes(d) ? "default" : "outline"}
+                                  className="rounded-md"
+                                  onClick={() =>
+                                    setCreateRecurrence((prev) => {
+                                      const has = prev.weekdays.includes(d);
+                                      return {
+                                        ...prev,
+                                        weekdays: has
+                                          ? prev.weekdays.filter((x) => x !== d)
+                                          : [...prev.weekdays, d],
+                                      };
+                                    })
+                                  }
+                                >
+                                  周{WEEKDAY_SHORT_LABEL[d]}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                        <div className="space-y-2">
+                          <Label htmlFor="create-exceptions" className="text-sm font-medium text-gray-700">
+                            例外日期（可选）
+                          </Label>
+                          <Textarea
+                            id="create-exceptions"
+                            value={createRecurrence.exceptionText}
+                            onChange={(event) =>
+                              setCreateRecurrence((prev) => ({
+                                ...prev,
+                                exceptionText: event.target.value,
+                              }))
+                            }
+                            placeholder={
+                              "每行一个或用逗号分隔，例如：\n2026-04-12\n2026-04-20"
+                            }
+                            className="min-h-[72px] rounded-md border-gray-300 text-sm"
+                          />
+                          <p className="text-xs text-gray-500">这些日期不会生成该循环行程。</p>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-3">
                       <Label className="text-sm font-medium text-gray-700">开始时间</Label>
@@ -1204,112 +1119,6 @@ export function WeeklyTimeGrid({
                         </Select>
                       </div>
                     </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-gray-700">循环事件</Label>
-                      <Switch
-                        checked={createForm.recurrence}
-                        onCheckedChange={(checked) =>
-                          setCreateForm((prev) => ({ ...prev, recurrence: checked }))
-                        }
-                      />
-                    </div>
-                    {createForm.recurrence && (
-                      <div className="space-y-4 border border-gray-200 rounded-lg p-4">
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">循环类型</Label>
-                          <Select
-                            value={createForm.recurrenceType}
-                            onValueChange={(value) =>
-                              setCreateForm((prev) => ({ ...prev, recurrenceType: value as "daily" | "weekly" | "monthly" }))
-                            }
-                          >
-                            <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
-                              <SelectValue placeholder="选择循环类型" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="daily">每天</SelectItem>
-                              <SelectItem value="weekly">每周</SelectItem>
-                              <SelectItem value="monthly">每月</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">循环间隔</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={createForm.interval}
-                            onChange={(event) =>
-                              setCreateForm((prev) => ({ ...prev, interval: Number(event.target.value) || 1 }))
-                            }
-                            className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                          />
-                        </div>
-                        {createForm.recurrenceType === "weekly" && (
-                          <div className="space-y-3">
-                            <Label className="text-sm font-medium text-gray-700">星期几</Label>
-                            <div className="grid grid-cols-7 gap-2">
-                              {["日", "一", "二", "三", "四", "五", "六"].map((day, index) => (
-                                <button
-                                  key={index}
-                                  type="button"
-                                  className={`rounded-md py-2 text-center text-sm ${createForm.weekdays.includes(index) ? "bg-primary text-white" : "border border-gray-300 hover:bg-gray-50"}`}
-                                  onClick={() => {
-                                    const newWeekdays = createForm.weekdays.includes(index)
-                                      ? createForm.weekdays.filter((d) => d !== index)
-                                      : [...createForm.weekdays, index];
-                                    setCreateForm((prev) => ({ ...prev, weekdays: newWeekdays }));
-                                  }}
-                                >
-                                  {day}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">循环结束</Label>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="date"
-                                value={createForm.endDate}
-                                onChange={(event) =>
-                                  setCreateForm((prev) => ({ ...prev, endDate: event.target.value }))
-                                }
-                                className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                              />
-                              <span className="text-sm text-gray-600">结束日期</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={createForm.endCount}
-                                onChange={(event) =>
-                                  setCreateForm((prev) => ({ ...prev, endCount: Number(event.target.value) || 0 }))
-                                }
-                                className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                              />
-                              <span className="text-sm text-gray-600">结束次数（0表示无限制）</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">例外日期（每行一个日期，格式：YYYY-MM-DD）</Label>
-                          <Textarea
-                            value={createForm.exceptionDates}
-                            onChange={(event) =>
-                              setCreateForm((prev) => ({ ...prev, exceptionDates: event.target.value }))
-                            }
-                            placeholder="例如：\n2026-04-15\n2026-04-22"
-                            className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                   <Button
                     onClick={handleCreateEvent}
@@ -1469,112 +1278,6 @@ export function WeeklyTimeGrid({
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-gray-700">循环事件</Label>
-                      <Switch
-                        checked={editForm.recurrence}
-                        onCheckedChange={(checked) =>
-                          setEditForm((prev) => ({ ...prev, recurrence: checked }))
-                        }
-                      />
-                    </div>
-                    {editForm.recurrence && (
-                      <div className="space-y-4 border border-gray-200 rounded-lg p-4">
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">循环类型</Label>
-                          <Select
-                            value={editForm.recurrenceType}
-                            onValueChange={(value) =>
-                              setEditForm((prev) => ({ ...prev, recurrenceType: value as "daily" | "weekly" | "monthly" }))
-                            }
-                          >
-                            <SelectTrigger className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150">
-                              <SelectValue placeholder="选择循环类型" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="daily">每天</SelectItem>
-                              <SelectItem value="weekly">每周</SelectItem>
-                              <SelectItem value="monthly">每月</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">循环间隔</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={editForm.interval}
-                            onChange={(event) =>
-                              setEditForm((prev) => ({ ...prev, interval: Number(event.target.value) || 1 }))
-                            }
-                            className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                          />
-                        </div>
-                        {editForm.recurrenceType === "weekly" && (
-                          <div className="space-y-3">
-                            <Label className="text-sm font-medium text-gray-700">星期几</Label>
-                            <div className="grid grid-cols-7 gap-2">
-                              {["日", "一", "二", "三", "四", "五", "六"].map((day, index) => (
-                                <button
-                                  key={index}
-                                  type="button"
-                                  className={`rounded-md py-2 text-center text-sm ${editForm.weekdays.includes(index) ? "bg-primary text-white" : "border border-gray-300 hover:bg-gray-50"}`}
-                                  onClick={() => {
-                                    const newWeekdays = editForm.weekdays.includes(index)
-                                      ? editForm.weekdays.filter((d) => d !== index)
-                                      : [...editForm.weekdays, index];
-                                    setEditForm((prev) => ({ ...prev, weekdays: newWeekdays }));
-                                  }}
-                                >
-                                  {day}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">循环结束</Label>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="date"
-                                value={editForm.endDate}
-                                onChange={(event) =>
-                                  setEditForm((prev) => ({ ...prev, endDate: event.target.value }))
-                                }
-                                className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                              />
-                              <span className="text-sm text-gray-600">结束日期</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={editForm.endCount}
-                                onChange={(event) =>
-                                  setEditForm((prev) => ({ ...prev, endCount: Number(event.target.value) || 0 }))
-                                }
-                                className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                              />
-                              <span className="text-sm text-gray-600">结束次数（0表示无限制）</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">例外日期（每行一个日期，格式：YYYY-MM-DD）</Label>
-                          <Textarea
-                            value={editForm.exceptionDates}
-                            onChange={(event) =>
-                              setEditForm((prev) => ({ ...prev, exceptionDates: event.target.value }))
-                            }
-                            placeholder="例如：\n2026-04-15\n2026-04-22"
-                            className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-3">
                     <Label htmlFor="edit-notes" className="text-sm font-medium text-gray-700">备注</Label>
                     <Textarea
                       id="edit-notes"
@@ -1608,16 +1311,93 @@ export function WeeklyTimeGrid({
                     />
                     <Label htmlFor="edit-completed" className="text-sm font-medium text-gray-700">标记为已完成</Label>
                   </div>
-                  <div className="flex space-x-4">
-                    <Button
-                      onClick={() => {
-                        handleDeleteEventClick(selectedEvent.id);
-                        setEditingEventId(null);
-                      }}
-                      className="flex-1 rounded-md bg-red-600 text-white hover:bg-red-700 transition-all duration-150 py-2"
-                    >
-                      删除行程
-                    </Button>
+                  {parseSyntheticEventId(selectedEvent.id) ? (
+                    <div className="space-y-4 rounded-lg border border-amber-100 bg-amber-50/60 p-4">
+                      <p className="text-sm text-gray-800">
+                        循环行程 · 当前日期 <span className="font-medium">{selectedEvent.date}</span>
+                      </p>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-medium uppercase tracking-wide text-gray-600">
+                          保存范围
+                        </Label>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={editScope === "occurrence" ? "default" : "outline"}
+                            className="rounded-md"
+                            onClick={() => setEditScope("occurrence")}
+                          >
+                            仅此日
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={editScope === "series" ? "default" : "outline"}
+                            className="rounded-md"
+                            onClick={() => setEditScope("series")}
+                          >
+                            整个系列
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-600">
+                          修改时间、标题等时：选「仅此日」只影响当天；选「整个系列」会更新该循环规则下所有日期（已单独改过的那一天仍以「仅此日」覆盖为准）。
+                        </p>
+                      </div>
+                      <div className="space-y-2 border-t border-amber-200/80 pt-3">
+                        <Label className="text-xs font-medium uppercase tracking-wide text-gray-600">
+                          删除
+                        </Label>
+                        <div className="flex flex-col gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full rounded-md border-gray-300"
+                            onClick={() => {
+                              onDeleteEvent(selectedEvent.id, { mode: "single" });
+                              setEditingEventId(null);
+                            }}
+                          >
+                            删除此日（其余日期保留）
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full rounded-md border-gray-300"
+                            onClick={() => {
+                              onDeleteEvent(selectedEvent.id, { mode: "future" });
+                              setEditingEventId(null);
+                            }}
+                          >
+                            删除此日及之后的循环（已过去的保留）
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            className="w-full rounded-md"
+                            onClick={() => {
+                              onDeleteEvent(selectedEvent.id, { mode: "all" });
+                              setEditingEventId(null);
+                            }}
+                          >
+                            删除整个系列
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:space-x-4 sm:gap-0">
+                    {parseSyntheticEventId(selectedEvent.id) ? null : (
+                      <Button
+                        onClick={() => {
+                          onDeleteEvent(selectedEvent.id, { mode: "all" });
+                          setEditingEventId(null);
+                        }}
+                        className="flex-1 rounded-md bg-red-600 text-white hover:bg-red-700 transition-all duration-150 py-2"
+                      >
+                        删除行程
+                      </Button>
+                    )}
                     <Button
                       onClick={handleSaveEdit}
                       className="flex-1 rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150 py-2"
@@ -1628,70 +1408,6 @@ export function WeeklyTimeGrid({
                 </div>
               </DialogContent>
             )}
-          </Dialog>
-
-          {/* 删除循环事件对话框 */}
-          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <DialogContent className="rounded-lg border-gray-200 shadow-lg">
-              <DialogHeader>
-                <DialogTitle className="text-lg font-semibold text-gray-900">删除行程</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-5 mt-4">
-                <p className="text-sm text-gray-600">请选择删除方式：</p>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      id="delete-only"
-                      name="delete-option"
-                      value="only"
-                      checked={deleteOption === 'only'}
-                      onChange={() => setDeleteOption('only')}
-                    />
-                    <label htmlFor="delete-only" className="text-sm text-gray-700">只删除当前实例</label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      id="delete-all-future"
-                      name="delete-option"
-                      value="all-future"
-                      checked={deleteOption === 'all-future'}
-                      onChange={() => setDeleteOption('all-future')}
-                    />
-                    <label htmlFor="delete-all-future" className="text-sm text-gray-700">删除当前及未来的循环事件</label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      id="delete-all"
-                      name="delete-option"
-                      value="all"
-                      checked={deleteOption === 'all'}
-                      onChange={() => setDeleteOption('all')}
-                    />
-                    <label htmlFor="delete-all" className="text-sm text-gray-700">删除整个循环系列</label>
-                  </div>
-                </div>
-                <div className="flex space-x-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1 rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150 py-2"
-                    onClick={() => setDeleteDialogOpen(false)}
-                  >
-                    取消
-                  </Button>
-                  <Button
-                    type="button"
-                    className="flex-1 rounded-md bg-red-600 text-white hover:bg-red-700 transition-all duration-150 py-2"
-                    onClick={handleConfirmDelete}
-                  >
-                    确认删除
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
           </Dialog>
 
           {/* 分类管理对话框 */}
@@ -1864,7 +1580,9 @@ export function WeeklyTimeGrid({
               className="block w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
               onClick={() => handleToggleComplete(contextMenu.eventId)}
             >
-              {events.find(e => e.id === contextMenu.eventId)?.isCompleted ? "标记为未完成" : "标记为已完成"}
+              {expandedEvents.find((e) => e.id === contextMenu.eventId)?.isCompleted
+                ? "标记为未完成"
+                : "标记为已完成"}
             </button>
             <div className="border-t border-gray-200 my-1"></div>
             <button

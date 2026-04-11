@@ -10,20 +10,16 @@ import { WeeklyTimeGrid, ViewMode, TimeGranularity } from "@/components/schedule
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createId } from "@/lib/id";
+import {
+  type RecurrenceConfig,
+  type RecurrenceInstanceOverride,
+  parseSyntheticEventId,
+  pickRecurrenceOverridePatch,
+} from "@/lib/recurrence";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 export type EventTag = "待定" | "不着急" | "不可后退" | null;
-
-export type RecurrenceType = "daily" | "weekly" | "monthly";
-
-export type RecurrenceRule = {
-  type: RecurrenceType;
-  interval: number; // 循环间隔
-  endDate?: string; // 循环结束日期
-  endCount?: number; // 循环结束次数
-  weekdays?: number[]; // 每周循环的星期几 (0-6, 0 是周日)
-};
 
 export type ScheduleEvent = {
   id: string;
@@ -36,9 +32,11 @@ export type ScheduleEvent = {
   isCompleted: boolean;
   category: string;
   tag: EventTag;
-  recurrence?: RecurrenceRule;
-  exceptionDates?: string[]; // 例外日期列表
-  originalId?: string; // 循环事件的原始ID，用于识别同一循环系列的事件
+  /** 仅主事件（非展开实例）使用 */
+  recurrence?: RecurrenceConfig | null;
+  exceptionDates?: string[];
+  recurrenceOverrides?: Record<string, RecurrenceInstanceOverride>;
+  recurrenceEndExclusive?: string | null;
 };
 
 export type SubTask = {
@@ -153,25 +151,29 @@ function normalizeTasks(payload: unknown): LongTask[] {
   });
 }
 
+function normalizeRecurrence(value: unknown): RecurrenceConfig | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const r = value as { kind?: string; weekdays?: unknown };
+  if (r.kind === "daily") return { kind: "daily" };
+  if (r.kind === "weekly") {
+    const weekdays = Array.isArray(r.weekdays)
+      ? r.weekdays.filter((d): d is number => typeof d === "number" && d >= 0 && d <= 6)
+      : [];
+    return { kind: "weekly", weekdays };
+  }
+  return undefined;
+}
+
 function normalizeEvents(payload: unknown): ScheduleEvent[] {
   if (!Array.isArray(payload)) return defaultEvents;
   return payload.map((event, index) => {
     const value = event as Partial<ScheduleEvent>;
-    
-    // 验证和转换recurrence字段
-    let recurrence = undefined;
-    if (value.recurrence && typeof value.recurrence === 'object') {
-      recurrence = {
-        type: (value.recurrence.type as RecurrenceType) || 'daily',
-        interval: typeof value.recurrence.interval === 'number' ? value.recurrence.interval : 1,
-        endDate: value.recurrence.endDate || undefined,
-        endCount: typeof value.recurrence.endCount === 'number' ? value.recurrence.endCount : undefined,
-        weekdays: Array.isArray(value.recurrence.weekdays)
-          ? value.recurrence.weekdays.filter((day): day is number => typeof day === 'number' && day >= 0 && day <= 6)
-          : undefined,
-      };
-    }
-    
+    const recurrence = normalizeRecurrence(value.recurrence);
+    const overridesRaw = value.recurrenceOverrides;
+    const recurrenceOverrides =
+      overridesRaw && typeof overridesRaw === "object" && !Array.isArray(overridesRaw)
+        ? (overridesRaw as Record<string, RecurrenceInstanceOverride>)
+        : {};
     return {
       id: value.id ?? `event-restored-${index}`,
       date: value.date ?? format(new Date(), "yyyy-MM-dd"),
@@ -185,11 +187,13 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
       isCompleted: Boolean(value.isCompleted),
       category: value.category ?? "个人",
       tag: (value.tag as EventTag) ?? null,
-      recurrence,
+      recurrence: recurrence ?? undefined,
       exceptionDates: Array.isArray(value.exceptionDates)
         ? value.exceptionDates.filter((item): item is string => typeof item === "string")
-        : undefined,
-      originalId: value.originalId,
+        : [],
+      recurrenceOverrides,
+      recurrenceEndExclusive:
+        typeof value.recurrenceEndExclusive === "string" ? value.recurrenceEndExclusive : null,
     };
   });
 }
@@ -210,13 +214,6 @@ export default function Home() {
     const end = format(addDays(currentWeekStart, 6), "yyyy/MM/dd", { locale: zhCN });
     return `${start} - ${end}`;
   }, [currentWeekStart]);
-  
-  // 模拟用户，以便测试循环事件功能
-  const mockUser = {
-    id: "mock-user-id",
-    email: "mock@example.com"
-  };
-  const testUser = mockUser; // 直接使用模拟用户
 
   useEffect(() => {
     let mounted = true;
@@ -230,7 +227,7 @@ export default function Home() {
 
     initAuth();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
@@ -242,24 +239,96 @@ export default function Home() {
 
   useEffect(() => {
     if (!isBooted) return;
-    if (!testUser) {
+    if (!user) {
       setEvents(defaultEvents);
       setTasks(defaultTasks);
       setDataReady(false);
       return;
     }
 
-    // 模拟加载数据，使用默认数据
-    setEvents(defaultEvents);
-    setTasks(defaultTasks);
-    setDataReady(true);
-  }, [isBooted, testUser]);
+    let cancelled = false;
+
+    async function createScheduleDataTable() {
+      const { error } = await supabase
+        .rpc('postgres_functions', {
+          function_name: 'create_schedule_data_table'
+        });
+      if (error) {
+        console.error("创建表失败:", error);
+        return false;
+      }
+      return true;
+    }
+
+    async function loadUserData() {
+      try {
+        if (!user) return;
+        const { data, error } = await supabase
+          .from("schedule_data")
+          .select("events,tasks")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (cancelled) return;
+        if (error) {
+          console.error("读取云端数据失败:", error);
+          if (error.message.includes("relation \"schedule_data\" does not exist")) {
+            toast.info("表不存在，正在创建...");
+            const created = await createScheduleDataTable();
+            if (created) {
+              // 重新尝试加载数据
+              await loadUserData();
+            } else {
+              toast.error("创建表失败");
+              setDataReady(true);
+            }
+          } else {
+            toast.error(`读取云端数据失败: ${error.message}`);
+            setDataReady(true);
+          }
+          return;
+        }
+
+        if (data) {
+          setEvents(normalizeEvents(data.events));
+          setTasks(normalizeTasks(data.tasks));
+        } else {
+          setEvents(defaultEvents);
+          setTasks(defaultTasks);
+        }
+        setDataReady(true);
+      } catch (error) {
+        console.error("加载数据时出错:", error);
+        toast.error("加载数据时出错");
+        setDataReady(true);
+      }
+    }
+
+    loadUserData();
+    return () => {
+      cancelled = true;
+    };
+  }, [isBooted, user]);
 
   useEffect(() => {
-    // 模拟保存数据，不实际调用 Supabase
-    if (!testUser || !dataReady) return;
-    console.log("模拟保存数据:", { events, tasks });
-  }, [events, tasks, testUser, dataReady]);
+    if (!user || !dataReady) return;
+    supabase
+      .from("schedule_data")
+      .upsert(
+        {
+          user_id: user.id,
+          events,
+          tasks,
+        },
+        { onConflict: "user_id" },
+      )
+      .then(({ error }) => {
+        if (error) {
+          console.error("保存到云端失败:", error);
+          toast.error(`保存到云端失败: ${error.message}`);
+        }
+      });
+  }, [events, tasks, user, dataReady]);
 
   async function handleSendMagicLink() {
     if (!authEmail.trim()) return;
@@ -279,7 +348,11 @@ export default function Home() {
   }
 
   async function handleSignOut() {
-    // 模拟退出登录，不实际调用 Supabase
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error(`退出失败：${error.message}`);
+      return;
+    }
     toast.success("已退出登录");
   }
 
@@ -348,11 +421,73 @@ export default function Home() {
     setEvents((prev) => [...prev, event]);
   }
 
-  function handleUpdateEvent(eventId: string, patch: Partial<ScheduleEvent>) {
+  function handleUpdateEvent(
+    eventId: string,
+    patch: Partial<ScheduleEvent>,
+    options?: { scope?: "occurrence" | "series" },
+  ) {
+    const parsed = parseSyntheticEventId(eventId);
+    if (parsed) {
+      const scope = options?.scope ?? "occurrence";
+      if (scope === "series") {
+        setEvents((prev) =>
+          prev.map((event) => {
+            if (event.id !== parsed.masterId) return event;
+            return { ...event, ...patch, id: event.id };
+          }),
+        );
+        return;
+      }
+      setEvents((prev) =>
+        prev.map((event) => {
+          if (event.id !== parsed.masterId) return event;
+          const nextOverrides = { ...(event.recurrenceOverrides ?? {}) };
+          const cur = nextOverrides[parsed.occurrenceDate] ?? {};
+          const delta = pickRecurrenceOverridePatch(patch);
+          nextOverrides[parsed.occurrenceDate] = { ...cur, ...delta };
+          return { ...event, recurrenceOverrides: nextOverrides };
+        }),
+      );
+      return;
+    }
     setEvents((prev) => prev.map((event) => (event.id === eventId ? { ...event, ...patch } : event)));
   }
 
-  function handleDeleteEvent(eventId: string) {
+  function handleDeleteEvent(
+    eventId: string,
+    options?: { mode?: "single" | "future" | "all" },
+  ) {
+    const mode = options?.mode ?? "all";
+    const parsed = parseSyntheticEventId(eventId);
+    if (parsed) {
+      if (mode === "single") {
+        setEvents((prev) =>
+          prev.map((event) => {
+            if (event.id !== parsed.masterId) return event;
+            const next = new Set([...(event.exceptionDates ?? []), parsed.occurrenceDate]);
+            const nextOverrides = { ...(event.recurrenceOverrides ?? {}) };
+            delete nextOverrides[parsed.occurrenceDate];
+            return {
+              ...event,
+              exceptionDates: [...next],
+              recurrenceOverrides: nextOverrides,
+            };
+          }),
+        );
+        return;
+      }
+      if (mode === "future") {
+        setEvents((prev) =>
+          prev.map((event) => {
+            if (event.id !== parsed.masterId) return event;
+            return { ...event, recurrenceEndExclusive: parsed.occurrenceDate };
+          }),
+        );
+        return;
+      }
+      setEvents((prev) => prev.filter((event) => event.id !== parsed.masterId));
+      return;
+    }
     setEvents((prev) => prev.filter((event) => event.id !== eventId));
   }
 
@@ -367,7 +502,7 @@ export default function Home() {
     );
   }
 
-  if (!testUser) {
+  if (!user) {
     return (
       <main className="min-h-screen bg-white text-black">
         <div className="mx-auto max-w-lg px-4 py-16">
@@ -411,7 +546,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-white text-black">
       <div className="mx-auto flex max-w-[1520px] items-center justify-between px-4 pt-4">
-        <p className="text-xs text-gray-600">当前账号：{testUser.email} (模拟)</p>
+        <p className="text-xs text-gray-600">当前账号：{user.email}</p>
         <Button
           type="button"
           variant="outline"
