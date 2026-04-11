@@ -157,6 +157,21 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
   if (!Array.isArray(payload)) return defaultEvents;
   return payload.map((event, index) => {
     const value = event as Partial<ScheduleEvent>;
+    
+    // 验证和转换recurrence字段
+    let recurrence = undefined;
+    if (value.recurrence && typeof value.recurrence === 'object') {
+      recurrence = {
+        type: (value.recurrence.type as RecurrenceType) || 'daily',
+        interval: typeof value.recurrence.interval === 'number' ? value.recurrence.interval : 1,
+        endDate: value.recurrence.endDate || undefined,
+        endCount: typeof value.recurrence.endCount === 'number' ? value.recurrence.endCount : undefined,
+        weekdays: Array.isArray(value.recurrence.weekdays)
+          ? value.recurrence.weekdays.filter((day): day is number => typeof day === 'number' && day >= 0 && day <= 6)
+          : undefined,
+      };
+    }
+    
     return {
       id: value.id ?? `event-restored-${index}`,
       date: value.date ?? format(new Date(), "yyyy-MM-dd"),
@@ -170,7 +185,7 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
       isCompleted: Boolean(value.isCompleted),
       category: value.category ?? "个人",
       tag: (value.tag as EventTag) ?? null,
-      recurrence: value.recurrence,
+      recurrence,
       exceptionDates: Array.isArray(value.exceptionDates)
         ? value.exceptionDates.filter((item): item is string => typeof item === "string")
         : undefined,

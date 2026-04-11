@@ -174,12 +174,108 @@ function isOverlap(a: ScheduleEvent, b: ScheduleEvent) {
 }
 
 function generateRecurrenceEvents(event: ScheduleEvent, startDate: Date, endDate: Date): ScheduleEvent[] {
-  // 暂时只返回原始事件，不生成循环事件实例，以便应用能够正常启动
-  return [event];
+  const result: ScheduleEvent[] = [];
+  
+  // 如果没有循环规则，只返回原始事件
+  if (!event.recurrence) {
+    return [event];
+  }
+  
+  // 如果是循环事件的实例（有originalId），不再次生成循环事件
+  if (event.originalId) {
+    return [event];
+  }
+  
+  try {
+    // 验证日期格式
+    if (!event.date) {
+      console.error('Event missing date:', event);
+      return [event];
+    }
+    
+    const originalDate = parseISO(event.date);
+    let currentDate = originalDate;
+    let count = 0;
+    
+    // 生成循环事件实例
+    while (currentDate <= endDate) {
+      // 检查是否在视图范围内
+      if (currentDate >= startDate) {
+        // 检查是否是例外日期
+        const currentDateStr = format(currentDate, 'yyyy-MM-dd');
+        const isException = event.exceptionDates?.includes(currentDateStr);
+        if (!isException) {
+          // 对于每周循环，检查是否是指定的星期几
+          if (event.recurrence.type === 'weekly' && event.recurrence.weekdays) {
+            const dayOfWeek = currentDate.getDay(); // 0-6, 0 是周日
+            if (event.recurrence.weekdays.includes(dayOfWeek)) {
+              result.push({
+                ...event,
+                id: `${event.id}-${currentDateStr}`,
+                date: currentDateStr,
+                originalId: event.id
+              });
+            }
+          } else {
+            // 每天或每月循环
+            result.push({
+              ...event,
+              id: `${event.id}-${currentDateStr}`,
+              date: currentDateStr,
+              originalId: event.id
+            });
+          }
+        }
+      }
+      
+      // 计算下一个循环日期
+      currentDate = getNextRecurrenceDate(currentDate, event.recurrence);
+      count++;
+      
+      // 检查循环结束条件
+      if (event.recurrence.endCount && count >= event.recurrence.endCount) {
+        break;
+      }
+      if (event.recurrence.endDate) {
+        try {
+          if (currentDate > parseISO(event.recurrence.endDate)) {
+            break;
+          }
+        } catch (e) {
+          console.error('Invalid endDate format:', event.recurrence.endDate);
+          break;
+        }
+      }
+      
+      // 防止无限循环
+      if (count > 1000) {
+        console.warn('Recurrence event generation limit reached');
+        break;
+      }
+    }
+    
+    // 如果没有生成任何事件，返回原始事件
+    return result.length > 0 ? result : [event];
+  } catch (error) {
+    // 如果出错，返回原始事件
+    console.error('Error generating recurrence events:', error);
+    return [event];
+  }
 }
 
 function getNextRecurrenceDate(currentDate: Date, recurrence: any): Date {
-  const interval = recurrence.interval || 1;
+  // 验证参数
+  if (!(currentDate instanceof Date) || isNaN(currentDate.getTime())) {
+    console.error('Invalid currentDate:', currentDate);
+    return new Date();
+  }
+  
+  if (!recurrence || typeof recurrence !== 'object') {
+    console.error('Invalid recurrence:', recurrence);
+    return addDays(currentDate, 1);
+  }
+  
+  const interval = typeof recurrence.interval === 'number' && recurrence.interval > 0 ? recurrence.interval : 1;
   
   switch (recurrence.type) {
     case "daily":
@@ -189,6 +285,7 @@ function getNextRecurrenceDate(currentDate: Date, recurrence: any): Date {
     case "monthly":
       return addMonths(currentDate, interval);
     default:
+      console.warn('Unknown recurrence type:', recurrence.type);
       return addDays(currentDate, 1);
   }
 }
