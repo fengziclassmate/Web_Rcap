@@ -2,6 +2,7 @@ create table if not exists public.schedule_data (
   user_id uuid primary key references auth.users(id) on delete cascade,
   events jsonb not null default '[]'::jsonb,
   tasks jsonb not null default '[]'::jsonb,
+  annual_tasks jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now()
 );
 

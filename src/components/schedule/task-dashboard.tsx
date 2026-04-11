@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight, ListTodo, Plus, RotateCcw, Trash2, AlertTriangle, Clock, Star, CheckCircle } from "lucide-react";
+import { CalendarRange, ChevronDown, ChevronRight, ListTodo, Plus, RotateCcw, Trash2, AlertTriangle, Clock, Star, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { LongTask, Priority, SubTask } from "@/app/page";
+import type { AnnualTask, LongTask, Priority, SubTask } from "@/app/page";
 import {
   Collapsible,
   CollapsibleContent,
@@ -33,6 +33,10 @@ type TaskDashboardProps = {
   onAddTask: (name: string, dueDate: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<LongTask>) => void;
   onDeleteTask: (taskId: string) => void;
+  annualTasks: AnnualTask[];
+  onAddAnnualTask: (name: string) => void;
+  onToggleAnnualTask: (taskId: string) => void;
+  onDeleteAnnualTask: (taskId: string) => void;
 };
 
 type TaskDraft = {
@@ -58,8 +62,13 @@ export function TaskDashboard({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
+  annualTasks,
+  onAddAnnualTask,
+  onToggleAnnualTask,
+  onDeleteAnnualTask,
 }: TaskDashboardProps) {
   const [taskName, setTaskName] = useState("");
+  const [annualTaskName, setAnnualTaskName] = useState("");
   const [dueDate, setDueDate] = useState(getTodayISODate);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
@@ -235,6 +244,84 @@ export function TaskDashboard({
               添加
             </Button>
           </div>
+        </div>
+
+        <p className="mb-4 flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-600">
+          <CalendarRange className="h-4 w-4 text-primary" aria-hidden />
+          年度任务清单
+        </p>
+        <div className="mb-6 space-y-3 rounded-lg border border-gray-200 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Input
+              value={annualTaskName}
+              onChange={(event) => setAnnualTaskName(event.target.value)}
+              placeholder="输入本年度目标或大事（如：考证、旅行计划）"
+              className="min-w-0 flex-1 rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  if (!annualTaskName.trim()) return;
+                  onAddAnnualTask(annualTaskName);
+                  setAnnualTaskName("");
+                  toast.success("已加入年度清单");
+                }
+              }}
+            />
+            <Button
+              type="button"
+              onClick={() => {
+                if (!annualTaskName.trim()) return;
+                onAddAnnualTask(annualTaskName);
+                setAnnualTaskName("");
+                toast.success("已加入年度清单");
+              }}
+              className="shrink-0 rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150"
+            >
+              <Plus className="h-4 w-4" />
+              添加
+            </Button>
+          </div>
+          {annualTasks.length > 0 ? (
+            <ul className="max-h-56 space-y-2 overflow-y-auto pr-1 text-sm">
+              {annualTasks.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-start gap-2 rounded-md border border-gray-100 bg-gray-50/80 px-2 py-2"
+                >
+                  <Checkbox
+                    checked={item.done}
+                    onCheckedChange={() => onToggleAnnualTask(item.id)}
+                    className="mt-0.5"
+                    aria-label={`年度任务 ${item.name} 完成状态`}
+                  />
+                  <span
+                    className={`min-w-0 flex-1 leading-snug [overflow-wrap:anywhere] break-words ${
+                      item.done ? "text-gray-500 line-through" : "text-gray-900"
+                    }`}
+                  >
+                    {item.name}
+                  </span>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 shrink-0 rounded-md hover:bg-red-50 hover:text-red-500"
+                    onClick={() => {
+                      onDeleteAnnualTask(item.id);
+                      toast.success("已从年度清单移除");
+                    }}
+                    aria-label={`删除年度任务 ${item.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-center text-sm text-gray-500">
+              尚未添加年度任务。可在此记录全年级目标，与下方按截止日管理的长期任务互补。
+            </p>
+          )}
         </div>
 
         <p className="mb-4 text-sm font-medium uppercase tracking-wide text-gray-600">

@@ -207,7 +207,7 @@ export function WeeklyTimeGrid({
   onViewModeChange,
   onTimeGranularityChange,
   viewMode = 'week',
-  timeGranularity = 30,
+  timeGranularity = 60,
 }: WeeklyTimeGridProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -585,7 +585,7 @@ export function WeeklyTimeGrid({
     const height = (event.endHour - event.startHour) * hourCellHeight - 8;
     return {
       top: `${top}px`,
-      height: `${height}px`,
+      height: `${Math.max(height, 28)}px`,
       left: `calc(${(event.lane / event.laneCount) * 100}% + 4px)`,
       width: `calc(${100 / event.laneCount}% - 8px)`,
     };
@@ -728,10 +728,13 @@ export function WeeklyTimeGrid({
                       </div>
 
                       <div className="pointer-events-none absolute inset-0 p-1">
-                        {dayEvents.map((event) => (
+                        {dayEvents.map((event) => {
+                          const durationHours = event.endHour - event.startHour;
+                          const compactCard = durationHours < 1.25;
+                          return (
                           <div
                             key={event.id}
-                            className={`pointer-events-auto absolute rounded-lg border px-3 py-2 text-left text-sm shadow-md transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
+                            className={`pointer-events-auto absolute flex min-h-0 flex-col overflow-hidden rounded-lg border text-left text-sm shadow-md transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
                               event.isCompleted
                                 ? "border-gray-300 bg-gray-100 text-gray-500 opacity-70"
                                 : getCategoryColor(categories, event.category)
@@ -744,32 +747,59 @@ export function WeeklyTimeGrid({
                           >
                             <button
                               type="button"
-                              className="w-full text-left"
+                              className={`flex min-h-0 w-full min-w-0 flex-1 flex-col text-left ${
+                                compactCard
+                                  ? "items-stretch justify-start px-2 pb-1 pt-1"
+                                  : "items-stretch justify-center px-2 py-1.5"
+                              }`}
                               onClick={() => handleOpenEdit(event)}
                             >
-                              <div className="flex items-center justify-between mb-1">
-                                <div className="flex items-center gap-2">
-                                  {parseSyntheticEventId(event.id) ? (
-                                    <Repeat className="h-3.5 w-3.5 shrink-0 text-gray-500" aria-hidden />
-                                  ) : null}
-                                  <p className="font-medium truncate">{event.title}</p>
-                                  {event.tag && (
-                                    <span className={`text-sm font-bold ${getTagInfo(event.tag).color}`}>
-                                      {getTagInfo(event.tag).icon}
-                                    </span>
-                                  )}
+                              <div
+                                className={`flex min-h-0 min-w-0 flex-col gap-1 ${
+                                  compactCard ? "" : "flex-1"
+                                }`}
+                              >
+                                <div
+                                  className={`min-w-0 ${
+                                    compactCard
+                                      ? ""
+                                      : "flex flex-1 flex-col justify-center overflow-y-auto"
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-1.5">
+                                    {parseSyntheticEventId(event.id) ? (
+                                      <Repeat
+                                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600"
+                                        aria-hidden
+                                      />
+                                    ) : null}
+                                    <p
+                                      className={`min-w-0 flex-1 font-medium leading-snug [overflow-wrap:anywhere] break-words ${
+                                        compactCard ? "line-clamp-3" : ""
+                                      }`}
+                                    >
+                                      {event.title}
+                                    </p>
+                                    {event.tag ? (
+                                      <span
+                                        className={`shrink-0 text-sm font-bold ${getTagInfo(event.tag).color}`}
+                                      >
+                                        {getTagInfo(event.tag).icon}
+                                      </span>
+                                    ) : null}
+                                    {event.isCompleted ? (
+                                      <Check className="h-4 w-4 shrink-0 text-green-600" aria-hidden />
+                                    ) : null}
+                                  </div>
                                 </div>
-                                {event.isCompleted && (
-                                  <Check className="h-4 w-4 text-green-500" />
-                                )}
+                                <p className="shrink-0 text-xs leading-tight text-gray-700">
+                                  {formatHour(event.startHour)} – {formatHour(event.endHour)}
+                                </p>
                               </div>
-                              <p className="text-xs text-gray-600">
-                                {formatHour(event.startHour)} - {formatHour(event.endHour)}
-                              </p>
                             </button>
                             <button
                               type="button"
-                              className="absolute right-2 top-2 rounded-full border border-gray-300 bg-white p-1 text-black hover:bg-gray-100 transition-colors duration-150"
+                              className="absolute right-1 top-1 z-10 rounded-full border border-gray-300 bg-white p-1 text-black shadow-sm hover:bg-gray-100 transition-colors duration-150"
                               onClick={(mouseEvent) => {
                                 mouseEvent.stopPropagation();
                                 resetCreateDialog({ date: event.date, startHour: event.startHour });
@@ -780,7 +810,8 @@ export function WeeklyTimeGrid({
                             </button>
 
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -854,7 +885,7 @@ export function WeeklyTimeGrid({
                         {dayEvents.slice(0, 3).map((event) => (
                           <div 
                             key={event.id}
-                            className={`text-xs p-1 rounded ${getCategoryColor(categories, event.category)} truncate`}
+                            className={`cursor-pointer text-xs p-1 rounded leading-snug line-clamp-3 break-words [overflow-wrap:anywhere] ${getCategoryColor(categories, event.category)}`}
                             onClick={() => handleOpenEdit(event)}
                           >
                             {event.title}

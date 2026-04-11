@@ -59,6 +59,12 @@ export type LongTask = {
   subtasks: SubTask[];
 };
 
+export type AnnualTask = {
+  id: string;
+  name: string;
+  done: boolean;
+};
+
 const defaultTasks: LongTask[] = [
   {
     id: "task-1",
@@ -123,6 +129,18 @@ const defaultEvents: ScheduleEvent[] = [
 
 function getCurrentWeekStart() {
   return startOfWeek(new Date(), { weekStartsOn: 1 });
+}
+
+function normalizeAnnualTasks(payload: unknown): AnnualTask[] {
+  if (!Array.isArray(payload)) return [];
+  return payload.map((item, index) => {
+    const value = item as Partial<AnnualTask>;
+    return {
+      id: value.id ?? `annual-restored-${index}`,
+      name: typeof value.name === "string" ? value.name : "未命名年度任务",
+      done: Boolean(value.done),
+    };
+  });
 }
 
 function normalizeTasks(payload: unknown): LongTask[] {
@@ -203,12 +221,13 @@ export default function Home() {
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getCurrentWeekStart);
   const [events, setEvents] = useState<ScheduleEvent[]>(defaultEvents);
   const [tasks, setTasks] = useState<LongTask[]>(defaultTasks);
+  const [annualTasks, setAnnualTasks] = useState<AnnualTask[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [authEmail, setAuthEmail] = useState("");
   const [sendingLink, setSendingLink] = useState(false);
   const [dataReady, setDataReady] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(30);
+  const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(60);
   const weekRange = useMemo(() => {
     const start = format(currentWeekStart, "yyyy/MM/dd", { locale: zhCN });
     const end = format(addDays(currentWeekStart, 6), "yyyy/MM/dd", { locale: zhCN });
@@ -242,6 +261,7 @@ export default function Home() {
     if (!user) {
       setEvents(defaultEvents);
       setTasks(defaultTasks);
+      setAnnualTasks([]);
       setDataReady(false);
       return;
     }
@@ -265,7 +285,7 @@ export default function Home() {
         if (!user) return;
         const { data, error } = await supabase
           .from("schedule_data")
-          .select("events,tasks")
+          .select("events,tasks,annual_tasks")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -292,9 +312,11 @@ export default function Home() {
         if (data) {
           setEvents(normalizeEvents(data.events));
           setTasks(normalizeTasks(data.tasks));
+          setAnnualTasks(normalizeAnnualTasks((data as { annual_tasks?: unknown }).annual_tasks));
         } else {
           setEvents(defaultEvents);
           setTasks(defaultTasks);
+          setAnnualTasks([]);
         }
         setDataReady(true);
       } catch (error) {
@@ -319,6 +341,7 @@ export default function Home() {
           user_id: user.id,
           events,
           tasks,
+          annual_tasks: annualTasks,
         },
         { onConflict: "user_id" },
       )
@@ -328,7 +351,7 @@ export default function Home() {
           toast.error(`保存到云端失败: ${error.message}`);
         }
       });
-  }, [events, tasks, user, dataReady]);
+  }, [annualTasks, events, tasks, user, dataReady]);
 
   async function handleSendMagicLink() {
     if (!authEmail.trim()) return;
@@ -415,6 +438,25 @@ export default function Home() {
 
   function handleDeleteTask(taskId: string) {
     setTasks((prev) => prev.filter((task) => task.id !== taskId));
+  }
+
+  function handleAddAnnualTask(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setAnnualTasks((prev) => [
+      ...prev,
+      { id: createId("annual"), name: trimmed, done: false },
+    ]);
+  }
+
+  function handleToggleAnnualTask(taskId: string) {
+    setAnnualTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t)),
+    );
+  }
+
+  function handleDeleteAnnualTask(taskId: string) {
+    setAnnualTasks((prev) => prev.filter((t) => t.id !== taskId));
   }
 
   function handleCreateEvent(event: ScheduleEvent) {
@@ -578,6 +620,10 @@ export default function Home() {
           onAddTask={handleAddTask}
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
+          annualTasks={annualTasks}
+          onAddAnnualTask={handleAddAnnualTask}
+          onToggleAnnualTask={handleToggleAnnualTask}
+          onDeleteAnnualTask={handleDeleteAnnualTask}
         />
       </div>
     </main>
