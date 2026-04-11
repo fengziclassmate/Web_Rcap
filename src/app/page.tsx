@@ -215,7 +215,7 @@ export default function Home() {
 
     initAuth();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       setUser(session?.user ?? null);
     });
 
@@ -351,13 +351,6 @@ export default function Home() {
       </main>
     );
   }
-
-  // 模拟用户，以便测试循环事件功能
-  const mockUser = {
-    id: "mock-user-id",
-    email: "mock@example.com"
-  };
-  const testUser = mockUser; // 直接使用模拟用户
 
   if (!testUser) {
     return (
