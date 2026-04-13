@@ -405,11 +405,22 @@ export default function Home() {
     async function loadUserData() {
       try {
         if (!user) return;
-        let { data, error } = await supabase
+        type ScheduleDataRow = {
+          events: unknown;
+          tasks: unknown;
+          annual_tasks: unknown;
+          project_checkins: unknown;
+          footprints: unknown;
+          ui_preferences?: unknown;
+        };
+
+        const primary = await supabase
           .from("schedule_data")
           .select("events,tasks,annual_tasks,project_checkins,footprints,ui_preferences")
           .eq("user_id", user.id)
           .maybeSingle();
+        let data: ScheduleDataRow | null = primary.data as ScheduleDataRow | null;
+        let error = primary.error;
 
         if (error?.message && isUiPreferencesColumnMissing(error.message)) {
           const fallback = await supabase
@@ -417,7 +428,7 @@ export default function Home() {
             .select("events,tasks,annual_tasks,project_checkins,footprints")
             .eq("user_id", user.id)
             .maybeSingle();
-          data = fallback.data;
+          data = fallback.data as ScheduleDataRow | null;
           error = fallback.error;
         }
 
@@ -479,10 +490,11 @@ export default function Home() {
 
   useEffect(() => {
     if (!user || !dataReady) return;
+    const currentUser = user;
 
     async function saveUserData() {
       const payload = {
-        user_id: user.id,
+        user_id: currentUser.id,
         events,
         tasks,
         annual_tasks: annualTasks,
