@@ -128,7 +128,7 @@ type DiaryEntry = {
   content: string;
 };
 
-const hourCellHeight = 52;
+const hourCellHeight = 60;
 
 const moodOptions: { value: Mood; icon: React.ReactNode; label: string }[] = [
   { value: "开心", icon: <Smile className="h-5 w-5 text-yellow-500" />, label: "开心" },
@@ -537,6 +537,15 @@ export function WeeklyTimeGrid({
     closeContextMenu();
   }
 
+  function handleDeleteFromContext(eventId: string) {
+    if (parseSyntheticEventId(eventId)) {
+      onDeleteEvent(eventId, { mode: "single" });
+    } else {
+      onDeleteEvent(eventId, { mode: "all" });
+    }
+    closeContextMenu();
+  }
+
   useEffect(() => {
     if (!resizeState) return;
 
@@ -664,11 +673,11 @@ export function WeeklyTimeGrid({
       </header>
 
       <div className="overflow-x-auto">
-        <div className="relative min-w-[920px]">
+        <div className="relative min-w-[1120px]">
           {/* 日视图和周视图 */}
           {viewMode !== 'month' && (
             <>
-              <div className="grid grid-cols-[88px_repeat(auto-fit,minmax(120px,1fr))] border-b border-gray-200 bg-white">
+              <div className="grid grid-cols-[96px_repeat(auto-fit,minmax(140px,1fr))] border-b border-gray-200 bg-white">
                 <div className="border-r border-gray-200 px-3 py-3 text-sm font-medium text-gray-700 bg-gray-50">时间</div>
                 {displayDates.map((day) => (
                   <div
@@ -680,7 +689,7 @@ export function WeeklyTimeGrid({
                 ))}
               </div>
 
-              <div className="grid grid-cols-[88px_repeat(auto-fit,minmax(120px,1fr))]">
+              <div className="grid grid-cols-[96px_repeat(auto-fit,minmax(140px,1fr))]">
                 <div>
                   {hours.map((hour) => {
                     const isMainHour = Number.isInteger(hour);
@@ -769,6 +778,13 @@ export function WeeklyTimeGrid({
                                   }`}
                                 >
                                   <div className="flex items-start gap-1.5">
+                                    {event.tag ? (
+                                      <span
+                                        className={`shrink-0 text-sm font-bold ${getTagInfo(event.tag).color}`}
+                                      >
+                                        {getTagInfo(event.tag).icon}
+                                      </span>
+                                    ) : null}
                                     {parseSyntheticEventId(event.id) ? (
                                       <Repeat
                                         className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600"
@@ -781,13 +797,6 @@ export function WeeklyTimeGrid({
                                     >
                                       {event.title}
                                     </p>
-                                    {event.tag ? (
-                                      <span
-                                        className={`shrink-0 text-sm font-bold ${getTagInfo(event.tag).color}`}
-                                      >
-                                        {getTagInfo(event.tag).icon}
-                                      </span>
-                                    ) : null}
                                     {event.isCompleted ? (
                                       <Check className="h-4 w-4 shrink-0 text-green-600" aria-hidden />
                                     ) : null}
@@ -821,7 +830,7 @@ export function WeeklyTimeGrid({
 
               {/* 日记区域 */}
               <div className="border-t border-gray-200 mt-6 bg-gray-50">
-                <div className="grid grid-cols-[88px_repeat(auto-fit,minmax(120px,1fr))]">
+                <div className="grid grid-cols-[96px_repeat(auto-fit,minmax(140px,1fr))]">
                   <div className="border-r border-gray-200 px-3 py-4 text-sm font-medium text-gray-700 bg-gray-100">
                     日记
                   </div>
@@ -1616,6 +1625,12 @@ export function WeeklyTimeGrid({
               {expandedEvents.find((e) => e.id === contextMenu.eventId)?.isCompleted
                 ? "标记为未完成"
                 : "标记为已完成"}
+            </button>
+            <button
+              className="block w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-red-50"
+              onClick={() => handleDeleteFromContext(contextMenu.eventId)}
+            >
+              删除该行程
             </button>
             <div className="border-t border-gray-200 my-1"></div>
             <button

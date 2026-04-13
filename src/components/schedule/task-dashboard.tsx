@@ -136,6 +136,7 @@ export function TaskDashboard({
   const [projectNoteDraft, setProjectNoteDraft] = useState<Record<string, string>>({});
   const [newFootprintName, setNewFootprintName] = useState("");
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
+  const [showAddAnnualDialog, setShowAddAnnualDialog] = useState(false);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showAddFootprintDialog, setShowAddFootprintDialog] = useState(false);
   const [historyProjectId, setHistoryProjectId] = useState<string | null>(null);
@@ -147,6 +148,8 @@ export function TaskDashboard({
   const [editingFootprintId, setEditingFootprintId] = useState<string | null>(null);
   const [editingFootprintName, setEditingFootprintName] = useState("");
   const [editingFootprintDate, setEditingFootprintDate] = useState(getTodayISODate);
+  const [longTaskSectionOpen, setLongTaskSectionOpen] = useState(true);
+  const [expandedCompletedTasks, setExpandedCompletedTasks] = useState<Set<string>>(new Set());
   const incompleteTasks = tasks.filter((task) => !task.done);
   const completedTasks = tasks.filter((task) => task.done);
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
@@ -176,6 +179,14 @@ export function TaskDashboard({
     setTaskName("");
     setShowAddTaskDialog(false);
     toast.success("长期任务已添加");
+  }
+
+  function handleAddAnnual() {
+    if (!annualTaskName.trim()) return;
+    onAddAnnualTask(annualTaskName);
+    setAnnualTaskName("");
+    setShowAddAnnualDialog(false);
+    toast.success("已加入年度清单");
   }
 
   function handleOpenEdit(task: LongTask) {
@@ -402,41 +413,17 @@ export function TaskDashboard({
           </Button>
         </div>
 
-        <p className="mb-4 flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-600">
-          <CalendarRange className="h-4 w-4 text-primary" aria-hidden />
-          年度任务清单
-        </p>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-600">
+            <CalendarRange className="h-4 w-4 text-primary" aria-hidden />
+            年度任务清单
+          </p>
+          <Button type="button" size="sm" onClick={() => setShowAddAnnualDialog(true)}>
+            <Plus className="mr-1 h-4 w-4" />
+            添加
+          </Button>
+        </div>
         <div className="mb-6 space-y-3 rounded-lg border border-gray-200 p-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Input
-              value={annualTaskName}
-              onChange={(event) => setAnnualTaskName(event.target.value)}
-              placeholder="输入本年度目标或大事（如：考证、旅行计划）"
-              className="min-w-0 flex-1 rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  if (!annualTaskName.trim()) return;
-                  onAddAnnualTask(annualTaskName);
-                  setAnnualTaskName("");
-                  toast.success("已加入年度清单");
-                }
-              }}
-            />
-            <Button
-              type="button"
-              onClick={() => {
-                if (!annualTaskName.trim()) return;
-                onAddAnnualTask(annualTaskName);
-                setAnnualTaskName("");
-                toast.success("已加入年度清单");
-              }}
-              className="shrink-0 rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150"
-            >
-              <Plus className="h-4 w-4" />
-              添加
-            </Button>
-          </div>
           {annualTasks.length > 0 ? (
             <ul className="max-h-56 space-y-2 overflow-y-auto pr-1 text-sm">
               {annualTasks.map((item) => (
@@ -480,29 +467,34 @@ export function TaskDashboard({
           )}
         </div>
 
-        <p className="mb-4 text-sm font-medium uppercase tracking-wide text-gray-600">
-          长期任务 / 未完成任务
-        </p>
-        <div className="mb-3 flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={taskViewMode === "order" ? "default" : "outline"}
-            onClick={() => setTaskViewMode("order")}
-          >
-            拖拽排序
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={taskViewMode === "priority" ? "default" : "outline"}
-            onClick={() => setTaskViewMode("priority")}
-          >
-            按优先级分组
-          </Button>
-        </div>
+        <Collapsible open={longTaskSectionOpen} onOpenChange={setLongTaskSectionOpen}>
+          <CollapsibleTrigger className="mb-3 flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
+            <span className="text-sm font-medium uppercase tracking-wide text-gray-600">
+              长期任务 / 未完成任务
+            </span>
+            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${longTaskSectionOpen ? "" : "-rotate-90"}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="mb-3 flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={taskViewMode === "order" ? "default" : "outline"}
+                onClick={() => setTaskViewMode("order")}
+              >
+                常规
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={taskViewMode === "priority" ? "default" : "outline"}
+                onClick={() => setTaskViewMode("priority")}
+              >
+                按优先级分组
+              </Button>
+            </div>
 
-        {taskViewMode === "order" ? (
+            {taskViewMode === "order" ? (
           <ul className="space-y-2">
             {orderedIncompleteTasks.map((task) => (
               <li
@@ -600,7 +592,7 @@ export function TaskDashboard({
               </li>
             ))}
           </ul>
-        ) : (
+            ) : (
           <div className="space-y-3">
             {groupedIncompleteTasks.map((group) => (
               <div key={group.priority} className="rounded-lg border border-gray-200 p-3">
@@ -625,10 +617,12 @@ export function TaskDashboard({
               </div>
             ))}
           </div>
-        )}
-        {orderedIncompleteTasks.length === 0 && (
-          <p className="mt-4 border border-gray-200 rounded-lg p-4 text-sm text-gray-500 text-center">当前没有未完成长期任务</p>
-        )}
+            )}
+            {orderedIncompleteTasks.length === 0 && (
+              <p className="mt-4 border border-gray-200 rounded-lg p-4 text-sm text-gray-500 text-center">当前没有未完成长期任务</p>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       <Separator />
@@ -642,18 +636,73 @@ export function TaskDashboard({
           {completedTasks.length > 0 ? (
             <ul className="mt-4 space-y-3 border border-gray-200 rounded-lg p-4 text-sm text-gray-600">
               {completedTasks.map((task) => (
-                <li key={task.id} className="flex items-center justify-between gap-3">
-                  <span className="line-through">{task.name}</span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8 rounded-md border-gray-300 px-3 text-xs hover:bg-gray-50 transition-colors duration-150"
-                    onClick={() => handleMoveBackToIncomplete(task.id)}
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    移回未完成
-                  </Button>
+                <li key={task.id} className="rounded-md border border-gray-200 bg-white px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      onClick={() =>
+                        setExpandedCompletedTasks((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(task.id)) {
+                            next.delete(task.id);
+                          } else {
+                            next.add(task.id);
+                          }
+                          return next;
+                        })
+                      }
+                    >
+                      <ChevronDown
+                        className={`h-4 w-4 text-gray-500 transition-transform ${expandedCompletedTasks.has(task.id) ? "" : "-rotate-90"}`}
+                      />
+                      <span className="min-w-0 truncate line-through">{task.name}</span>
+                    </button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleOpenEdit(task)}
+                      >
+                        编辑
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 rounded-md border-gray-300 px-3 text-xs hover:bg-gray-50 transition-colors duration-150"
+                        onClick={() => handleMoveBackToIncomplete(task.id)}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        移回未完成
+                      </Button>
+                    </div>
+                  </div>
+                  {expandedCompletedTasks.has(task.id) ? (
+                    <div className="mt-2 space-y-2 rounded-md border border-gray-100 bg-gray-50 p-2">
+                      <p className="text-xs text-gray-600">
+                        完成记录：{task.completionLog || "暂无"}
+                      </p>
+                      <div className="text-xs text-gray-600">
+                        子任务完成情况：
+                        {task.subtasks.length === 0 ? (
+                          <span className="ml-1">无子任务</span>
+                        ) : (
+                          <ul className="mt-1 space-y-1">
+                            {task.subtasks.map((subtask) => (
+                              <li key={subtask.id} className="flex items-center gap-2">
+                                <Checkbox checked={subtask.done} className="h-3.5 w-3.5" />
+                                <span className={subtask.done ? "line-through text-gray-500" : "text-gray-700"}>
+                                  {subtask.name}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -828,6 +877,30 @@ export function TaskDashboard({
             <Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
             <Button type="button" className="w-full" onClick={handleAddTask}>
               添加任务
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAddAnnualDialog} onOpenChange={setShowAddAnnualDialog}>
+        <DialogContent className="rounded-sm border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-sm">新增年度任务</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              value={annualTaskName}
+              onChange={(event) => setAnnualTaskName(event.target.value)}
+              placeholder="输入本年度目标或大事（如：考证、旅行计划）"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  handleAddAnnual();
+                }
+              }}
+            />
+            <Button type="button" className="w-full" onClick={handleAddAnnual}>
+              添加年度任务
             </Button>
           </div>
         </DialogContent>
