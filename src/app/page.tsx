@@ -587,6 +587,41 @@ export default function Home() {
     setProjectCheckins((prev) => prev.filter((project) => project.id !== projectId));
   }
 
+  function handleUpdateProjectCheckin(
+    projectId: string,
+    patch: Partial<Pick<ProjectCheckin, "name" | "description" | "startDate">>,
+  ) {
+    setProjectCheckins((prev) =>
+      prev.map((project) => (project.id === projectId ? { ...project, ...patch } : project)),
+    );
+  }
+
+  function handleUpdateProjectCheckinEntry(projectId: string, date: string, note: string) {
+    setProjectCheckins((prev) =>
+      prev.map((project) => {
+        if (project.id !== projectId) return project;
+        return {
+          ...project,
+          checkins: project.checkins.map((entry) =>
+            entry.date === date ? { ...entry, note: note.trim() } : entry,
+          ),
+        };
+      }),
+    );
+  }
+
+  function handleDeleteProjectCheckinEntry(projectId: string, date: string) {
+    setProjectCheckins((prev) =>
+      prev.map((project) => {
+        if (project.id !== projectId) return project;
+        return {
+          ...project,
+          checkins: project.checkins.filter((entry) => entry.date !== date),
+        };
+      }),
+    );
+  }
+
   function handleAddFootprint(name: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -609,6 +644,12 @@ export default function Home() {
 
   function handleDeleteFootprint(itemId: string) {
     setFootprints((prev) => prev.filter((item) => item.id !== itemId));
+  }
+
+  function handleUpdateFootprint(itemId: string, patch: Partial<Pick<FootprintItem, "name" | "lastDate">>) {
+    setFootprints((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
+    );
   }
 
   function handleCreateEvent(event: ScheduleEvent) {
@@ -792,10 +833,14 @@ export default function Home() {
             onAddProjectCheckin={handleAddProjectCheckin}
             onCheckinProject={handleCheckinProject}
             onDeleteProjectCheckin={handleDeleteProjectCheckin}
+            onUpdateProjectCheckin={handleUpdateProjectCheckin}
+            onUpdateProjectCheckinEntry={handleUpdateProjectCheckinEntry}
+            onDeleteProjectCheckinEntry={handleDeleteProjectCheckinEntry}
             footprints={footprints}
             onAddFootprint={handleAddFootprint}
             onResetFootprint={handleResetFootprint}
             onDeleteFootprint={handleDeleteFootprint}
+            onUpdateFootprint={handleUpdateFootprint}
           />
         </section>
       </div>

@@ -55,10 +55,20 @@ type TaskDashboardProps = {
   onAddProjectCheckin: (name: string, description: string) => void;
   onCheckinProject: (projectId: string, note: string) => void;
   onDeleteProjectCheckin: (projectId: string) => void;
+  onUpdateProjectCheckin: (
+    projectId: string,
+    patch: Partial<Pick<ProjectCheckin, "name" | "description" | "startDate">>,
+  ) => void;
+  onUpdateProjectCheckinEntry: (projectId: string, date: string, note: string) => void;
+  onDeleteProjectCheckinEntry: (projectId: string, date: string) => void;
   footprints: FootprintItem[];
   onAddFootprint: (name: string) => void;
   onResetFootprint: (itemId: string) => void;
   onDeleteFootprint: (itemId: string) => void;
+  onUpdateFootprint: (
+    itemId: string,
+    patch: Partial<Pick<FootprintItem, "name" | "lastDate">>,
+  ) => void;
 };
 
 const PRIORITY_ORDER: Priority[] = ["紧急且重要", "紧急不重要", "不紧急重要", "不紧急不重要"];
@@ -102,10 +112,14 @@ export function TaskDashboard({
   onAddProjectCheckin,
   onCheckinProject,
   onDeleteProjectCheckin,
+  onUpdateProjectCheckin,
+  onUpdateProjectCheckinEntry,
+  onDeleteProjectCheckinEntry,
   footprints,
   onAddFootprint,
   onResetFootprint,
   onDeleteFootprint,
+  onUpdateFootprint,
 }: TaskDashboardProps) {
   const [taskName, setTaskName] = useState("");
   const [annualTaskName, setAnnualTaskName] = useState("");
@@ -114,6 +128,7 @@ export function TaskDashboard({
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [taskViewMode, setTaskViewMode] = useState<"order" | "priority">("order");
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [newProjectName, setNewProjectName] = useState("");
@@ -124,6 +139,14 @@ export function TaskDashboard({
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showAddFootprintDialog, setShowAddFootprintDialog] = useState(false);
   const [historyProjectId, setHistoryProjectId] = useState<string | null>(null);
+  const [confirmDangerousActions, setConfirmDangerousActions] = useState(true);
+  const [checkinDrafts, setCheckinDrafts] = useState<Record<string, string>>({});
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editingProjectName, setEditingProjectName] = useState("");
+  const [editingProjectDesc, setEditingProjectDesc] = useState("");
+  const [editingFootprintId, setEditingFootprintId] = useState<string | null>(null);
+  const [editingFootprintName, setEditingFootprintName] = useState("");
+  const [editingFootprintDate, setEditingFootprintDate] = useState(getTodayISODate);
   const incompleteTasks = tasks.filter((task) => !task.done);
   const completedTasks = tasks.filter((task) => task.done);
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
@@ -141,6 +164,10 @@ export function TaskDashboard({
   const historyProject = useMemo(
     () => projectCheckins.find((project) => project.id === historyProjectId) ?? null,
     [projectCheckins, historyProjectId],
+  );
+  const editingFootprint = useMemo(
+    () => footprints.find((item) => item.id === editingFootprintId) ?? null,
+    [footprints, editingFootprintId],
   );
 
   function handleAddTask() {
@@ -283,6 +310,32 @@ export function TaskDashboard({
     onDeleteProjectCheckin(projectId);
   }
 
+  function withOptionalConfirm(message: string, action: () => void) {
+    if (!confirmDangerousActions) {
+      action();
+      return;
+    }
+    if (typeof window !== "undefined" && !window.confirm(message)) {
+      return;
+    }
+    action();
+  }
+
+  function openEditProject(project: ProjectCheckin) {
+    setEditingProjectId(project.id);
+    setEditingProjectName(project.name);
+    setEditingProjectDesc(project.description);
+  }
+
+  function saveEditProject() {
+    if (!editingProjectId || !editingProjectName.trim()) return;
+    onUpdateProjectCheckin(editingProjectId, {
+      name: editingProjectName.trim(),
+      description: editingProjectDesc.trim(),
+    });
+    setEditingProjectId(null);
+  }
+
   function handleAddFootprint() {
     if (!newFootprintName.trim()) return;
     onAddFootprint(newFootprintName);
@@ -292,6 +345,30 @@ export function TaskDashboard({
 
   function handleResetFootprint(itemId: string) {
     onResetFootprint(itemId);
+  }
+
+  function openEditFootprint(item: FootprintItem) {
+    setEditingFootprintId(item.id);
+    setEditingFootprintName(item.name);
+    setEditingFootprintDate(item.lastDate);
+  }
+
+  function saveEditFootprint() {
+    if (!editingFootprintId || !editingFootprintName.trim() || !editingFootprintDate) return;
+    onUpdateFootprint(editingFootprintId, {
+      name: editingFootprintName.trim(),
+      lastDate: editingFootprintDate,
+    });
+    setEditingFootprintId(null);
+  }
+
+  function handleToggleTaskSubtask(taskId: string, subtaskId: string) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const nextSubtasks = task.subtasks.map((subtask) =>
+      subtask.id === subtaskId ? { ...subtask, done: !subtask.done } : subtask,
+    );
+    onUpdateTask(taskId, { subtasks: nextSubtasks });
   }
 
   return (
@@ -306,6 +383,17 @@ export function TaskDashboard({
       <Separator />
 
       <div className="p-6">
+        <div className="mb-4 flex items-center justify-end gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+          <Label htmlFor="confirm-dangerous-actions" className="text-xs text-gray-700">
+            操作确认
+          </Label>
+          <Switch
+            id="confirm-dangerous-actions"
+            checked={confirmDangerousActions}
+            onCheckedChange={setConfirmDangerousActions}
+          />
+        </div>
+
         <div className="mb-4 flex items-center justify-between gap-3">
           <p className="text-sm font-medium uppercase tracking-wide text-gray-600">长期任务</p>
           <Button type="button" size="sm" onClick={() => setShowAddTaskDialog(true)}>
@@ -457,6 +545,26 @@ export function TaskDashboard({
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                       <span>截止：{task.dueDate}</span>
                       <Badge className="rounded-md border border-primary bg-primary text-white">未完成</Badge>
+                      {task.subtasks.length > 0 ? (
+                        <button
+                          type="button"
+                          className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-600 hover:bg-gray-100"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setExpandedTasks((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(task.id)) {
+                                next.delete(task.id);
+                              } else {
+                                next.add(task.id);
+                              }
+                              return next;
+                            });
+                          }}
+                        >
+                          {expandedTasks.has(task.id) ? "收起子任务" : `子任务 ${task.subtasks.length}`}
+                        </button>
+                      ) : null}
                     </div>
                   </button>
                   <Button
@@ -473,6 +581,22 @@ export function TaskDashboard({
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+                {task.subtasks.length > 0 && expandedTasks.has(task.id) ? (
+                  <ul className="mt-2 space-y-1 rounded-md border border-gray-200 bg-gray-50 p-2">
+                    {task.subtasks.map((subtask) => (
+                      <li key={subtask.id} className="flex items-center gap-2 text-xs">
+                        <Checkbox
+                          checked={subtask.done}
+                          onCheckedChange={() => handleToggleTaskSubtask(task.id, subtask.id)}
+                          className="h-3.5 w-3.5"
+                        />
+                        <span className={subtask.done ? "line-through text-gray-500" : "text-gray-700"}>
+                          {subtask.name}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -567,9 +691,23 @@ export function TaskDashboard({
                   <p className="truncate text-sm font-medium" title={project.name}>
                     {project.name}
                   </p>
-                  <Button type="button" size="icon" variant="ghost" onClick={() => handleDeleteProject(project.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button type="button" size="sm" variant="ghost" onClick={() => openEditProject(project)}>
+                      编辑
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() =>
+                        withOptionalConfirm("确认删除这个 Project 以及其全部打卡记录吗？", () =>
+                          handleDeleteProject(project.id),
+                        )
+                      }
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 {project.description ? <p className="mb-2 text-xs text-gray-500">{project.description}</p> : null}
                 <div className="mb-2 h-2 rounded bg-gray-100">
@@ -600,7 +738,9 @@ export function TaskDashboard({
                         <li key={`${project.id}-${entry.date}`} className="text-xs text-gray-700">
                           <span className="font-medium">{entry.date}</span>
                           <span className="mx-1">·</span>
-                          <span>{entry.note || "（无描述）"}</span>
+                          <span className="inline-block max-w-[220px] truncate align-bottom" title={entry.note || "（无描述）"}>
+                            {entry.note || "（无描述）"}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -652,8 +792,19 @@ export function TaskDashboard({
                   type="button"
                   size="sm"
                   variant="ghost"
+                  className="mt-1"
+                  onClick={() => openEditFootprint(item)}
+                >
+                  编辑
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
                   className="mt-1 text-xs text-red-500 hover:text-red-600"
-                  onClick={() => onDeleteFootprint(item.id)}
+                  onClick={() =>
+                    withOptionalConfirm("确认删除这个足迹项吗？", () => onDeleteFootprint(item.id))
+                  }
                 >
                   删除
                 </Button>
@@ -741,7 +892,45 @@ export function TaskDashboard({
                     className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
                   >
                     <p className="text-xs font-medium text-gray-700">{entry.date}</p>
-                    <p className="mt-1 text-sm text-gray-800">{entry.note || "（无描述）"}</p>
+                    <div className="mt-1 flex gap-2">
+                      <Input
+                        value={checkinDrafts[`${historyProject.id}__${entry.date}`] ?? entry.note}
+                        onChange={(event) =>
+                          setCheckinDrafts((prev) => ({
+                            ...prev,
+                            [`${historyProject.id}__${entry.date}`]: event.target.value,
+                          }))
+                        }
+                        placeholder="打卡描述"
+                        className="h-8 text-xs"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() =>
+                          onUpdateProjectCheckinEntry(
+                            historyProject.id,
+                            entry.date,
+                            checkinDrafts[`${historyProject.id}__${entry.date}`] ?? entry.note,
+                          )
+                        }
+                      >
+                        保存
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600"
+                        onClick={() =>
+                          withOptionalConfirm("确认删除这条打卡记录吗？", () =>
+                            onDeleteProjectCheckinEntry(historyProject.id, entry.date),
+                          )
+                        }
+                      >
+                        删除
+                      </Button>
+                    </div>
                   </div>
                 ))}
               {historyProject.checkins.length === 0 ? (
@@ -752,6 +941,56 @@ export function TaskDashboard({
             </div>
           </DialogContent>
         ) : null}
+      </Dialog>
+
+      <Dialog open={Boolean(editingProjectId)} onOpenChange={(open) => !open && setEditingProjectId(null)}>
+        <DialogContent className="rounded-sm border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-sm">编辑 Project</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              value={editingProjectName}
+              onChange={(event) => setEditingProjectName(event.target.value)}
+              placeholder="项目名称"
+            />
+            <Textarea
+              value={editingProjectDesc}
+              onChange={(event) => setEditingProjectDesc(event.target.value)}
+              placeholder="项目描述"
+              className="min-h-20"
+            />
+            <Button type="button" className="w-full" onClick={saveEditProject}>
+              保存修改
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(editingFootprint)}
+        onOpenChange={(open) => !open && setEditingFootprintId(null)}
+      >
+        <DialogContent className="rounded-sm border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-sm">编辑足迹</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              value={editingFootprintName}
+              onChange={(event) => setEditingFootprintName(event.target.value)}
+              placeholder="足迹名称"
+            />
+            <Input
+              type="date"
+              value={editingFootprintDate}
+              onChange={(event) => setEditingFootprintDate(event.target.value)}
+            />
+            <Button type="button" className="w-full" onClick={saveEditFootprint}>
+              保存修改
+            </Button>
+          </div>
+        </DialogContent>
       </Dialog>
 
       <Dialog
