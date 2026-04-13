@@ -777,7 +777,7 @@ export function WeeklyTimeGrid({
                                     ) : null}
                                     <p
                                       className="min-w-0 flex-1 truncate font-medium leading-snug"
-                                      title={event.title}
+                                      title={`${event.title} (${formatHour(event.startHour)} - ${formatHour(event.endHour)})`}
                                     >
                                       {event.title}
                                     </p>
@@ -887,7 +887,7 @@ export function WeeklyTimeGrid({
                           <div 
                             key={event.id}
                             className={`cursor-pointer truncate text-xs p-1 rounded ${getCategoryColor(categories, event.category)}`}
-                            title={event.title}
+                            title={`${event.title} (${formatHour(event.startHour)} - ${formatHour(event.endHour)})`}
                             onClick={() => handleOpenEdit(event)}
                           >
                             {event.title}

@@ -520,6 +520,19 @@ export default function Home() {
     setTasks((prev) => prev.filter((task) => task.id !== taskId));
   }
 
+  function handleReorderTask(sourceTaskId: string, targetTaskId: string) {
+    if (!sourceTaskId || !targetTaskId || sourceTaskId === targetTaskId) return;
+    setTasks((prev) => {
+      const next = [...prev];
+      const fromIndex = next.findIndex((task) => task.id === sourceTaskId);
+      const toIndex = next.findIndex((task) => task.id === targetTaskId);
+      if (fromIndex < 0 || toIndex < 0) return prev;
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }
+
   function handleAddAnnualTask(name: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -770,6 +783,7 @@ export default function Home() {
             onAddTask={handleAddTask}
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
+            onReorderTask={handleReorderTask}
             annualTasks={annualTasks}
             onAddAnnualTask={handleAddAnnualTask}
             onToggleAnnualTask={handleToggleAnnualTask}

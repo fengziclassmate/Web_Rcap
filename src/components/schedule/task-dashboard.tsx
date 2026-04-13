@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Footprints,
   KanbanSquare,
+  GripVertical,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ type TaskDashboardProps = {
   onAddTask: (name: string, dueDate: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<LongTask>) => void;
   onDeleteTask: (taskId: string) => void;
+  onReorderTask: (sourceTaskId: string, targetTaskId: string) => void;
   annualTasks: AnnualTask[];
   onAddAnnualTask: (name: string) => void;
   onToggleAnnualTask: (taskId: string) => void;
@@ -100,6 +102,7 @@ export function TaskDashboard({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
+  onReorderTask,
   annualTasks,
   onAddAnnualTask,
   onToggleAnnualTask,
@@ -122,12 +125,14 @@ export function TaskDashboard({
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [taskViewMode, setTaskViewMode] = useState<"order" | "priority">("order");
-  const [taskOrder, setTaskOrder] = useState<string[]>(() => tasks.map((t) => t.id));
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDesc, setNewProjectDesc] = useState("");
   const [projectNoteDraft, setProjectNoteDraft] = useState<Record<string, string>>({});
   const [newFootprintName, setNewFootprintName] = useState("");
+  const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
+  const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
+  const [showAddFootprintDialog, setShowAddFootprintDialog] = useState(false);
   const incompleteTasks = tasks.filter((task) => !task.done);
   const completedTasks = tasks.filter((task) => task.done);
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
@@ -144,16 +149,7 @@ export function TaskDashboard({
     });
   }
 
-  const orderedIncompleteTasks = useMemo(() => {
-    const currentIds = tasks.map((t) => t.id);
-    const normalizedOrder = [...taskOrder.filter((id) => currentIds.includes(id)), ...currentIds.filter((id) => !taskOrder.includes(id))];
-    const orderMap = new Map(normalizedOrder.map((id, index) => [id, index]));
-    return [...incompleteTasks].sort((a, b) => {
-      const ai = orderMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-      const bi = orderMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-      return ai - bi;
-    });
-  }, [incompleteTasks, taskOrder, tasks]);
+  const orderedIncompleteTasks = useMemo(() => [...incompleteTasks], [incompleteTasks]);
 
   const groupedIncompleteTasks = useMemo(
     () =>
@@ -168,6 +164,7 @@ export function TaskDashboard({
     if (!taskName.trim()) return;
     onAddTask(taskName, dueDate);
     setTaskName("");
+    setShowAddTaskDialog(false);
     toast.success("长期任务已添加");
   }
 
@@ -270,16 +267,20 @@ export function TaskDashboard({
 
   function handleDropTask(targetTaskId: string) {
     if (!draggingTaskId || draggingTaskId === targetTaskId) return;
-    setTaskOrder((prev) => {
-      const next = [...prev];
-      const fromIndex = next.indexOf(draggingTaskId);
-      const toIndex = next.indexOf(targetTaskId);
-      if (fromIndex < 0 || toIndex < 0) return prev;
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
+    onReorderTask(draggingTaskId, targetTaskId);
     setDraggingTaskId(null);
+  }
+
+  function handleTaskDragStart(taskId: string, event: React.DragEvent<HTMLButtonElement>) {
+    setDraggingTaskId(taskId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/task-id", taskId);
+    const ghost = document.createElement("div");
+    ghost.className = "rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700";
+    ghost.textContent = "移动任务";
+    document.body.appendChild(ghost);
+    event.dataTransfer.setDragImage(ghost, 24, 12);
+    requestAnimationFrame(() => document.body.removeChild(ghost));
   }
 
   function handleAddProject() {
@@ -287,6 +288,7 @@ export function TaskDashboard({
     onAddProjectCheckin(newProjectName, newProjectDesc);
     setNewProjectName("");
     setNewProjectDesc("");
+    setShowAddProjectDialog(false);
   }
 
   function handleProjectCheckin(projectId: string) {
@@ -302,6 +304,7 @@ export function TaskDashboard({
     if (!newFootprintName.trim()) return;
     onAddFootprint(newFootprintName);
     setNewFootprintName("");
+    setShowAddFootprintDialog(false);
   }
 
   function handleResetFootprint(itemId: string) {
@@ -320,30 +323,12 @@ export function TaskDashboard({
       <Separator />
 
       <div className="p-6">
-        <p className="mb-4 text-sm font-medium uppercase tracking-wide text-gray-600">新增长期任务</p>
-        <div className="mb-6 space-y-3 rounded-lg border border-gray-200 p-4">
-          <Input
-            value={taskName}
-            onChange={(event) => setTaskName(event.target.value)}
-            placeholder="输入任务名称"
-            className="rounded-md border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-          />
-          <div className="flex items-center gap-3">
-            <Input
-              type="date"
-              value={dueDate}
-              onChange={(event) => setDueDate(event.target.value)}
-              className="min-w-0 rounded-md border-gray-300 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-150"
-            />
-            <Button
-              type="button"
-              onClick={handleAddTask}
-              className="rounded-md bg-primary text-white hover:bg-primary/90 transition-all duration-150"
-            >
-              <Plus className="h-4 w-4" />
-              添加
-            </Button>
-          </div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="text-sm font-medium uppercase tracking-wide text-gray-600">长期任务</p>
+          <Button type="button" size="sm" onClick={() => setShowAddTaskDialog(true)}>
+            <Plus className="mr-1 h-4 w-4" />
+            添加
+          </Button>
         </div>
 
         <p className="mb-4 flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-600">
@@ -463,8 +448,6 @@ export function TaskDashboard({
                 {orderedIncompleteTasks.map((task) => (
                   <React.Fragment key={task.id}>
                     <TableRow
-                      draggable
-                      onDragStart={() => setDraggingTaskId(task.id)}
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={() => handleDropTask(task.id)}
                       className="cursor-pointer hover:bg-gray-50 transition-colors duration-150"
@@ -475,16 +458,29 @@ export function TaskDashboard({
                       }}
                     >
                       <TableCell data-no-open="true">
-                        <Checkbox
-                          checked={task.done}
-                          onCheckedChange={() => {
-                            onToggleTask(task.id);
-                            toast.success("任务已标记为完成");
-                          }}
-                          onPointerDown={(event) => event.stopPropagation()}
-                          onClick={(event) => event.stopPropagation()}
-                          aria-label={`任务 ${task.name} 的完成状态`}
-                        />
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            draggable
+                            onDragStart={(event) => handleTaskDragStart(task.id, event)}
+                            onDragEnd={() => setDraggingTaskId(null)}
+                            onClick={(event) => event.stopPropagation()}
+                            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                            aria-label={`拖动排序 ${task.name}`}
+                          >
+                            <GripVertical className="h-4 w-4" />
+                          </button>
+                          <Checkbox
+                            checked={task.done}
+                            onCheckedChange={() => {
+                              onToggleTask(task.id);
+                              toast.success("任务已标记为完成");
+                            }}
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => event.stopPropagation()}
+                            aria-label={`任务 ${task.name} 的完成状态`}
+                          />
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -603,24 +599,14 @@ export function TaskDashboard({
       <Separator />
 
       <section className="space-y-4 p-6">
-        <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
-          <KanbanSquare className="h-4 w-4 text-primary" />
-          Project 打卡记录栏
-        </h3>
-        <div className="space-y-2 rounded-lg border border-gray-200 p-3">
-          <Input
-            value={newProjectName}
-            onChange={(event) => setNewProjectName(event.target.value)}
-            placeholder="项目名（如：每天喝水）"
-          />
-          <Input
-            value={newProjectDesc}
-            onChange={(event) => setNewProjectDesc(event.target.value)}
-            placeholder="描述（可选）"
-          />
-          <Button type="button" size="sm" className="w-full" onClick={handleAddProject}>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
+            <KanbanSquare className="h-4 w-4 text-primary" />
+            Project 打卡记录栏
+          </h3>
+          <Button type="button" size="sm" onClick={() => setShowAddProjectDialog(true)}>
             <Plus className="mr-1 h-4 w-4" />
-            添加项目
+            添加
           </Button>
         </div>
         <div className="space-y-3">
@@ -668,17 +654,13 @@ export function TaskDashboard({
       <Separator />
 
       <section className="space-y-4 p-6">
-        <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
-          <Footprints className="h-4 w-4 text-primary" />
-          足迹跟踪栏
-        </h3>
-        <div className="flex gap-2 rounded-lg border border-gray-200 p-3">
-          <Input
-            value={newFootprintName}
-            onChange={(event) => setNewFootprintName(event.target.value)}
-            placeholder="足迹名（如：换牙刷）"
-          />
-          <Button type="button" size="sm" onClick={handleAddFootprint}>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
+            <Footprints className="h-4 w-4 text-primary" />
+            足迹跟踪栏
+          </h3>
+          <Button type="button" size="sm" onClick={() => setShowAddFootprintDialog(true)}>
+            <Plus className="mr-1 h-4 w-4" />
             添加
           </Button>
         </div>
@@ -709,6 +691,67 @@ export function TaskDashboard({
           })}
         </div>
       </section>
+
+      <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
+        <DialogContent className="rounded-sm border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-sm">新增长期任务</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              value={taskName}
+              onChange={(event) => setTaskName(event.target.value)}
+              placeholder="输入任务名称"
+            />
+            <Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+            <Button type="button" className="w-full" onClick={handleAddTask}>
+              添加任务
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAddProjectDialog} onOpenChange={setShowAddProjectDialog}>
+        <DialogContent className="rounded-sm border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-sm">新增 Project 打卡项</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              value={newProjectName}
+              onChange={(event) => setNewProjectName(event.target.value)}
+              placeholder="项目名（如：每天喝水）"
+            />
+            <Textarea
+              value={newProjectDesc}
+              onChange={(event) => setNewProjectDesc(event.target.value)}
+              placeholder="项目描述（可选）"
+              className="min-h-20"
+            />
+            <Button type="button" className="w-full" onClick={handleAddProject}>
+              添加项目
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAddFootprintDialog} onOpenChange={setShowAddFootprintDialog}>
+        <DialogContent className="rounded-sm border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-sm">新增足迹项</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              value={newFootprintName}
+              onChange={(event) => setNewFootprintName(event.target.value)}
+              placeholder="足迹名（如：换牙刷）"
+            />
+            <Button type="button" className="w-full" onClick={handleAddFootprint}>
+              添加足迹
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(editingTask)}
