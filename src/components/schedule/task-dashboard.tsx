@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type {
   AnnualTask,
+  DashboardUiPreferences,
   FootprintItem,
   LongTask,
   Priority,
@@ -69,6 +70,9 @@ type TaskDashboardProps = {
     itemId: string,
     patch: Partial<Pick<FootprintItem, "name" | "lastDate">>,
   ) => void;
+  confirmDangerousActions: boolean;
+  uiPreferences: DashboardUiPreferences;
+  onUiPreferencesChange: (value: DashboardUiPreferences) => void;
 };
 
 const PRIORITY_ORDER: Priority[] = ["紧急且重要", "紧急不重要", "不紧急重要", "不紧急不重要"];
@@ -120,6 +124,9 @@ export function TaskDashboard({
   onResetFootprint,
   onDeleteFootprint,
   onUpdateFootprint,
+  confirmDangerousActions,
+  uiPreferences,
+  onUiPreferencesChange,
 }: TaskDashboardProps) {
   const [taskName, setTaskName] = useState("");
   const [annualTaskName, setAnnualTaskName] = useState("");
@@ -128,7 +135,9 @@ export function TaskDashboard({
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(
+    () => new Set(uiPreferences.expandedTasks),
+  );
   const [taskViewMode, setTaskViewMode] = useState<"order" | "priority">("order");
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [newProjectName, setNewProjectName] = useState("");
@@ -140,7 +149,6 @@ export function TaskDashboard({
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showAddFootprintDialog, setShowAddFootprintDialog] = useState(false);
   const [historyProjectId, setHistoryProjectId] = useState<string | null>(null);
-  const [confirmDangerousActions, setConfirmDangerousActions] = useState(true);
   const [checkinDrafts, setCheckinDrafts] = useState<Record<string, string>>({});
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingProjectName, setEditingProjectName] = useState("");
@@ -148,8 +156,18 @@ export function TaskDashboard({
   const [editingFootprintId, setEditingFootprintId] = useState<string | null>(null);
   const [editingFootprintName, setEditingFootprintName] = useState("");
   const [editingFootprintDate, setEditingFootprintDate] = useState(getTodayISODate);
-  const [longTaskSectionOpen, setLongTaskSectionOpen] = useState(true);
-  const [expandedCompletedTasks, setExpandedCompletedTasks] = useState<Set<string>>(new Set());
+  const [longTaskSectionOpen, setLongTaskSectionOpen] = useState(uiPreferences.longTaskSectionOpen);
+  const [expandedCompletedTasks, setExpandedCompletedTasks] = useState<Set<string>>(
+    () => new Set(uiPreferences.expandedCompletedTasks),
+  );
+  const [projectSectionOpen, setProjectSectionOpen] = useState(uiPreferences.projectSectionOpen);
+  const [footprintSectionOpen, setFootprintSectionOpen] = useState(uiPreferences.footprintSectionOpen);
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
+    () => new Set(uiPreferences.expandedProjects),
+  );
+  const [expandedFootprints, setExpandedFootprints] = useState<Set<string>>(
+    () => new Set(uiPreferences.expandedFootprints),
+  );
   const incompleteTasks = tasks.filter((task) => !task.done);
   const completedTasks = tasks.filter((task) => task.done);
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
@@ -172,6 +190,10 @@ export function TaskDashboard({
     () => footprints.find((item) => item.id === editingFootprintId) ?? null,
     [footprints, editingFootprintId],
   );
+
+  function patchUiPreferences(patch: Partial<DashboardUiPreferences>) {
+    onUiPreferencesChange({ ...uiPreferences, ...patch });
+  }
 
   function handleAddTask() {
     if (!taskName.trim()) return;
@@ -394,25 +416,6 @@ export function TaskDashboard({
       <Separator />
 
       <div className="p-6">
-        <div className="mb-4 flex items-center justify-end gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
-          <Label htmlFor="confirm-dangerous-actions" className="text-xs text-gray-700">
-            操作确认
-          </Label>
-          <Switch
-            id="confirm-dangerous-actions"
-            checked={confirmDangerousActions}
-            onCheckedChange={setConfirmDangerousActions}
-          />
-        </div>
-
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <p className="text-sm font-medium uppercase tracking-wide text-gray-600">长期任务</p>
-          <Button type="button" size="sm" onClick={() => setShowAddTaskDialog(true)}>
-            <Plus className="mr-1 h-4 w-4" />
-            添加
-          </Button>
-        </div>
-
         <div className="mb-4 flex items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-600">
             <CalendarRange className="h-4 w-4 text-primary" aria-hidden />
@@ -467,7 +470,13 @@ export function TaskDashboard({
           )}
         </div>
 
-        <Collapsible open={longTaskSectionOpen} onOpenChange={setLongTaskSectionOpen}>
+        <Collapsible
+          open={longTaskSectionOpen}
+          onOpenChange={(open) => {
+            setLongTaskSectionOpen(open);
+            patchUiPreferences({ longTaskSectionOpen: open });
+          }}
+        >
           <CollapsibleTrigger className="mb-3 flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
             <span className="text-sm font-medium uppercase tracking-wide text-gray-600">
               长期任务 / 未完成任务
@@ -491,6 +500,10 @@ export function TaskDashboard({
                 onClick={() => setTaskViewMode("priority")}
               >
                 按优先级分组
+              </Button>
+              <Button type="button" size="sm" onClick={() => setShowAddTaskDialog(true)}>
+                <Plus className="mr-1 h-4 w-4" />
+                添加
               </Button>
             </div>
 
@@ -550,6 +563,7 @@ export function TaskDashboard({
                               } else {
                                 next.add(task.id);
                               }
+                              patchUiPreferences({ expandedTasks: [...next] });
                               return next;
                             });
                           }}
@@ -649,6 +663,7 @@ export function TaskDashboard({
                           } else {
                             next.add(task.id);
                           }
+                          patchUiPreferences({ expandedCompletedTasks: [...next] });
                           return next;
                         })
                       }
@@ -715,18 +730,30 @@ export function TaskDashboard({
       <Separator />
 
       <section className="space-y-4 p-6">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
-            <KanbanSquare className="h-4 w-4 text-primary" />
-            Project 打卡记录栏
-          </h3>
-          <Button type="button" size="sm" onClick={() => setShowAddProjectDialog(true)}>
-            <Plus className="mr-1 h-4 w-4" />
-            添加
-          </Button>
-        </div>
-        <div className="space-y-3">
-          {projectCheckins.map((project) => {
+        <Collapsible
+          open={projectSectionOpen}
+          onOpenChange={(open) => {
+            setProjectSectionOpen(open);
+            patchUiPreferences({ projectSectionOpen: open });
+          }}
+        >
+          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
+            <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
+              <KanbanSquare className="h-4 w-4 text-primary" />
+              Project 打卡记录栏
+            </h3>
+            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${projectSectionOpen ? "" : "-rotate-90"}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3 space-y-3">
+            <div className="flex justify-end">
+              <Button type="button" size="sm" onClick={() => setShowAddProjectDialog(true)}>
+                <Plus className="mr-1 h-4 w-4" />
+                添加
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {projectCheckins.map((project) => {
+                const projectExpanded = expandedProjects.has(project.id);
             const today = getTodayISODate();
             const doneCount = project.checkins.length;
             const totalDays = daysBetweenInclusive(project.startDate, today);
@@ -737,9 +764,24 @@ export function TaskDashboard({
             return (
               <div key={project.id} className="rounded-lg border border-gray-200 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-medium" title={project.name}>
-                    {project.name}
-                  </p>
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    onClick={() =>
+                      setExpandedProjects((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(project.id)) next.delete(project.id);
+                        else next.add(project.id);
+                        patchUiPreferences({ expandedProjects: [...next] });
+                        return next;
+                      })
+                    }
+                  >
+                    <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${projectExpanded ? "" : "-rotate-90"}`} />
+                    <p className="truncate text-sm font-medium" title={project.name}>
+                      {project.name}
+                    </p>
+                  </button>
                   <div className="flex items-center gap-1">
                     <Button type="button" size="sm" variant="ghost" onClick={() => openEditProject(project)}>
                       编辑
@@ -758,109 +800,148 @@ export function TaskDashboard({
                     </Button>
                   </div>
                 </div>
-                {project.description ? <p className="mb-2 text-xs text-gray-500">{project.description}</p> : null}
-                <div className="mb-2 h-2 rounded bg-gray-100">
-                  <div className="h-2 rounded bg-black" style={{ width: `${percent}%` }} />
-                </div>
-                <p className="mb-2 text-xs text-gray-600">
-                  进度：{doneCount}/{totalDays}（{percent}%）
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    value={projectNoteDraft[project.id] ?? ""}
-                    onChange={(event) =>
-                      setProjectNoteDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
-                    }
-                    placeholder="今日描述（可选）"
-                  />
-                  <Button type="button" size="sm" onClick={() => handleProjectCheckin(project.id)}>
-                    打卡
-                  </Button>
-                </div>
-                <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2">
-                  <p className="mb-1 text-xs font-medium text-gray-600">最近打卡记录</p>
-                  {recentCheckins.length === 0 ? (
-                    <p className="text-xs text-gray-500">暂无记录</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {recentCheckins.map((entry) => (
-                        <li key={`${project.id}-${entry.date}`} className="text-xs text-gray-700">
-                          <span className="font-medium">{entry.date}</span>
-                          <span className="mx-1">·</span>
-                          <span className="inline-block max-w-[220px] truncate align-bottom" title={entry.note || "（无描述）"}>
-                            {entry.note || "（无描述）"}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="mt-2 w-full"
-                  onClick={() => setHistoryProjectId(project.id)}
-                >
-                  查看全部打卡历史
-                </Button>
+                {projectExpanded ? (
+                  <>
+                    {project.description ? <p className="mb-2 text-xs text-gray-500">{project.description}</p> : null}
+                    <div className="mb-2 h-2 rounded bg-gray-100">
+                      <div className="h-2 rounded bg-black" style={{ width: `${percent}%` }} />
+                    </div>
+                    <p className="mb-2 text-xs text-gray-600">
+                      进度：{doneCount}/{totalDays}（{percent}%）
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        value={projectNoteDraft[project.id] ?? ""}
+                        onChange={(event) =>
+                          setProjectNoteDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
+                        }
+                        placeholder="今日描述（可选）"
+                      />
+                      <Button type="button" size="sm" onClick={() => handleProjectCheckin(project.id)}>
+                        打卡
+                      </Button>
+                    </div>
+                    <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2">
+                      <p className="mb-1 text-xs font-medium text-gray-600">最近打卡记录</p>
+                      {recentCheckins.length === 0 ? (
+                        <p className="text-xs text-gray-500">暂无记录</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {recentCheckins.map((entry) => (
+                            <li key={`${project.id}-${entry.date}`} className="text-xs text-gray-700">
+                              <span className="font-medium">{entry.date}</span>
+                              <span className="mx-1">·</span>
+                              <span className="inline-block max-w-[220px] truncate align-bottom" title={entry.note || "（无描述）"}>
+                                {entry.note || "（无描述）"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2 w-full"
+                      onClick={() => setHistoryProjectId(project.id)}
+                    >
+                      查看全部打卡历史
+                    </Button>
+                  </>
+                ) : null}
               </div>
             );
-          })}
-          {projectCheckins.length === 0 ? <p className="text-xs text-gray-500">暂无 Project 打卡项</p> : null}
-        </div>
+              })}
+              {projectCheckins.length === 0 ? <p className="text-xs text-gray-500">暂无 Project 打卡项</p> : null}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </section>
 
       <Separator />
 
       <section className="space-y-4 p-6">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
-            <Footprints className="h-4 w-4 text-primary" />
-            足迹跟踪栏
-          </h3>
-          <Button type="button" size="sm" onClick={() => setShowAddFootprintDialog(true)}>
-            <Plus className="mr-1 h-4 w-4" />
-            添加
-          </Button>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          {footprints.map((item) => {
+        <Collapsible
+          open={footprintSectionOpen}
+          onOpenChange={(open) => {
+            setFootprintSectionOpen(open);
+            patchUiPreferences({ footprintSectionOpen: open });
+          }}
+        >
+          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
+            <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
+              <Footprints className="h-4 w-4 text-primary" />
+              足迹跟踪栏
+            </h3>
+            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${footprintSectionOpen ? "" : "-rotate-90"}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3 space-y-3">
+            <div className="flex justify-end">
+              <Button type="button" size="sm" onClick={() => setShowAddFootprintDialog(true)}>
+                <Plus className="mr-1 h-4 w-4" />
+                添加
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {footprints.map((item) => {
+                const itemExpanded = expandedFootprints.has(item.id);
             const days = daysBetweenInclusive(item.lastDate, getTodayISODate()) - 1;
             return (
               <div key={item.id} className="rounded-lg border border-gray-200 p-3 text-center">
-                <p className="truncate text-sm font-medium" title={item.name}>
-                  {item.name}
-                </p>
-                <p className="mt-2 text-lg font-semibold">{days} 天</p>
-                <p className="text-xs text-gray-500">距上次</p>
-                <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => handleResetFootprint(item.id)}>
-                  今天重置
-                </Button>
-                <Button
+                <button
                   type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="mt-1"
-                  onClick={() => openEditFootprint(item)}
-                >
-                  编辑
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="mt-1 text-xs text-red-500 hover:text-red-600"
+                  className="flex w-full items-center justify-between gap-2 text-left"
                   onClick={() =>
-                    withOptionalConfirm("确认删除这个足迹项吗？", () => onDeleteFootprint(item.id))
+                    setExpandedFootprints((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(item.id)) next.delete(item.id);
+                      else next.add(item.id);
+                      patchUiPreferences({ expandedFootprints: [...next] });
+                      return next;
+                    })
                   }
                 >
-                  删除
-                </Button>
+                  <p className="truncate text-sm font-medium" title={item.name}>
+                    {item.name}
+                  </p>
+                  <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${itemExpanded ? "" : "-rotate-90"}`} />
+                </button>
+                {itemExpanded ? (
+                  <>
+                    <p className="mt-2 text-lg font-semibold">{days} 天</p>
+                    <p className="text-xs text-gray-500">距上次</p>
+                    <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => handleResetFootprint(item.id)}>
+                      今天重置
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="mt-1"
+                      onClick={() => openEditFootprint(item)}
+                    >
+                      编辑
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="mt-1 text-xs text-red-500 hover:text-red-600"
+                      onClick={() =>
+                        withOptionalConfirm("确认删除这个足迹项吗？", () => onDeleteFootprint(item.id))
+                      }
+                    >
+                      删除
+                    </Button>
+                  </>
+                ) : null}
               </div>
             );
-          })}
-        </div>
+              })}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </section>
 
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>

@@ -81,6 +81,28 @@ export type FootprintItem = {
   lastDate: string;
 };
 
+export type DashboardUiPreferences = {
+  longTaskSectionOpen: boolean;
+  projectSectionOpen: boolean;
+  footprintSectionOpen: boolean;
+  expandedTasks: string[];
+  expandedCompletedTasks: string[];
+  expandedProjects: string[];
+  expandedFootprints: string[];
+};
+
+const DASHBOARD_UI_PREFS_STORAGE_KEY = "schedule-dashboard-collapse-state";
+
+const defaultDashboardUiPreferences: DashboardUiPreferences = {
+  longTaskSectionOpen: true,
+  projectSectionOpen: true,
+  footprintSectionOpen: true,
+  expandedTasks: [],
+  expandedCompletedTasks: [],
+  expandedProjects: [],
+  expandedFootprints: [],
+};
+
 const defaultTasks: LongTask[] = [
   {
     id: "task-1",
@@ -199,6 +221,33 @@ function normalizeFootprints(payload: unknown): FootprintItem[] {
   });
 }
 
+function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPreferences {
+  if (!payload || typeof payload !== "object") return defaultDashboardUiPreferences;
+  const value = payload as Partial<DashboardUiPreferences>;
+  return {
+    longTaskSectionOpen: value.longTaskSectionOpen ?? true,
+    projectSectionOpen: value.projectSectionOpen ?? true,
+    footprintSectionOpen: value.footprintSectionOpen ?? true,
+    expandedTasks: Array.isArray(value.expandedTasks) ? value.expandedTasks : [],
+    expandedCompletedTasks: Array.isArray(value.expandedCompletedTasks)
+      ? value.expandedCompletedTasks
+      : [],
+    expandedProjects: Array.isArray(value.expandedProjects) ? value.expandedProjects : [],
+    expandedFootprints: Array.isArray(value.expandedFootprints) ? value.expandedFootprints : [],
+  };
+}
+
+function readDashboardUiPreferencesFromLocal(): DashboardUiPreferences {
+  if (typeof window === "undefined") return defaultDashboardUiPreferences;
+  try {
+    const raw = localStorage.getItem(DASHBOARD_UI_PREFS_STORAGE_KEY);
+    if (!raw) return defaultDashboardUiPreferences;
+    return normalizeDashboardUiPreferences(JSON.parse(raw));
+  } catch {
+    return defaultDashboardUiPreferences;
+  }
+}
+
 function normalizeTasks(payload: unknown): LongTask[] {
   if (!Array.isArray(payload)) return defaultTasks;
   return payload.map((task, index) => {
@@ -280,12 +329,16 @@ export default function Home() {
   const [annualTasks, setAnnualTasks] = useState<AnnualTask[]>([]);
   const [projectCheckins, setProjectCheckins] = useState<ProjectCheckin[]>([]);
   const [footprints, setFootprints] = useState<FootprintItem[]>([]);
+  const [dashboardUiPreferences, setDashboardUiPreferences] = useState<DashboardUiPreferences>(
+    defaultDashboardUiPreferences,
+  );
   const [user, setUser] = useState<User | null>(null);
   const [authEmail, setAuthEmail] = useState("");
   const [sendingLink, setSendingLink] = useState(false);
   const [dataReady, setDataReady] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(60);
+  const [confirmDangerousActions, setConfirmDangerousActions] = useState(true);
   const [mobileTab, setMobileTab] = useState<"schedule" | "tasks">("schedule");
   const weekRange = useMemo(() => {
     const start = format(currentWeekStart, "yyyy/MM/dd", { locale: zhCN });
@@ -323,6 +376,7 @@ export default function Home() {
       setAnnualTasks([]);
       setProjectCheckins([]);
       setFootprints([]);
+      setDashboardUiPreferences(defaultDashboardUiPreferences);
       setDataReady(false);
       return;
     }
@@ -346,7 +400,7 @@ export default function Home() {
         if (!user) return;
         const { data, error } = await supabase
           .from("schedule_data")
-          .select("events,tasks,annual_tasks,project_checkins,footprints")
+          .select("events,tasks,annual_tasks,project_checkins,footprints,ui_preferences")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -378,12 +432,19 @@ export default function Home() {
             normalizeProjectCheckins((data as { project_checkins?: unknown }).project_checkins),
           );
           setFootprints(normalizeFootprints((data as { footprints?: unknown }).footprints));
+          const uiPrefsRaw = (data as { ui_preferences?: unknown }).ui_preferences;
+          setDashboardUiPreferences(
+            uiPrefsRaw
+              ? normalizeDashboardUiPreferences(uiPrefsRaw)
+              : readDashboardUiPreferencesFromLocal(),
+          );
         } else {
           setEvents(defaultEvents);
           setTasks(defaultTasks);
           setAnnualTasks([]);
           setProjectCheckins([]);
           setFootprints([]);
+          setDashboardUiPreferences(readDashboardUiPreferencesFromLocal());
         }
         setDataReady(true);
       } catch (error) {
@@ -411,6 +472,7 @@ export default function Home() {
           annual_tasks: annualTasks,
           project_checkins: projectCheckins,
           footprints,
+          ui_preferences: dashboardUiPreferences,
         },
         { onConflict: "user_id" },
       )
@@ -420,7 +482,19 @@ export default function Home() {
           toast.error(`保存到云端失败: ${error.message}`);
         }
       });
-  }, [annualTasks, events, footprints, projectCheckins, tasks, user, dataReady]);
+  }, [annualTasks, dashboardUiPreferences, events, footprints, projectCheckins, tasks, user, dataReady]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(
+        DASHBOARD_UI_PREFS_STORAGE_KEY,
+        JSON.stringify(dashboardUiPreferences),
+      );
+    } catch {
+      // ignore
+    }
+  }, [dashboardUiPreferences]);
 
   async function handleSendMagicLink() {
     if (!authEmail.trim()) return;
@@ -790,15 +864,26 @@ export default function Home() {
     >
       <div className="mx-auto flex max-w-[1520px] items-center justify-between gap-3 px-4 pt-4">
         <p className="min-w-0 truncate text-xs text-gray-600">当前账号：{user.email}</p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleSignOut}
-          className="shrink-0 rounded-sm border-gray-200"
-        >
-          退出登录
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setConfirmDangerousActions((prev) => !prev)}
+            className="shrink-0 rounded-sm border-gray-200"
+          >
+            删除确认：{confirmDangerousActions ? "开" : "关"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSignOut}
+            className="shrink-0 rounded-sm border-gray-200"
+          >
+            退出登录
+          </Button>
+        </div>
       </div>
       <div className="mx-auto grid max-w-[1520px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[1fr_460px]">
         <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
@@ -841,6 +926,9 @@ export default function Home() {
             onResetFootprint={handleResetFootprint}
             onDeleteFootprint={handleDeleteFootprint}
             onUpdateFootprint={handleUpdateFootprint}
+            confirmDangerousActions={confirmDangerousActions}
+            uiPreferences={dashboardUiPreferences}
+            onUiPreferencesChange={setDashboardUiPreferences}
           />
         </section>
       </div>
