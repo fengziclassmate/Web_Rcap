@@ -248,6 +248,13 @@ function readDashboardUiPreferencesFromLocal(): DashboardUiPreferences {
   }
 }
 
+function isUiPreferencesColumnMissing(message: string) {
+  return (
+    message.includes("ui_preferences") &&
+    (message.includes("schema cache") || message.includes("does not exist"))
+  );
+}
+
 function normalizeTasks(payload: unknown): LongTask[] {
   if (!Array.isArray(payload)) return defaultTasks;
   return payload.map((task, index) => {
@@ -398,11 +405,21 @@ export default function Home() {
     async function loadUserData() {
       try {
         if (!user) return;
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from("schedule_data")
           .select("events,tasks,annual_tasks,project_checkins,footprints,ui_preferences")
           .eq("user_id", user.id)
           .maybeSingle();
+
+        if (error?.message && isUiPreferencesColumnMissing(error.message)) {
+          const fallback = await supabase
+            .from("schedule_data")
+            .select("events,tasks,annual_tasks,project_checkins,footprints")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          data = fallback.data;
+          error = fallback.error;
+        }
 
         if (cancelled) return;
         if (error) {
@@ -462,26 +479,53 @@ export default function Home() {
 
   useEffect(() => {
     if (!user || !dataReady) return;
-    supabase
-      .from("schedule_data")
-      .upsert(
-        {
-          user_id: user.id,
-          events,
-          tasks,
-          annual_tasks: annualTasks,
-          project_checkins: projectCheckins,
-          footprints,
-          ui_preferences: dashboardUiPreferences,
-        },
-        { onConflict: "user_id" },
-      )
-      .then(({ error }) => {
-        if (error) {
-          console.error("保存到云端失败:", error);
-          toast.error(`保存到云端失败: ${error.message}`);
+
+    async function saveUserData() {
+      const payload = {
+        user_id: user.id,
+        events,
+        tasks,
+        annual_tasks: annualTasks,
+        project_checkins: projectCheckins,
+        footprints,
+        ui_preferences: dashboardUiPreferences,
+      };
+
+      const withPreferences = await supabase
+        .from("schedule_data")
+        .upsert(payload, { onConflict: "user_id" });
+
+      if (!withPreferences.error) return;
+
+      if (
+        withPreferences.error.message &&
+        isUiPreferencesColumnMissing(withPreferences.error.message)
+      ) {
+        const fallbackPayload: Omit<typeof payload, "ui_preferences"> = {
+          user_id: payload.user_id,
+          events: payload.events,
+          tasks: payload.tasks,
+          annual_tasks: payload.annual_tasks,
+          project_checkins: payload.project_checkins,
+          footprints: payload.footprints,
+        };
+        const fallbackSave = await supabase
+          .from("schedule_data")
+          .upsert(fallbackPayload, { onConflict: "user_id" });
+        if (fallbackSave.error) {
+          console.error("保存到云端失败:", fallbackSave.error);
+          toast.error(`保存到云端失败: ${fallbackSave.error.message}`);
+          return;
         }
-      });
+        toast.warning("云端尚未完成新字段迁移，已临时使用本地记忆兜底");
+        return;
+      }
+
+      console.error("保存到云端失败:", withPreferences.error);
+      toast.error(`保存到云端失败: ${withPreferences.error.message}`);
+    }
+
+    saveUserData();
   }, [annualTasks, dashboardUiPreferences, events, footprints, projectCheckins, tasks, user, dataReady]);
 
   useEffect(() => {
