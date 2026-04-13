@@ -18,6 +18,8 @@ import {
 } from "@/lib/recurrence";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { CalendarDays, ListTodo } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type EventTag = "待定" | "不着急" | "不可后退" | null;
 
@@ -63,6 +65,20 @@ export type AnnualTask = {
   id: string;
   name: string;
   done: boolean;
+};
+
+export type ProjectCheckin = {
+  id: string;
+  name: string;
+  description: string;
+  startDate: string;
+  checkins: { date: string; note: string }[];
+};
+
+export type FootprintItem = {
+  id: string;
+  name: string;
+  lastDate: string;
 };
 
 const defaultTasks: LongTask[] = [
@@ -139,6 +155,46 @@ function normalizeAnnualTasks(payload: unknown): AnnualTask[] {
       id: value.id ?? `annual-restored-${index}`,
       name: typeof value.name === "string" ? value.name : "未命名年度任务",
       done: Boolean(value.done),
+    };
+  });
+}
+
+function normalizeProjectCheckins(payload: unknown): ProjectCheckin[] {
+  if (!Array.isArray(payload)) return [];
+  return payload.map((item, index) => {
+    const value = item as Partial<ProjectCheckin>;
+    const checkins = Array.isArray(value.checkins)
+      ? value.checkins
+          .map((checkin) => ({
+            date: typeof checkin.date === "string" ? checkin.date : "",
+            note: typeof checkin.note === "string" ? checkin.note : "",
+          }))
+          .filter((checkin) => checkin.date.length > 0)
+      : [];
+    return {
+      id: value.id ?? `project-restored-${index}`,
+      name: typeof value.name === "string" ? value.name : "未命名项目",
+      description: typeof value.description === "string" ? value.description : "",
+      startDate:
+        typeof value.startDate === "string"
+          ? value.startDate
+          : new Date().toISOString().slice(0, 10),
+      checkins,
+    };
+  });
+}
+
+function normalizeFootprints(payload: unknown): FootprintItem[] {
+  if (!Array.isArray(payload)) return [];
+  return payload.map((item, index) => {
+    const value = item as Partial<FootprintItem>;
+    return {
+      id: value.id ?? `footprint-restored-${index}`,
+      name: typeof value.name === "string" ? value.name : "未命名足迹",
+      lastDate:
+        typeof value.lastDate === "string"
+          ? value.lastDate
+          : new Date().toISOString().slice(0, 10),
     };
   });
 }
@@ -222,12 +278,15 @@ export default function Home() {
   const [events, setEvents] = useState<ScheduleEvent[]>(defaultEvents);
   const [tasks, setTasks] = useState<LongTask[]>(defaultTasks);
   const [annualTasks, setAnnualTasks] = useState<AnnualTask[]>([]);
+  const [projectCheckins, setProjectCheckins] = useState<ProjectCheckin[]>([]);
+  const [footprints, setFootprints] = useState<FootprintItem[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [authEmail, setAuthEmail] = useState("");
   const [sendingLink, setSendingLink] = useState(false);
   const [dataReady, setDataReady] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(60);
+  const [mobileTab, setMobileTab] = useState<"schedule" | "tasks">("schedule");
   const weekRange = useMemo(() => {
     const start = format(currentWeekStart, "yyyy/MM/dd", { locale: zhCN });
     const end = format(addDays(currentWeekStart, 6), "yyyy/MM/dd", { locale: zhCN });
@@ -262,6 +321,8 @@ export default function Home() {
       setEvents(defaultEvents);
       setTasks(defaultTasks);
       setAnnualTasks([]);
+      setProjectCheckins([]);
+      setFootprints([]);
       setDataReady(false);
       return;
     }
@@ -285,7 +346,7 @@ export default function Home() {
         if (!user) return;
         const { data, error } = await supabase
           .from("schedule_data")
-          .select("events,tasks,annual_tasks")
+          .select("events,tasks,annual_tasks,project_checkins,footprints")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -313,10 +374,16 @@ export default function Home() {
           setEvents(normalizeEvents(data.events));
           setTasks(normalizeTasks(data.tasks));
           setAnnualTasks(normalizeAnnualTasks((data as { annual_tasks?: unknown }).annual_tasks));
+          setProjectCheckins(
+            normalizeProjectCheckins((data as { project_checkins?: unknown }).project_checkins),
+          );
+          setFootprints(normalizeFootprints((data as { footprints?: unknown }).footprints));
         } else {
           setEvents(defaultEvents);
           setTasks(defaultTasks);
           setAnnualTasks([]);
+          setProjectCheckins([]);
+          setFootprints([]);
         }
         setDataReady(true);
       } catch (error) {
@@ -342,6 +409,8 @@ export default function Home() {
           events,
           tasks,
           annual_tasks: annualTasks,
+          project_checkins: projectCheckins,
+          footprints,
         },
         { onConflict: "user_id" },
       )
@@ -351,15 +420,26 @@ export default function Home() {
           toast.error(`保存到云端失败: ${error.message}`);
         }
       });
-  }, [annualTasks, events, tasks, user, dataReady]);
+  }, [annualTasks, events, footprints, projectCheckins, tasks, user, dataReady]);
 
   async function handleSendMagicLink() {
     if (!authEmail.trim()) return;
     setSendingLink(true);
+    const appUrl =
+      typeof process !== "undefined" && process.env.NEXT_PUBLIC_APP_URL
+        ? process.env.NEXT_PUBLIC_APP_URL
+        : undefined;
+    const redirectTo =
+      appUrl && appUrl.length > 0
+        ? appUrl
+        : typeof window !== "undefined"
+          ? window.location.origin
+          : undefined;
+
     const { error } = await supabase.auth.signInWithOtp({
       email: authEmail.trim(),
       options: {
-        emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+        emailRedirectTo: redirectTo,
       },
     });
     setSendingLink(false);
@@ -459,6 +539,65 @@ export default function Home() {
     setAnnualTasks((prev) => prev.filter((t) => t.id !== taskId));
   }
 
+  function handleAddProjectCheckin(name: string, description: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setProjectCheckins((prev) => [
+      ...prev,
+      {
+        id: createId("project"),
+        name: trimmed,
+        description: description.trim(),
+        startDate: new Date().toISOString().slice(0, 10),
+        checkins: [],
+      },
+    ]);
+  }
+
+  function handleCheckinProject(projectId: string, note: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    setProjectCheckins((prev) =>
+      prev.map((project) => {
+        if (project.id !== projectId) return project;
+        const exists = project.checkins.find((c) => c.date === today);
+        const nextCheckins = exists
+          ? project.checkins.map((c) =>
+              c.date === today ? { ...c, note: note.trim() } : c,
+            )
+          : [...project.checkins, { date: today, note: note.trim() }];
+        return { ...project, checkins: nextCheckins };
+      }),
+    );
+  }
+
+  function handleDeleteProjectCheckin(projectId: string) {
+    setProjectCheckins((prev) => prev.filter((project) => project.id !== projectId));
+  }
+
+  function handleAddFootprint(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setFootprints((prev) => [
+      ...prev,
+      {
+        id: createId("footprint"),
+        name: trimmed,
+        lastDate: new Date().toISOString().slice(0, 10),
+      },
+    ]);
+  }
+
+  function handleResetFootprint(itemId: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    setFootprints((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, lastDate: today } : item)),
+    );
+  }
+
+  function handleDeleteFootprint(itemId: string) {
+    setFootprints((prev) => prev.filter((item) => item.id !== itemId));
+  }
+
   function handleCreateEvent(event: ScheduleEvent) {
     setEvents((prev) => [...prev, event]);
   }
@@ -533,9 +672,12 @@ export default function Home() {
     setEvents((prev) => prev.filter((event) => event.id !== eventId));
   }
 
+  const shellClass =
+    "min-h-screen bg-white text-black pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]";
+
   if (!isBooted) {
     return (
-      <main className="min-h-screen bg-white text-black">
+      <main className={shellClass}>
         <div className="mx-auto grid max-w-[1520px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[1fr_460px]">
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
@@ -546,7 +688,7 @@ export default function Home() {
 
   if (!user) {
     return (
-      <main className="min-h-screen bg-white text-black">
+      <main className={shellClass}>
         <div className="mx-auto max-w-lg px-4 py-16">
           <section className="rounded-sm border border-gray-200 bg-white p-6">
             <h1 className="text-lg font-semibold">邮箱登录</h1>
@@ -576,7 +718,7 @@ export default function Home() {
 
   if (!dataReady) {
     return (
-      <main className="min-h-screen bg-white text-black">
+      <main className={shellClass}>
         <div className="mx-auto grid max-w-[1520px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[1fr_460px]">
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
@@ -586,46 +728,90 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-black">
-      <div className="mx-auto flex max-w-[1520px] items-center justify-between px-4 pt-4">
-        <p className="text-xs text-gray-600">当前账号：{user.email}</p>
+    <main
+      className={cn(
+        shellClass,
+        "pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-4",
+      )}
+    >
+      <div className="mx-auto flex max-w-[1520px] items-center justify-between gap-3 px-4 pt-4">
+        <p className="min-w-0 truncate text-xs text-gray-600">当前账号：{user.email}</p>
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={handleSignOut}
-          className="rounded-sm border-gray-200"
+          className="shrink-0 rounded-sm border-gray-200"
         >
           退出登录
         </Button>
       </div>
       <div className="mx-auto grid max-w-[1520px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[1fr_460px]">
-        <WeeklyTimeGrid
-          currentWeekStart={currentWeekStart}
-          weekRange={weekRange}
-          events={events}
-          onCreateEvent={handleCreateEvent}
-          onUpdateEvent={handleUpdateEvent}
-          onDeleteEvent={handleDeleteEvent}
-          onPrevWeek={handleGoPrevWeek}
-          onNextWeek={handleGoNextWeek}
-          onViewModeChange={handleViewModeChange}
-          onTimeGranularityChange={handleTimeGranularityChange}
-          viewMode={viewMode}
-          timeGranularity={timeGranularity}
-        />
-        <TaskDashboard
-          tasks={tasks}
-          onToggleTask={handleToggleTask}
-          onAddTask={handleAddTask}
-          onUpdateTask={handleUpdateTask}
-          onDeleteTask={handleDeleteTask}
-          annualTasks={annualTasks}
-          onAddAnnualTask={handleAddAnnualTask}
-          onToggleAnnualTask={handleToggleAnnualTask}
-          onDeleteAnnualTask={handleDeleteAnnualTask}
-        />
+        <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
+          <WeeklyTimeGrid
+            currentWeekStart={currentWeekStart}
+            weekRange={weekRange}
+            events={events}
+            onCreateEvent={handleCreateEvent}
+            onUpdateEvent={handleUpdateEvent}
+            onDeleteEvent={handleDeleteEvent}
+            onPrevWeek={handleGoPrevWeek}
+            onNextWeek={handleGoNextWeek}
+            onViewModeChange={handleViewModeChange}
+            onTimeGranularityChange={handleTimeGranularityChange}
+            viewMode={viewMode}
+            timeGranularity={timeGranularity}
+          />
+        </section>
+        <section className={cn(mobileTab === "tasks" ? "block" : "hidden", "min-h-0 lg:block")}>
+          <TaskDashboard
+            tasks={tasks}
+            onToggleTask={handleToggleTask}
+            onAddTask={handleAddTask}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            annualTasks={annualTasks}
+            onAddAnnualTask={handleAddAnnualTask}
+            onToggleAnnualTask={handleToggleAnnualTask}
+            onDeleteAnnualTask={handleDeleteAnnualTask}
+            projectCheckins={projectCheckins}
+            onAddProjectCheckin={handleAddProjectCheckin}
+            onCheckinProject={handleCheckinProject}
+            onDeleteProjectCheckin={handleDeleteProjectCheckin}
+            footprints={footprints}
+            onAddFootprint={handleAddFootprint}
+            onResetFootprint={handleResetFootprint}
+            onDeleteFootprint={handleDeleteFootprint}
+          />
+        </section>
       </div>
+      <nav
+        className="fixed inset-x-0 bottom-0 z-50 flex border-t border-gray-200 bg-white/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur-md supports-[backdrop-filter]:bg-white/80 lg:hidden"
+        aria-label="主功能"
+      >
+        <button
+          type="button"
+          onClick={() => setMobileTab("schedule")}
+          className={cn(
+            "flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] text-gray-500 transition-colors",
+            mobileTab === "schedule" && "font-medium text-black",
+          )}
+        >
+          <CalendarDays className="size-6 shrink-0" aria-hidden />
+          <span>日程</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab("tasks")}
+          className={cn(
+            "flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] text-gray-500 transition-colors",
+            mobileTab === "tasks" && "font-medium text-black",
+          )}
+        >
+          <ListTodo className="size-6 shrink-0" aria-hidden />
+          <span>任务</span>
+        </button>
+      </nav>
     </main>
   );
 }

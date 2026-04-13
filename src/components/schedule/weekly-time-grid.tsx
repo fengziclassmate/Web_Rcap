@@ -335,8 +335,9 @@ export function WeeklyTimeGrid({
 
   function handleCreateEvent() {
     if (!selectedCell || !createForm.title.trim()) return;
-    const startHour = Math.max(0, Math.min(23.5, createForm.startHour));
-    const endHour = Math.max(startHour + 0.5, Math.min(24, createForm.endHour));
+    const minDuration = 1 / 60;
+    const startHour = Math.max(0, Math.min(23.9833, createForm.startHour));
+    const endHour = Math.max(startHour + minDuration, Math.min(24, createForm.endHour));
 
     if (createRecurrence.enabled) {
       if (createRecurrence.kind === "weekly") {
@@ -394,8 +395,9 @@ export function WeeklyTimeGrid({
 
   function handleSaveEdit() {
     if (!selectedEvent || !editForm.title.trim()) return;
-    const startHour = Math.max(0, Math.min(23.5, editForm.startHour));
-    const endHour = Math.max(startHour + 0.5, Math.min(24, editForm.endHour));
+    const minDuration = 1 / 60;
+    const startHour = Math.max(0, Math.min(23.9833, editForm.startHour));
+    const endHour = Math.max(startHour + minDuration, Math.min(24, editForm.endHour));
     const patch: Partial<ScheduleEvent> = {
       title: editForm.title.trim(),
       startHour,
@@ -774,9 +776,8 @@ export function WeeklyTimeGrid({
                                       />
                                     ) : null}
                                     <p
-                                      className={`min-w-0 flex-1 font-medium leading-snug [overflow-wrap:anywhere] break-words ${
-                                        compactCard ? "line-clamp-3" : ""
-                                      }`}
+                                      className="min-w-0 flex-1 truncate font-medium leading-snug"
+                                      title={event.title}
                                     >
                                       {event.title}
                                     </p>
@@ -885,7 +886,8 @@ export function WeeklyTimeGrid({
                         {dayEvents.slice(0, 3).map((event) => (
                           <div 
                             key={event.id}
-                            className={`cursor-pointer text-xs p-1 rounded leading-snug line-clamp-3 break-words [overflow-wrap:anywhere] ${getCategoryColor(categories, event.category)}`}
+                            className={`cursor-pointer truncate text-xs p-1 rounded ${getCategoryColor(categories, event.category)}`}
+                            title={event.title}
                             onClick={() => handleOpenEdit(event)}
                           >
                             {event.title}
