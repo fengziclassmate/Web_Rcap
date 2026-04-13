@@ -4,7 +4,6 @@ import React, { useMemo, useState } from "react";
 import {
   CalendarRange,
   ChevronDown,
-  ChevronRight,
   CheckCircle,
   Clock,
   ListTodo,
@@ -38,14 +37,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
@@ -123,7 +114,6 @@ export function TaskDashboard({
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [taskViewMode, setTaskViewMode] = useState<"order" | "priority">("order");
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [newProjectName, setNewProjectName] = useState("");
@@ -133,21 +123,10 @@ export function TaskDashboard({
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showAddFootprintDialog, setShowAddFootprintDialog] = useState(false);
+  const [historyProjectId, setHistoryProjectId] = useState<string | null>(null);
   const incompleteTasks = tasks.filter((task) => !task.done);
   const completedTasks = tasks.filter((task) => task.done);
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
-
-  function toggleTaskExpansion(taskId: string) {
-    setExpandedTasks((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(taskId)) {
-        newSet.delete(taskId);
-      } else {
-        newSet.add(taskId);
-      }
-      return newSet;
-    });
-  }
 
   const orderedIncompleteTasks = useMemo(() => [...incompleteTasks], [incompleteTasks]);
 
@@ -158,6 +137,10 @@ export function TaskDashboard({
         items: orderedIncompleteTasks.filter((task) => task.priority === priority),
       })),
     [orderedIncompleteTasks],
+  );
+  const historyProject = useMemo(
+    () => projectCheckins.find((project) => project.id === historyProjectId) ?? null,
+    [projectCheckins, historyProjectId],
   );
 
   function handleAddTask() {
@@ -432,107 +415,67 @@ export function TaskDashboard({
         </div>
 
         {taskViewMode === "order" ? (
-          <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-white">
-                  <TableHead className="w-12" />
-                  <TableHead>任务名称</TableHead>
-                  <TableHead className="w-[124px]">截止日期</TableHead>
-                  <TableHead className="w-[84px]">状态</TableHead>
-                  <TableHead className="w-[56px] text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {orderedIncompleteTasks.map((task) => (
-                  <React.Fragment key={task.id}>
-                    <TableRow
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => handleDropTask(task.id)}
-                      className="cursor-pointer hover:bg-gray-50 transition-colors duration-150"
-                      onClick={(event) => {
-                        const target = event.target as HTMLElement;
-                        if (target.closest("[data-no-open='true']")) return;
-                        handleOpenEdit(task);
-                      }}
-                    >
-                      <TableCell data-no-open="true">
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            draggable
-                            onDragStart={(event) => handleTaskDragStart(task.id, event)}
-                            onDragEnd={() => setDraggingTaskId(null)}
-                            onClick={(event) => event.stopPropagation()}
-                            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                            aria-label={`拖动排序 ${task.name}`}
-                          >
-                            <GripVertical className="h-4 w-4" />
-                          </button>
-                          <Checkbox
-                            checked={task.done}
-                            onCheckedChange={() => {
-                              onToggleTask(task.id);
-                              toast.success("任务已标记为完成");
-                            }}
-                            onPointerDown={(event) => event.stopPropagation()}
-                            onClick={(event) => event.stopPropagation()}
-                            aria-label={`任务 ${task.name} 的完成状态`}
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          {getPriorityIcon(task.priority)}
-                          <span className={task.done ? "text-gray-500 line-through" : "text-gray-900 font-medium"}>
-                            {task.name}
-                          </span>
-                          {task.subtasks.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                toggleTaskExpansion(task.id);
-                              }}
-                              className="ml-2 p-1 rounded-md hover:bg-gray-100 transition-colors duration-150"
-                              aria-label={expandedTasks.has(task.id) ? "折叠子任务" : "展开子任务"}
-                            >
-                              {expandedTasks.has(task.id) ? (
-                                <ChevronDown className="h-4 w-4 text-gray-500" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-gray-500" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{task.dueDate}</TableCell>
-                      <TableCell>
-                        <Badge className="rounded-md border border-primary bg-primary text-white">未完成</Badge>
-                      </TableCell>
-                      <TableCell className="text-right" data-no-open="true">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 rounded-md hover:bg-red-50 hover:text-red-500 transition-colors duration-150"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setPendingDeleteTaskId(task.id);
-                            setConfirmDeleteOpen(true);
-                          }}
-                          aria-label={`删除任务 ${task.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  </React.Fragment>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <ul className="space-y-2">
+            {orderedIncompleteTasks.map((task) => (
+              <li
+                key={task.id}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => handleDropTask(task.id)}
+                className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-colors hover:bg-gray-50"
+              >
+                <div className="flex items-start gap-2">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={(event) => handleTaskDragStart(task.id, event)}
+                    onDragEnd={() => setDraggingTaskId(null)}
+                    className="mt-0.5 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    aria-label={`拖动排序 ${task.name}`}
+                  >
+                    <GripVertical className="h-4 w-4" />
+                  </button>
+                  <Checkbox
+                    checked={task.done}
+                    onCheckedChange={() => {
+                      onToggleTask(task.id);
+                      toast.success("任务已标记为完成");
+                    }}
+                    aria-label={`任务 ${task.name} 的完成状态`}
+                    className="mt-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(task)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div className="flex items-start gap-2">
+                      {getPriorityIcon(task.priority)}
+                      <p className="min-w-0 flex-1 break-words text-sm font-medium text-gray-900">
+                        {task.name}
+                      </p>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                      <span>截止：{task.dueDate}</span>
+                      <Badge className="rounded-md border border-primary bg-primary text-white">未完成</Badge>
+                    </div>
+                  </button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 rounded-md hover:bg-red-50 hover:text-red-500"
+                    onClick={() => {
+                      setPendingDeleteTaskId(task.id);
+                      setConfirmDeleteOpen(true);
+                    }}
+                    aria-label={`删除任务 ${task.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
         ) : (
           <div className="space-y-3">
             {groupedIncompleteTasks.map((group) => (
@@ -615,6 +558,9 @@ export function TaskDashboard({
             const doneCount = project.checkins.length;
             const totalDays = daysBetweenInclusive(project.startDate, today);
             const percent = Math.min(100, Math.round((doneCount / Math.max(1, totalDays)) * 100));
+            const recentCheckins = [...project.checkins]
+              .sort((a, b) => b.date.localeCompare(a.date))
+              .slice(0, 5);
             return (
               <div key={project.id} className="rounded-lg border border-gray-200 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -644,6 +590,31 @@ export function TaskDashboard({
                     打卡
                   </Button>
                 </div>
+                <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2">
+                  <p className="mb-1 text-xs font-medium text-gray-600">最近打卡记录</p>
+                  {recentCheckins.length === 0 ? (
+                    <p className="text-xs text-gray-500">暂无记录</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {recentCheckins.map((entry) => (
+                        <li key={`${project.id}-${entry.date}`} className="text-xs text-gray-700">
+                          <span className="font-medium">{entry.date}</span>
+                          <span className="mx-1">·</span>
+                          <span>{entry.note || "（无描述）"}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 w-full"
+                  onClick={() => setHistoryProjectId(project.id)}
+                >
+                  查看全部打卡历史
+                </Button>
               </div>
             );
           })}
@@ -751,6 +722,36 @@ export function TaskDashboard({
             </Button>
           </div>
         </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(historyProject)} onOpenChange={(open) => !open && setHistoryProjectId(null)}>
+        {historyProject ? (
+          <DialogContent className="rounded-sm border-gray-200">
+            <DialogHeader>
+              <DialogTitle className="text-sm">
+                {historyProject.name} · 全部打卡历史
+              </DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+              {[...historyProject.checkins]
+                .sort((a, b) => b.date.localeCompare(a.date))
+                .map((entry, index) => (
+                  <div
+                    key={`${historyProject.id}-${entry.date}-${index}`}
+                    className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                  >
+                    <p className="text-xs font-medium text-gray-700">{entry.date}</p>
+                    <p className="mt-1 text-sm text-gray-800">{entry.note || "（无描述）"}</p>
+                  </div>
+                ))}
+              {historyProject.checkins.length === 0 ? (
+                <p className="rounded-md border border-gray-200 p-3 text-sm text-gray-500">
+                  暂无打卡记录
+                </p>
+              ) : null}
+            </div>
+          </DialogContent>
+        ) : null}
       </Dialog>
 
       <Dialog
