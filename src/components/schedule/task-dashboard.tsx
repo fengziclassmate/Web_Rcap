@@ -160,6 +160,9 @@ export function TaskDashboard({
   const [expandedCompletedTasks, setExpandedCompletedTasks] = useState<Set<string>>(
     () => new Set(uiPreferences.expandedCompletedTasks),
   );
+  const [completedSectionOpen, setCompletedSectionOpen] = useState(
+    uiPreferences.completedSectionOpen ?? true,
+  );
   const [projectSectionOpen, setProjectSectionOpen] = useState(uiPreferences.projectSectionOpen);
   const [footprintSectionOpen, setFootprintSectionOpen] = useState(uiPreferences.footprintSectionOpen);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
@@ -641,7 +644,14 @@ export function TaskDashboard({
 
       <Separator />
 
-      <Collapsible defaultOpen className="p-6">
+      <Collapsible
+        open={completedSectionOpen}
+        onOpenChange={(open) => {
+          setCompletedSectionOpen(open);
+          patchUiPreferences({ completedSectionOpen: open });
+        }}
+        className="p-6"
+      >
         <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors duration-150">
           已完成任务库
           <ChevronDown className="h-4 w-4 text-gray-500" />

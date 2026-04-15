@@ -20,6 +20,23 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { CalendarDays, ListTodo } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
+import { AchievementsPanel, type Achievement } from "@/components/monitoring/achievements-panel";
+import {
+  ResearchProjectsPanel,
+  type ResearchProject,
+  type PlanItem,
+} from "@/components/monitoring/research-projects-panel";
+import {
+  PaperProgressPanel,
+  type PaperProgress,
+  type PaperPlanItem,
+} from "@/components/monitoring/paper-progress-panel";
+import { SubmissionsPanel, type SubmissionRecord } from "@/components/monitoring/submissions-panel";
+import {
+  GroupMeetingsPanel,
+  type GroupMeetingRecord,
+} from "@/components/monitoring/group-meetings-panel";
 
 export type EventTag = "待定" | "不着急" | "不可后退" | null;
 
@@ -83,6 +100,7 @@ export type FootprintItem = {
 
 export type DashboardUiPreferences = {
   longTaskSectionOpen: boolean;
+  completedSectionOpen: boolean;
   projectSectionOpen: boolean;
   footprintSectionOpen: boolean;
   expandedTasks: string[];
@@ -95,6 +113,7 @@ const DASHBOARD_UI_PREFS_STORAGE_KEY = "schedule-dashboard-collapse-state";
 
 const defaultDashboardUiPreferences: DashboardUiPreferences = {
   longTaskSectionOpen: true,
+  completedSectionOpen: true,
   projectSectionOpen: true,
   footprintSectionOpen: true,
   expandedTasks: [],
@@ -221,11 +240,158 @@ function normalizeFootprints(payload: unknown): FootprintItem[] {
   });
 }
 
+function normalizeAchievements(payload: unknown): Achievement[] {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((item, index) => {
+      const value = item as Partial<Achievement>;
+      const title = typeof value.title === "string" ? value.title.trim() : "";
+      if (!title) return null;
+      const note =
+        typeof value.note === "string" && value.note.trim().length > 0 ? value.note.trim() : undefined;
+      return {
+        id: value.id ?? `achievement-restored-${index}`,
+        date:
+          typeof value.date === "string" && value.date.length > 0
+            ? value.date
+            : new Date().toISOString().slice(0, 10),
+        title,
+        ...(note ? { note } : {}),
+      } satisfies Achievement;
+    })
+    .filter((x): x is Achievement => x !== null);
+}
+
+function normalizePlanItems(payload: unknown): PlanItem[] {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((item, index) => {
+      const value = item as Partial<PlanItem>;
+      const content = typeof value.content === "string" ? value.content.trim() : "";
+      if (!content) return null;
+      return {
+        id: value.id ?? `plan-restored-${index}`,
+        date: typeof value.date === "string" && value.date.length > 0 ? value.date : "",
+        content,
+        done: Boolean(value.done),
+      } satisfies PlanItem;
+    })
+    .filter((x): x is PlanItem => Boolean(x));
+}
+
+function normalizePaperPlanItems(payload: unknown): PaperPlanItem[] {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((item, index) => {
+      const value = item as Partial<PaperPlanItem>;
+      const content = typeof value.content === "string" ? value.content.trim() : "";
+      if (!content) return null;
+      return {
+        id: value.id ?? `paper-plan-restored-${index}`,
+        date: typeof value.date === "string" && value.date.length > 0 ? value.date : "",
+        content,
+        done: Boolean(value.done),
+      } satisfies PaperPlanItem;
+    })
+    .filter((x): x is PaperPlanItem => Boolean(x));
+}
+
+function normalizeResearchProjects(payload: unknown): ResearchProject[] {
+  if (!Array.isArray(payload)) return [];
+  return payload.map((item, index) => {
+    const value = item as Partial<ResearchProject>;
+    return {
+      id: value.id ?? `research-restored-${index}`,
+      name: typeof value.name === "string" ? value.name : "未命名项目",
+      content: typeof value.content === "string" ? value.content : "",
+      techDetails: typeof value.techDetails === "string" ? value.techDetails : "",
+      nextStepPlan: typeof value.nextStepPlan === "string" ? value.nextStepPlan : "",
+      milestones: typeof value.milestones === "string" ? value.milestones : "",
+      dailyPlans: normalizePlanItems(value.dailyPlans),
+      weeklyPlans: normalizePlanItems(value.weeklyPlans),
+      monthlyPlans: normalizePlanItems(value.monthlyPlans),
+    };
+  });
+}
+
+const defaultPaperProgress: PaperProgress = {
+  title: "",
+  totalChapters: 0,
+  doneChapters: 0,
+  nextStepPlan: "",
+  milestones: "",
+  dailyPlans: [],
+  weeklyPlans: [],
+  monthlyPlans: [],
+};
+
+function normalizePaperProgress(payload: unknown): PaperProgress {
+  if (!payload || typeof payload !== "object") return defaultPaperProgress;
+  const value = payload as Partial<PaperProgress>;
+  return {
+    title: typeof value.title === "string" ? value.title : "",
+    totalChapters: typeof value.totalChapters === "number" ? value.totalChapters : 0,
+    doneChapters: typeof value.doneChapters === "number" ? value.doneChapters : 0,
+    nextStepPlan: typeof value.nextStepPlan === "string" ? value.nextStepPlan : "",
+    milestones: typeof value.milestones === "string" ? value.milestones : "",
+    dailyPlans: normalizePaperPlanItems(value.dailyPlans),
+    weeklyPlans: normalizePaperPlanItems(value.weeklyPlans),
+    monthlyPlans: normalizePaperPlanItems(value.monthlyPlans),
+  };
+}
+
+function normalizeSubmissions(payload: unknown): SubmissionRecord[] {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((item, index) => {
+      const value = item as Partial<SubmissionRecord>;
+      const content = typeof value.content === "string" ? value.content.trim() : "";
+      const journal = typeof value.journal === "string" ? value.journal.trim() : "";
+      if (!content || !journal) return null;
+      return {
+        id: value.id ?? `submission-restored-${index}`,
+        content,
+        journal,
+        submittedAt:
+          typeof value.submittedAt === "string" && value.submittedAt.length > 0
+            ? value.submittedAt
+            : new Date().toISOString().slice(0, 10),
+        status: (value.status as SubmissionRecord["status"]) ?? "准备中",
+        resultNote: typeof value.resultNote === "string" ? value.resultNote : "",
+      } satisfies SubmissionRecord;
+    })
+    .filter((x): x is SubmissionRecord => Boolean(x));
+}
+
+function normalizeGroupMeetings(payload: unknown): GroupMeetingRecord[] {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((item, index) => {
+      const value = item as Partial<GroupMeetingRecord>;
+      const topic = typeof value.topic === "string" ? value.topic.trim() : "";
+      const date =
+        typeof value.date === "string" && value.date.length > 0
+          ? value.date
+          : new Date().toISOString().slice(0, 10);
+      if (!topic) return null;
+      return {
+        id: value.id ?? `meeting-restored-${index}`,
+        date,
+        topic,
+        attendees: typeof value.attendees === "string" ? value.attendees : "",
+        notes: typeof value.notes === "string" ? value.notes : "",
+        actionItems: typeof value.actionItems === "string" ? value.actionItems : "",
+      } satisfies GroupMeetingRecord;
+    })
+    .filter((x): x is GroupMeetingRecord => Boolean(x));
+}
+
 function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPreferences {
   if (!payload || typeof payload !== "object") return defaultDashboardUiPreferences;
   const value = payload as Partial<DashboardUiPreferences>;
   return {
     longTaskSectionOpen: value.longTaskSectionOpen ?? true,
+    completedSectionOpen: value.completedSectionOpen ?? true,
     projectSectionOpen: value.projectSectionOpen ?? true,
     footprintSectionOpen: value.footprintSectionOpen ?? true,
     expandedTasks: Array.isArray(value.expandedTasks) ? value.expandedTasks : [],
@@ -251,6 +417,13 @@ function readDashboardUiPreferencesFromLocal(): DashboardUiPreferences {
 function isUiPreferencesColumnMissing(message: string) {
   return (
     message.includes("ui_preferences") &&
+    (message.includes("schema cache") || message.includes("does not exist"))
+  );
+}
+
+function isColumnMissing(message: string, column: string) {
+  return (
+    message.includes(column) &&
     (message.includes("schema cache") || message.includes("does not exist"))
   );
 }
@@ -330,12 +503,18 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
 
 export default function Home() {
   const [isBooted, setIsBooted] = useState(false);
+  const [activeModule, setActiveModule] = useState<MonitoringModuleId>("schedule");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getCurrentWeekStart);
   const [events, setEvents] = useState<ScheduleEvent[]>(defaultEvents);
   const [tasks, setTasks] = useState<LongTask[]>(defaultTasks);
   const [annualTasks, setAnnualTasks] = useState<AnnualTask[]>([]);
   const [projectCheckins, setProjectCheckins] = useState<ProjectCheckin[]>([]);
   const [footprints, setFootprints] = useState<FootprintItem[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [researchProjects, setResearchProjects] = useState<ResearchProject[]>([]);
+  const [paperProgress, setPaperProgress] = useState<PaperProgress>(defaultPaperProgress);
+  const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
+  const [groupMeetings, setGroupMeetings] = useState<GroupMeetingRecord[]>([]);
   const [dashboardUiPreferences, setDashboardUiPreferences] = useState<DashboardUiPreferences>(
     defaultDashboardUiPreferences,
   );
@@ -383,6 +562,11 @@ export default function Home() {
       setAnnualTasks([]);
       setProjectCheckins([]);
       setFootprints([]);
+      setAchievements([]);
+      setResearchProjects([]);
+      setPaperProgress(defaultPaperProgress);
+      setSubmissions([]);
+      setGroupMeetings([]);
       setDashboardUiPreferences(defaultDashboardUiPreferences);
       setDataReady(false);
       return;
@@ -412,17 +596,32 @@ export default function Home() {
           project_checkins: unknown;
           footprints: unknown;
           ui_preferences?: unknown;
+          achievements?: unknown;
+          research_projects?: unknown;
+          paper_progress?: unknown;
+          submissions?: unknown;
+          group_meetings?: unknown;
         };
 
         const primary = await supabase
           .from("schedule_data")
-          .select("events,tasks,annual_tasks,project_checkins,footprints,ui_preferences")
+          .select(
+            "events,tasks,annual_tasks,project_checkins,footprints,ui_preferences,achievements,research_projects,paper_progress,submissions,group_meetings",
+          )
           .eq("user_id", user.id)
           .maybeSingle();
         let data: ScheduleDataRow | null = primary.data as ScheduleDataRow | null;
         let error = primary.error;
 
-        if (error?.message && isUiPreferencesColumnMissing(error.message)) {
+        if (
+          error?.message &&
+          (isUiPreferencesColumnMissing(error.message) ||
+            isColumnMissing(error.message, "achievements") ||
+            isColumnMissing(error.message, "research_projects") ||
+            isColumnMissing(error.message, "paper_progress") ||
+            isColumnMissing(error.message, "submissions") ||
+            isColumnMissing(error.message, "group_meetings"))
+        ) {
           const fallback = await supabase
             .from("schedule_data")
             .select("events,tasks,annual_tasks,project_checkins,footprints")
@@ -460,6 +659,13 @@ export default function Home() {
             normalizeProjectCheckins((data as { project_checkins?: unknown }).project_checkins),
           );
           setFootprints(normalizeFootprints((data as { footprints?: unknown }).footprints));
+          setAchievements(normalizeAchievements((data as { achievements?: unknown }).achievements));
+          setResearchProjects(
+            normalizeResearchProjects((data as { research_projects?: unknown }).research_projects),
+          );
+          setPaperProgress(normalizePaperProgress((data as { paper_progress?: unknown }).paper_progress));
+          setSubmissions(normalizeSubmissions((data as { submissions?: unknown }).submissions));
+          setGroupMeetings(normalizeGroupMeetings((data as { group_meetings?: unknown }).group_meetings));
           const uiPrefsRaw = (data as { ui_preferences?: unknown }).ui_preferences;
           setDashboardUiPreferences(
             uiPrefsRaw
@@ -472,6 +678,11 @@ export default function Home() {
           setAnnualTasks([]);
           setProjectCheckins([]);
           setFootprints([]);
+          setAchievements([]);
+          setResearchProjects([]);
+          setPaperProgress(defaultPaperProgress);
+          setSubmissions([]);
+          setGroupMeetings([]);
           setDashboardUiPreferences(readDashboardUiPreferencesFromLocal());
         }
         setDataReady(true);
@@ -500,6 +711,11 @@ export default function Home() {
         annual_tasks: annualTasks,
         project_checkins: projectCheckins,
         footprints,
+        achievements,
+        research_projects: researchProjects,
+        paper_progress: paperProgress,
+        submissions,
+        group_meetings: groupMeetings,
         ui_preferences: dashboardUiPreferences,
       };
 
@@ -509,28 +725,47 @@ export default function Home() {
 
       if (!withPreferences.error) return;
 
-      if (
-        withPreferences.error.message &&
-        isUiPreferencesColumnMissing(withPreferences.error.message)
-      ) {
-        const fallbackPayload: Omit<typeof payload, "ui_preferences"> = {
-          user_id: payload.user_id,
-          events: payload.events,
-          tasks: payload.tasks,
-          annual_tasks: payload.annual_tasks,
-          project_checkins: payload.project_checkins,
-          footprints: payload.footprints,
-        };
-        const fallbackSave = await supabase
-          .from("schedule_data")
-          .upsert(fallbackPayload, { onConflict: "user_id" });
-        if (fallbackSave.error) {
-          console.error("保存到云端失败:", fallbackSave.error);
-          toast.error(`保存到云端失败: ${fallbackSave.error.message}`);
+      if (withPreferences.error.message) {
+        const missingUi = isUiPreferencesColumnMissing(withPreferences.error.message);
+        const missingAchievements = isColumnMissing(withPreferences.error.message, "achievements");
+        const missingResearch = isColumnMissing(withPreferences.error.message, "research_projects");
+        const missingPaper = isColumnMissing(withPreferences.error.message, "paper_progress");
+        const missingSubmissions = isColumnMissing(withPreferences.error.message, "submissions");
+        const missingMeetings = isColumnMissing(withPreferences.error.message, "group_meetings");
+        if (
+          missingUi ||
+          missingAchievements ||
+          missingResearch ||
+          missingPaper ||
+          missingSubmissions ||
+          missingMeetings
+        ) {
+          const fallbackPayload: Record<string, unknown> = {
+            user_id: payload.user_id,
+            events: payload.events,
+            tasks: payload.tasks,
+            annual_tasks: payload.annual_tasks,
+            project_checkins: payload.project_checkins,
+            footprints: payload.footprints,
+            ...(missingAchievements ? {} : { achievements: payload.achievements }),
+            ...(missingResearch ? {} : { research_projects: payload.research_projects }),
+            ...(missingPaper ? {} : { paper_progress: payload.paper_progress }),
+            ...(missingSubmissions ? {} : { submissions: payload.submissions }),
+            ...(missingMeetings ? {} : { group_meetings: payload.group_meetings }),
+            ...(missingUi ? {} : { ui_preferences: payload.ui_preferences }),
+          };
+
+          const fallbackSave = await supabase
+            .from("schedule_data")
+            .upsert(fallbackPayload, { onConflict: "user_id" });
+          if (fallbackSave.error) {
+            console.error("保存到云端失败:", fallbackSave.error);
+            toast.error(`保存到云端失败: ${fallbackSave.error.message}`);
+            return;
+          }
+          toast.warning("云端尚未完成新字段迁移，已临时使用本地记忆兜底");
           return;
         }
-        toast.warning("云端尚未完成新字段迁移，已临时使用本地记忆兜底");
-        return;
       }
 
       console.error("保存到云端失败:", withPreferences.error);
@@ -538,7 +773,69 @@ export default function Home() {
     }
 
     saveUserData();
-  }, [annualTasks, dashboardUiPreferences, events, footprints, projectCheckins, tasks, user, dataReady]);
+  }, [
+    achievements,
+    annualTasks,
+    dashboardUiPreferences,
+    events,
+    footprints,
+    projectCheckins,
+    researchProjects,
+    paperProgress,
+    submissions,
+    groupMeetings,
+    tasks,
+    user,
+    dataReady,
+  ]);
+
+  function handleAddResearchProject(value: Omit<ResearchProject, "id">) {
+    setResearchProjects((prev) => [...prev, { id: createId("research"), ...value }]);
+  }
+
+  function handleUpdateResearchProject(id: string, patch: Partial<Omit<ResearchProject, "id">>) {
+    setResearchProjects((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  }
+
+  function handleDeleteResearchProject(id: string) {
+    setResearchProjects((prev) => prev.filter((x) => x.id !== id));
+  }
+
+  function handleAddSubmission(value: Omit<SubmissionRecord, "id">) {
+    setSubmissions((prev) => [...prev, { id: createId("submission"), ...value }]);
+  }
+
+  function handleUpdateSubmission(id: string, patch: Partial<Omit<SubmissionRecord, "id">>) {
+    setSubmissions((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  }
+
+  function handleDeleteSubmission(id: string) {
+    setSubmissions((prev) => prev.filter((x) => x.id !== id));
+  }
+
+  function handleAddGroupMeeting(value: Omit<GroupMeetingRecord, "id">) {
+    setGroupMeetings((prev) => [...prev, { id: createId("meeting"), ...value }]);
+  }
+
+  function handleUpdateGroupMeeting(id: string, patch: Partial<Omit<GroupMeetingRecord, "id">>) {
+    setGroupMeetings((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  }
+
+  function handleDeleteGroupMeeting(id: string) {
+    setGroupMeetings((prev) => prev.filter((x) => x.id !== id));
+  }
+
+  function handleAddAchievement(value: Omit<Achievement, "id">) {
+    setAchievements((prev) => [...prev, { id: createId("achievement"), ...value }]);
+  }
+
+  function handleUpdateAchievement(id: string, patch: Partial<Omit<Achievement, "id">>) {
+    setAchievements((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  }
+
+  function handleDeleteAchievement(id: string) {
+    setAchievements((prev) => prev.filter((x) => x.id !== id));
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -941,52 +1238,98 @@ export default function Home() {
           </Button>
         </div>
       </div>
-      <div className="mx-auto grid max-w-[1520px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[1fr_460px]">
-        <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
-          <WeeklyTimeGrid
-            currentWeekStart={currentWeekStart}
-            weekRange={weekRange}
-            events={events}
-            onCreateEvent={handleCreateEvent}
-            onUpdateEvent={handleUpdateEvent}
-            onDeleteEvent={handleDeleteEvent}
-            onPrevWeek={handleGoPrevWeek}
-            onNextWeek={handleGoNextWeek}
-            onViewModeChange={handleViewModeChange}
-            onTimeGranularityChange={handleTimeGranularityChange}
-            viewMode={viewMode}
-            timeGranularity={timeGranularity}
-          />
-        </section>
-        <section className={cn(mobileTab === "tasks" ? "block" : "hidden", "min-h-0 lg:block")}>
-          <TaskDashboard
-            tasks={tasks}
-            onToggleTask={handleToggleTask}
-            onAddTask={handleAddTask}
-            onUpdateTask={handleUpdateTask}
-            onDeleteTask={handleDeleteTask}
-            onReorderTask={handleReorderTask}
-            annualTasks={annualTasks}
-            onAddAnnualTask={handleAddAnnualTask}
-            onToggleAnnualTask={handleToggleAnnualTask}
-            onDeleteAnnualTask={handleDeleteAnnualTask}
-            projectCheckins={projectCheckins}
-            onAddProjectCheckin={handleAddProjectCheckin}
-            onCheckinProject={handleCheckinProject}
-            onDeleteProjectCheckin={handleDeleteProjectCheckin}
-            onUpdateProjectCheckin={handleUpdateProjectCheckin}
-            onUpdateProjectCheckinEntry={handleUpdateProjectCheckinEntry}
-            onDeleteProjectCheckinEntry={handleDeleteProjectCheckinEntry}
-            footprints={footprints}
-            onAddFootprint={handleAddFootprint}
-            onResetFootprint={handleResetFootprint}
-            onDeleteFootprint={handleDeleteFootprint}
-            onUpdateFootprint={handleUpdateFootprint}
-            confirmDangerousActions={confirmDangerousActions}
-            uiPreferences={dashboardUiPreferences}
-            onUiPreferencesChange={setDashboardUiPreferences}
-          />
-        </section>
+
+      <div className="mx-auto grid max-w-[1520px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[260px_1fr]">
+        <div className="hidden min-h-0 lg:block">
+          <MonitoringSidebar active={activeModule} onChange={setActiveModule} />
+        </div>
+
+        <div className="min-h-0">
+          {activeModule === "schedule" ? (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_460px]">
+              <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
+                <WeeklyTimeGrid
+                  currentWeekStart={currentWeekStart}
+                  weekRange={weekRange}
+                  events={events}
+                  onCreateEvent={handleCreateEvent}
+                  onUpdateEvent={handleUpdateEvent}
+                  onDeleteEvent={handleDeleteEvent}
+                  onPrevWeek={handleGoPrevWeek}
+                  onNextWeek={handleGoNextWeek}
+                  onViewModeChange={handleViewModeChange}
+                  onTimeGranularityChange={handleTimeGranularityChange}
+                  viewMode={viewMode}
+                  timeGranularity={timeGranularity}
+                />
+              </section>
+              <section className={cn(mobileTab === "tasks" ? "block" : "hidden", "min-h-0 lg:block")}>
+                <TaskDashboard
+                  tasks={tasks}
+                  onToggleTask={handleToggleTask}
+                  onAddTask={handleAddTask}
+                  onUpdateTask={handleUpdateTask}
+                  onDeleteTask={handleDeleteTask}
+                  onReorderTask={handleReorderTask}
+                  annualTasks={annualTasks}
+                  onAddAnnualTask={handleAddAnnualTask}
+                  onToggleAnnualTask={handleToggleAnnualTask}
+                  onDeleteAnnualTask={handleDeleteAnnualTask}
+                  projectCheckins={projectCheckins}
+                  onAddProjectCheckin={handleAddProjectCheckin}
+                  onCheckinProject={handleCheckinProject}
+                  onDeleteProjectCheckin={handleDeleteProjectCheckin}
+                  onUpdateProjectCheckin={handleUpdateProjectCheckin}
+                  onUpdateProjectCheckinEntry={handleUpdateProjectCheckinEntry}
+                  onDeleteProjectCheckinEntry={handleDeleteProjectCheckinEntry}
+                  footprints={footprints}
+                  onAddFootprint={handleAddFootprint}
+                  onResetFootprint={handleResetFootprint}
+                  onDeleteFootprint={handleDeleteFootprint}
+                  onUpdateFootprint={handleUpdateFootprint}
+                  confirmDangerousActions={confirmDangerousActions}
+                  uiPreferences={dashboardUiPreferences}
+                  onUiPreferencesChange={setDashboardUiPreferences}
+                />
+                <div className="mt-4">
+                  <AchievementsPanel
+                    achievements={achievements}
+                    onAdd={handleAddAchievement}
+                    onUpdate={handleUpdateAchievement}
+                    onDelete={handleDeleteAchievement}
+                  />
+                </div>
+              </section>
+            </div>
+          ) : activeModule === "research" ? (
+            <ResearchProjectsPanel
+              projects={researchProjects}
+              onAdd={handleAddResearchProject}
+              onUpdate={handleUpdateResearchProject}
+              onDelete={handleDeleteResearchProject}
+            />
+          ) : activeModule === "paper" ? (
+            <PaperProgressPanel value={paperProgress} onChange={setPaperProgress} />
+          ) : activeModule === "submissions" ? (
+            <SubmissionsPanel
+              submissions={submissions}
+              onAdd={handleAddSubmission}
+              onUpdate={handleUpdateSubmission}
+              onDelete={handleDeleteSubmission}
+            />
+          ) : activeModule === "meetings" ? (
+            <GroupMeetingsPanel
+              records={groupMeetings}
+              onAdd={handleAddGroupMeeting}
+              onUpdate={handleUpdateGroupMeeting}
+              onDelete={handleDeleteGroupMeeting}
+            />
+          ) : (
+            <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-md">
+              <p className="text-sm text-gray-600">模块开发中：{activeModule}</p>
+            </section>
+          )}
+        </div>
       </div>
       <nav
         className="fixed inset-x-0 bottom-0 z-50 flex border-t border-gray-200 bg-white/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur-md supports-[backdrop-filter]:bg-white/80 lg:hidden"
