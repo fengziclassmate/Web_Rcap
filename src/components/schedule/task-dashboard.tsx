@@ -70,6 +70,7 @@ type TaskDashboardProps = {
     itemId: string,
     patch: Partial<Pick<FootprintItem, "name" | "lastDate">>,
   ) => void;
+  showFootprintsSection?: boolean;
   confirmDangerousActions: boolean;
   uiPreferences: DashboardUiPreferences;
   onUiPreferencesChange: (value: DashboardUiPreferences) => void;
@@ -124,6 +125,7 @@ export function TaskDashboard({
   onResetFootprint,
   onDeleteFootprint,
   onUpdateFootprint,
+  showFootprintsSection = true,
   confirmDangerousActions,
   uiPreferences,
   onUiPreferencesChange,
@@ -869,90 +871,108 @@ export function TaskDashboard({
         </Collapsible>
       </section>
 
-      <Separator />
+      {showFootprintsSection ? (
+        <>
+          <Separator />
 
-      <section className="space-y-4 p-6">
-        <Collapsible
-          open={footprintSectionOpen}
-          onOpenChange={(open) => {
-            setFootprintSectionOpen(open);
-            patchUiPreferences({ footprintSectionOpen: open });
-          }}
-        >
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
-            <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
-              <Footprints className="h-4 w-4 text-primary" />
-              足迹跟踪栏
-            </h3>
-            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${footprintSectionOpen ? "" : "-rotate-90"}`} />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3 space-y-3">
-            <div className="flex justify-end">
-              <Button type="button" size="sm" onClick={() => setShowAddFootprintDialog(true)}>
-                <Plus className="mr-1 h-4 w-4" />
-                添加
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {footprints.map((item) => {
-                const itemExpanded = expandedFootprints.has(item.id);
-            const days = daysBetweenInclusive(item.lastDate, getTodayISODate()) - 1;
-            return (
-              <div key={item.id} className="rounded-lg border border-gray-200 p-3 text-center">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2 text-left"
-                  onClick={() =>
-                    setExpandedFootprints((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(item.id)) next.delete(item.id);
-                      else next.add(item.id);
-                      patchUiPreferences({ expandedFootprints: [...next] });
-                      return next;
-                    })
-                  }
-                >
-                  <p className="truncate text-sm font-medium" title={item.name}>
-                    {item.name}
-                  </p>
-                  <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${itemExpanded ? "" : "-rotate-90"}`} />
-                </button>
-                {itemExpanded ? (
-                  <>
-                    <p className="mt-2 text-lg font-semibold">{days} 天</p>
-                    <p className="text-xs text-gray-500">距上次</p>
-                    <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => handleResetFootprint(item.id)}>
-                      今天重置
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="mt-1"
-                      onClick={() => openEditFootprint(item)}
-                    >
-                      编辑
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="mt-1 text-xs text-red-500 hover:text-red-600"
-                      onClick={() =>
-                        withOptionalConfirm("确认删除这个足迹项吗？", () => onDeleteFootprint(item.id))
-                      }
-                    >
-                      删除
-                    </Button>
-                  </>
-                ) : null}
-              </div>
-            );
-              })}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      </section>
+          <section className="space-y-4 p-6">
+            <Collapsible
+              open={footprintSectionOpen}
+              onOpenChange={(open) => {
+                setFootprintSectionOpen(open);
+                patchUiPreferences({ footprintSectionOpen: open });
+              }}
+            >
+              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
+                <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
+                  <Footprints className="h-4 w-4 text-primary" />
+                  足迹跟踪栏
+                </h3>
+                <ChevronDown
+                  className={`h-4 w-4 text-gray-500 transition-transform ${
+                    footprintSectionOpen ? "" : "-rotate-90"
+                  }`}
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3 space-y-3">
+                <div className="flex justify-end">
+                  <Button type="button" size="sm" onClick={() => setShowAddFootprintDialog(true)}>
+                    <Plus className="mr-1 h-4 w-4" />
+                    添加
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {footprints.map((item) => {
+                    const itemExpanded = expandedFootprints.has(item.id);
+                    const days = daysBetweenInclusive(item.lastDate, getTodayISODate()) - 1;
+                    return (
+                      <div key={item.id} className="rounded-lg border border-gray-200 p-3 text-center">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between gap-2 text-left"
+                          onClick={() =>
+                            setExpandedFootprints((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(item.id)) next.delete(item.id);
+                              else next.add(item.id);
+                              patchUiPreferences({ expandedFootprints: [...next] });
+                              return next;
+                            })
+                          }
+                        >
+                          <p className="truncate text-sm font-medium" title={item.name}>
+                            {item.name}
+                          </p>
+                          <ChevronDown
+                            className={`h-4 w-4 text-gray-500 transition-transform ${
+                              itemExpanded ? "" : "-rotate-90"
+                            }`}
+                          />
+                        </button>
+                        {itemExpanded ? (
+                          <>
+                            <p className="mt-2 text-lg font-semibold">{days} 天</p>
+                            <p className="text-xs text-gray-500">距上次</p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="mt-2"
+                              onClick={() => handleResetFootprint(item.id)}
+                            >
+                              今天重置
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="mt-1"
+                              onClick={() => openEditFootprint(item)}
+                            >
+                              编辑
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="mt-1 text-xs text-red-500 hover:text-red-600"
+                              onClick={() =>
+                                withOptionalConfirm("确认删除这个足迹项吗？", () => onDeleteFootprint(item.id))
+                              }
+                            >
+                              删除
+                            </Button>
+                          </>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </section>
+        </>
+      ) : null}
 
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
         <DialogContent className="rounded-sm border-gray-200">

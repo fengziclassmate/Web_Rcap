@@ -22,6 +22,7 @@ import { CalendarDays, ListTodo } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
 import { AchievementsPanel, type Achievement } from "@/components/monitoring/achievements-panel";
+import { FootprintsPanel } from "@/components/monitoring/footprints-panel";
 import {
   ResearchProjectsPanel,
   type ResearchProject,
@@ -1287,20 +1288,29 @@ export default function Home() {
                   onResetFootprint={handleResetFootprint}
                   onDeleteFootprint={handleDeleteFootprint}
                   onUpdateFootprint={handleUpdateFootprint}
+                  showFootprintsSection={false}
                   confirmDangerousActions={confirmDangerousActions}
                   uiPreferences={dashboardUiPreferences}
                   onUiPreferencesChange={setDashboardUiPreferences}
                 />
-                <div className="mt-4">
-                  <AchievementsPanel
-                    achievements={achievements}
-                    onAdd={handleAddAchievement}
-                    onUpdate={handleUpdateAchievement}
-                    onDelete={handleDeleteAchievement}
-                  />
-                </div>
               </section>
             </div>
+          ) : activeModule === "achievements" ? (
+            <AchievementsPanel
+              achievements={achievements}
+              onAdd={handleAddAchievement}
+              onUpdate={handleUpdateAchievement}
+              onDelete={handleDeleteAchievement}
+            />
+          ) : activeModule === "footprints" ? (
+            <FootprintsPanel
+              footprints={footprints}
+              onAdd={handleAddFootprint}
+              onReset={handleResetFootprint}
+              onUpdate={handleUpdateFootprint}
+              onDelete={handleDeleteFootprint}
+              confirmDangerousActions={confirmDangerousActions}
+            />
           ) : activeModule === "research" ? (
             <ResearchProjectsPanel
               projects={researchProjects}

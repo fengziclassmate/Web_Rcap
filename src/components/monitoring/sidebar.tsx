@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   CalendarDays,
+  Trophy,
+  Footprints,
   FlaskConical,
   FileText,
   Send,
@@ -13,6 +15,8 @@ import {
 
 export type MonitoringModuleId =
   | "schedule"
+  | "achievements"
+  | "footprints"
   | "research"
   | "paper"
   | "submissions"
@@ -24,6 +28,8 @@ const items: Array<{
   icon: React.ReactNode;
 }> = [
   { id: "schedule", label: "个人行程管理", icon: <CalendarDays className="h-4 w-4" aria-hidden /> },
+  { id: "achievements", label: "成就记录", icon: <Trophy className="h-4 w-4" aria-hidden /> },
+  { id: "footprints", label: "足迹跟踪", icon: <Footprints className="h-4 w-4" aria-hidden /> },
   { id: "research", label: "科研项目进度", icon: <FlaskConical className="h-4 w-4" aria-hidden /> },
   { id: "paper", label: "论文进度", icon: <FileText className="h-4 w-4" aria-hidden /> },
   { id: "submissions", label: "投稿记录", icon: <Send className="h-4 w-4" aria-hidden /> },
