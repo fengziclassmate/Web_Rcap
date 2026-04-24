@@ -1,17 +1,9 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
+import { CalendarDays, FileText, FlaskConical, Footprints, LayoutDashboard, NotebookPen, Send, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  CalendarDays,
-  Trophy,
-  Footprints,
-  FlaskConical,
-  FileText,
-  Send,
-  Users,
-  LayoutDashboard,
-} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type MonitoringModuleId =
   | "schedule"
@@ -20,20 +12,22 @@ export type MonitoringModuleId =
   | "research"
   | "paper"
   | "submissions"
-  | "meetings";
+  | "meetings"
+  | "logs";
 
 const items: Array<{
   id: MonitoringModuleId;
   label: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
 }> = [
-  { id: "schedule", label: "个人行程管理", icon: <CalendarDays className="h-4 w-4" aria-hidden /> },
+  { id: "schedule", label: "个人日程管理", icon: <CalendarDays className="h-4 w-4" aria-hidden /> },
   { id: "achievements", label: "成就记录", icon: <Trophy className="h-4 w-4" aria-hidden /> },
   { id: "footprints", label: "足迹跟踪", icon: <Footprints className="h-4 w-4" aria-hidden /> },
-  { id: "research", label: "科研项目进度", icon: <FlaskConical className="h-4 w-4" aria-hidden /> },
+  { id: "research", label: "科研项目", icon: <FlaskConical className="h-4 w-4" aria-hidden /> },
   { id: "paper", label: "论文进度", icon: <FileText className="h-4 w-4" aria-hidden /> },
   { id: "submissions", label: "投稿记录", icon: <Send className="h-4 w-4" aria-hidden /> },
   { id: "meetings", label: "组会记录", icon: <Users className="h-4 w-4" aria-hidden /> },
+  { id: "logs", label: "动态日志", icon: <NotebookPen className="h-4 w-4" aria-hidden /> },
 ];
 
 export function MonitoringSidebar({
@@ -50,7 +44,7 @@ export function MonitoringSidebar({
           <LayoutDashboard className="h-4 w-4 text-gray-700" aria-hidden />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-gray-900">博士生精神状态监测站</p>
+          <p className="truncate text-sm font-semibold text-gray-900">个人科研与生活工作台</p>
           <p className="truncate text-xs text-gray-500">切换模块</p>
         </div>
       </div>
@@ -70,9 +64,7 @@ export function MonitoringSidebar({
                 )}
                 onClick={() => onChange(item.id)}
               >
-                <span className={cn("mr-2", selected ? "text-white" : "text-gray-600")}>
-                  {item.icon}
-                </span>
+                <span className={cn("mr-2", selected ? "text-white" : "text-gray-600")}>{item.icon}</span>
                 <span className="text-sm">{item.label}</span>
               </Button>
             );
@@ -82,4 +74,3 @@ export function MonitoringSidebar({
     </aside>
   );
 }
-

@@ -1,7 +1,6 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addDays, addWeeks, format, startOfWeek } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import type { User } from "@supabase/supabase-js";
@@ -24,20 +23,44 @@ import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitor
 import { AchievementsPanel, type Achievement } from "@/components/monitoring/achievements-panel";
 import { FootprintsPanel } from "@/components/monitoring/footprints-panel";
 import {
-  ResearchProjectsPanel,
   type ResearchProject,
   type PlanItem,
 } from "@/components/monitoring/research-projects-panel";
 import {
-  PaperProgressPanel,
   type PaperProgress,
   type PaperPlanItem,
 } from "@/components/monitoring/paper-progress-panel";
-import { SubmissionsPanel, type SubmissionRecord } from "@/components/monitoring/submissions-panel";
+import { type SubmissionRecord } from "@/components/monitoring/submissions-panel";
 import {
-  GroupMeetingsPanel,
   type GroupMeetingRecord,
 } from "@/components/monitoring/group-meetings-panel";
+import { LogPage } from "@/components/logs/log-page";
+import { ResearchWorkflowPanel } from "@/components/monitoring/research-workflow-panel";
+import {
+  defaultResearchWorkflowState,
+  type GroupMeetingRecord as WorkflowGroupMeetingRecord,
+  type MeetingActionItem,
+  type PaperFeedback,
+  type PaperProjectLink,
+  type PaperSection,
+  type ProjectLog,
+  type ResearchPaper,
+  type ResearchProject as WorkflowResearchProject,
+  type ResearchWorkflowState,
+  type ReviewComment,
+  type SubmissionRecord as WorkflowSubmissionRecord,
+  type SubmissionStatusHistoryEntry,
+  type TimelineEntry,
+} from "@/lib/research-workflow";
+import {
+  type LogComposerInput,
+  type LogPost,
+  type LogPostEditorInput,
+  type LogPostImage,
+  type LogPostLink,
+  type LogPostRecord,
+  type LogTag,
+} from "@/lib/logs";
 
 export type EventTag = "待定" | "不着急" | "不可后退" | null;
 
@@ -111,6 +134,7 @@ export type DashboardUiPreferences = {
 };
 
 const DASHBOARD_UI_PREFS_STORAGE_KEY = "schedule-dashboard-collapse-state";
+const SCHEDULE_DATA_BACKUP_STORAGE_PREFIX = "schedule-data-backup";
 
 const defaultDashboardUiPreferences: DashboardUiPreferences = {
   longTaskSectionOpen: true,
@@ -187,6 +211,10 @@ const defaultEvents: ScheduleEvent[] = [
 
 function getCurrentWeekStart() {
   return startOfWeek(new Date(), { weekStartsOn: 1 });
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function normalizeAnnualTasks(payload: unknown): AnnualTask[] {
@@ -387,6 +415,638 @@ function normalizeGroupMeetings(payload: unknown): GroupMeetingRecord[] {
     .filter((x): x is GroupMeetingRecord => Boolean(x));
 }
 
+function buildResearchWorkflowFromLegacy(
+  legacyProjects: ResearchProject[],
+  legacyPaper: PaperProgress,
+  legacySubmissions: SubmissionRecord[],
+  legacyMeetings: GroupMeetingRecord[],
+): ResearchWorkflowState {
+  const projectRows: WorkflowResearchProject[] = legacyProjects.map((project) => ({
+    id: project.id,
+    title: project.name,
+    summary: project.content,
+    status: "running",
+    priority: "medium",
+    progress: 0,
+    startDate: "",
+    targetEndDate: "",
+    researchQuestion: "",
+    hypothesis: "",
+    method: project.techDetails,
+    dataSources: "",
+    currentIssues: "",
+    nextActions: project.nextStepPlan,
+    plannedTaskIds: [],
+    metadata: {},
+    linkedTaskIds: [],
+    linkedEventIds: [],
+    linkedActivityLogIds: [],
+  }));
+
+  const paperRows: ResearchPaper[] =
+    legacyPaper.title || legacyPaper.totalChapters > 0 || legacyPaper.dailyPlans.length > 0
+      ? [
+          {
+            id: "legacy-paper",
+            title: legacyPaper.title || "历史论文",
+            abstract: "",
+            keywords: [],
+            status: "drafting",
+            targetVenue: "",
+            chapterCount: legacyPaper.totalChapters,
+            completedChapters: legacyPaper.doneChapters,
+            overallProgress:
+              legacyPaper.totalChapters > 0
+                ? Math.round((legacyPaper.doneChapters / legacyPaper.totalChapters) * 100)
+                : 0,
+            currentIssues: "",
+            nextActions: legacyPaper.nextStepPlan,
+            writingPlan: legacyPaper.milestones,
+            metadata: {},
+            linkedTaskIds: [],
+            linkedEventIds: [],
+            linkedActivityLogIds: [],
+          },
+        ]
+      : [];
+
+  const submissionRows: WorkflowSubmissionRecord[] = legacySubmissions.map((item) => ({
+    id: item.id,
+    paperId: paperRows[0]?.id ?? "",
+    venueName: item.journal,
+    venueType: "journal",
+    submittedAt: item.submittedAt,
+    manuscriptId: "",
+    status: "submitted",
+    decisionDate: "",
+    revisionDueDate: "",
+    resultNote: item.resultNote,
+    responseLetterStatus: "open",
+    revisionPlan: "",
+    materialsChecklist: [],
+    linkedTaskIds: [],
+    linkedEventIds: [],
+    linkedActivityLogIds: [],
+  }));
+
+  const meetingRows: WorkflowGroupMeetingRecord[] = legacyMeetings.map((item) => ({
+    id: item.id,
+    date: item.date,
+    title: item.topic,
+    meetingType: "group",
+    attendees: item.attendees,
+    summary: item.notes,
+    discussionNotes: item.notes,
+    mentorFeedback: "",
+    decisions: item.actionItems,
+    nextMeetingDate: "",
+    projectIds: [],
+    paperIds: [],
+    submissionIds: [],
+    followUp: "",
+    linkedTaskIds: [],
+    linkedEventIds: [],
+    linkedActivityLogIds: [],
+  }));
+
+  const timelineEntries: TimelineEntry[] = [
+    ...projectRows.map((item) => ({
+      id: `timeline-${item.id}`,
+      entityType: "project" as const,
+      entityId: item.id,
+      date: item.startDate || todayISO(),
+      title: item.title,
+      description: "从历史科研项目迁移",
+      linkedTaskIds: [],
+      linkedEventIds: [],
+      linkedActivityLogIds: [],
+    })),
+    ...paperRows.map((item) => ({
+      id: `timeline-${item.id}`,
+      entityType: "paper" as const,
+      entityId: item.id,
+      date: todayISO(),
+      title: item.title,
+      description: "从历史论文进度迁移",
+      linkedTaskIds: [],
+      linkedEventIds: [],
+      linkedActivityLogIds: [],
+    })),
+  ];
+
+  return {
+    ...defaultResearchWorkflowState,
+    projects: projectRows,
+    papers: paperRows,
+    submissions: submissionRows,
+    meetings: meetingRows,
+    timelineEntries,
+  };
+}
+
+function fromProjectRow(row: Record<string, unknown>): WorkflowResearchProject {
+  return {
+    id: String(row.id ?? ""),
+    title: String(row.title ?? ""),
+    summary: String(row.summary ?? ""),
+    status: (row.status as WorkflowResearchProject["status"]) ?? "idea",
+    priority: (row.priority as WorkflowResearchProject["priority"]) ?? "medium",
+    progress: Number(row.progress ?? 0),
+    startDate: typeof row.start_date === "string" ? row.start_date : "",
+    targetEndDate: typeof row.target_end_date === "string" ? row.target_end_date : "",
+    researchQuestion: String(row.research_question ?? ""),
+    hypothesis: String(row.hypothesis ?? ""),
+    method: String(row.method ?? ""),
+    dataSources: String(row.data_sources ?? ""),
+    currentIssues: String(row.current_issues ?? ""),
+    nextActions: String(row.next_actions ?? ""),
+    plannedTaskIds: Array.isArray(row.planned_task_ids) ? (row.planned_task_ids as string[]) : [],
+    linkedTaskIds: Array.isArray(row.linked_task_ids) ? (row.linked_task_ids as string[]) : [],
+    linkedEventIds: Array.isArray(row.linked_event_ids) ? (row.linked_event_ids as string[]) : [],
+    linkedActivityLogIds: Array.isArray(row.linked_activity_log_ids)
+      ? (row.linked_activity_log_ids as string[])
+      : [],
+    metadata: (row.metadata as Record<string, string>) ?? {},
+  };
+}
+
+function toProjectRow(item: WorkflowResearchProject) {
+  return {
+    id: item.id,
+    title: item.title,
+    summary: item.summary,
+    status: item.status,
+    priority: item.priority,
+    progress: item.progress,
+    start_date: item.startDate || null,
+    target_end_date: item.targetEndDate || null,
+    research_question: item.researchQuestion,
+    hypothesis: item.hypothesis,
+    method: item.method,
+    data_sources: item.dataSources,
+    current_issues: item.currentIssues,
+    next_actions: item.nextActions,
+    planned_task_ids: item.plannedTaskIds,
+    linked_task_ids: item.linkedTaskIds,
+    linked_event_ids: item.linkedEventIds,
+    linked_activity_log_ids: item.linkedActivityLogIds,
+    metadata: item.metadata,
+  };
+}
+
+function fromProjectLogRow(row: Record<string, unknown>): ProjectLog {
+  return {
+    id: String(row.id ?? ""),
+    projectId: String(row.project_id ?? ""),
+    date: typeof row.entry_date === "string" ? row.entry_date : "",
+    progressText: String(row.progress_text ?? ""),
+    issues: String(row.issues ?? ""),
+    nextActions: String(row.next_actions ?? ""),
+    syncToActivityLog: Boolean(row.sync_to_activity_log),
+    linkedTaskIds: Array.isArray(row.linked_task_ids) ? (row.linked_task_ids as string[]) : [],
+    linkedEventIds: Array.isArray(row.linked_event_ids) ? (row.linked_event_ids as string[]) : [],
+    linkedActivityLogIds: Array.isArray(row.linked_activity_log_ids)
+      ? (row.linked_activity_log_ids as string[])
+      : [],
+  };
+}
+
+function toProjectLogRow(item: ProjectLog) {
+  return {
+    id: item.id,
+    project_id: item.projectId,
+    entry_date: item.date,
+    progress_text: item.progressText,
+    issues: item.issues,
+    next_actions: item.nextActions,
+    sync_to_activity_log: item.syncToActivityLog,
+    linked_task_ids: item.linkedTaskIds,
+    linked_event_ids: item.linkedEventIds,
+    linked_activity_log_ids: item.linkedActivityLogIds,
+  };
+}
+
+function fromPaperRow(row: Record<string, unknown>): ResearchPaper {
+  return {
+    id: String(row.id ?? ""),
+    title: String(row.title ?? ""),
+    abstract: String(row.abstract ?? ""),
+    keywords: Array.isArray(row.keywords) ? (row.keywords as string[]) : [],
+    status: (row.status as ResearchPaper["status"]) ?? "planning",
+    targetVenue: String(row.target_venue ?? ""),
+    chapterCount: Number(row.chapter_count ?? 0),
+    completedChapters: Number(row.completed_chapters ?? 0),
+    overallProgress: Number(row.overall_progress ?? 0),
+    currentIssues: String(row.current_issues ?? ""),
+    nextActions: String(row.next_actions ?? ""),
+    writingPlan: String(row.writing_plan ?? ""),
+    linkedTaskIds: Array.isArray(row.linked_task_ids) ? (row.linked_task_ids as string[]) : [],
+    linkedEventIds: Array.isArray(row.linked_event_ids) ? (row.linked_event_ids as string[]) : [],
+    linkedActivityLogIds: Array.isArray(row.linked_activity_log_ids)
+      ? (row.linked_activity_log_ids as string[])
+      : [],
+    metadata: (row.metadata as Record<string, string>) ?? {},
+  };
+}
+
+function toPaperRow(item: ResearchPaper) {
+  return {
+    id: item.id,
+    title: item.title,
+    abstract: item.abstract,
+    keywords: item.keywords,
+    status: item.status,
+    target_venue: item.targetVenue,
+    chapter_count: item.chapterCount,
+    completed_chapters: item.completedChapters,
+    overall_progress: item.overallProgress,
+    current_issues: item.currentIssues,
+    next_actions: item.nextActions,
+    writing_plan: item.writingPlan,
+    linked_task_ids: item.linkedTaskIds,
+    linked_event_ids: item.linkedEventIds,
+    linked_activity_log_ids: item.linkedActivityLogIds,
+    metadata: item.metadata,
+  };
+}
+
+function fromPaperProjectLinkRow(row: Record<string, unknown>): PaperProjectLink {
+  return {
+    id: String(row.id ?? ""),
+    paperId: String(row.paper_id ?? ""),
+    projectId: String(row.project_id ?? ""),
+  };
+}
+
+function toPaperProjectLinkRow(item: PaperProjectLink) {
+  return { id: item.id, paper_id: item.paperId, project_id: item.projectId };
+}
+
+function fromPaperSectionRow(row: Record<string, unknown>): PaperSection {
+  return {
+    id: String(row.id ?? ""),
+    paperId: String(row.paper_id ?? ""),
+    title: String(row.title ?? ""),
+    sortOrder: Number(row.sort_order ?? 0),
+    status: (row.status as PaperSection["status"]) ?? "planned",
+    targetWords: Number(row.target_words ?? 0),
+    currentWords: Number(row.current_words ?? 0),
+    notes: String(row.notes ?? ""),
+    issues: String(row.issues ?? ""),
+    nextActions: String(row.next_actions ?? ""),
+    linkedTaskIds: Array.isArray(row.linked_task_ids) ? (row.linked_task_ids as string[]) : [],
+    linkedEventIds: Array.isArray(row.linked_event_ids) ? (row.linked_event_ids as string[]) : [],
+    linkedActivityLogIds: Array.isArray(row.linked_activity_log_ids)
+      ? (row.linked_activity_log_ids as string[])
+      : [],
+  };
+}
+
+function toPaperSectionRow(item: PaperSection) {
+  return {
+    id: item.id,
+    paper_id: item.paperId,
+    title: item.title,
+    sort_order: item.sortOrder,
+    status: item.status,
+    target_words: item.targetWords,
+    current_words: item.currentWords,
+    notes: item.notes,
+    issues: item.issues,
+    next_actions: item.nextActions,
+    linked_task_ids: item.linkedTaskIds,
+    linked_event_ids: item.linkedEventIds,
+    linked_activity_log_ids: item.linkedActivityLogIds,
+  };
+}
+
+function fromPaperFeedbackRow(row: Record<string, unknown>): PaperFeedback {
+  return {
+    id: String(row.id ?? ""),
+    paperId: String(row.paper_id ?? ""),
+    source: (row.source as PaperFeedback["source"]) ?? "advisor",
+    date: typeof row.feedback_date === "string" ? row.feedback_date : "",
+    content: String(row.content ?? ""),
+    suggestedAction: String(row.suggested_action ?? ""),
+    status: (row.status as PaperFeedback["status"]) ?? "open",
+    relatedSectionId: typeof row.related_section_id === "string" ? row.related_section_id : null,
+    linkedTaskIds: Array.isArray(row.linked_task_ids) ? (row.linked_task_ids as string[]) : [],
+    linkedEventIds: Array.isArray(row.linked_event_ids) ? (row.linked_event_ids as string[]) : [],
+    linkedActivityLogIds: Array.isArray(row.linked_activity_log_ids)
+      ? (row.linked_activity_log_ids as string[])
+      : [],
+  };
+}
+
+function toPaperFeedbackRow(item: PaperFeedback) {
+  return {
+    id: item.id,
+    paper_id: item.paperId,
+    source: item.source,
+    feedback_date: item.date,
+    content: item.content,
+    suggested_action: item.suggestedAction,
+    status: item.status,
+    related_section_id: item.relatedSectionId,
+    linked_task_ids: item.linkedTaskIds,
+    linked_event_ids: item.linkedEventIds,
+    linked_activity_log_ids: item.linkedActivityLogIds,
+  };
+}
+
+function fromSubmissionRow(row: Record<string, unknown>): WorkflowSubmissionRecord {
+  return {
+    id: String(row.id ?? ""),
+    paperId: String(row.paper_id ?? ""),
+    venueName: String(row.venue_name ?? ""),
+    venueType: (row.venue_type as WorkflowSubmissionRecord["venueType"]) ?? "journal",
+    submittedAt: typeof row.submitted_at === "string" ? row.submitted_at : "",
+    manuscriptId: String(row.manuscript_id ?? ""),
+    status: (row.status as WorkflowSubmissionRecord["status"]) ?? "preparing",
+    decisionDate: typeof row.decision_date === "string" ? row.decision_date : "",
+    revisionDueDate: typeof row.revision_due_date === "string" ? row.revision_due_date : "",
+    resultNote: String(row.result_note ?? ""),
+    responseLetterStatus:
+      (row.response_letter_status as WorkflowSubmissionRecord["responseLetterStatus"]) ?? "open",
+    revisionPlan: String(row.revision_plan ?? ""),
+    materialsChecklist: Array.isArray(row.materials_checklist)
+      ? (row.materials_checklist as WorkflowSubmissionRecord["materialsChecklist"])
+      : [],
+    linkedTaskIds: Array.isArray(row.linked_task_ids) ? (row.linked_task_ids as string[]) : [],
+    linkedEventIds: Array.isArray(row.linked_event_ids) ? (row.linked_event_ids as string[]) : [],
+    linkedActivityLogIds: Array.isArray(row.linked_activity_log_ids)
+      ? (row.linked_activity_log_ids as string[])
+      : [],
+  };
+}
+
+function toSubmissionRow(item: WorkflowSubmissionRecord) {
+  return {
+    id: item.id,
+    paper_id: item.paperId,
+    venue_name: item.venueName,
+    venue_type: item.venueType,
+    submitted_at: item.submittedAt || null,
+    manuscript_id: item.manuscriptId,
+    status: item.status,
+    decision_date: item.decisionDate || null,
+    revision_due_date: item.revisionDueDate || null,
+    result_note: item.resultNote,
+    response_letter_status: item.responseLetterStatus,
+    revision_plan: item.revisionPlan,
+    materials_checklist: item.materialsChecklist,
+    linked_task_ids: item.linkedTaskIds,
+    linked_event_ids: item.linkedEventIds,
+    linked_activity_log_ids: item.linkedActivityLogIds,
+  };
+}
+
+function fromSubmissionHistoryRow(row: Record<string, unknown>): SubmissionStatusHistoryEntry {
+  return {
+    id: String(row.id ?? ""),
+    submissionId: String(row.submission_id ?? ""),
+    status: (row.status as SubmissionStatusHistoryEntry["status"]) ?? "submitted",
+    changedAt: typeof row.changed_at === "string" ? row.changed_at : "",
+    note: String(row.note ?? ""),
+  };
+}
+
+function toSubmissionHistoryRow(item: SubmissionStatusHistoryEntry) {
+  return {
+    id: item.id,
+    submission_id: item.submissionId,
+    status: item.status,
+    changed_at: item.changedAt,
+    note: item.note,
+  };
+}
+
+function fromReviewCommentRow(row: Record<string, unknown>): ReviewComment {
+  return {
+    id: String(row.id ?? ""),
+    submissionId: String(row.submission_id ?? ""),
+    reviewer: String(row.reviewer ?? ""),
+    comment: String(row.comment ?? ""),
+    response: String(row.response ?? ""),
+    status: (row.status as ReviewComment["status"]) ?? "open",
+    paperSectionId: typeof row.paper_section_id === "string" ? row.paper_section_id : null,
+    linkedTaskIds: Array.isArray(row.linked_task_ids) ? (row.linked_task_ids as string[]) : [],
+    linkedEventIds: Array.isArray(row.linked_event_ids) ? (row.linked_event_ids as string[]) : [],
+    linkedActivityLogIds: Array.isArray(row.linked_activity_log_ids)
+      ? (row.linked_activity_log_ids as string[])
+      : [],
+  };
+}
+
+function toReviewCommentRow(item: ReviewComment) {
+  return {
+    id: item.id,
+    submission_id: item.submissionId,
+    reviewer: item.reviewer,
+    comment: item.comment,
+    response: item.response,
+    status: item.status,
+    paper_section_id: item.paperSectionId,
+    linked_task_ids: item.linkedTaskIds,
+    linked_event_ids: item.linkedEventIds,
+    linked_activity_log_ids: item.linkedActivityLogIds,
+  };
+}
+
+function fromMeetingRow(row: Record<string, unknown>): WorkflowGroupMeetingRecord {
+  return {
+    id: String(row.id ?? ""),
+    date: typeof row.meeting_date === "string" ? row.meeting_date : "",
+    title: String(row.title ?? ""),
+    meetingType: (row.meeting_type as WorkflowGroupMeetingRecord["meetingType"]) ?? "group",
+    attendees: String(row.attendees ?? ""),
+    summary: String(row.summary ?? ""),
+    discussionNotes: String(row.discussion_notes ?? ""),
+    mentorFeedback: String(row.mentor_feedback ?? ""),
+    decisions: String(row.decisions ?? ""),
+    nextMeetingDate: typeof row.next_meeting_date === "string" ? row.next_meeting_date : "",
+    projectIds: Array.isArray(row.project_ids) ? (row.project_ids as string[]) : [],
+    paperIds: Array.isArray(row.paper_ids) ? (row.paper_ids as string[]) : [],
+    submissionIds: Array.isArray(row.submission_ids) ? (row.submission_ids as string[]) : [],
+    followUp: String(row.follow_up ?? ""),
+    linkedTaskIds: Array.isArray(row.linked_task_ids) ? (row.linked_task_ids as string[]) : [],
+    linkedEventIds: Array.isArray(row.linked_event_ids) ? (row.linked_event_ids as string[]) : [],
+    linkedActivityLogIds: Array.isArray(row.linked_activity_log_ids)
+      ? (row.linked_activity_log_ids as string[])
+      : [],
+  };
+}
+
+function toMeetingRow(item: WorkflowGroupMeetingRecord) {
+  return {
+    id: item.id,
+    meeting_date: item.date,
+    title: item.title,
+    meeting_type: item.meetingType,
+    attendees: item.attendees,
+    summary: item.summary,
+    discussion_notes: item.discussionNotes,
+    mentor_feedback: item.mentorFeedback,
+    decisions: item.decisions,
+    next_meeting_date: item.nextMeetingDate || null,
+    project_ids: item.projectIds,
+    paper_ids: item.paperIds,
+    submission_ids: item.submissionIds,
+    follow_up: item.followUp,
+    linked_task_ids: item.linkedTaskIds,
+    linked_event_ids: item.linkedEventIds,
+    linked_activity_log_ids: item.linkedActivityLogIds,
+  };
+}
+
+function fromMeetingActionRow(row: Record<string, unknown>): MeetingActionItem {
+  return {
+    id: String(row.id ?? ""),
+    meetingId: String(row.meeting_id ?? ""),
+    content: String(row.content ?? ""),
+    owner: String(row.owner ?? ""),
+    dueDate: typeof row.due_date === "string" ? row.due_date : "",
+    priority: (row.priority as MeetingActionItem["priority"]) ?? "medium",
+    status: (row.status as MeetingActionItem["status"]) ?? "todo",
+    projectId: typeof row.project_id === "string" ? row.project_id : null,
+    paperId: typeof row.paper_id === "string" ? row.paper_id : null,
+    submissionId: typeof row.submission_id === "string" ? row.submission_id : null,
+    linkedTaskIds: Array.isArray(row.linked_task_ids) ? (row.linked_task_ids as string[]) : [],
+    linkedEventIds: Array.isArray(row.linked_event_ids) ? (row.linked_event_ids as string[]) : [],
+    linkedActivityLogIds: Array.isArray(row.linked_activity_log_ids)
+      ? (row.linked_activity_log_ids as string[])
+      : [],
+  };
+}
+
+function toMeetingActionRow(item: MeetingActionItem) {
+  return {
+    id: item.id,
+    meeting_id: item.meetingId,
+    content: item.content,
+    owner: item.owner,
+    due_date: item.dueDate || null,
+    priority: item.priority,
+    status: item.status,
+    project_id: item.projectId,
+    paper_id: item.paperId,
+    submission_id: item.submissionId,
+    linked_task_ids: item.linkedTaskIds,
+    linked_event_ids: item.linkedEventIds,
+    linked_activity_log_ids: item.linkedActivityLogIds,
+  };
+}
+
+function fromTimelineRow(row: Record<string, unknown>): TimelineEntry {
+  return {
+    id: String(row.id ?? ""),
+    entityType: (row.entity_type as TimelineEntry["entityType"]) ?? "project",
+    entityId: String(row.entity_id ?? ""),
+    date: typeof row.entry_date === "string" ? row.entry_date : "",
+    title: String(row.title ?? ""),
+    description: String(row.description ?? ""),
+    linkedTaskIds: Array.isArray(row.linked_task_ids) ? (row.linked_task_ids as string[]) : [],
+    linkedEventIds: Array.isArray(row.linked_event_ids) ? (row.linked_event_ids as string[]) : [],
+    linkedActivityLogIds: Array.isArray(row.linked_activity_log_ids)
+      ? (row.linked_activity_log_ids as string[])
+      : [],
+  };
+}
+
+function toTimelineRow(item: TimelineEntry) {
+  return {
+    id: item.id,
+    entity_type: item.entityType,
+    entity_id: item.entityId,
+    entry_date: item.date,
+    title: item.title,
+    description: item.description,
+    linked_task_ids: item.linkedTaskIds,
+    linked_event_ids: item.linkedEventIds,
+    linked_activity_log_ids: item.linkedActivityLogIds,
+  };
+}
+
+function fromLogPostRow(row: Record<string, unknown>): LogPost {
+  return {
+    id: String(row.id ?? ""),
+    userId: String(row.user_id ?? ""),
+    content: String(row.content ?? ""),
+    category: (row.category as LogPost["category"]) ?? "life",
+    mood: (row.mood as LogPost["mood"]) ?? null,
+    location: String(row.location ?? ""),
+    visibility: "private",
+    isPinned: Boolean(row.is_pinned),
+    isArchived: Boolean(row.is_archived),
+    sourceType: String(row.source_type ?? "manual"),
+    sourceId: typeof row.source_id === "string" ? row.source_id : null,
+    createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? ""),
+  };
+}
+
+function fromLogImageRow(row: Record<string, unknown>): LogPostImage {
+  return {
+    id: String(row.id ?? ""),
+    postId: String(row.post_id ?? ""),
+    userId: String(row.user_id ?? ""),
+    imageUrl: String(row.image_url ?? ""),
+    storagePath: typeof row.storage_path === "string" ? row.storage_path : null,
+    sortOrder: Number(row.sort_order ?? 0),
+    createdAt: String(row.created_at ?? ""),
+  };
+}
+
+function fromLogTagRow(row: Record<string, unknown>): LogTag {
+  return {
+    id: String(row.id ?? ""),
+    userId: String(row.user_id ?? ""),
+    name: String(row.name ?? ""),
+    color: typeof row.color === "string" ? row.color : null,
+    usageCount: Number(row.usage_count ?? 0),
+    createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? ""),
+  };
+}
+
+function fromLogLinkRow(row: Record<string, unknown>): LogPostLink {
+  return {
+    id: String(row.id ?? ""),
+    postId: String(row.post_id ?? ""),
+    userId: String(row.user_id ?? ""),
+    targetType: String(row.target_type ?? ""),
+    targetId: String(row.target_id ?? ""),
+    targetTitle: typeof row.target_title === "string" ? row.target_title : null,
+    createdAt: String(row.created_at ?? ""),
+  };
+}
+
+function composeLogPostRecords(
+  posts: LogPost[],
+  images: LogPostImage[],
+  tags: LogTag[],
+  tagLinks: Array<{ postId: string; tagId: string }>,
+  links: LogPostLink[],
+): LogPostRecord[] {
+  return posts.map((post) => ({
+    ...post,
+    images: images
+      .filter((image) => image.postId === post.id)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
+    tags: tagLinks
+      .filter((item) => item.postId === post.id)
+      .map((item) => tags.find((tag) => tag.id === item.tagId))
+      .filter((item): item is LogTag => Boolean(item)),
+    links: links
+      .filter((item) => item.postId === post.id)
+      .map((item) => ({
+        id: item.targetId,
+        type: item.targetType,
+        title: item.targetTitle ?? item.targetType,
+      })),
+  }));
+}
+
 function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPreferences {
   if (!payload || typeof payload !== "object") return defaultDashboardUiPreferences;
   const value = payload as Partial<DashboardUiPreferences>;
@@ -420,6 +1080,53 @@ function isUiPreferencesColumnMissing(message: string) {
     message.includes("ui_preferences") &&
     (message.includes("schema cache") || message.includes("does not exist"))
   );
+}
+
+type PersistedSchedulePayload = {
+  events: ScheduleEvent[];
+  tasks: LongTask[];
+  annual_tasks: AnnualTask[];
+  project_checkins: ProjectCheckin[];
+  footprints: FootprintItem[];
+  achievements: Achievement[];
+  research_projects: ResearchProject[];
+  paper_progress: PaperProgress;
+  submissions: SubmissionRecord[];
+  group_meetings: GroupMeetingRecord[];
+  ui_preferences: DashboardUiPreferences;
+};
+
+function getScheduleBackupStorageKey(userId: string) {
+  return `${SCHEDULE_DATA_BACKUP_STORAGE_PREFIX}:${userId}`;
+}
+
+function normalizePersistedSchedulePayload(payload: unknown): PersistedSchedulePayload | null {
+  if (!payload || typeof payload !== "object") return null;
+  const value = payload as Partial<PersistedSchedulePayload>;
+  return {
+    events: normalizeEvents(value.events),
+    tasks: normalizeTasks(value.tasks),
+    annual_tasks: normalizeAnnualTasks(value.annual_tasks),
+    project_checkins: normalizeProjectCheckins(value.project_checkins),
+    footprints: normalizeFootprints(value.footprints),
+    achievements: normalizeAchievements(value.achievements),
+    research_projects: normalizeResearchProjects(value.research_projects),
+    paper_progress: normalizePaperProgress(value.paper_progress),
+    submissions: normalizeSubmissions(value.submissions),
+    group_meetings: normalizeGroupMeetings(value.group_meetings),
+    ui_preferences: normalizeDashboardUiPreferences(value.ui_preferences),
+  };
+}
+
+function readScheduleBackupFromLocal(userId: string): PersistedSchedulePayload | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(getScheduleBackupStorageKey(userId));
+    if (!raw) return null;
+    return normalizePersistedSchedulePayload(JSON.parse(raw));
+  } catch {
+    return null;
+  }
 }
 
 function isColumnMissing(message: string, column: string) {
@@ -503,6 +1210,10 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
 }
 
 export default function Home() {
+  const canSaveRemoteRef = useRef(false);
+  const lastLoadedSnapshotRef = useRef<string | null>(null);
+  const canSyncResearchWorkflowRef = useRef(false);
+  const lastResearchWorkflowSnapshotRef = useRef<string | null>(null);
   const [isBooted, setIsBooted] = useState(false);
   const [activeModule, setActiveModule] = useState<MonitoringModuleId>("schedule");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getCurrentWeekStart);
@@ -516,6 +1227,14 @@ export default function Home() {
   const [paperProgress, setPaperProgress] = useState<PaperProgress>(defaultPaperProgress);
   const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
   const [groupMeetings, setGroupMeetings] = useState<GroupMeetingRecord[]>([]);
+  const [researchWorkflow, setResearchWorkflow] = useState<ResearchWorkflowState>(
+    defaultResearchWorkflowState,
+  );
+  const [researchWorkflowReady, setResearchWorkflowReady] = useState(false);
+  const [logPosts, setLogPosts] = useState<LogPostRecord[]>([]);
+  const [logTags, setLogTags] = useState<LogTag[]>([]);
+  const [logReady, setLogReady] = useState(false);
+  const [logUploading, setLogUploading] = useState(false);
   const [dashboardUiPreferences, setDashboardUiPreferences] = useState<DashboardUiPreferences>(
     defaultDashboardUiPreferences,
   );
@@ -532,6 +1251,70 @@ export default function Home() {
     const end = format(addDays(currentWeekStart, 6), "yyyy/MM/dd", { locale: zhCN });
     return `${start} - ${end}`;
   }, [currentWeekStart]);
+  const persistedPayload = useMemo<PersistedSchedulePayload>(
+    () => ({
+      events,
+      tasks,
+      annual_tasks: annualTasks,
+      project_checkins: projectCheckins,
+      footprints,
+      achievements,
+      research_projects: researchProjects,
+      paper_progress: paperProgress,
+      submissions,
+      group_meetings: groupMeetings,
+      ui_preferences: dashboardUiPreferences,
+    }),
+    [
+      achievements,
+      annualTasks,
+      dashboardUiPreferences,
+      events,
+      footprints,
+      groupMeetings,
+      paperProgress,
+      projectCheckins,
+      researchProjects,
+      submissions,
+      tasks,
+    ],
+  );
+  const persistedPayloadJson = useMemo(() => JSON.stringify(persistedPayload), [persistedPayload]);
+  const researchWorkflowJson = useMemo(() => JSON.stringify(researchWorkflow), [researchWorkflow]);
+
+  async function refreshLogs(currentUser: User) {
+    const results = await Promise.all([
+      supabase.from("log_posts").select("*").eq("user_id", currentUser.id).order("created_at", { ascending: false }),
+      supabase.from("log_post_images").select("*").eq("user_id", currentUser.id),
+      supabase.from("log_tags").select("*").eq("user_id", currentUser.id),
+      supabase.from("log_post_tags").select("post_id,tag_id").eq("user_id", currentUser.id),
+      supabase.from("log_post_links").select("*").eq("user_id", currentUser.id),
+    ]);
+    const firstError = results.find((item) => item.error)?.error;
+    if (firstError) throw firstError;
+
+    const posts = (results[0].data ?? []).map((item) => fromLogPostRow(item));
+    const rawImages = (results[1].data ?? []).map((item) => fromLogImageRow(item));
+    const tags = (results[2].data ?? []).map((item) => fromLogTagRow(item));
+    const tagLinks = (results[3].data ?? []).map((item) => ({
+      postId: String(item.post_id),
+      tagId: String(item.tag_id),
+    }));
+    const links = (results[4].data ?? []).map((item) => fromLogLinkRow(item));
+
+    const signedImages = await Promise.all(
+      rawImages.map(async (image) => {
+        if (!image.storagePath) return image;
+        const { data } = await supabase.storage
+          .from("log-images")
+          .createSignedUrl(image.storagePath, 60 * 60 * 24 * 30);
+        return { ...image, imageUrl: data?.signedUrl ?? image.imageUrl };
+      }),
+    );
+
+    setLogTags(tags);
+    setLogPosts(composeLogPostRecords(posts, signedImages, tags, tagLinks, links));
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -558,6 +1341,10 @@ export default function Home() {
   useEffect(() => {
     if (!isBooted) return;
     if (!user) {
+      canSaveRemoteRef.current = false;
+      lastLoadedSnapshotRef.current = null;
+      canSyncResearchWorkflowRef.current = false;
+      lastResearchWorkflowSnapshotRef.current = null;
       setEvents(defaultEvents);
       setTasks(defaultTasks);
       setAnnualTasks([]);
@@ -568,6 +1355,11 @@ export default function Home() {
       setPaperProgress(defaultPaperProgress);
       setSubmissions([]);
       setGroupMeetings([]);
+      setResearchWorkflow(defaultResearchWorkflowState);
+      setResearchWorkflowReady(false);
+      setLogPosts([]);
+      setLogTags([]);
+      setLogReady(false);
       setDashboardUiPreferences(defaultDashboardUiPreferences);
       setDataReady(false);
       return;
@@ -634,62 +1426,133 @@ export default function Home() {
 
         if (cancelled) return;
         if (error) {
-          console.error("读取云端数据失败:", error);
-          if (error.message.includes("relation \"schedule_data\" does not exist")) {
-            toast.info("表不存在，正在创建...");
+          console.error("Failed to read remote schedule data:", error);
+          const localBackup = readScheduleBackupFromLocal(user.id);
+          if (localBackup) {
+            canSaveRemoteRef.current = true;
+            lastLoadedSnapshotRef.current = JSON.stringify(localBackup);
+            setEvents(localBackup.events);
+            setTasks(localBackup.tasks);
+            setAnnualTasks(localBackup.annual_tasks);
+            setProjectCheckins(localBackup.project_checkins);
+            setFootprints(localBackup.footprints);
+            setAchievements(localBackup.achievements);
+            setResearchProjects(localBackup.research_projects);
+            setPaperProgress(localBackup.paper_progress);
+            setSubmissions(localBackup.submissions);
+            setGroupMeetings(localBackup.group_meetings);
+            setDashboardUiPreferences(localBackup.ui_preferences);
+            toast.warning("Remote read failed. Restored from local backup.");
+            setDataReady(true);
+            return;
+          }
+          canSaveRemoteRef.current = false;
+          lastLoadedSnapshotRef.current = null;
+          if (error.message.includes('relation \"schedule_data\" does not exist')) {
+            toast.info("Remote table missing. Creating it now...");
             const created = await createScheduleDataTable();
             if (created) {
-              // 重新尝试加载数据
               await loadUserData();
             } else {
-              toast.error("创建表失败");
+              toast.error("Failed to create remote table.");
               setDataReady(true);
             }
           } else {
-            toast.error(`读取云端数据失败: ${error.message}`);
+            toast.error("Failed to read remote data: " + error.message);
             setDataReady(true);
           }
           return;
         }
 
         if (data) {
-          setEvents(normalizeEvents(data.events));
-          setTasks(normalizeTasks(data.tasks));
-          setAnnualTasks(normalizeAnnualTasks((data as { annual_tasks?: unknown }).annual_tasks));
-          setProjectCheckins(
-            normalizeProjectCheckins((data as { project_checkins?: unknown }).project_checkins),
-          );
-          setFootprints(normalizeFootprints((data as { footprints?: unknown }).footprints));
-          setAchievements(normalizeAchievements((data as { achievements?: unknown }).achievements));
-          setResearchProjects(
-            normalizeResearchProjects((data as { research_projects?: unknown }).research_projects),
-          );
-          setPaperProgress(normalizePaperProgress((data as { paper_progress?: unknown }).paper_progress));
-          setSubmissions(normalizeSubmissions((data as { submissions?: unknown }).submissions));
-          setGroupMeetings(normalizeGroupMeetings((data as { group_meetings?: unknown }).group_meetings));
-          const uiPrefsRaw = (data as { ui_preferences?: unknown }).ui_preferences;
-          setDashboardUiPreferences(
-            uiPrefsRaw
-              ? normalizeDashboardUiPreferences(uiPrefsRaw)
+          const normalized: PersistedSchedulePayload = {
+            events: normalizeEvents(data.events),
+            tasks: normalizeTasks(data.tasks),
+            annual_tasks: normalizeAnnualTasks((data as { annual_tasks?: unknown }).annual_tasks),
+            project_checkins: normalizeProjectCheckins(
+              (data as { project_checkins?: unknown }).project_checkins,
+            ),
+            footprints: normalizeFootprints((data as { footprints?: unknown }).footprints),
+            achievements: normalizeAchievements((data as { achievements?: unknown }).achievements),
+            research_projects: normalizeResearchProjects(
+              (data as { research_projects?: unknown }).research_projects,
+            ),
+            paper_progress: normalizePaperProgress(
+              (data as { paper_progress?: unknown }).paper_progress,
+            ),
+            submissions: normalizeSubmissions((data as { submissions?: unknown }).submissions),
+            group_meetings: normalizeGroupMeetings(
+              (data as { group_meetings?: unknown }).group_meetings,
+            ),
+            ui_preferences: (data as { ui_preferences?: unknown }).ui_preferences
+              ? normalizeDashboardUiPreferences((data as { ui_preferences?: unknown }).ui_preferences)
               : readDashboardUiPreferencesFromLocal(),
-          );
+          };
+          canSaveRemoteRef.current = true;
+          lastLoadedSnapshotRef.current = JSON.stringify(normalized);
+          setEvents(normalized.events);
+          setTasks(normalized.tasks);
+          setAnnualTasks(normalized.annual_tasks);
+          setProjectCheckins(normalized.project_checkins);
+          setFootprints(normalized.footprints);
+          setAchievements(normalized.achievements);
+          setResearchProjects(normalized.research_projects);
+          setPaperProgress(normalized.paper_progress);
+          setSubmissions(normalized.submissions);
+          setGroupMeetings(normalized.group_meetings);
+          setDashboardUiPreferences(normalized.ui_preferences);
         } else {
-          setEvents(defaultEvents);
-          setTasks(defaultTasks);
-          setAnnualTasks([]);
-          setProjectCheckins([]);
-          setFootprints([]);
-          setAchievements([]);
-          setResearchProjects([]);
-          setPaperProgress(defaultPaperProgress);
-          setSubmissions([]);
-          setGroupMeetings([]);
-          setDashboardUiPreferences(readDashboardUiPreferencesFromLocal());
+          const localBackup = readScheduleBackupFromLocal(user.id);
+          if (localBackup) {
+            canSaveRemoteRef.current = true;
+            lastLoadedSnapshotRef.current = JSON.stringify(localBackup);
+            setEvents(localBackup.events);
+            setTasks(localBackup.tasks);
+            setAnnualTasks(localBackup.annual_tasks);
+            setProjectCheckins(localBackup.project_checkins);
+            setFootprints(localBackup.footprints);
+            setAchievements(localBackup.achievements);
+            setResearchProjects(localBackup.research_projects);
+            setPaperProgress(localBackup.paper_progress);
+            setSubmissions(localBackup.submissions);
+            setGroupMeetings(localBackup.group_meetings);
+            setDashboardUiPreferences(localBackup.ui_preferences);
+            toast.warning("Remote data was empty. Restored from local backup.");
+          } else {
+            const emptyState: PersistedSchedulePayload = {
+              events: defaultEvents,
+              tasks: defaultTasks,
+              annual_tasks: [],
+              project_checkins: [],
+              footprints: [],
+              achievements: [],
+              research_projects: [],
+              paper_progress: defaultPaperProgress,
+              submissions: [],
+              group_meetings: [],
+              ui_preferences: readDashboardUiPreferencesFromLocal(),
+            };
+            canSaveRemoteRef.current = false;
+            lastLoadedSnapshotRef.current = JSON.stringify(emptyState);
+            setEvents(emptyState.events);
+            setTasks(emptyState.tasks);
+            setAnnualTasks(emptyState.annual_tasks);
+            setProjectCheckins(emptyState.project_checkins);
+            setFootprints(emptyState.footprints);
+            setAchievements(emptyState.achievements);
+            setResearchProjects(emptyState.research_projects);
+            setPaperProgress(emptyState.paper_progress);
+            setSubmissions(emptyState.submissions);
+            setGroupMeetings(emptyState.group_meetings);
+            setDashboardUiPreferences(emptyState.ui_preferences);
+          }
         }
         setDataReady(true);
       } catch (error) {
-        console.error("加载数据时出错:", error);
-        toast.error("加载数据时出错");
+        console.error("Failed to load schedule data:", error);
+        canSaveRemoteRef.current = false;
+        lastLoadedSnapshotRef.current = null;
+        toast.error("Failed to load schedule data.");
         setDataReady(true);
       }
     }
@@ -702,29 +1565,24 @@ export default function Home() {
 
   useEffect(() => {
     if (!user || !dataReady) return;
+    if (!canSaveRemoteRef.current) return;
+    if (lastLoadedSnapshotRef.current === persistedPayloadJson) return;
     const currentUser = user;
 
     async function saveUserData() {
       const payload = {
         user_id: currentUser.id,
-        events,
-        tasks,
-        annual_tasks: annualTasks,
-        project_checkins: projectCheckins,
-        footprints,
-        achievements,
-        research_projects: researchProjects,
-        paper_progress: paperProgress,
-        submissions,
-        group_meetings: groupMeetings,
-        ui_preferences: dashboardUiPreferences,
+        ...persistedPayload,
       };
 
       const withPreferences = await supabase
         .from("schedule_data")
         .upsert(payload, { onConflict: "user_id" });
 
-      if (!withPreferences.error) return;
+      if (!withPreferences.error) {
+        lastLoadedSnapshotRef.current = persistedPayloadJson;
+        return;
+      }
 
       if (withPreferences.error.message) {
         const missingUi = isUiPreferencesColumnMissing(withPreferences.error.message);
@@ -741,7 +1599,7 @@ export default function Home() {
           missingSubmissions ||
           missingMeetings
         ) {
-          const fallbackPayload: Record<string, unknown> = {
+          const fallbackPayload = {
             user_id: payload.user_id,
             events: payload.events,
             tasks: payload.tasks,
@@ -760,70 +1618,446 @@ export default function Home() {
             .from("schedule_data")
             .upsert(fallbackPayload, { onConflict: "user_id" });
           if (fallbackSave.error) {
-            console.error("保存到云端失败:", fallbackSave.error);
-            toast.error(`保存到云端失败: ${fallbackSave.error.message}`);
+            console.error("Failed to save schedule data:", fallbackSave.error);
+            toast.error("Failed to save remote data: " + fallbackSave.error.message);
             return;
           }
-          toast.warning("云端尚未完成新字段迁移，已临时使用本地记忆兜底");
+          lastLoadedSnapshotRef.current = persistedPayloadJson;
+          toast.warning("Remote schema is behind. Used compatibility save.");
           return;
         }
       }
 
-      console.error("保存到云端失败:", withPreferences.error);
-      toast.error(`保存到云端失败: ${withPreferences.error.message}`);
+      console.error("Failed to save schedule data:", withPreferences.error);
+      toast.error("Failed to save remote data: " + withPreferences.error.message);
     }
 
     saveUserData();
-  }, [
-    achievements,
-    annualTasks,
-    dashboardUiPreferences,
-    events,
-    footprints,
-    projectCheckins,
-    researchProjects,
-    paperProgress,
-    submissions,
-    groupMeetings,
-    tasks,
-    user,
-    dataReady,
-  ]);
+  }, [persistedPayload, persistedPayloadJson, user, dataReady]);
 
-  function handleAddResearchProject(value: Omit<ResearchProject, "id">) {
-    setResearchProjects((prev) => [...prev, { id: createId("research"), ...value }]);
+  useEffect(() => {
+    if (!user || !dataReady) return;
+    try {
+      localStorage.setItem(getScheduleBackupStorageKey(user.id), persistedPayloadJson);
+    } catch {
+      // ignore
+    }
+  }, [dataReady, persistedPayloadJson, user]);
+
+  useEffect(() => {
+    if (!user || !dataReady) return;
+    let cancelled = false;
+    const currentUser = user;
+
+    async function loadResearchWorkflow() {
+      const legacyFallback = buildResearchWorkflowFromLegacy(
+        researchProjects,
+        paperProgress,
+        submissions,
+        groupMeetings,
+      );
+
+      const queries = await Promise.all([
+        supabase.from("research_projects").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_project_logs").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_papers").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_paper_project_links").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_paper_sections").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_paper_feedback").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_submissions").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_submission_status_history").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_review_comments").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_meetings").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_meeting_action_items").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_timeline_entries").select("*").eq("user_id", currentUser.id),
+      ]);
+
+      if (cancelled) return;
+
+      const firstError = queries.find((item) => item.error)?.error;
+      if (firstError) {
+        if (firstError.message.includes("does not exist")) {
+          canSyncResearchWorkflowRef.current = false;
+          lastResearchWorkflowSnapshotRef.current = JSON.stringify(legacyFallback);
+          setResearchWorkflow(legacyFallback);
+          setResearchWorkflowReady(true);
+          return;
+        }
+        toast.error(`Failed to load research workflow: ${firstError.message}`);
+        canSyncResearchWorkflowRef.current = false;
+        lastResearchWorkflowSnapshotRef.current = JSON.stringify(legacyFallback);
+        setResearchWorkflow(legacyFallback);
+        setResearchWorkflowReady(true);
+        return;
+      }
+
+      const nextWorkflow: ResearchWorkflowState = {
+        projects: (queries[0].data ?? []).map((item) => fromProjectRow(item)),
+        projectLogs: (queries[1].data ?? []).map((item) => fromProjectLogRow(item)),
+        papers: (queries[2].data ?? []).map((item) => fromPaperRow(item)),
+        paperProjectLinks: (queries[3].data ?? []).map((item) => fromPaperProjectLinkRow(item)),
+        paperSections: (queries[4].data ?? []).map((item) => fromPaperSectionRow(item)),
+        paperFeedback: (queries[5].data ?? []).map((item) => fromPaperFeedbackRow(item)),
+        submissions: (queries[6].data ?? []).map((item) => fromSubmissionRow(item)),
+        submissionStatusHistory: (queries[7].data ?? []).map((item) => fromSubmissionHistoryRow(item)),
+        reviewComments: (queries[8].data ?? []).map((item) => fromReviewCommentRow(item)),
+        meetings: (queries[9].data ?? []).map((item) => fromMeetingRow(item)),
+        meetingActionItems: (queries[10].data ?? []).map((item) => fromMeetingActionRow(item)),
+        timelineEntries: (queries[11].data ?? []).map((item) => fromTimelineRow(item)),
+      };
+
+      const hasWorkflowData = Object.values(nextWorkflow).some(
+        (value) => Array.isArray(value) && value.length > 0,
+      );
+      const resolvedWorkflow = hasWorkflowData ? nextWorkflow : legacyFallback;
+      canSyncResearchWorkflowRef.current = true;
+      lastResearchWorkflowSnapshotRef.current = JSON.stringify(resolvedWorkflow);
+      setResearchWorkflow(resolvedWorkflow);
+      setResearchWorkflowReady(true);
+    }
+
+    loadResearchWorkflow();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataReady, groupMeetings, paperProgress, researchProjects, submissions, user]);
+
+  useEffect(() => {
+    if (!user || !researchWorkflowReady) return;
+    if (!canSyncResearchWorkflowRef.current) return;
+    if (lastResearchWorkflowSnapshotRef.current === researchWorkflowJson) return;
+    const currentUser = user;
+
+    async function syncTable(table: string, rows: Array<Record<string, unknown>>) {
+      if (rows.length > 0) {
+        const { error } = await supabase
+          .from(table)
+          .upsert(rows.map((row) => ({ ...row, user_id: currentUser.id })), { onConflict: "id" });
+        if (error) return error;
+      }
+
+      const deleteQuery = supabase.from(table).delete().eq("user_id", currentUser.id);
+      if (rows.length === 0) {
+        return (await deleteQuery).error;
+      }
+      const ids = rows
+        .map((row) => row.id)
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => `"${value}"`)
+        .join(",");
+      return (await deleteQuery.not("id", "in", `(${ids})`)).error;
+    }
+
+    async function saveResearchWorkflow() {
+      const syncJobs: Array<[string, Array<Record<string, unknown>>]> = [
+        ["research_projects", researchWorkflow.projects.map((item) => toProjectRow(item))],
+        ["research_project_logs", researchWorkflow.projectLogs.map((item) => toProjectLogRow(item))],
+        ["research_papers", researchWorkflow.papers.map((item) => toPaperRow(item))],
+        ["research_paper_project_links", researchWorkflow.paperProjectLinks.map((item) => toPaperProjectLinkRow(item))],
+        ["research_paper_sections", researchWorkflow.paperSections.map((item) => toPaperSectionRow(item))],
+        ["research_paper_feedback", researchWorkflow.paperFeedback.map((item) => toPaperFeedbackRow(item))],
+        ["research_submissions", researchWorkflow.submissions.map((item) => toSubmissionRow(item))],
+        [
+          "research_submission_status_history",
+          researchWorkflow.submissionStatusHistory.map((item) => toSubmissionHistoryRow(item)),
+        ],
+        ["research_review_comments", researchWorkflow.reviewComments.map((item) => toReviewCommentRow(item))],
+        ["research_meetings", researchWorkflow.meetings.map((item) => toMeetingRow(item))],
+        [
+          "research_meeting_action_items",
+          researchWorkflow.meetingActionItems.map((item) => toMeetingActionRow(item)),
+        ],
+        ["research_timeline_entries", researchWorkflow.timelineEntries.map((item) => toTimelineRow(item))],
+      ];
+
+      for (const [table, rows] of syncJobs) {
+        const error = await syncTable(table, rows);
+        if (error) {
+          toast.error(`Failed to sync ${table}: ${error.message}`);
+          return;
+        }
+      }
+      lastResearchWorkflowSnapshotRef.current = researchWorkflowJson;
+    }
+
+    saveResearchWorkflow();
+  }, [researchWorkflow, researchWorkflowJson, researchWorkflowReady, user]);
+
+  useEffect(() => {
+    if (!user || !dataReady) return;
+    let cancelled = false;
+    const currentUser = user;
+
+    async function loadLogs() {
+      try {
+        await refreshLogs(currentUser);
+        if (!cancelled) setLogReady(true);
+      } catch (firstError) {
+        if (cancelled) return;
+        const message = firstError instanceof Error ? firstError.message : String(firstError);
+        if (message.includes("does not exist")) {
+          setLogPosts([]);
+          setLogTags([]);
+          setLogReady(true);
+          return;
+        }
+        toast.error(`Failed to load logs: ${message}`);
+        setLogReady(true);
+      }
+    }
+
+    loadLogs();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataReady, user]);
+
+  async function upsertLogTagsForUser(currentUser: User, tagNames: string[]) {
+    const cleaned = Array.from(new Set(tagNames.map((item) => item.trim()).filter(Boolean)));
+    if (cleaned.length === 0) return [] as LogTag[];
+    const { error } = await supabase.from("log_tags").upsert(
+      cleaned.map((name) => ({
+        user_id: currentUser.id,
+        name,
+      })),
+      { onConflict: "user_id,name" },
+    );
+    if (error) throw error;
+    const { data, error: selectError } = await supabase
+      .from("log_tags")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .in("name", cleaned);
+    if (selectError) throw selectError;
+    return (data ?? []).map((item) => fromLogTagRow(item));
   }
 
-  function handleUpdateResearchProject(id: string, patch: Partial<Omit<ResearchProject, "id">>) {
-    setResearchProjects((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  async function recalculateLogTagUsage(currentUser: User) {
+    const [{ data: tagLinks, error: linksError }, { data: tagsData, error: tagsError }] = await Promise.all([
+      supabase.from("log_post_tags").select("tag_id").eq("user_id", currentUser.id),
+      supabase.from("log_tags").select("*").eq("user_id", currentUser.id),
+    ]);
+    if (linksError) throw linksError;
+    if (tagsError) throw tagsError;
+    const usageMap = new Map<string, number>();
+    (tagLinks ?? []).forEach((item) => {
+      const tagId = String(item.tag_id);
+      usageMap.set(tagId, (usageMap.get(tagId) ?? 0) + 1);
+    });
+    for (const row of tagsData ?? []) {
+      const count = usageMap.get(String(row.id)) ?? 0;
+      const { error } = await supabase
+        .from("log_tags")
+        .update({ usage_count: count, updated_at: new Date().toISOString() })
+        .eq("id", row.id)
+        .eq("user_id", currentUser.id);
+      if (error) throw error;
+    }
   }
 
-  function handleDeleteResearchProject(id: string) {
-    setResearchProjects((prev) => prev.filter((x) => x.id !== id));
+  async function uploadLogImages(currentUser: User, postId: string, files: File[]) {
+    const rows: Array<Record<string, unknown>> = [];
+    for (const [index, file] of files.entries()) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+      const storagePath = `${currentUser.id}/${postId}/${Date.now()}-${index}-${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from("log-images")
+        .upload(storagePath, file, { upsert: false });
+      if (uploadError) throw uploadError;
+      const { data } = await supabase.storage.from("log-images").createSignedUrl(storagePath, 60 * 60 * 24 * 30);
+      rows.push({
+        post_id: postId,
+        user_id: currentUser.id,
+        image_url: data?.signedUrl ?? "",
+        storage_path: storagePath,
+        sort_order: index,
+      });
+    }
+    if (rows.length > 0) {
+      const { error } = await supabase.from("log_post_images").insert(rows);
+      if (error) throw error;
+    }
   }
 
-  function handleAddSubmission(value: Omit<SubmissionRecord, "id">) {
-    setSubmissions((prev) => [...prev, { id: createId("submission"), ...value }]);
+  async function syncLogPostTags(currentUser: User, postId: string, tagNames: string[]) {
+    const ensuredTags = await upsertLogTagsForUser(currentUser, tagNames);
+    const { error: deleteError } = await supabase
+      .from("log_post_tags")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", currentUser.id);
+    if (deleteError) throw deleteError;
+    if (ensuredTags.length > 0) {
+      const { error } = await supabase.from("log_post_tags").insert(
+        ensuredTags.map((tag) => ({
+          post_id: postId,
+          tag_id: tag.id,
+          user_id: currentUser.id,
+        })),
+      );
+      if (error) throw error;
+    }
+    await recalculateLogTagUsage(currentUser);
   }
 
-  function handleUpdateSubmission(id: string, patch: Partial<Omit<SubmissionRecord, "id">>) {
-    setSubmissions((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  async function syncLogPostLinks(currentUser: User, postId: string, links: Array<{ id: string; type: string; title: string }>) {
+    const { error: deleteError } = await supabase
+      .from("log_post_links")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", currentUser.id);
+    if (deleteError) throw deleteError;
+    if (links.length > 0) {
+      const { error } = await supabase.from("log_post_links").insert(
+        links.map((item) => ({
+          post_id: postId,
+          user_id: currentUser.id,
+          target_type: item.type,
+          target_id: item.id,
+          target_title: item.title,
+        })),
+      );
+      if (error) throw error;
+    }
   }
 
-  function handleDeleteSubmission(id: string) {
-    setSubmissions((prev) => prev.filter((x) => x.id !== id));
+  async function handleCreateLogPost(input: LogComposerInput) {
+    if (!user) return;
+    setLogUploading(true);
+    const currentUser = user;
+    const now = new Date().toISOString();
+    try {
+      const { data, error } = await supabase
+        .from("log_posts")
+        .insert({
+          user_id: currentUser.id,
+          content: input.content,
+          category: input.category,
+          mood: input.mood || null,
+          location: input.location,
+          visibility: "private",
+          source_type: "manual",
+          created_at: now,
+          updated_at: now,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      const post = fromLogPostRow(data);
+      await uploadLogImages(currentUser, post.id, input.images.slice(0, 9));
+      await syncLogPostTags(currentUser, post.id, input.tagNames);
+      await syncLogPostLinks(currentUser, post.id, input.links);
+      await refreshLogs(currentUser);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to create log post: ${message}`);
+    } finally {
+      setLogUploading(false);
+    }
   }
 
-  function handleAddGroupMeeting(value: Omit<GroupMeetingRecord, "id">) {
-    setGroupMeetings((prev) => [...prev, { id: createId("meeting"), ...value }]);
+  async function handleUpdateLogPost(postId: string, input: LogPostEditorInput) {
+    if (!user) return;
+    setLogUploading(true);
+    const currentUser = user;
+    try {
+      const { error: updateError } = await supabase
+        .from("log_posts")
+        .update({
+          content: input.content,
+          category: input.category,
+          mood: input.mood || null,
+          location: input.location,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", postId)
+        .eq("user_id", currentUser.id);
+      if (updateError) throw updateError;
+
+      const existingPost = logPosts.find((item) => item.id === postId);
+      const removedImages = existingPost?.images.filter((image) => !input.keepImageIds.includes(image.id)) ?? [];
+      if (removedImages.length > 0) {
+        const storagePaths = removedImages
+          .map((image) => image.storagePath)
+          .filter((item): item is string => Boolean(item));
+        if (storagePaths.length > 0) {
+          await supabase.storage.from("log-images").remove(storagePaths);
+        }
+        const { error: deleteImagesError } = await supabase
+          .from("log_post_images")
+          .delete()
+          .eq("post_id", postId)
+          .eq("user_id", currentUser.id)
+          .in("id", removedImages.map((item) => item.id));
+        if (deleteImagesError) throw deleteImagesError;
+      }
+
+      await uploadLogImages(currentUser, postId, input.newImages.slice(0, Math.max(0, 9 - input.keepImageIds.length)));
+      await syncLogPostTags(currentUser, postId, input.tagNames);
+      await syncLogPostLinks(currentUser, postId, input.links);
+      await refreshLogs(currentUser);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to update log post: ${message}`);
+    } finally {
+      setLogUploading(false);
+    }
   }
 
-  function handleUpdateGroupMeeting(id: string, patch: Partial<Omit<GroupMeetingRecord, "id">>) {
-    setGroupMeetings((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  async function handleDeleteLogPost(postId: string) {
+    if (!user) return;
+    const currentUser = user;
+    try {
+      const existingPost = logPosts.find((item) => item.id === postId);
+      const storagePaths = existingPost?.images
+        .map((image) => image.storagePath)
+        .filter((item): item is string => Boolean(item)) ?? [];
+      if (storagePaths.length > 0) {
+        await supabase.storage.from("log-images").remove(storagePaths);
+      }
+      await supabase.from("log_post_images").delete().eq("post_id", postId).eq("user_id", currentUser.id);
+      await supabase.from("log_post_tags").delete().eq("post_id", postId).eq("user_id", currentUser.id);
+      await supabase.from("log_post_links").delete().eq("post_id", postId).eq("user_id", currentUser.id);
+      const { error } = await supabase.from("log_posts").delete().eq("id", postId).eq("user_id", currentUser.id);
+      if (error) throw error;
+      await recalculateLogTagUsage(currentUser);
+      await refreshLogs(currentUser);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete log post: ${message}`);
+    }
   }
 
-  function handleDeleteGroupMeeting(id: string) {
-    setGroupMeetings((prev) => prev.filter((x) => x.id !== id));
+  async function handleToggleLogPinned(postId: string) {
+    if (!user) return;
+    const post = logPosts.find((item) => item.id === postId);
+    if (!post) return;
+    const { error } = await supabase
+      .from("log_posts")
+      .update({ is_pinned: !post.isPinned, updated_at: new Date().toISOString() })
+      .eq("id", postId)
+      .eq("user_id", user.id);
+    if (error) {
+      toast.error(`Failed to update pinned state: ${error.message}`);
+      return;
+    }
+    await refreshLogs(user);
+  }
+
+  async function handleToggleLogArchived(postId: string) {
+    if (!user) return;
+    const post = logPosts.find((item) => item.id === postId);
+    if (!post) return;
+    const { error } = await supabase
+      .from("log_posts")
+      .update({ is_archived: !post.isArchived, updated_at: new Date().toISOString() })
+      .eq("id", postId)
+      .eq("user_id", user.id);
+    if (error) {
+      toast.error(`Failed to update archived state: ${error.message}`);
+      return;
+    }
+    await refreshLogs(user);
   }
 
   function handleAddAchievement(value: Omit<Achievement, "id">) {
@@ -938,6 +2172,49 @@ export default function Home() {
         subtasks: [],
       },
     ]);
+  }
+
+  function handleCreateWorkflowTask(input: { title: string; dueDate?: string; notes?: string }) {
+    const trimmedTitle = input.title.trim();
+    if (!trimmedTitle) return null;
+    const id = createId("task");
+    setTasks((prev) => [
+      ...prev,
+      {
+        id,
+        name: trimmedTitle,
+        dueDate: input.dueDate || todayISO(),
+        done: false,
+        notes: input.notes?.trim() ?? "",
+        precautions: [],
+        completionLog: "",
+        priority: "涓嶇揣鎬ヤ笉閲嶈" as Priority,
+        subtasks: [],
+      },
+    ]);
+    return id;
+  }
+
+  function handleCreateWorkflowEvent(input: { title: string; date: string; notes?: string }) {
+    const trimmedTitle = input.title.trim();
+    if (!trimmedTitle || !input.date) return null;
+    const id = createId("evt");
+    setEvents((prev) => [
+      ...prev,
+      {
+        id,
+        date: input.date,
+        startHour: 9,
+        endHour: 10,
+        title: trimmedTitle,
+        notes: input.notes?.trim() ?? "",
+        requirements: [],
+        isCompleted: false,
+        category: "涓汉",
+        tag: null,
+      },
+    ]);
+    return id;
   }
 
   function handleUpdateTask(taskId: string, patch: Partial<LongTask>) {
@@ -1312,28 +2589,54 @@ export default function Home() {
               confirmDangerousActions={confirmDangerousActions}
             />
           ) : activeModule === "research" ? (
-            <ResearchProjectsPanel
-              projects={researchProjects}
-              onAdd={handleAddResearchProject}
-              onUpdate={handleUpdateResearchProject}
-              onDelete={handleDeleteResearchProject}
+            <ResearchWorkflowPanel
+              module="research"
+              workflow={researchWorkflow}
+              onChange={setResearchWorkflow}
+              onCreateTask={handleCreateWorkflowTask}
+              onCreateEvent={handleCreateWorkflowEvent}
             />
           ) : activeModule === "paper" ? (
-            <PaperProgressPanel value={paperProgress} onChange={setPaperProgress} />
+            <ResearchWorkflowPanel
+              module="paper"
+              workflow={researchWorkflow}
+              onChange={setResearchWorkflow}
+              onCreateTask={handleCreateWorkflowTask}
+              onCreateEvent={handleCreateWorkflowEvent}
+            />
           ) : activeModule === "submissions" ? (
-            <SubmissionsPanel
-              submissions={submissions}
-              onAdd={handleAddSubmission}
-              onUpdate={handleUpdateSubmission}
-              onDelete={handleDeleteSubmission}
+            <ResearchWorkflowPanel
+              module="submissions"
+              workflow={researchWorkflow}
+              onChange={setResearchWorkflow}
+              onCreateTask={handleCreateWorkflowTask}
+              onCreateEvent={handleCreateWorkflowEvent}
             />
           ) : activeModule === "meetings" ? (
-            <GroupMeetingsPanel
-              records={groupMeetings}
-              onAdd={handleAddGroupMeeting}
-              onUpdate={handleUpdateGroupMeeting}
-              onDelete={handleDeleteGroupMeeting}
+            <ResearchWorkflowPanel
+              module="meetings"
+              workflow={researchWorkflow}
+              onChange={setResearchWorkflow}
+              onCreateTask={handleCreateWorkflowTask}
+              onCreateEvent={handleCreateWorkflowEvent}
             />
+          ) : activeModule === "logs" ? (
+            logReady ? (
+              <LogPage
+                posts={logPosts}
+                tags={logTags}
+                uploading={logUploading}
+                onCreatePost={handleCreateLogPost}
+                onUpdatePost={handleUpdateLogPost}
+                onDeletePost={handleDeleteLogPost}
+                onTogglePinned={handleToggleLogPinned}
+                onToggleArchived={handleToggleLogArchived}
+              />
+            ) : (
+              <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-md">
+                <p className="text-sm text-gray-600">正在加载动态日志…</p>
+              </section>
+            )
           ) : (
             <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-md">
               <p className="text-sm text-gray-600">模块开发中：{activeModule}</p>
