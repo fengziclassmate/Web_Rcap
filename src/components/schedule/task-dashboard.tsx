@@ -71,6 +71,7 @@ type TaskDashboardProps = {
     patch: Partial<Pick<FootprintItem, "name" | "lastDate">>,
   ) => void;
   showFootprintsSection?: boolean;
+  showProjectSection?: boolean;
   confirmDangerousActions: boolean;
   uiPreferences: DashboardUiPreferences;
   onUiPreferencesChange: (value: DashboardUiPreferences) => void;
@@ -126,6 +127,7 @@ export function TaskDashboard({
   onDeleteFootprint,
   onUpdateFootprint,
   showFootprintsSection = true,
+  showProjectSection = true,
   confirmDangerousActions,
   uiPreferences,
   onUiPreferencesChange,
@@ -656,7 +658,7 @@ export function TaskDashboard({
       >
         <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors duration-150">
           已完成任务库
-          <ChevronDown className="h-4 w-4 text-gray-500" />
+          <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${completedSectionOpen ? "" : "-rotate-90"}`} />
         </CollapsibleTrigger>
         <CollapsibleContent>
           {completedTasks.length > 0 ? (
@@ -739,6 +741,8 @@ export function TaskDashboard({
         </CollapsibleContent>
       </Collapsible>
 
+      {showProjectSection ? (
+        <>
       <Separator />
 
       <section className="space-y-4 p-6">
@@ -870,6 +874,8 @@ export function TaskDashboard({
           </CollapsibleContent>
         </Collapsible>
       </section>
+        </>
+      ) : null}
 
       {showFootprintsSection ? (
         <>

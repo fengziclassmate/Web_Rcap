@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
 import { AchievementsPanel, type Achievement } from "@/components/monitoring/achievements-panel";
 import { FootprintsPanel } from "@/components/monitoring/footprints-panel";
+import { ProjectCheckinsPanel } from "@/components/monitoring/project-checkins-panel";
 import {
   type ResearchProject,
   type PlanItem,
@@ -2142,6 +2143,16 @@ export default function Home() {
   }
 
   function handleViewModeChange(mode: ViewMode) {
+    if (mode === "week") {
+      setCurrentWeekStart((prev) =>
+        startOfWeek(prev ?? getCurrentWeekStart(), { weekStartsOn: 1 }),
+      );
+    }
+    if (mode === "month") {
+      setCurrentWeekStart((prev) =>
+        startOfWeek(prev ?? getCurrentWeekStart(), { weekStartsOn: 1 }),
+      );
+    }
     setViewMode(mode);
   }
 
@@ -2565,6 +2576,7 @@ export default function Home() {
                   onResetFootprint={handleResetFootprint}
                   onDeleteFootprint={handleDeleteFootprint}
                   onUpdateFootprint={handleUpdateFootprint}
+                  showProjectSection={false}
                   showFootprintsSection={false}
                   confirmDangerousActions={confirmDangerousActions}
                   uiPreferences={dashboardUiPreferences}
@@ -2586,6 +2598,17 @@ export default function Home() {
               onReset={handleResetFootprint}
               onUpdate={handleUpdateFootprint}
               onDelete={handleDeleteFootprint}
+              confirmDangerousActions={confirmDangerousActions}
+            />
+          ) : activeModule === "project-checkins" ? (
+            <ProjectCheckinsPanel
+              projectCheckins={projectCheckins}
+              onAddProjectCheckin={handleAddProjectCheckin}
+              onCheckinProject={handleCheckinProject}
+              onDeleteProjectCheckin={handleDeleteProjectCheckin}
+              onUpdateProjectCheckin={handleUpdateProjectCheckin}
+              onUpdateProjectCheckinEntry={handleUpdateProjectCheckinEntry}
+              onDeleteProjectCheckinEntry={handleDeleteProjectCheckinEntry}
               confirmDangerousActions={confirmDangerousActions}
             />
           ) : activeModule === "research" ? (
