@@ -1,7 +1,19 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { CalendarDays, FileText, FlaskConical, Footprints, KanbanSquare, LayoutDashboard, NotebookPen, Send, Trophy, Users } from "lucide-react";
+import {
+  BookOpen,
+  CalendarDays,
+  FileText,
+  FlaskConical,
+  Footprints,
+  KanbanSquare,
+  LayoutDashboard,
+  NotebookPen,
+  Send,
+  Trophy,
+  Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +26,7 @@ export type MonitoringModuleId =
   | "paper"
   | "submissions"
   | "meetings"
+  | "literature"
   | "logs";
 
 const items: Array<{
@@ -29,6 +42,7 @@ const items: Array<{
   { id: "paper", label: "论文进度", icon: <FileText className="h-4 w-4" aria-hidden /> },
   { id: "submissions", label: "投稿记录", icon: <Send className="h-4 w-4" aria-hidden /> },
   { id: "meetings", label: "组会记录", icon: <Users className="h-4 w-4" aria-hidden /> },
+  { id: "literature", label: "文献阅读", icon: <BookOpen className="h-4 w-4" aria-hidden /> },
   { id: "logs", label: "动态日志", icon: <NotebookPen className="h-4 w-4" aria-hidden /> },
 ];
 

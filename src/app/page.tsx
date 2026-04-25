@@ -36,6 +36,7 @@ import {
   type GroupMeetingRecord,
 } from "@/components/monitoring/group-meetings-panel";
 import { LogPage } from "@/components/logs/log-page";
+import { LiteraturePage } from "@/components/monitoring/literature-page";
 import { ResearchWorkflowPanel } from "@/components/monitoring/research-workflow-panel";
 import {
   defaultResearchWorkflowState,
@@ -62,6 +63,21 @@ import {
   type LogPostRecord,
   type LogTag,
 } from "@/lib/logs";
+import {
+  type LiteratureExcerpt,
+  type LiteratureExcerptInput,
+  type LiteratureFormInput,
+  type LiteratureItem,
+  type LiteratureMethodNote,
+  type LiteratureNote,
+  type LiteratureNoteInput,
+  type LiteraturePaperUsage,
+  type LiteratureProjectLink,
+  type LiteratureReadingLog,
+  type LiteratureRecord,
+  type LiteratureTag,
+  type LiteratureTagLink,
+} from "@/lib/literature";
 
 export type EventTag = "待定" | "不着急" | "不可后退" | null;
 
@@ -1048,6 +1064,171 @@ function composeLogPostRecords(
   }));
 }
 
+function fromLiteratureRow(row: Record<string, unknown>): LiteratureRecord {
+  return {
+    id: String(row.id ?? ""),
+    userId: String(row.user_id ?? ""),
+    title: String(row.title ?? ""),
+    authors: String(row.authors ?? ""),
+    year: typeof row.publish_year === "number" ? row.publish_year : null,
+    venue: String(row.venue ?? ""),
+    doi: String(row.doi ?? ""),
+    url: String(row.url ?? ""),
+    pdfUrl: String(row.pdf_url ?? ""),
+    abstract: String(row.abstract ?? ""),
+    keywords: Array.isArray(row.keywords) ? (row.keywords as string[]) : [],
+    status: (row.status as LiteratureRecord["status"]) ?? "to_read",
+    importance: (row.importance as LiteratureRecord["importance"]) ?? "medium",
+    summary: String(row.summary ?? ""),
+    contributions: String(row.contributions ?? ""),
+    limitations: String(row.limitations ?? ""),
+    createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? ""),
+    linkedTaskIds: Array.isArray(row.linked_task_ids) ? (row.linked_task_ids as string[]) : [],
+    linkedEventIds: Array.isArray(row.linked_event_ids) ? (row.linked_event_ids as string[]) : [],
+    linkedMeetingIds: Array.isArray(row.linked_meeting_ids) ? (row.linked_meeting_ids as string[]) : [],
+    linkedLogPostIds: Array.isArray(row.linked_log_post_ids) ? (row.linked_log_post_ids as string[]) : [],
+  };
+}
+
+function fromLiteratureNoteRow(row: Record<string, unknown>): LiteratureNote {
+  return {
+    id: String(row.id ?? ""),
+    literatureId: String(row.literature_id ?? ""),
+    userId: String(row.user_id ?? ""),
+    researchQuestion: String(row.research_question ?? ""),
+    researchBackground: String(row.research_background ?? ""),
+    dataSource: String(row.data_source ?? ""),
+    method: String(row.method ?? ""),
+    findings: String(row.findings ?? ""),
+    innovations: String(row.innovations ?? ""),
+    shortcomings: String(row.shortcomings ?? ""),
+    inspiration: String(row.inspiration ?? ""),
+    quotableContent: String(row.quotable_content ?? ""),
+    updatedAt: String(row.updated_at ?? ""),
+  };
+}
+
+function fromLiteratureExcerptRow(row: Record<string, unknown>): LiteratureExcerpt {
+  return {
+    id: String(row.id ?? ""),
+    literatureId: String(row.literature_id ?? ""),
+    userId: String(row.user_id ?? ""),
+    content: String(row.content ?? ""),
+    page: String(row.page ?? ""),
+    note: String(row.note ?? ""),
+    excerptType: (row.excerpt_type as LiteratureExcerpt["excerptType"]) ?? "quote",
+    paperSection: (row.paper_section as LiteratureExcerpt["paperSection"]) ?? "literature_review",
+    tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
+    createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? ""),
+  };
+}
+
+function fromLiteratureMethodNoteRow(row: Record<string, unknown>): LiteratureMethodNote {
+  return {
+    id: String(row.id ?? ""),
+    literatureId: String(row.literature_id ?? ""),
+    userId: String(row.user_id ?? ""),
+    name: String(row.name ?? ""),
+    description: String(row.description ?? ""),
+    requiredData: String(row.required_data ?? ""),
+    strengths: String(row.strengths ?? ""),
+    weaknesses: String(row.weaknesses ?? ""),
+    applicability: String(row.applicability ?? ""),
+    plannedToUse: Boolean(row.planned_to_use),
+    projectId: typeof row.project_id === "string" ? row.project_id : null,
+    paperId: typeof row.paper_id === "string" ? row.paper_id : null,
+    createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? ""),
+  };
+}
+
+function fromLiteraturePaperUsageRow(row: Record<string, unknown>): LiteraturePaperUsage {
+  return {
+    id: String(row.id ?? ""),
+    literatureId: String(row.literature_id ?? ""),
+    userId: String(row.user_id ?? ""),
+    paperId: String(row.paper_id ?? ""),
+    chapter: String(row.chapter ?? ""),
+    usageType: (row.usage_type as LiteraturePaperUsage["usageType"]) ?? "background",
+    note: String(row.note ?? ""),
+    citationStatus: (row.citation_status as LiteraturePaperUsage["citationStatus"]) ?? "planned",
+    createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? ""),
+  };
+}
+
+function fromLiteratureProjectLinkRow(row: Record<string, unknown>): LiteratureProjectLink {
+  return {
+    id: String(row.id ?? ""),
+    literatureId: String(row.literature_id ?? ""),
+    userId: String(row.user_id ?? ""),
+    projectId: String(row.project_id ?? ""),
+    createdAt: String(row.created_at ?? ""),
+  };
+}
+
+function fromLiteratureReadingLogRow(row: Record<string, unknown>): LiteratureReadingLog {
+  return {
+    id: String(row.id ?? ""),
+    literatureId: String(row.literature_id ?? ""),
+    userId: String(row.user_id ?? ""),
+    loggedAt: String(row.logged_at ?? ""),
+    durationMinutes: Number(row.duration_minutes ?? 0),
+    progressText: String(row.progress_text ?? ""),
+    statusAfter: (row.status_after as LiteratureReadingLog["statusAfter"]) ?? "to_read",
+    linkedTaskId: typeof row.linked_task_id === "string" ? row.linked_task_id : null,
+    linkedEventId: typeof row.linked_event_id === "string" ? row.linked_event_id : null,
+    linkedLogPostId: typeof row.linked_log_post_id === "string" ? row.linked_log_post_id : null,
+    createdAt: String(row.created_at ?? ""),
+  };
+}
+
+function fromLiteratureTagRow(row: Record<string, unknown>): LiteratureTag {
+  return {
+    id: String(row.id ?? ""),
+    userId: String(row.user_id ?? ""),
+    name: String(row.name ?? ""),
+    color: typeof row.color === "string" ? row.color : null,
+    usageCount: Number(row.usage_count ?? 0),
+    createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? ""),
+  };
+}
+
+function composeLiteratureItems(
+  records: LiteratureRecord[],
+  notes: LiteratureNote[],
+  excerpts: LiteratureExcerpt[],
+  methodNotes: LiteratureMethodNote[],
+  paperUsages: LiteraturePaperUsage[],
+  projectLinks: LiteratureProjectLink[],
+  readingLogs: LiteratureReadingLog[],
+  tags: LiteratureTag[],
+  tagLinks: LiteratureTagLink[],
+): LiteratureItem[] {
+  return records.map((record) => ({
+    ...record,
+    note: notes.find((note) => note.literatureId === record.id) ?? null,
+    excerpts: excerpts
+      .filter((item) => item.literatureId === record.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    methodNotes: methodNotes
+      .filter((item) => item.literatureId === record.id)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    paperUsages: paperUsages.filter((item) => item.literatureId === record.id),
+    projectLinks: projectLinks.filter((item) => item.literatureId === record.id),
+    readingLogs: readingLogs
+      .filter((item) => item.literatureId === record.id)
+      .sort((a, b) => b.loggedAt.localeCompare(a.loggedAt)),
+    tags: tagLinks
+      .filter((item) => item.literatureId === record.id)
+      .map((item) => tags.find((tag) => tag.id === item.tagId))
+      .filter((item): item is LiteratureTag => Boolean(item)),
+  }));
+}
+
 function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPreferences {
   if (!payload || typeof payload !== "object") return defaultDashboardUiPreferences;
   const value = payload as Partial<DashboardUiPreferences>;
@@ -1236,6 +1417,9 @@ export default function Home() {
   const [logTags, setLogTags] = useState<LogTag[]>([]);
   const [logReady, setLogReady] = useState(false);
   const [logUploading, setLogUploading] = useState(false);
+  const [literatureItems, setLiteratureItems] = useState<LiteratureItem[]>([]);
+  const [literatureTags, setLiteratureTags] = useState<LiteratureTag[]>([]);
+  const [literatureReady, setLiteratureReady] = useState(false);
   const [dashboardUiPreferences, setDashboardUiPreferences] = useState<DashboardUiPreferences>(
     defaultDashboardUiPreferences,
   );
@@ -1282,6 +1466,49 @@ export default function Home() {
   );
   const persistedPayloadJson = useMemo(() => JSON.stringify(persistedPayload), [persistedPayload]);
   const researchWorkflowJson = useMemo(() => JSON.stringify(researchWorkflow), [researchWorkflow]);
+  const literatureProjectOptions = useMemo(
+    () => researchWorkflow.projects.map((item) => ({ id: item.id, title: item.title })),
+    [researchWorkflow.projects],
+  );
+  const literaturePaperOptions = useMemo(
+    () => researchWorkflow.papers.map((item) => ({ id: item.id, title: item.title })),
+    [researchWorkflow.papers],
+  );
+
+  async function refreshLiteratures(currentUser: User) {
+    const results = await Promise.all([
+      supabase.from("literatures").select("*").eq("user_id", currentUser.id).order("updated_at", { ascending: false }),
+      supabase.from("literature_notes").select("*").eq("user_id", currentUser.id),
+      supabase.from("literature_excerpts").select("*").eq("user_id", currentUser.id),
+      supabase.from("literature_method_notes").select("*").eq("user_id", currentUser.id),
+      supabase.from("literature_paper_usages").select("*").eq("user_id", currentUser.id),
+      supabase.from("literature_project_links").select("*").eq("user_id", currentUser.id),
+      supabase.from("literature_reading_logs").select("*").eq("user_id", currentUser.id),
+      supabase.from("literature_tags").select("*").eq("user_id", currentUser.id),
+      supabase.from("literature_tag_links").select("*").eq("user_id", currentUser.id),
+    ]);
+    const firstError = results.find((item) => item.error)?.error;
+    if (firstError) throw firstError;
+
+    const records = (results[0].data ?? []).map((item) => fromLiteratureRow(item));
+    const notes = (results[1].data ?? []).map((item) => fromLiteratureNoteRow(item));
+    const excerpts = (results[2].data ?? []).map((item) => fromLiteratureExcerptRow(item));
+    const methodNotes = (results[3].data ?? []).map((item) => fromLiteratureMethodNoteRow(item));
+    const paperUsages = (results[4].data ?? []).map((item) => fromLiteraturePaperUsageRow(item));
+    const projectLinks = (results[5].data ?? []).map((item) => fromLiteratureProjectLinkRow(item));
+    const readingLogs = (results[6].data ?? []).map((item) => fromLiteratureReadingLogRow(item));
+    const tags = (results[7].data ?? []).map((item) => fromLiteratureTagRow(item));
+    const tagLinks = (results[8].data ?? []).map((item) => ({
+      literatureId: String(item.literature_id),
+      tagId: String(item.tag_id),
+      userId: String(item.user_id),
+    }));
+
+    setLiteratureTags(tags);
+    setLiteratureItems(
+      composeLiteratureItems(records, notes, excerpts, methodNotes, paperUsages, projectLinks, readingLogs, tags, tagLinks),
+    );
+  }
 
   async function refreshLogs(currentUser: User) {
     const results = await Promise.all([
@@ -1361,6 +1588,9 @@ export default function Home() {
       setLogPosts([]);
       setLogTags([]);
       setLogReady(false);
+      setLiteratureItems([]);
+      setLiteratureTags([]);
+      setLiteratureReady(false);
       setDashboardUiPreferences(defaultDashboardUiPreferences);
       setDataReady(false);
       return;
@@ -1789,6 +2019,35 @@ export default function Home() {
     let cancelled = false;
     const currentUser = user;
 
+    async function loadLiteratures() {
+      try {
+        await refreshLiteratures(currentUser);
+        if (!cancelled) setLiteratureReady(true);
+      } catch (firstError) {
+        if (cancelled) return;
+        const message = firstError instanceof Error ? firstError.message : String(firstError);
+        if (message.includes("does not exist")) {
+          setLiteratureItems([]);
+          setLiteratureTags([]);
+          setLiteratureReady(true);
+          return;
+        }
+        toast.error(`Failed to load literatures: ${message}`);
+        setLiteratureReady(true);
+      }
+    }
+
+    loadLiteratures();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataReady, user]);
+
+  useEffect(() => {
+    if (!user || !dataReady) return;
+    let cancelled = false;
+    const currentUser = user;
+
     async function loadLogs() {
       try {
         await refreshLogs(currentUser);
@@ -2059,6 +2318,303 @@ export default function Home() {
       return;
     }
     await refreshLogs(user);
+  }
+
+  async function upsertLiteratureTagsForUser(currentUser: User, tagNames: string[]) {
+    const cleaned = Array.from(new Set(tagNames.map((item) => item.trim()).filter(Boolean)));
+    if (cleaned.length === 0) return [] as LiteratureTag[];
+    const { error } = await supabase.from("literature_tags").upsert(
+      cleaned.map((name) => ({
+        user_id: currentUser.id,
+        name,
+      })),
+      { onConflict: "user_id,name" },
+    );
+    if (error) throw error;
+    const { data, error: selectError } = await supabase
+      .from("literature_tags")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .in("name", cleaned);
+    if (selectError) throw selectError;
+    return (data ?? []).map((item) => fromLiteratureTagRow(item));
+  }
+
+  async function recalculateLiteratureTagUsage(currentUser: User) {
+    const [{ data: links, error: linksError }, { data: tagsData, error: tagsError }] = await Promise.all([
+      supabase.from("literature_tag_links").select("tag_id").eq("user_id", currentUser.id),
+      supabase.from("literature_tags").select("*").eq("user_id", currentUser.id),
+    ]);
+    if (linksError) throw linksError;
+    if (tagsError) throw tagsError;
+    const usageMap = new Map<string, number>();
+    (links ?? []).forEach((item) => {
+      const tagId = String(item.tag_id);
+      usageMap.set(tagId, (usageMap.get(tagId) ?? 0) + 1);
+    });
+    for (const row of tagsData ?? []) {
+      const count = usageMap.get(String(row.id)) ?? 0;
+      const { error } = await supabase
+        .from("literature_tags")
+        .update({ usage_count: count, updated_at: new Date().toISOString() })
+        .eq("id", row.id)
+        .eq("user_id", currentUser.id);
+      if (error) throw error;
+    }
+  }
+
+  async function syncLiteratureTagLinks(currentUser: User, literatureId: string, tagNames: string[]) {
+    await supabase.from("literature_tag_links").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id);
+    const tags = await upsertLiteratureTagsForUser(currentUser, tagNames);
+    if (tags.length > 0) {
+      const { error } = await supabase.from("literature_tag_links").insert(
+        tags.map((tag) => ({
+          literature_id: literatureId,
+          tag_id: tag.id,
+          user_id: currentUser.id,
+        })),
+      );
+      if (error) throw error;
+    }
+    await recalculateLiteratureTagUsage(currentUser);
+  }
+
+  async function syncLiteratureProjectLinks(currentUser: User, literatureId: string, projectIds: string[]) {
+    await supabase.from("literature_project_links").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id);
+    const cleaned = Array.from(new Set(projectIds.filter(Boolean)));
+    if (cleaned.length === 0) return;
+    const { error } = await supabase.from("literature_project_links").insert(
+      cleaned.map((projectId) => ({
+        literature_id: literatureId,
+        user_id: currentUser.id,
+        project_id: projectId,
+      })),
+    );
+    if (error) throw error;
+  }
+
+  async function syncLiteraturePaperUsages(currentUser: User, literatureId: string, paperIds: string[]) {
+    await supabase.from("literature_paper_usages").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id);
+    const cleaned = Array.from(new Set(paperIds.filter(Boolean)));
+    if (cleaned.length === 0) return;
+    const now = new Date().toISOString();
+    const { error } = await supabase.from("literature_paper_usages").insert(
+      cleaned.map((paperId) => ({
+        literature_id: literatureId,
+        user_id: currentUser.id,
+        paper_id: paperId,
+        chapter: "",
+        usage_type: "background",
+        note: "",
+        citation_status: "planned",
+        created_at: now,
+        updated_at: now,
+      })),
+    );
+    if (error) throw error;
+  }
+
+  async function handleCreateLiterature(input: LiteratureFormInput) {
+    if (!user) return;
+    const currentUser = user;
+    const now = new Date().toISOString();
+    try {
+      const { data, error } = await supabase
+        .from("literatures")
+        .insert({
+          user_id: currentUser.id,
+          title: input.title.trim(),
+          authors: input.authors.trim(),
+          publish_year: input.year.trim() ? Number(input.year.trim()) : null,
+          venue: input.venue.trim(),
+          doi: input.doi.trim(),
+          url: input.url.trim(),
+          pdf_url: input.pdfUrl.trim(),
+          abstract: input.abstract.trim(),
+          keywords: input.keywords
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean),
+          status: input.status,
+          importance: input.importance,
+          summary: input.summary.trim(),
+          contributions: input.contributions.trim(),
+          limitations: input.limitations.trim(),
+          created_at: now,
+          updated_at: now,
+          linked_task_ids: [],
+          linked_event_ids: [],
+          linked_meeting_ids: [],
+          linked_log_post_ids: [],
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      const literatureId = String(data.id);
+      await Promise.all([
+        syncLiteratureTagLinks(currentUser, literatureId, input.tagNames),
+        syncLiteratureProjectLinks(currentUser, literatureId, input.projectIds),
+        syncLiteraturePaperUsages(currentUser, literatureId, input.paperIds),
+      ]);
+      await refreshLiteratures(currentUser);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to create literature: ${message}`);
+    }
+  }
+
+  async function handleUpdateLiterature(literatureId: string, input: LiteratureFormInput) {
+    if (!user) return;
+    const currentUser = user;
+    try {
+      const { error } = await supabase
+        .from("literatures")
+        .update({
+          title: input.title.trim(),
+          authors: input.authors.trim(),
+          publish_year: input.year.trim() ? Number(input.year.trim()) : null,
+          venue: input.venue.trim(),
+          doi: input.doi.trim(),
+          url: input.url.trim(),
+          pdf_url: input.pdfUrl.trim(),
+          abstract: input.abstract.trim(),
+          keywords: input.keywords
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean),
+          status: input.status,
+          importance: input.importance,
+          summary: input.summary.trim(),
+          contributions: input.contributions.trim(),
+          limitations: input.limitations.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", literatureId)
+        .eq("user_id", currentUser.id);
+      if (error) throw error;
+      await Promise.all([
+        syncLiteratureTagLinks(currentUser, literatureId, input.tagNames),
+        syncLiteratureProjectLinks(currentUser, literatureId, input.projectIds),
+        syncLiteraturePaperUsages(currentUser, literatureId, input.paperIds),
+      ]);
+      await refreshLiteratures(currentUser);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to update literature: ${message}`);
+    }
+  }
+
+  async function handleDeleteLiterature(literatureId: string) {
+    if (!user) return;
+    const currentUser = user;
+    try {
+      await Promise.all([
+        supabase.from("literature_tag_links").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
+        supabase.from("literature_paper_usages").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
+        supabase.from("literature_project_links").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
+        supabase.from("literature_excerpts").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
+        supabase.from("literature_notes").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
+      ]);
+      const { error } = await supabase.from("literatures").delete().eq("id", literatureId).eq("user_id", currentUser.id);
+      if (error) throw error;
+      await recalculateLiteratureTagUsage(currentUser);
+      await refreshLiteratures(currentUser);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete literature: ${message}`);
+    }
+  }
+
+  async function handleSaveLiteratureNote(literatureId: string, input: LiteratureNoteInput) {
+    if (!user) return;
+    try {
+      const { error } = await supabase.from("literature_notes").upsert(
+        {
+          literature_id: literatureId,
+          user_id: user.id,
+          research_question: input.researchQuestion.trim(),
+          research_background: input.researchBackground.trim(),
+          data_source: input.dataSource.trim(),
+          method: input.method.trim(),
+          findings: input.findings.trim(),
+          innovations: input.innovations.trim(),
+          shortcomings: input.shortcomings.trim(),
+          inspiration: input.inspiration.trim(),
+          quotable_content: input.quotableContent.trim(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "literature_id,user_id" },
+      );
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to save literature note: ${message}`);
+    }
+  }
+
+  async function handleCreateLiteratureExcerpt(literatureId: string, input: LiteratureExcerptInput) {
+    if (!user) return;
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase.from("literature_excerpts").insert({
+        literature_id: literatureId,
+        user_id: user.id,
+        content: input.content.trim(),
+        page: input.page.trim(),
+        note: input.note.trim(),
+        excerpt_type: input.excerptType,
+        paper_section: input.paperSection,
+        tags: input.tags,
+        created_at: now,
+        updated_at: now,
+      });
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to create excerpt: ${message}`);
+    }
+  }
+
+  async function handleUpdateLiteratureExcerpt(excerptId: string, input: LiteratureExcerptInput) {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("literature_excerpts")
+        .update({
+          content: input.content.trim(),
+          page: input.page.trim(),
+          note: input.note.trim(),
+          excerpt_type: input.excerptType,
+          paper_section: input.paperSection,
+          tags: input.tags,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", excerptId)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to update excerpt: ${message}`);
+    }
+  }
+
+  async function handleDeleteLiteratureExcerpt(excerptId: string) {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("literature_excerpts")
+        .delete()
+        .eq("id", excerptId)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete excerpt: ${message}`);
+    }
   }
 
   function handleAddAchievement(value: Omit<Achievement, "id">) {
@@ -2643,6 +3199,26 @@ export default function Home() {
               onCreateTask={handleCreateWorkflowTask}
               onCreateEvent={handleCreateWorkflowEvent}
             />
+          ) : activeModule === "literature" ? (
+            literatureReady ? (
+              <LiteraturePage
+                items={literatureItems}
+                tags={literatureTags}
+                projects={literatureProjectOptions}
+                papers={literaturePaperOptions}
+                onCreateLiterature={handleCreateLiterature}
+                onUpdateLiterature={handleUpdateLiterature}
+                onDeleteLiterature={handleDeleteLiterature}
+                onSaveNote={handleSaveLiteratureNote}
+                onCreateExcerpt={handleCreateLiteratureExcerpt}
+                onUpdateExcerpt={handleUpdateLiteratureExcerpt}
+                onDeleteExcerpt={handleDeleteLiteratureExcerpt}
+              />
+            ) : (
+              <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-md">
+                <p className="text-sm text-gray-600">正在加载文献阅读模块…</p>
+              </section>
+            )
           ) : activeModule === "logs" ? (
             logReady ? (
               <LogPage
