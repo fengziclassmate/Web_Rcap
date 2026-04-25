@@ -205,7 +205,7 @@ const defaultEvents: ScheduleEvent[] = [
     notes: "明确今日优先级，更新待办。",
     requirements: ["安静环境", "关闭即时通讯"],
     isCompleted: false,
-    category: "个人",
+    category: "任务推进",
     tag: null,
   },
 ];
@@ -1197,7 +1197,7 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
         ? value.requirements.filter((item): item is string => typeof item === "string")
         : [],
       isCompleted: Boolean(value.isCompleted),
-      category: value.category ?? "个人",
+      category: value.category ?? "任务推进",
       tag: (value.tag as EventTag) ?? null,
       recurrence: recurrence ?? undefined,
       exceptionDates: Array.isArray(value.exceptionDates)
@@ -2221,7 +2221,7 @@ export default function Home() {
         notes: input.notes?.trim() ?? "",
         requirements: [],
         isCompleted: false,
-        category: "涓汉",
+        category: "任务推进",
         tag: null,
       },
     ]);
