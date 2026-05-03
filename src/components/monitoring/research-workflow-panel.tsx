@@ -50,6 +50,7 @@ import {
   type FeedbackSource,
   type FeedbackStatus,
   type GroupMeetingRecord,
+  type MeetingAttachment,
   type MeetingActionItem,
   type PaperFeedback,
   type PaperSection,
@@ -80,6 +81,8 @@ type ResearchWorkflowPanelProps = {
   onChange: (next: ResearchWorkflowState) => void;
   onCreateTask: (input: { title: string; dueDate?: string; notes?: string }) => string | null;
   onCreateEvent: (input: { title: string; date: string; notes?: string }) => string | null;
+  onUploadMeetingAttachments: (meetingId: string, files: File[]) => Promise<void>;
+  onDeleteMeetingAttachment: (attachmentId: string) => Promise<void>;
 };
 
 type ProjectDraft = Omit<ResearchProject, keyof ReturnType<typeof emptyLinkState> | "plannedTaskIds" | "metadata"> & {
@@ -158,6 +161,13 @@ function statusLabel(status: string) {
     ...actionItemStatusOptions,
   ] as Array<{ value: string; label: string }>;
   return entries.find((item) => item.value === status)?.label ?? status;
+}
+
+function formatFileSize(size: number) {
+  if (!Number.isFinite(size) || size <= 0) return "0 B";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function priorityLabel(value: WorkflowPriority) {
@@ -252,6 +262,8 @@ export function ResearchWorkflowPanel({
   onChange,
   onCreateTask,
   onCreateEvent,
+  onUploadMeetingAttachments,
+  onDeleteMeetingAttachment,
 }: ResearchWorkflowPanelProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -637,6 +649,7 @@ export function ResearchWorkflowPanel({
     commit((prev) => ({
       ...prev,
       meetings: prev.meetings.filter((item) => item.id !== id),
+      meetingAttachments: prev.meetingAttachments.filter((item) => item.meetingId !== id),
       meetingActionItems: prev.meetingActionItems.filter((item) => item.meetingId !== id),
       timelineEntries: prev.timelineEntries.filter((item) => item.entityId !== id),
     }));
@@ -676,6 +689,9 @@ export function ResearchWorkflowPanel({
     : [];
   const selectedMeetingActions = selectedMeeting
     ? workflow.meetingActionItems.filter((item) => item.meetingId === selectedMeeting.id)
+    : [];
+  const selectedMeetingAttachments = selectedMeeting
+    ? workflow.meetingAttachments.filter((item) => item.meetingId === selectedMeeting.id)
     : [];
   const selectedTimelines = workflow.timelineEntries
     .filter((item) => item.entityId === effectiveSelectedId)
@@ -967,6 +983,7 @@ export function ResearchWorkflowPanel({
             projects={workflow.projects.filter((item) => selectedMeeting.projectIds.includes(item.id))}
             papers={workflow.papers.filter((item) => selectedMeeting.paperIds.includes(item.id))}
             submissions={workflow.submissions.filter((item) => selectedMeeting.submissionIds.includes(item.id))}
+            attachments={selectedMeetingAttachments}
             actionItems={selectedMeetingActions}
             timeline={selectedTimelines}
             activeTab={selectedTab}
@@ -1009,6 +1026,8 @@ export function ResearchWorkflowPanel({
                 ),
               }));
             }}
+            onUploadAttachments={(files) => onUploadMeetingAttachments(selectedMeeting.id, files)}
+            onDeleteAttachment={onDeleteMeetingAttachment}
           />
         ) : (
           <div className="flex h-full items-center justify-center p-6 text-sm text-gray-500">
@@ -2032,6 +2051,7 @@ function MeetingDetails({
   projects,
   papers,
   submissions,
+  attachments,
   actionItems,
   timeline,
   activeTab,
@@ -2040,11 +2060,14 @@ function MeetingDetails({
   onUpdateAction,
   onCreateTask,
   onCreateEvent,
+  onUploadAttachments,
+  onDeleteAttachment,
 }: {
   meeting: GroupMeetingRecord;
   projects: ResearchProject[];
   papers: ResearchPaper[];
   submissions: SubmissionRecord[];
+  attachments: MeetingAttachment[];
   actionItems: MeetingActionItem[];
   timeline: TimelineEntry[];
   activeTab: string;
@@ -2053,6 +2076,8 @@ function MeetingDetails({
   onUpdateAction: (itemId: string, patch: Partial<MeetingActionItem>) => void;
   onCreateTask: (title: string, dueDate?: string, notes?: string, actionId?: string) => void;
   onCreateEvent: (title: string, date: string, notes?: string, actionId?: string) => void;
+  onUploadAttachments: (files: File[]) => Promise<void>;
+  onDeleteAttachment: (attachmentId: string) => Promise<void>;
 }) {
   const [actionDraft, setActionDraft] = useState({
     content: "",
@@ -2081,6 +2106,7 @@ function MeetingDetails({
           { id: "summary", label: "会议摘要" },
           { id: "discussion", label: "讨论内容" },
           { id: "decisions", label: "决定事项" },
+          { id: "attachments", label: "附件记录" },
           { id: "actions", label: "行动项" },
           { id: "links", label: "关联对象" },
           { id: "timeline", label: "时间线" },
@@ -2095,6 +2121,7 @@ function MeetingDetails({
               <InfoStat label="日期" value={meeting.date} />
               <InfoStat label="下次会议" value={meeting.nextMeetingDate || "-"} />
               <InfoStat label="参会人" value={meeting.attendees || "-"} />
+              <InfoStat label="附件数量" value={String(attachments.length)} />
               <InfoStat label="关联行动项" value={String(actionItems.length)} />
             </div>
           </DetailSection>
@@ -2116,6 +2143,57 @@ function MeetingDetails({
         {activeTab === "decisions" && (
           <DetailSection title="决定事项">
             <p className="text-sm text-gray-600 whitespace-pre-wrap">{meeting.decisions || "-"}</p>
+          </DetailSection>
+        )}
+        {activeTab === "attachments" && (
+          <DetailSection
+            title="附件记录"
+            action={
+              <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50">
+                上传附件
+                <input
+                  type="file"
+                  className="hidden"
+                  multiple
+                  accept=".doc,.docx,.ppt,.pptx,.xls,.xlsx,.pdf,.txt,.md,.csv"
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []);
+                    if (files.length > 0) {
+                      void onUploadAttachments(files);
+                    }
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            }
+          >
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500">支持 Word、PPT、Excel、PDF、TXT、CSV 等文件，附件默认私有存储。</p>
+              {attachments.length === 0 ? (
+                <p className="text-sm text-gray-500">当前没有附件。</p>
+              ) : (
+                attachments.map((attachment) => (
+                  <div key={attachment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-3">
+                    <div className="min-w-0">
+                      <a
+                        href={attachment.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block truncate text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
+                      >
+                        {attachment.fileName}
+                      </a>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {attachment.fileType || "未知类型"} · {formatFileSize(attachment.fileSize)} · 上传于 {attachment.createdAt.slice(0, 10)}
+                      </p>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteAttachment(attachment.id)}>
+                      删除附件
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
           </DetailSection>
         )}
         {activeTab === "actions" && (

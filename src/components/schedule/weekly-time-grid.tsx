@@ -106,6 +106,9 @@ export type ViewMode = "day" | "week" | "month";
 export type TimeGranularity = 5 | 15 | 30 | 60;
 
 const hourCellHeight = 60;
+const contextMenuWidth = 208;
+const contextMenuHeight = 320;
+const contextMenuViewportPadding = 12;
 
 const defaultCategoryPalette: CategoryPalette[] = [
   { name: "深度科研", color: "bg-sky-50 border-sky-300 text-sky-950" },
@@ -472,9 +475,11 @@ export function WeeklyTimeGrid({
 
   function handleContextMenu(event: React.MouseEvent, eventId: string) {
     event.preventDefault();
+    const maxX = window.innerWidth - contextMenuWidth - contextMenuViewportPadding;
+    const maxY = window.innerHeight - contextMenuHeight - contextMenuViewportPadding;
     setContextMenu({
-      x: event.clientX,
-      y: event.clientY,
+      x: Math.max(contextMenuViewportPadding, Math.min(event.clientX, maxX)),
+      y: Math.max(contextMenuViewportPadding, Math.min(event.clientY, maxY)),
       eventId,
     });
   }
@@ -576,6 +581,23 @@ export function WeeklyTimeGrid({
       window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [onUpdateEvent, resizeState]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    function handleGlobalClose() {
+      setContextMenu(null);
+    }
+
+    window.addEventListener("click", handleGlobalClose);
+    window.addEventListener("resize", handleGlobalClose);
+    window.addEventListener("scroll", handleGlobalClose, true);
+    return () => {
+      window.removeEventListener("click", handleGlobalClose);
+      window.removeEventListener("resize", handleGlobalClose);
+      window.removeEventListener("scroll", handleGlobalClose, true);
+    };
+  }, [contextMenu]);
 
   return (
     <section className="rounded-lg border border-gray-200 bg-white shadow-md">
@@ -1241,9 +1263,9 @@ export function WeeklyTimeGrid({
 
         {contextMenu ? (
           <div
-            className="fixed z-50 rounded-sm border border-gray-200 bg-white py-1 shadow-lg"
+            className="fixed z-50 w-52 max-h-[calc(100vh-24px)] overflow-y-auto rounded-sm border border-gray-200 bg-white py-1 shadow-lg"
             style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
-            onMouseLeave={closeContextMenu}
+            onClick={(event) => event.stopPropagation()}
           >
             <button className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" onClick={() => handleReschedule(contextMenu.eventId)}>
               改约

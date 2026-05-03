@@ -41,6 +41,7 @@ import { ResearchWorkflowPanel } from "@/components/monitoring/research-workflow
 import {
   defaultResearchWorkflowState,
   type GroupMeetingRecord as WorkflowGroupMeetingRecord,
+  type MeetingAttachment,
   type MeetingActionItem,
   type PaperFeedback,
   type PaperProjectLink,
@@ -913,6 +914,32 @@ function toMeetingRow(item: WorkflowGroupMeetingRecord) {
     linked_task_ids: item.linkedTaskIds,
     linked_event_ids: item.linkedEventIds,
     linked_activity_log_ids: item.linkedActivityLogIds,
+  };
+}
+
+function fromMeetingAttachmentRow(row: Record<string, unknown>): MeetingAttachment {
+  return {
+    id: String(row.id ?? ""),
+    meetingId: String(row.meeting_id ?? ""),
+    fileName: String(row.file_name ?? ""),
+    fileType: String(row.file_type ?? ""),
+    fileSize: Number(row.file_size ?? 0),
+    storagePath: String(row.storage_path ?? ""),
+    fileUrl: String(row.file_url ?? ""),
+    createdAt: String(row.created_at ?? ""),
+  };
+}
+
+function toMeetingAttachmentRow(item: MeetingAttachment) {
+  return {
+    id: item.id,
+    meeting_id: item.meetingId,
+    file_name: item.fileName,
+    file_type: item.fileType,
+    file_size: item.fileSize,
+    storage_path: item.storagePath,
+    file_url: item.fileUrl,
+    created_at: item.createdAt,
   };
 }
 
@@ -1899,13 +1926,16 @@ export default function Home() {
         supabase.from("research_submission_status_history").select("*").eq("user_id", currentUser.id),
         supabase.from("research_review_comments").select("*").eq("user_id", currentUser.id),
         supabase.from("research_meetings").select("*").eq("user_id", currentUser.id),
+        supabase.from("research_meeting_attachments").select("*").eq("user_id", currentUser.id),
         supabase.from("research_meeting_action_items").select("*").eq("user_id", currentUser.id),
         supabase.from("research_timeline_entries").select("*").eq("user_id", currentUser.id),
       ]);
 
       if (cancelled) return;
 
-      const firstError = queries.find((item) => item.error)?.error;
+      const attachmentQuery = queries[10];
+      const nonAttachmentQueries = queries.filter((_, index) => index !== 10);
+      const firstError = nonAttachmentQueries.find((item) => item.error)?.error ?? null;
       if (firstError) {
         if (firstError.message.includes("does not exist")) {
           canSyncResearchWorkflowRef.current = false;
@@ -1922,6 +1952,20 @@ export default function Home() {
         return;
       }
 
+      const rawMeetingAttachments =
+        attachmentQuery.error && attachmentQuery.error.message.includes("does not exist")
+          ? []
+          : (attachmentQuery.data ?? []).map((item) => fromMeetingAttachmentRow(item));
+      const signedMeetingAttachments = await Promise.all(
+        rawMeetingAttachments.map(async (attachment) => {
+          if (!attachment.storagePath) return attachment;
+          const { data } = await supabase.storage
+            .from("research-meeting-attachments")
+            .createSignedUrl(attachment.storagePath, 60 * 60 * 24 * 30);
+          return { ...attachment, fileUrl: data?.signedUrl ?? attachment.fileUrl };
+        }),
+      );
+
       const nextWorkflow: ResearchWorkflowState = {
         projects: (queries[0].data ?? []).map((item) => fromProjectRow(item)),
         projectLogs: (queries[1].data ?? []).map((item) => fromProjectLogRow(item)),
@@ -1933,8 +1977,9 @@ export default function Home() {
         submissionStatusHistory: (queries[7].data ?? []).map((item) => fromSubmissionHistoryRow(item)),
         reviewComments: (queries[8].data ?? []).map((item) => fromReviewCommentRow(item)),
         meetings: (queries[9].data ?? []).map((item) => fromMeetingRow(item)),
-        meetingActionItems: (queries[10].data ?? []).map((item) => fromMeetingActionRow(item)),
-        timelineEntries: (queries[11].data ?? []).map((item) => fromTimelineRow(item)),
+        meetingAttachments: signedMeetingAttachments,
+        meetingActionItems: (queries[11].data ?? []).map((item) => fromMeetingActionRow(item)),
+        timelineEntries: (queries[12].data ?? []).map((item) => fromTimelineRow(item)),
       };
 
       const hasWorkflowData = Object.values(nextWorkflow).some(
@@ -1995,6 +2040,10 @@ export default function Home() {
         ["research_review_comments", researchWorkflow.reviewComments.map((item) => toReviewCommentRow(item))],
         ["research_meetings", researchWorkflow.meetings.map((item) => toMeetingRow(item))],
         [
+          "research_meeting_attachments",
+          researchWorkflow.meetingAttachments.map((item) => toMeetingAttachmentRow(item)),
+        ],
+        [
           "research_meeting_action_items",
           researchWorkflow.meetingActionItems.map((item) => toMeetingActionRow(item)),
         ],
@@ -2004,6 +2053,9 @@ export default function Home() {
       for (const [table, rows] of syncJobs) {
         const error = await syncTable(table, rows);
         if (error) {
+          if (table === "research_meeting_attachments" && error.message.includes("does not exist")) {
+            continue;
+          }
           toast.error(`Failed to sync ${table}: ${error.message}`);
           return;
         }
@@ -2784,6 +2836,78 @@ export default function Home() {
     return id;
   }
 
+  async function handleUploadMeetingAttachments(meetingId: string, files: File[]) {
+    if (!user || files.length === 0) return;
+    const currentUser = user;
+    try {
+      const uploaded: MeetingAttachment[] = [];
+      for (const file of files) {
+        const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+        const storagePath = `${currentUser.id}/${meetingId}/${Date.now()}-${safeName}`;
+        const { error: uploadError } = await supabase.storage
+          .from("research-meeting-attachments")
+          .upload(storagePath, file, { upsert: false });
+        if (uploadError) throw uploadError;
+
+        const { data: signedData } = await supabase.storage
+          .from("research-meeting-attachments")
+          .createSignedUrl(storagePath, 60 * 60 * 24 * 30);
+
+        const attachment: MeetingAttachment = {
+          id: createId("meeting-attachment"),
+          meetingId,
+          fileName: file.name,
+          fileType: file.type || "application/octet-stream",
+          fileSize: file.size,
+          storagePath,
+          fileUrl: signedData?.signedUrl ?? "",
+          createdAt: new Date().toISOString(),
+        };
+
+        const { error: insertError } = await supabase
+          .from("research_meeting_attachments")
+          .insert({ ...toMeetingAttachmentRow(attachment), user_id: currentUser.id });
+        if (insertError) throw insertError;
+        uploaded.push(attachment);
+      }
+
+      setResearchWorkflow((prev) => ({
+        ...prev,
+        meetingAttachments: [...uploaded, ...prev.meetingAttachments],
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to upload meeting attachments: ${message}`);
+    }
+  }
+
+  async function handleDeleteMeetingAttachment(attachmentId: string) {
+    if (!user) return;
+    const attachment = researchWorkflow.meetingAttachments.find((item) => item.id === attachmentId);
+    if (!attachment) return;
+    try {
+      if (attachment.storagePath) {
+        const { error: storageError } = await supabase.storage
+          .from("research-meeting-attachments")
+          .remove([attachment.storagePath]);
+        if (storageError) throw storageError;
+      }
+      const { error } = await supabase
+        .from("research_meeting_attachments")
+        .delete()
+        .eq("id", attachmentId)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      setResearchWorkflow((prev) => ({
+        ...prev,
+        meetingAttachments: prev.meetingAttachments.filter((item) => item.id !== attachmentId),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete meeting attachment: ${message}`);
+    }
+  }
+
   function handleUpdateTask(taskId: string, patch: Partial<LongTask>) {
     setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, ...patch } : task)));
   }
@@ -3174,6 +3298,8 @@ export default function Home() {
               onChange={setResearchWorkflow}
               onCreateTask={handleCreateWorkflowTask}
               onCreateEvent={handleCreateWorkflowEvent}
+              onUploadMeetingAttachments={handleUploadMeetingAttachments}
+              onDeleteMeetingAttachment={handleDeleteMeetingAttachment}
             />
           ) : activeModule === "paper" ? (
             <ResearchWorkflowPanel
@@ -3182,6 +3308,8 @@ export default function Home() {
               onChange={setResearchWorkflow}
               onCreateTask={handleCreateWorkflowTask}
               onCreateEvent={handleCreateWorkflowEvent}
+              onUploadMeetingAttachments={handleUploadMeetingAttachments}
+              onDeleteMeetingAttachment={handleDeleteMeetingAttachment}
             />
           ) : activeModule === "submissions" ? (
             <ResearchWorkflowPanel
@@ -3190,6 +3318,8 @@ export default function Home() {
               onChange={setResearchWorkflow}
               onCreateTask={handleCreateWorkflowTask}
               onCreateEvent={handleCreateWorkflowEvent}
+              onUploadMeetingAttachments={handleUploadMeetingAttachments}
+              onDeleteMeetingAttachment={handleDeleteMeetingAttachment}
             />
           ) : activeModule === "meetings" ? (
             <ResearchWorkflowPanel
@@ -3198,6 +3328,8 @@ export default function Home() {
               onChange={setResearchWorkflow}
               onCreateTask={handleCreateWorkflowTask}
               onCreateEvent={handleCreateWorkflowEvent}
+              onUploadMeetingAttachments={handleUploadMeetingAttachments}
+              onDeleteMeetingAttachment={handleDeleteMeetingAttachment}
             />
           ) : activeModule === "literature" ? (
             literatureReady ? (
