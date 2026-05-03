@@ -56,6 +56,7 @@ import {
   type PaperSection,
   type PaperSectionStatus,
   type ProjectLog,
+  type ProjectAttachment,
   type ResearchPaper,
   type ResearchPaperStatus,
   type ResearchProject,
@@ -81,6 +82,8 @@ type ResearchWorkflowPanelProps = {
   onChange: (next: ResearchWorkflowState) => void;
   onCreateTask: (input: { title: string; dueDate?: string; notes?: string }) => string | null;
   onCreateEvent: (input: { title: string; date: string; notes?: string }) => string | null;
+  onUploadProjectAttachments: (projectId: string, files: File[]) => Promise<void>;
+  onDeleteProjectAttachment: (attachmentId: string) => Promise<void>;
   onUploadMeetingAttachments: (meetingId: string, files: File[]) => Promise<void>;
   onDeleteMeetingAttachment: (attachmentId: string) => Promise<void>;
 };
@@ -262,6 +265,8 @@ export function ResearchWorkflowPanel({
   onChange,
   onCreateTask,
   onCreateEvent,
+  onUploadProjectAttachments,
+  onDeleteProjectAttachment,
   onUploadMeetingAttachments,
   onDeleteMeetingAttachment,
 }: ResearchWorkflowPanelProps) {
@@ -598,6 +603,7 @@ export function ResearchWorkflowPanel({
         ...prev,
         projects: prev.projects.filter((item) => item.id !== id),
         projectLogs: prev.projectLogs.filter((item) => item.projectId !== id),
+        projectAttachments: prev.projectAttachments.filter((item) => item.projectId !== id),
         paperProjectLinks: prev.paperProjectLinks.filter((item) => item.projectId !== id),
         meetings: prev.meetings.map((item) => ({
           ...item,
@@ -666,6 +672,9 @@ export function ResearchWorkflowPanel({
     : [];
   const selectedProjectMeetings = selectedProject
     ? workflow.meetings.filter((item) => item.projectIds.includes(selectedProject.id))
+    : [];
+  const selectedProjectAttachments = selectedProject
+    ? workflow.projectAttachments.filter((item) => item.projectId === selectedProject.id)
     : [];
   const selectedPaperSections = selectedPaper
     ? workflow.paperSections
@@ -847,6 +856,7 @@ export function ResearchWorkflowPanel({
             papers={selectedProjectPapers}
             meetings={selectedProjectMeetings}
             logs={selectedProjectLogs}
+            attachments={selectedProjectAttachments}
             timeline={selectedTimelines}
             activeTab={selectedTab}
             onTabChange={(tab) => setDetailTabState((prev) => ({ ...prev, research: tab }))}
@@ -870,6 +880,8 @@ export function ResearchWorkflowPanel({
                 ),
               }));
             }}
+            onUploadAttachments={(files) => onUploadProjectAttachments(selectedProject.id, files)}
+            onDeleteAttachment={onDeleteProjectAttachment}
           />
         ) : module === "paper" && selectedPaper ? (
           <PaperDetails
@@ -1344,21 +1356,27 @@ function ProjectDetails({
   papers,
   meetings,
   logs,
+  attachments,
   timeline,
   activeTab,
   onTabChange,
   onAddLog,
   onCreateTask,
+  onUploadAttachments,
+  onDeleteAttachment,
 }: {
   project: ResearchProject;
   papers: ResearchPaper[];
   meetings: GroupMeetingRecord[];
   logs: ProjectLog[];
+  attachments: ProjectAttachment[];
   timeline: TimelineEntry[];
   activeTab: string;
   onTabChange: (value: string) => void;
   onAddLog: (value: ProjectLog) => void;
   onCreateTask: (title: string, dueDate?: string, notes?: string, targetId?: string) => void;
+  onUploadAttachments: (files: File[]) => Promise<void>;
+  onDeleteAttachment: (attachmentId: string) => Promise<void>;
 }) {
   const [logDraft, setLogDraft] = useState({
     date: todayISO(),
@@ -1385,6 +1403,7 @@ function ProjectDetails({
           { id: "plan", label: "计划" },
           { id: "tasks", label: "任务" },
           { id: "logs", label: "日志" },
+          { id: "attachments", label: "????" },
           { id: "papers", label: "论文" },
           { id: "meetings", label: "组会" },
           { id: "timeline", label: "时间线" },
@@ -1498,6 +1517,57 @@ function ProjectDetails({
               </div>
             </DetailSection>
           </>
+        )}
+        {activeTab === "attachments" && (
+          <DetailSection
+            title="????"
+            action={
+              <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50">
+                ????
+                <input
+                  type="file"
+                  className="hidden"
+                  multiple
+                  accept=".doc,.docx,.ppt,.pptx,.xls,.xlsx,.pdf,.txt,.md,.csv"
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []);
+                    if (files.length > 0) {
+                      void onUploadAttachments(files);
+                    }
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            }
+          >
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500">?? Word?PPT?Excel?PDF?TXT?CSV?Markdown ???????????</p>
+              {attachments.length === 0 ? (
+                <p className="text-sm text-gray-500">???????</p>
+              ) : (
+                attachments.map((attachment) => (
+                  <div key={attachment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-3">
+                    <div className="min-w-0">
+                      <a
+                        href={attachment.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block truncate text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
+                      >
+                        {attachment.fileName}
+                      </a>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {attachment.fileType || "????"} ? {formatFileSize(attachment.fileSize)} ? ??? {attachment.createdAt.slice(0, 10)}
+                      </p>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteAttachment(attachment.id)}>
+                      ????
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </DetailSection>
         )}
         {activeTab === "papers" && (
           <DetailSection title="关联论文">

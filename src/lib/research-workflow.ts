@@ -192,6 +192,17 @@ export type GroupMeetingRecord = WorkflowLinkState & {
   followUp: string;
 };
 
+export type ProjectAttachment = {
+  id: string;
+  projectId: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  storagePath: string;
+  fileUrl: string;
+  createdAt: string;
+};
+
 export type MeetingAttachment = {
   id: string;
   meetingId: string;
@@ -236,6 +247,7 @@ export type ResearchWorkflowState = {
   submissionStatusHistory: SubmissionStatusHistoryEntry[];
   reviewComments: ReviewComment[];
   meetings: GroupMeetingRecord[];
+  projectAttachments: ProjectAttachment[];
   meetingAttachments: MeetingAttachment[];
   meetingActionItems: MeetingActionItem[];
   timelineEntries: TimelineEntry[];
@@ -333,6 +345,7 @@ export const defaultResearchWorkflowState: ResearchWorkflowState = {
   submissionStatusHistory: [],
   reviewComments: [],
   meetings: [],
+  projectAttachments: [],
   meetingAttachments: [],
   meetingActionItems: [],
   timelineEntries: [],

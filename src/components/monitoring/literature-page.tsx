@@ -60,14 +60,15 @@ type LiteratureView = "list" | "board";
 type DetailTab = "overview" | "notes" | "excerpts" | "attachments" | "methods" | "usage" | "links" | "logs";
 
 const detailTabs: Array<{ value: DetailTab; label: string }> = [
-  { value: "overview", label: "概览" },
-  { value: "notes", label: "阅读笔记" },
-  { value: "excerpts", label: "摘录观点" },
-  { value: "methods", label: "方法借鉴" },
-  { value: "usage", label: "论文使用" },
-  { value: "links", label: "关联对象" },
-  { value: "logs", label: "阅读记录" },
-];
+  { value: "overview", label: "??" },
+  { value: "notes", label: "????" },
+  { value: "excerpts", label: "????" },
+  { value: "attachments", label: "????" },
+  { value: "methods", label: "????" },
+  { value: "usage", label: "????" },
+  { value: "links", label: "????" },
+  { value: "logs", label: "????" },
+]
 
 export function LiteraturePage({
   items,
@@ -423,8 +424,8 @@ function LiteratureBoard({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="max-h-[760px] overflow-x-auto p-4">
-      <div className="grid min-w-[860px] grid-cols-4 gap-4">
+    <div className="max-h-[760px] overflow-y-auto p-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-4">
         {[
           { key: "to_read", label: "待读" },
           { key: "reading", label: "阅读中" },
@@ -437,12 +438,12 @@ function LiteratureBoard({
             return item.status === column.key || (column.key === "reading" && item.status === "skimming");
           });
           return (
-            <div key={column.key} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div key={column.key} className="flex min-h-[280px] flex-col rounded-lg border border-gray-200 bg-gray-50 p-3">
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-sm font-semibold text-gray-900">{column.label}</p>
                 <Badge variant="secondary">{columnItems.length}</Badge>
               </div>
-              <div className="space-y-3">
+              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
                 {columnItems.map((item) => (
                   <button
                     key={item.id}
@@ -749,7 +750,7 @@ function AttachmentsTab({
           <Paperclip className="mt-0.5 h-4 w-4 text-gray-500" />
           <div>
             <p className="text-sm font-medium text-gray-900">????</p>
-            <p className="mt-1 text-sm text-gray-500">???? Word?PPT?Excel?PDF?TXT?CSV ???????????</p>
+            <p className="mt-1 text-sm text-gray-500">?? Word?PPT?Excel?PDF?TXT?CSV?Markdown ???????????</p>
           </div>
         </div>
         <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50">
@@ -772,7 +773,7 @@ function AttachmentsTab({
 
       {item.attachments.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
-          ???????
+          ????????
         </div>
       ) : (
         <div className="space-y-3">
