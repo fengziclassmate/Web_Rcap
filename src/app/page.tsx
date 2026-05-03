@@ -65,6 +65,7 @@ import {
   type LogTag,
 } from "@/lib/logs";
 import {
+  type LiteratureAttachment,
   type LiteratureExcerpt,
   type LiteratureExcerptInput,
   type LiteratureFormInput,
@@ -1224,6 +1225,20 @@ function fromLiteratureTagRow(row: Record<string, unknown>): LiteratureTag {
   };
 }
 
+function fromLiteratureAttachmentRow(row: Record<string, unknown>): LiteratureAttachment {
+  return {
+    id: String(row.id ?? ""),
+    literatureId: String(row.literature_id ?? ""),
+    userId: String(row.user_id ?? ""),
+    fileName: String(row.file_name ?? ""),
+    fileType: String(row.file_type ?? ""),
+    fileSize: Number(row.file_size ?? 0),
+    storagePath: String(row.storage_path ?? ""),
+    fileUrl: String(row.file_url ?? ""),
+    createdAt: String(row.created_at ?? ""),
+  };
+}
+
 function composeLiteratureItems(
   records: LiteratureRecord[],
   notes: LiteratureNote[],
@@ -1232,6 +1247,7 @@ function composeLiteratureItems(
   paperUsages: LiteraturePaperUsage[],
   projectLinks: LiteratureProjectLink[],
   readingLogs: LiteratureReadingLog[],
+  attachments: LiteratureAttachment[],
   tags: LiteratureTag[],
   tagLinks: LiteratureTagLink[],
 ): LiteratureItem[] {
@@ -1249,6 +1265,9 @@ function composeLiteratureItems(
     readingLogs: readingLogs
       .filter((item) => item.literatureId === record.id)
       .sort((a, b) => b.loggedAt.localeCompare(a.loggedAt)),
+    attachments: attachments
+      .filter((item) => item.literatureId === record.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     tags: tagLinks
       .filter((item) => item.literatureId === record.id)
       .map((item) => tags.find((tag) => tag.id === item.tagId))
@@ -1511,6 +1530,7 @@ export default function Home() {
       supabase.from("literature_paper_usages").select("*").eq("user_id", currentUser.id),
       supabase.from("literature_project_links").select("*").eq("user_id", currentUser.id),
       supabase.from("literature_reading_logs").select("*").eq("user_id", currentUser.id),
+      supabase.from("literature_attachments").select("*").eq("user_id", currentUser.id),
       supabase.from("literature_tags").select("*").eq("user_id", currentUser.id),
       supabase.from("literature_tag_links").select("*").eq("user_id", currentUser.id),
     ]);
@@ -1524,8 +1544,18 @@ export default function Home() {
     const paperUsages = (results[4].data ?? []).map((item) => fromLiteraturePaperUsageRow(item));
     const projectLinks = (results[5].data ?? []).map((item) => fromLiteratureProjectLinkRow(item));
     const readingLogs = (results[6].data ?? []).map((item) => fromLiteratureReadingLogRow(item));
-    const tags = (results[7].data ?? []).map((item) => fromLiteratureTagRow(item));
-    const tagLinks = (results[8].data ?? []).map((item) => ({
+    const rawAttachments = (results[7].data ?? []).map((item) => fromLiteratureAttachmentRow(item));
+    const attachments = await Promise.all(
+      rawAttachments.map(async (attachment) => {
+        if (!attachment.storagePath) return attachment;
+        const { data } = await supabase.storage
+          .from("literature-attachments")
+          .createSignedUrl(attachment.storagePath, 60 * 60 * 24 * 30);
+        return { ...attachment, fileUrl: data?.signedUrl ?? attachment.fileUrl };
+      }),
+    );
+    const tags = (results[8].data ?? []).map((item) => fromLiteratureTagRow(item));
+    const tagLinks = (results[9].data ?? []).map((item) => ({
       literatureId: String(item.literature_id),
       tagId: String(item.tag_id),
       userId: String(item.user_id),
@@ -1533,7 +1563,7 @@ export default function Home() {
 
     setLiteratureTags(tags);
     setLiteratureItems(
-      composeLiteratureItems(records, notes, excerpts, methodNotes, paperUsages, projectLinks, readingLogs, tags, tagLinks),
+      composeLiteratureItems(records, notes, excerpts, methodNotes, paperUsages, projectLinks, readingLogs, attachments, tags, tagLinks),
     );
   }
 
@@ -2566,6 +2596,7 @@ export default function Home() {
         supabase.from("literature_project_links").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
         supabase.from("literature_excerpts").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
         supabase.from("literature_notes").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
+        supabase.from("literature_attachments").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
       ]);
       const { error } = await supabase.from("literatures").delete().eq("id", literatureId).eq("user_id", currentUser.id);
       if (error) throw error;
@@ -2666,6 +2697,69 @@ export default function Home() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error(`Failed to delete excerpt: ${message}`);
+    }
+  }
+
+  async function handleUploadLiteratureAttachments(literatureId: string, files: File[]) {
+    if (!user || files.length === 0) return;
+    const currentUser = user;
+    try {
+      for (const file of files) {
+        const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+        const storagePath = `${currentUser.id}/${literatureId}/${Date.now()}-${safeName}`;
+        const { error: uploadError } = await supabase.storage
+          .from("literature-attachments")
+          .upload(storagePath, file, { upsert: false });
+        if (uploadError) throw uploadError;
+
+        const { data: signedData } = await supabase.storage
+          .from("literature-attachments")
+          .createSignedUrl(storagePath, 60 * 60 * 24 * 30);
+
+        const { error: insertError } = await supabase.from("literature_attachments").insert({
+          id: createId("literature-attachment"),
+          literature_id: literatureId,
+          user_id: currentUser.id,
+          file_name: file.name,
+          file_type: file.type || "application/octet-stream",
+          file_size: file.size,
+          storage_path: storagePath,
+          file_url: signedData?.signedUrl ?? "",
+          created_at: new Date().toISOString(),
+        });
+        if (insertError) throw insertError;
+      }
+      await refreshLiteratures(currentUser);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to upload literature attachments: ${message}`);
+    }
+  }
+
+  async function handleDeleteLiteratureAttachment(attachmentId: string) {
+    if (!user) return;
+    const currentUser = user;
+    const attachment = literatureItems
+      .flatMap((item) => item.attachments)
+      .find((item) => item.id === attachmentId);
+    if (!attachment) return;
+    try {
+      if (attachment.storagePath) {
+        const { error: storageError } = await supabase.storage
+          .from("literature-attachments")
+          .remove([attachment.storagePath]);
+        if (storageError) throw storageError;
+      }
+      const { error } = await supabase
+        .from("literature_attachments")
+        .delete()
+        .eq("id", attachmentId)
+        .eq("user_id", currentUser.id);
+      if (error) throw error;
+      await refreshLiteratures(currentUser);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete literature attachment: ${message}`);
     }
   }
 
@@ -3345,6 +3439,8 @@ export default function Home() {
                 onCreateExcerpt={handleCreateLiteratureExcerpt}
                 onUpdateExcerpt={handleUpdateLiteratureExcerpt}
                 onDeleteExcerpt={handleDeleteLiteratureExcerpt}
+                onUploadAttachments={handleUploadLiteratureAttachments}
+                onDeleteAttachment={handleDeleteLiteratureAttachment}
               />
             ) : (
               <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-md">

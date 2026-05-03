@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Filter, LibraryBig, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Filter, LibraryBig, Paperclip, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,10 +52,12 @@ type LiteraturePageProps = {
   onCreateExcerpt: (literatureId: string, input: LiteratureExcerptInput) => Promise<void>;
   onUpdateExcerpt: (excerptId: string, input: LiteratureExcerptInput) => Promise<void>;
   onDeleteExcerpt: (excerptId: string) => Promise<void>;
+  onUploadAttachments: (literatureId: string, files: File[]) => Promise<void>;
+  onDeleteAttachment: (attachmentId: string) => Promise<void>;
 };
 
 type LiteratureView = "list" | "board";
-type DetailTab = "overview" | "notes" | "excerpts" | "methods" | "usage" | "links" | "logs";
+type DetailTab = "overview" | "notes" | "excerpts" | "attachments" | "methods" | "usage" | "links" | "logs";
 
 const detailTabs: Array<{ value: DetailTab; label: string }> = [
   { value: "overview", label: "概览" },
@@ -79,6 +81,8 @@ export function LiteraturePage({
   onCreateExcerpt,
   onUpdateExcerpt,
   onDeleteExcerpt,
+  onUploadAttachments,
+  onDeleteAttachment,
 }: LiteraturePageProps) {
   const [view, setView] = useState<LiteratureView>("list");
   const [filters, setFilters] = useState<LiteratureFilters>(defaultLiteratureFilters);
@@ -154,6 +158,8 @@ export function LiteraturePage({
                   onCreateExcerpt={onCreateExcerpt}
                   onUpdateExcerpt={onUpdateExcerpt}
                   onDeleteExcerpt={onDeleteExcerpt}
+                  onUploadAttachments={onUploadAttachments}
+                  onDeleteAttachment={onDeleteAttachment}
                 />
               ) : (
                 <div className="flex h-full min-h-[720px] items-center justify-center p-8 text-sm text-gray-500">
@@ -473,6 +479,8 @@ function LiteratureDetail({
   onCreateExcerpt,
   onUpdateExcerpt,
   onDeleteExcerpt,
+  onUploadAttachments,
+  onDeleteAttachment,
 }: {
   item: LiteratureItem;
   projects: LiteratureReferenceOption[];
@@ -482,6 +490,8 @@ function LiteratureDetail({
   onCreateExcerpt: (literatureId: string, input: LiteratureExcerptInput) => Promise<void>;
   onUpdateExcerpt: (excerptId: string, input: LiteratureExcerptInput) => Promise<void>;
   onDeleteExcerpt: (excerptId: string) => Promise<void>;
+  onUploadAttachments: (literatureId: string, files: File[]) => Promise<void>;
+  onDeleteAttachment: (attachmentId: string) => Promise<void>;
 }) {
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
 
@@ -530,6 +540,13 @@ function LiteratureDetail({
             onCreateExcerpt={onCreateExcerpt}
             onUpdateExcerpt={onUpdateExcerpt}
             onDeleteExcerpt={onDeleteExcerpt}
+          />
+        ) : null}
+        {activeTab === "attachments" ? (
+          <AttachmentsTab
+            item={item}
+            onUploadAttachments={onUploadAttachments}
+            onDeleteAttachment={onDeleteAttachment}
           />
         ) : null}
         {activeTab === "methods" ? <MethodsTab item={item} projects={projects} papers={papers} /> : null}
@@ -712,6 +729,75 @@ function ExcerptTab({
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+function AttachmentsTab({
+  item,
+  onUploadAttachments,
+  onDeleteAttachment,
+}: {
+  item: LiteratureItem;
+  onUploadAttachments: (literatureId: string, files: File[]) => Promise<void>;
+  onDeleteAttachment: (attachmentId: string) => Promise<void>;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <div className="flex items-start gap-3">
+          <Paperclip className="mt-0.5 h-4 w-4 text-gray-500" />
+          <div>
+            <p className="text-sm font-medium text-gray-900">????</p>
+            <p className="mt-1 text-sm text-gray-500">???? Word?PPT?Excel?PDF?TXT?CSV ???????????</p>
+          </div>
+        </div>
+        <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50">
+          ????
+          <input
+            type="file"
+            className="hidden"
+            multiple
+            accept=".doc,.docx,.ppt,.pptx,.xls,.xlsx,.pdf,.txt,.md,.csv"
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              if (files.length > 0) {
+                void onUploadAttachments(item.id, files);
+              }
+              event.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+
+      {item.attachments.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
+          ???????
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {item.attachments.map((attachment) => (
+            <div key={attachment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-4">
+              <div className="min-w-0">
+                <a
+                  href={attachment.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block truncate text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
+                >
+                  {attachment.fileName}
+                </a>
+                <p className="mt-1 text-xs text-gray-500">
+                  {attachment.fileType || "????"} ? {formatFileSize(attachment.fileSize)} ? ??? {attachment.createdAt.slice(0, 10)}
+                </p>
+              </div>
+              <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteAttachment(attachment.id)}>
+                ????
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1192,6 +1278,13 @@ function IconButton({
       {icon}
     </button>
   );
+}
+
+function formatFileSize(size: number) {
+  if (!Number.isFinite(size) || size <= 0) return "0 B";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {

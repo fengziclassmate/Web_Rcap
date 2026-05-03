@@ -148,6 +148,18 @@ export type LiteratureReadingLog = {
   createdAt: string;
 };
 
+export type LiteratureAttachment = {
+  id: string;
+  literatureId: string;
+  userId: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  storagePath: string;
+  fileUrl: string;
+  createdAt: string;
+};
+
 export type LiteratureTag = {
   id: string;
   userId: string;
@@ -176,6 +188,7 @@ export type LiteratureItem = LiteratureRecord & {
   paperUsages: LiteraturePaperUsage[];
   projectLinks: LiteratureProjectLink[];
   readingLogs: LiteratureReadingLog[];
+  attachments: LiteratureAttachment[];
   tags: LiteratureTag[];
 };
 
