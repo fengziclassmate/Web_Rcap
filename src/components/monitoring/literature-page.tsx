@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Filter, LibraryBig, Paperclip, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Filter, LibraryBig, Paperclip, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,6 +90,12 @@ export function LiteraturePage({
   const [activeId, setActiveId] = useState<string | null>(items[0]?.id ?? null);
   const [editingItem, setEditingItem] = useState<LiteratureItem | null>(null);
   const [creating, setCreating] = useState(false);
+  const [collapsedColumns, setCollapsedColumns] = useState<Record<string, boolean>>({
+    to_read: false,
+    reading: false,
+    deep_read: false,
+    cited: false,
+  });
 
   const visibleItems = useMemo(() => sortLiteratures(filterLiteratures(items, filters)), [items, filters]);
   const activeItem = useMemo(
@@ -127,7 +133,14 @@ export function LiteraturePage({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-0 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+          <div
+            className={cn(
+              "grid grid-cols-1 gap-0",
+              view === "board"
+                ? "xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.9fr)]"
+                : "xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]",
+            )}
+          >
             <div className="border-b border-gray-200 xl:border-b-0 xl:border-r">
               {view === "list" ? (
                 <LiteratureList
@@ -144,6 +157,13 @@ export function LiteraturePage({
                   items={visibleItems}
                   activeId={activeItem?.id ?? null}
                   onSelect={setActiveId}
+                  collapsedColumns={collapsedColumns}
+                  onToggleColumn={(columnKey) =>
+                    setCollapsedColumns((prev) => ({
+                      ...prev,
+                      [columnKey]: !prev[columnKey],
+                    }))
+                  }
                 />
               )}
             </div>
@@ -418,52 +438,117 @@ function LiteratureBoard({
   items,
   activeId,
   onSelect,
+  collapsedColumns,
+  onToggleColumn,
 }: {
   items: LiteratureItem[];
   activeId: string | null;
   onSelect: (id: string) => void;
+  collapsedColumns: Record<string, boolean>;
+  onToggleColumn: (columnKey: string) => void;
 }) {
+  const columns = [
+    { key: "to_read", label: "\u5f85\u8bfb" },
+    { key: "reading", label: "\u9605\u8bfb\u4e2d" },
+    { key: "deep_read", label: "\u7cbe\u8bfb / \u5df2\u8bfb" },
+    { key: "cited", label: "\u5df2\u5f15\u7528 / \u5f52\u6863" },
+  ] as const;
+
   return (
-    <div className="max-h-[760px] overflow-y-auto p-4">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-4">
-        {[
-          { key: "to_read", label: "待读" },
-          { key: "reading", label: "阅读中" },
-          { key: "deep_read", label: "精读/已读" },
-          { key: "cited", label: "已引用/归档" },
-        ].map((column) => {
+    <div className="max-h-[760px] overflow-x-auto overflow-y-hidden p-4">
+      <div className="flex min-w-max gap-4">
+        {columns.map((column) => {
           const columnItems = items.filter((item) => {
             if (column.key === "deep_read") return item.status === "deep_read" || item.status === "read";
             if (column.key === "cited") return item.status === "cited" || item.status === "archived";
             return item.status === column.key || (column.key === "reading" && item.status === "skimming");
           });
+          const collapsed = collapsedColumns[column.key] ?? false;
+
           return (
-            <div key={column.key} className="flex min-h-[280px] flex-col rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-900">{column.label}</p>
-                <Badge variant="secondary">{columnItems.length}</Badge>
-              </div>
-              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-                {columnItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
+            <section
+              key={column.key}
+              className={cn(
+                "flex max-h-[700px] shrink-0 flex-col rounded-2xl border border-gray-200 bg-gradient-to-b from-gray-50 to-white shadow-sm transition-all",
+                collapsed ? "w-[92px]" : "w-[280px]",
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => onToggleColumn(column.key)}
+                className={cn(
+                  "flex items-start justify-between gap-3 border-b border-gray-200 px-4 py-4 text-left",
+                  collapsed && "h-full min-h-[96px] flex-col items-center justify-center px-3",
+                )}
+              >
+                <div className={cn("min-w-0", collapsed && "text-center")}>
+                  <p
                     className={cn(
-                      "block w-full rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:border-gray-300",
-                      activeId === item.id && "border-black",
+                      "text-sm font-semibold text-gray-900",
+                      collapsed && "whitespace-pre-line text-xs leading-5",
                     )}
-                    onClick={() => onSelect(item.id)}
                   >
-                    <p className="line-clamp-2 text-sm font-medium text-gray-900">{item.title}</p>
-                    <p className="mt-1 line-clamp-2 text-xs text-gray-500">{item.authors || "未填写作者"}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge variant="secondary">{importanceLabel(item.importance)}</Badge>
-                    </div>
-                  </button>
-                ))}
-                {columnItems.length === 0 ? <p className="text-xs text-gray-500">暂无文献</p> : null}
-              </div>
-            </div>
+                    {collapsed ? column.label.replace(" / ", "\n") : column.label}
+                  </p>
+                  {!collapsed ? <p className="mt-1 text-xs text-gray-500">\u6309\u9605\u8bfb\u72b6\u6001\u5206\u7ec4\u6d4f\u89c8\u6587\u732e</p> : null}
+                </div>
+                <div className={cn("flex items-center gap-2", collapsed && "flex-col")}>
+                  <Badge variant="secondary" className="rounded-full px-2.5 py-0.5">
+                    {columnItems.length}
+                  </Badge>
+                  {collapsed ? (
+                    <ChevronRight className="h-4 w-4 text-gray-500" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                  )}
+                </div>
+              </button>
+
+              {collapsed ? null : (
+                <div className="flex-1 overflow-y-auto p-3">
+                  <div className="space-y-3">
+                    {columnItems.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-gray-300 bg-white/80 p-4 text-center text-xs text-gray-500">
+                        \u5f53\u524d\u6ca1\u6709\u6587\u732e
+                      </div>
+                    ) : (
+                      columnItems.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={cn(
+                            "block w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md",
+                            activeId === item.id && "border-black ring-1 ring-black/10",
+                          )}
+                          onClick={() => onSelect(item.id)}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.title}</p>
+                            <Badge variant="outline" className="shrink-0">
+                              {importanceLabel(item.importance)}
+                            </Badge>
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">
+                            {item.authors || "\u672a\u586b\u5199\u4f5c\u8005"}
+                          </p>
+                          {item.summary ? (
+                            <p className="mt-3 line-clamp-3 text-xs leading-5 text-gray-600">{item.summary}</p>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Badge variant="secondary">{statusLabel(item.status)}</Badge>
+                            {item.tags.slice(0, 1).map((tag) => (
+                              <Badge key={tag.id} variant="outline">
+                                #{tag.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </section>
           );
         })}
       </div>
@@ -750,7 +835,7 @@ function AttachmentsTab({
           <Paperclip className="mt-0.5 h-4 w-4 text-gray-500" />
           <div>
             <p className="text-sm font-medium text-gray-900">????</p>
-            <p className="mt-1 text-sm text-gray-500">?? Word?PPT?Excel?PDF?TXT?CSV?Markdown ???????????</p>
+            <p className="mt-1 text-sm text-gray-500">?? Word?PPT?Excel?PDF?TXT?CSV?Markdown \u5f53\u524d\u6ca1\u6709\u6587\u732e?????</p>
           </div>
         </div>
         <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50">
@@ -773,7 +858,7 @@ function AttachmentsTab({
 
       {item.attachments.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
-          ????????
+          \u5f53\u524d\u6ca1\u6709\u6587\u732e??
         </div>
       ) : (
         <div className="space-y-3">
