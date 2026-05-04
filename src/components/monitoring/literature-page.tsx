@@ -60,15 +60,15 @@ type LiteratureView = "list" | "board";
 type DetailTab = "overview" | "notes" | "excerpts" | "attachments" | "methods" | "usage" | "links" | "logs";
 
 const detailTabs: Array<{ value: DetailTab; label: string }> = [
-  { value: "overview", label: "??" },
-  { value: "notes", label: "????" },
-  { value: "excerpts", label: "????" },
-  { value: "attachments", label: "????" },
-  { value: "methods", label: "????" },
-  { value: "usage", label: "????" },
-  { value: "links", label: "????" },
-  { value: "logs", label: "????" },
-]
+  { value: "overview", label: "概览" },
+  { value: "notes", label: "阅读笔记" },
+  { value: "excerpts", label: "摘录观点" },
+  { value: "attachments", label: "附件记录" },
+  { value: "methods", label: "方法借鉴" },
+  { value: "usage", label: "论文使用" },
+  { value: "links", label: "关联对象" },
+  { value: "logs", label: "阅读记录" },
+];
 
 export function LiteraturePage({
   items,
@@ -137,7 +137,7 @@ export function LiteraturePage({
             className={cn(
               "grid grid-cols-1 gap-0",
               view === "board"
-                ? "xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.9fr)]"
+                ? "xl:grid-cols-[minmax(0,520px)_minmax(0,1fr)]"
                 : "xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]",
             )}
           >
@@ -448,15 +448,15 @@ function LiteratureBoard({
   onToggleColumn: (columnKey: string) => void;
 }) {
   const columns = [
-    { key: "to_read", label: "\u5f85\u8bfb" },
-    { key: "reading", label: "\u9605\u8bfb\u4e2d" },
-    { key: "deep_read", label: "\u7cbe\u8bfb / \u5df2\u8bfb" },
-    { key: "cited", label: "\u5df2\u5f15\u7528 / \u5f52\u6863" },
+    { key: "to_read", label: "待读" },
+    { key: "reading", label: "阅读中" },
+    { key: "deep_read", label: "精读 / 已读" },
+    { key: "cited", label: "已引用 / 归档" },
   ] as const;
 
   return (
-    <div className="max-h-[760px] overflow-x-auto overflow-y-hidden p-4">
-      <div className="flex min-w-max gap-4">
+    <div className="max-h-[760px] overflow-y-auto p-4">
+      <div className="space-y-3">
         {columns.map((column) => {
           const columnItems = items.filter((item) => {
             if (column.key === "deep_read") return item.status === "deep_read" || item.status === "read";
@@ -466,33 +466,17 @@ function LiteratureBoard({
           const collapsed = collapsedColumns[column.key] ?? false;
 
           return (
-            <section
-              key={column.key}
-              className={cn(
-                "flex max-h-[700px] shrink-0 flex-col rounded-2xl border border-gray-200 bg-gradient-to-b from-gray-50 to-white shadow-sm transition-all",
-                collapsed ? "w-[92px]" : "w-[280px]",
-              )}
-            >
+            <section key={column.key} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
               <button
                 type="button"
                 onClick={() => onToggleColumn(column.key)}
-                className={cn(
-                  "flex items-start justify-between gap-3 border-b border-gray-200 px-4 py-4 text-left",
-                  collapsed && "h-full min-h-[96px] flex-col items-center justify-center px-3",
-                )}
+                className="flex w-full items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-left transition hover:bg-gray-100"
               >
-                <div className={cn("min-w-0", collapsed && "text-center")}>
-                  <p
-                    className={cn(
-                      "text-sm font-semibold text-gray-900",
-                      collapsed && "whitespace-pre-line text-xs leading-5",
-                    )}
-                  >
-                    {collapsed ? column.label.replace(" / ", "\n") : column.label}
-                  </p>
-                  {!collapsed ? <p className="mt-1 text-xs text-gray-500">\u6309\u9605\u8bfb\u72b6\u6001\u5206\u7ec4\u6d4f\u89c8\u6587\u732e</p> : null}
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{column.label}</p>
+                  <p className="mt-1 text-xs text-gray-500">按阅读状态分组浏览文献</p>
                 </div>
-                <div className={cn("flex items-center gap-2", collapsed && "flex-col")}>
+                <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="rounded-full px-2.5 py-0.5">
                     {columnItems.length}
                   </Badge>
@@ -505,11 +489,11 @@ function LiteratureBoard({
               </button>
 
               {collapsed ? null : (
-                <div className="flex-1 overflow-y-auto p-3">
-                  <div className="space-y-3">
+                <div className="p-3">
+                  <div className="grid grid-cols-1 gap-3 2xl:grid-cols-2">
                     {columnItems.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-gray-300 bg-white/80 p-4 text-center text-xs text-gray-500">
-                        \u5f53\u524d\u6ca1\u6709\u6587\u732e
+                      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500 2xl:col-span-2">
+                        当前没有文献
                       </div>
                     ) : (
                       columnItems.map((item) => (
@@ -517,7 +501,7 @@ function LiteratureBoard({
                           key={item.id}
                           type="button"
                           className={cn(
-                            "block w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md",
+                            "block w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition hover:border-gray-300 hover:bg-gray-50",
                             activeId === item.id && "border-black ring-1 ring-black/10",
                           )}
                           onClick={() => onSelect(item.id)}
@@ -529,7 +513,7 @@ function LiteratureBoard({
                             </Badge>
                           </div>
                           <p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">
-                            {item.authors || "\u672a\u586b\u5199\u4f5c\u8005"}
+                            {item.authors || "未填写作者"}
                           </p>
                           {item.summary ? (
                             <p className="mt-3 line-clamp-3 text-xs leading-5 text-gray-600">{item.summary}</p>
@@ -834,12 +818,12 @@ function AttachmentsTab({
         <div className="flex items-start gap-3">
           <Paperclip className="mt-0.5 h-4 w-4 text-gray-500" />
           <div>
-            <p className="text-sm font-medium text-gray-900">????</p>
-            <p className="mt-1 text-sm text-gray-500">?? Word?PPT?Excel?PDF?TXT?CSV?Markdown \u5f53\u524d\u6ca1\u6709\u6587\u732e?????</p>
+            <p className="text-sm font-medium text-gray-900">附件记录</p>
+            <p className="mt-1 text-sm text-gray-500">支持 Word、PPT、Excel、PDF、TXT、CSV、Markdown 等文件，默认私有存储。</p>
           </div>
         </div>
         <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50">
-          ????
+          上传附件
           <input
             type="file"
             className="hidden"
@@ -858,7 +842,7 @@ function AttachmentsTab({
 
       {item.attachments.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
-          \u5f53\u524d\u6ca1\u6709\u6587\u732e??
+          当前还没有附件。
         </div>
       ) : (
         <div className="space-y-3">
@@ -874,11 +858,11 @@ function AttachmentsTab({
                   {attachment.fileName}
                 </a>
                 <p className="mt-1 text-xs text-gray-500">
-                  {attachment.fileType || "????"} ? {formatFileSize(attachment.fileSize)} ? ??? {attachment.createdAt.slice(0, 10)}
+                  {attachment.fileType || "未知类型"} · {formatFileSize(attachment.fileSize)} · 上传于 {attachment.createdAt.slice(0, 10)}
                 </p>
               </div>
               <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteAttachment(attachment.id)}>
-                ????
+                删除附件
               </Button>
             </div>
           ))}

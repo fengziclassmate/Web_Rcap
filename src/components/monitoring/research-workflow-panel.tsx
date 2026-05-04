@@ -1403,7 +1403,7 @@ function ProjectDetails({
           { id: "plan", label: "计划" },
           { id: "tasks", label: "任务" },
           { id: "logs", label: "日志" },
-          { id: "attachments", label: "????" },
+          { id: "attachments", label: "附件记录" },
           { id: "papers", label: "论文" },
           { id: "meetings", label: "组会" },
           { id: "timeline", label: "时间线" },
@@ -1419,6 +1419,7 @@ function ProjectDetails({
                 <InfoStat label="进度" value={`${project.progress}%`} />
                 <InfoStat label="开始日期" value={project.startDate || "-"} />
                 <InfoStat label="目标结束" value={project.targetEndDate || "-"} />
+                <InfoStat label="附件数量" value={String(attachments.length)} />
                 <InfoStat label="预留任务链接" value={String(project.linkedTaskIds.length)} />
               </div>
             </DetailSection>
@@ -1520,10 +1521,10 @@ function ProjectDetails({
         )}
         {activeTab === "attachments" && (
           <DetailSection
-            title="????"
+            title="附件记录"
             action={
               <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50">
-                ????
+                上传附件
                 <input
                   type="file"
                   className="hidden"
@@ -1541,9 +1542,9 @@ function ProjectDetails({
             }
           >
             <div className="space-y-3">
-              <p className="text-sm text-gray-500">?? Word?PPT?Excel?PDF?TXT?CSV?Markdown ???????????</p>
+              <p className="text-sm text-gray-500">支持 Word、PPT、Excel、PDF、TXT、CSV、Markdown 等文件，附件默认私有存储。</p>
               {attachments.length === 0 ? (
-                <p className="text-sm text-gray-500">???????</p>
+                <p className="text-sm text-gray-500">当前没有附件。</p>
               ) : (
                 attachments.map((attachment) => (
                   <div key={attachment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-3">
@@ -1557,11 +1558,11 @@ function ProjectDetails({
                         {attachment.fileName}
                       </a>
                       <p className="mt-1 text-xs text-gray-500">
-                        {attachment.fileType || "????"} ? {formatFileSize(attachment.fileSize)} ? ??? {attachment.createdAt.slice(0, 10)}
+                        {attachment.fileType || "未知类型"} · {formatFileSize(attachment.fileSize)} · 上传于 {attachment.createdAt.slice(0, 10)}
                       </p>
                     </div>
                     <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteAttachment(attachment.id)}>
-                      ????
+                      删除附件
                     </Button>
                   </div>
                 ))
