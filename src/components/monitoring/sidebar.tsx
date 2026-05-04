@@ -14,7 +14,6 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export type MonitoringModuleId =
@@ -71,19 +70,18 @@ export function MonitoringSidebar({
             {items.map((item) => {
               const selected = item.id === active;
               return (
-                <Button
+                <button
                   key={item.id}
                   type="button"
-                  variant="ghost"
                   className={cn(
-                    "h-9 shrink-0 justify-start rounded-md border border-transparent px-3 transition-colors active:translate-y-0",
-                    selected ? "bg-black text-white hover:bg-black" : "text-gray-700 hover:bg-gray-100",
+                    "inline-flex h-9 shrink-0 select-none items-center justify-center whitespace-nowrap rounded-md border border-transparent px-3 text-sm font-medium outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                    selected ? "bg-black text-white" : "text-gray-700 hover:bg-gray-100 hover:text-gray-950",
                   )}
                   onClick={() => onChange(item.id)}
                 >
                   <span className={cn("mr-2", selected ? "text-white" : "text-gray-600")}>{item.icon}</span>
-                  <span className="text-sm">{item.label}</span>
-                </Button>
+                  <span>{item.label}</span>
+                </button>
               );
             })}
           </div>

@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 type CategoryVisual = {
   name: string;
   accent: string;
-  soft: string;
   hex: string;
 };
 
@@ -35,15 +34,20 @@ type ScheduleTimeAnalyticsProps = {
 };
 
 const categoryVisuals: CategoryVisual[] = [
-  { name: "深度科研", accent: "bg-sky-500", soft: "bg-sky-50 text-sky-950 border-sky-200", hex: "#0ea5e9" },
-  { name: "论文写作", accent: "bg-indigo-500", soft: "bg-indigo-50 text-indigo-950 border-indigo-200", hex: "#6366f1" },
-  { name: "文献阅读", accent: "bg-cyan-500", soft: "bg-cyan-50 text-cyan-950 border-cyan-200", hex: "#06b6d4" },
-  { name: "课程学习", accent: "bg-violet-500", soft: "bg-violet-50 text-violet-950 border-violet-200", hex: "#8b5cf6" },
-  { name: "会议沟通", accent: "bg-amber-500", soft: "bg-amber-50 text-amber-950 border-amber-200", hex: "#f59e0b" },
-  { name: "任务推进", accent: "bg-emerald-500", soft: "bg-emerald-50 text-emerald-950 border-emerald-200", hex: "#10b981" },
-  { name: "生活事务", accent: "bg-rose-500", soft: "bg-rose-50 text-rose-950 border-rose-200", hex: "#f43f5e" },
-  { name: "健康运动", accent: "bg-orange-500", soft: "bg-orange-50 text-orange-950 border-orange-200", hex: "#f97316" },
-  { name: "休息恢复", accent: "bg-slate-500", soft: "bg-slate-100 text-slate-900 border-slate-200", hex: "#64748b" },
+  { name: "深度科研", accent: "bg-sky-400", hex: "#38bdf8" },
+  { name: "实验数据", accent: "bg-teal-400", hex: "#2dd4bf" },
+  { name: "论文写作", accent: "bg-indigo-400", hex: "#818cf8" },
+  { name: "文献阅读", accent: "bg-cyan-400", hex: "#22d3ee" },
+  { name: "课程学习", accent: "bg-violet-400", hex: "#a78bfa" },
+  { name: "会议沟通", accent: "bg-amber-400", hex: "#fbbf24" },
+  { name: "任务推进", accent: "bg-emerald-400", hex: "#34d399" },
+  { name: "行政事务", accent: "bg-stone-400", hex: "#a8a29e" },
+  { name: "生活事务", accent: "bg-rose-400", hex: "#fb7185" },
+  { name: "健康运动", accent: "bg-orange-400", hex: "#fb923c" },
+  { name: "通勤外出", accent: "bg-lime-400", hex: "#a3e635" },
+  { name: "情绪复盘", accent: "bg-fuchsia-400", hex: "#e879f9" },
+  { name: "休息恢复", accent: "bg-slate-400", hex: "#94a3b8" },
+  { name: "弹性缓冲", accent: "bg-zinc-400", hex: "#a1a1aa" },
 ];
 
 const categoryAliasMap: Record<string, string> = {
@@ -53,14 +57,24 @@ const categoryAliasMap: Record<string, string> = {
   生活运动: "健康运动",
   学习成长: "课程学习",
   娱乐休息: "休息恢复",
+  兴趣爱好: "休息恢复",
+  放松休闲: "休息恢复",
+  "life&other": "生活事务",
+  自我提升: "课程学习",
+  计划复盘: "任务推进",
   其他: "生活事务",
+  数据整理: "实验数据",
+  实验分析: "实验数据",
+  行政杂务: "行政事务",
+  外出通勤: "通勤外出",
+  情绪记录: "情绪复盘",
+  缓冲时间: "弹性缓冲",
 };
 
 const fallbackVisual: CategoryVisual = {
   name: "未分类",
-  accent: "bg-zinc-500",
-  soft: "bg-zinc-50 text-zinc-900 border-zinc-200",
-  hex: "#71717a",
+  accent: "bg-zinc-400",
+  hex: "#a1a1aa",
 };
 
 function normalizeCategoryName(value: string) {
