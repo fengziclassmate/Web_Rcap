@@ -54,7 +54,7 @@ type TaskDashboardProps = {
   onDeleteAnnualTask: (taskId: string) => void;
   projectCheckins: ProjectCheckin[];
   onAddProjectCheckin: (name: string, description: string) => void;
-  onCheckinProject: (projectId: string, note: string) => void;
+  onCheckinProject: (projectId: string, date: string, note: string) => void;
   onDeleteProjectCheckin: (projectId: string) => void;
   onUpdateProjectCheckin: (
     projectId: string,
@@ -342,7 +342,7 @@ export function TaskDashboard({
   }
 
   function handleProjectCheckin(projectId: string) {
-    onCheckinProject(projectId, projectNoteDraft[projectId] ?? "");
+    onCheckinProject(projectId, getTodayISODate(), projectNoteDraft[projectId] ?? "");
     setProjectNoteDraft((prev) => ({ ...prev, [projectId]: "" }));
   }
 

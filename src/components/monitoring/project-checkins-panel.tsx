@@ -39,7 +39,7 @@ export function ProjectCheckinsPanel({
 }: {
   projectCheckins: ProjectCheckin[];
   onAddProjectCheckin: (name: string, description: string) => void;
-  onCheckinProject: (projectId: string, note: string) => void;
+  onCheckinProject: (projectId: string, date: string, note: string) => void;
   onDeleteProjectCheckin: (projectId: string) => void;
   onUpdateProjectCheckin: (
     projectId: string,
@@ -54,6 +54,7 @@ export function ProjectCheckinsPanel({
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDesc, setNewProjectDesc] = useState("");
   const [projectNoteDraft, setProjectNoteDraft] = useState<Record<string, string>>({});
+  const [projectDateDraft, setProjectDateDraft] = useState<Record<string, string>>({});
   const [checkinDrafts, setCheckinDrafts] = useState<Record<string, string>>({});
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [historyProjectId, setHistoryProjectId] = useState<string | null>(null);
@@ -84,8 +85,10 @@ export function ProjectCheckinsPanel({
   }
 
   function handleProjectCheckin(projectId: string) {
-    onCheckinProject(projectId, projectNoteDraft[projectId] ?? "");
+    const targetDate = projectDateDraft[projectId] || todayISO();
+    onCheckinProject(projectId, targetDate, projectNoteDraft[projectId] ?? "");
     setProjectNoteDraft((prev) => ({ ...prev, [projectId]: "" }));
+    setProjectDateDraft((prev) => ({ ...prev, [projectId]: todayISO() }));
   }
 
   function openEditProject(project: ProjectCheckin) {
@@ -187,13 +190,23 @@ export function ProjectCheckinsPanel({
                         进度：{doneCount}/{totalDays}（{percent}%）
                       </p>
 
-                      <div className="flex gap-2">
+                      <div className="grid gap-2 sm:grid-cols-[150px_1fr_auto]">
+                        <Input
+                          type="date"
+                          value={projectDateDraft[project.id] ?? today}
+                          min={project.startDate}
+                          max={today}
+                          onChange={(event) =>
+                            setProjectDateDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
+                          }
+                          aria-label={`${project.name} 打卡日期`}
+                        />
                         <Input
                           value={projectNoteDraft[project.id] ?? ""}
                           onChange={(event) =>
                             setProjectNoteDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
                           }
-                          placeholder="今日描述（可选）"
+                          placeholder="打卡描述（可选）"
                         />
                         <Button type="button" size="sm" onClick={() => handleProjectCheckin(project.id)}>
                           打卡

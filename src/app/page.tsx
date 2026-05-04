@@ -3181,17 +3181,17 @@ export default function Home() {
     ]);
   }
 
-  function handleCheckinProject(projectId: string, note: string) {
-    const today = new Date().toISOString().slice(0, 10);
+  function handleCheckinProject(projectId: string, date: string, note: string) {
+    const targetDate = date || todayISO();
     setProjectCheckins((prev) =>
       prev.map((project) => {
         if (project.id !== projectId) return project;
-        const exists = project.checkins.find((c) => c.date === today);
+        const exists = project.checkins.find((c) => c.date === targetDate);
         const nextCheckins = exists
           ? project.checkins.map((c) =>
-              c.date === today ? { ...c, note: note.trim() } : c,
+              c.date === targetDate ? { ...c, note: note.trim() } : c,
             )
-          : [...project.checkins, { date: today, note: note.trim() }];
+          : [...project.checkins, { date: targetDate, note: note.trim() }];
         return { ...project, checkins: nextCheckins };
       }),
     );
