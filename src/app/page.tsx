@@ -3425,12 +3425,10 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-[1520px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[260px_1fr]">
-        <div className="hidden min-h-0 lg:block">
-          <MonitoringSidebar active={activeModule} onChange={setActiveModule} />
-        </div>
+      <div className="mx-auto flex max-w-[1520px] flex-col gap-4 px-4 py-4">
+        <MonitoringSidebar active={activeModule} onChange={setActiveModule} />
 
-        <div className="min-h-0">
+        <div className="min-h-0 w-full">
           {activeModule === "schedule" ? (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_460px]">
               <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
