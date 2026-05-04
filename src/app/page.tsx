@@ -6,6 +6,7 @@ import { zhCN } from "date-fns/locale";
 import type { User } from "@supabase/supabase-js";
 import { TaskDashboard } from "@/components/schedule/task-dashboard";
 import { WeeklyTimeGrid, ViewMode, TimeGranularity } from "@/components/schedule/weekly-time-grid";
+import { ScheduleTimeAnalytics } from "@/components/schedule/schedule-time-analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createId } from "@/lib/id";
@@ -3447,7 +3448,7 @@ export default function Home() {
                   timeGranularity={timeGranularity}
                 />
               </section>
-              <section className={cn(mobileTab === "tasks" ? "block" : "hidden", "min-h-0 lg:block")}>
+              <section className={cn(mobileTab === "tasks" ? "block" : "hidden", "min-h-0 space-y-4 lg:block")}>
                 <TaskDashboard
                   tasks={tasks}
                   onToggleTask={handleToggleTask}
@@ -3477,6 +3478,7 @@ export default function Home() {
                   uiPreferences={dashboardUiPreferences}
                   onUiPreferencesChange={setDashboardUiPreferences}
                 />
+                <ScheduleTimeAnalytics events={events} currentWeekStart={currentWeekStart} />
               </section>
             </div>
           ) : activeModule === "achievements" ? (

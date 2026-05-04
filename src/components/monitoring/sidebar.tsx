@@ -74,10 +74,10 @@ export function MonitoringSidebar({
                 <Button
                   key={item.id}
                   type="button"
-                  variant={selected ? "default" : "ghost"}
+                  variant="ghost"
                   className={cn(
-                    "h-9 shrink-0 justify-start rounded-md px-3",
-                    selected ? "bg-black text-white hover:bg-black/90" : "text-gray-700",
+                    "h-9 shrink-0 justify-start rounded-md border border-transparent px-3 transition-colors active:translate-y-0",
+                    selected ? "bg-black text-white hover:bg-black" : "text-gray-700 hover:bg-gray-100",
                   )}
                   onClick={() => onChange(item.id)}
                 >
