@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { addDays, addWeeks, format, startOfWeek } from "date-fns";
@@ -96,7 +96,7 @@ export type ScheduleEvent = {
   isCompleted: boolean;
   category: string;
   tag: EventTag;
-  /** 仅主事件（非展开实例）使用 */
+  /** 浠呬富浜嬩欢锛堥潪灞曞紑瀹炰緥锛変娇鐢?*/
   recurrence?: RecurrenceConfig | null;
   exceptionDates?: string[];
   recurrenceOverrides?: Record<string, RecurrenceInstanceOverride>;
@@ -109,7 +109,7 @@ export type SubTask = {
   done: boolean;
 };
 
-export type Priority = '紧急且重要' | '紧急不重要' | '不紧急重要' | '不紧急不重要';
+export type Priority = "紧急且重要" | "紧急不重要" | "不紧急重要" | "不紧急不重要";
 
 export type LongTask = {
   id: string;
@@ -171,7 +171,7 @@ const defaultDashboardUiPreferences: DashboardUiPreferences = {
 const defaultTasks: LongTask[] = [
   {
     id: "task-1",
-    name: "重构个人周计划模板",
+    name: "重构个人周计划模块",
     dueDate: "2026-04-12",
     done: false,
     notes: "",
@@ -187,7 +187,7 @@ const defaultTasks: LongTask[] = [
     done: true,
     notes: "已完成初版梳理，待归档。",
     precautions: ["避免重复分类"],
-    completionLog: "2026-04-08 完成并同步到知识库",
+    completionLog: "2026-04-08 完成并同步到知识库。",
     priority: "不紧急不重要",
     subtasks: [],
   },
@@ -221,11 +221,11 @@ const defaultEvents: ScheduleEvent[] = [
     date: "2026-04-09",
     startHour: 8,
     endHour: 10,
-    title: "晨间复盘",
+    title: "鏅ㄩ棿澶嶇洏",
     notes: "明确今日优先级，更新待办。",
-    requirements: ["安静环境", "关闭即时通讯"],
+    requirements: ["瀹夐潤鐜", "鍏抽棴鍗虫椂閫氳"],
     isCompleted: false,
-    category: "任务推进",
+    category: "浠诲姟鎺ㄨ繘",
     tag: null,
   },
 ];
@@ -469,7 +469,7 @@ function buildResearchWorkflowFromLegacy(
       ? [
           {
             id: "legacy-paper",
-            title: legacyPaper.title || "历史论文",
+            title: legacyPaper.title || "鍘嗗彶璁烘枃",
             abstract: "",
             keywords: [],
             status: "drafting",
@@ -1406,11 +1406,11 @@ function normalizeTasks(payload: unknown): LongTask[] {
         ? value.precautions.filter((item): item is string => typeof item === "string")
         : [],
       completionLog: value.completionLog ?? "",
-      priority: (value.priority as Priority) ?? "不紧急不重要",
+      priority: (value.priority as Priority) ?? "涓嶇揣鎬ヤ笉閲嶈",
       subtasks: Array.isArray(value.subtasks)
         ? value.subtasks.map((subtask, subIndex) => ({
             id: subtask.id ?? `subtask-${index}-${subIndex}`,
-            name: subtask.name ?? `子任务 ${subIndex + 1}`,
+            name: subtask.name ?? `瀛愪换鍔?${subIndex + 1}`,
             done: Boolean(subtask.done),
           }))
         : [],
@@ -1452,7 +1452,7 @@ function normalizeEvents(payload: unknown): ScheduleEvent[] {
         ? value.requirements.filter((item): item is string => typeof item === "string")
         : [],
       isCompleted: Boolean(value.isCompleted),
-      category: value.category ?? "任务推进",
+      category: value.category ?? "浠诲姟鎺ㄨ繘",
       tag: (value.tag as EventTag) ?? null,
       recurrence: recurrence ?? undefined,
       exceptionDates: Array.isArray(value.exceptionDates)
@@ -1689,7 +1689,7 @@ export default function Home() {
           function_name: 'create_schedule_data_table'
         });
       if (error) {
-        console.error("创建表失败:", error);
+        console.error("鍒涘缓琛ㄥけ璐?", error);
         return false;
       }
       return true;
@@ -2861,19 +2861,19 @@ export default function Home() {
     });
     setSendingLink(false);
     if (error) {
-      toast.error(`发送登录链接失败：${error.message}`);
+      toast.error(`鍙戦€佺櫥褰曢摼鎺ュけ璐ワ細${error.message}`);
       return;
     }
-    toast.success("登录链接已发送，请检查邮箱");
+    toast.success("登录链接已发送，请检查邮箱。");
   }
 
   async function handleSignOut() {
     const { error } = await supabase.auth.signOut();
     if (error) {
-      toast.error(`退出失败：${error.message}`);
+      toast.error(`閫€鍑哄け璐ワ細${error.message}`);
       return;
     }
-    toast.success("已退出登录");
+    toast.success("已退出登录。");
   }
 
   function handleGoPrevWeek() {
@@ -2953,7 +2953,7 @@ export default function Home() {
         notes: input.notes?.trim() ?? "",
         precautions: [],
         completionLog: "",
-        priority: "涓嶇揣鎬ヤ笉閲嶈" as Priority,
+        priority: "不紧急重要" as Priority,
         subtasks: [],
       },
     ]);
@@ -2975,7 +2975,7 @@ export default function Home() {
         notes: input.notes?.trim() ?? "",
         requirements: [],
         isCompleted: false,
-        category: "任务推进",
+        category: "浠诲姟鎺ㄨ繘",
         tag: null,
       },
     ]);
@@ -3341,7 +3341,7 @@ export default function Home() {
   }
 
   const shellClass =
-    "min-h-screen bg-white text-black pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]";
+    "workbench-shell min-h-screen text-stone-950 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]";
 
   if (!isBooted) {
     return (
@@ -3402,15 +3402,18 @@ export default function Home() {
         "pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-4",
       )}
     >
-      <div className="mx-auto flex max-w-[1520px] items-center justify-between gap-3 px-4 pt-4">
-        <p className="min-w-0 truncate text-xs text-gray-600">当前账号：{user.email}</p>
+      <div className="relative z-10 mx-auto flex max-w-[1520px] items-center justify-between gap-3 px-4 pt-4">
+        <div className="workbench-hero min-w-0 rounded-2xl px-4 py-2">
+          <p className="truncate text-xs uppercase tracking-[0.22em] text-stone-500">Current account</p>
+          <p className="mt-0.5 min-w-0 truncate text-sm font-medium text-stone-900">{user.email}</p>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => setConfirmDangerousActions((prev) => !prev)}
-            className="shrink-0 rounded-sm border-gray-200"
+            className="shrink-0 rounded-xl border-stone-200/80 bg-white/65 text-stone-700 shadow-sm backdrop-blur hover:bg-white"
           >
             删除确认：{confirmDangerousActions ? "开" : "关"}
           </Button>
@@ -3419,19 +3422,19 @@ export default function Home() {
             variant="outline"
             size="sm"
             onClick={handleSignOut}
-            className="shrink-0 rounded-sm border-gray-200"
+            className="shrink-0 rounded-xl border-stone-200/80 bg-white/65 text-stone-700 shadow-sm backdrop-blur hover:bg-white"
           >
             退出登录
           </Button>
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-[1520px] flex-col gap-4 px-4 py-4">
+      <div className="relative z-10 mx-auto flex max-w-[1520px] flex-col gap-4 px-4 py-4">
         <MonitoringSidebar active={activeModule} onChange={setActiveModule} />
 
         <div className="min-h-0 w-full">
           {activeModule === "schedule" ? (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_460px]">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(400px,460px)]">
               <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
                 <WeeklyTimeGrid
                   currentWeekStart={currentWeekStart}
@@ -3575,7 +3578,7 @@ export default function Home() {
               />
             ) : (
               <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-md">
-                <p className="text-sm text-gray-600">正在加载文献阅读模块…</p>
+                <p className="text-sm text-gray-600">正在加载文献阅读模块...</p>
               </section>
             )
           ) : activeModule === "logs" ? (
@@ -3592,7 +3595,7 @@ export default function Home() {
               />
             ) : (
               <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-md">
-                <p className="text-sm text-gray-600">正在加载动态日志…</p>
+                <p className="text-sm text-gray-600">正在加载动态日志...</p>
               </section>
             )
           ) : (
@@ -3615,7 +3618,7 @@ export default function Home() {
           )}
         >
           <CalendarDays className="size-6 shrink-0" aria-hidden />
-          <span>日程</span>
+          <span>鏃ョ▼</span>
         </button>
         <button
           type="button"
@@ -3626,9 +3629,10 @@ export default function Home() {
           )}
         >
           <ListTodo className="size-6 shrink-0" aria-hidden />
-          <span>任务</span>
+          <span>浠诲姟</span>
         </button>
       </nav>
     </main>
   );
 }
+
