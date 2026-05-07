@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
 import {
@@ -909,6 +909,25 @@ export function ResearchWorkflowPanel({
                 ],
               }))
             }
+            onUpdateLog={(logId, patch) =>
+              commit((prev) => ({
+                ...prev,
+                projectLogs: prev.projectLogs.map((item) => (item.id === logId ? { ...item, ...patch } : item)),
+                timelineEntries: [
+                  createTimelineEntry("project_log", logId, patch.date ?? todayISO(), selectedProject.title, "项目日志已更新"),
+                  ...prev.timelineEntries,
+                ],
+              }))
+            }
+            onDeleteLog={(logId) =>
+              commit((prev) => ({
+                ...prev,
+                projectLogs: prev.projectLogs.filter((item) => item.id !== logId),
+                timelineEntries: prev.timelineEntries.filter(
+                  (item) => !(item.entityType === "project_log" && item.entityId === logId),
+                ),
+              }))
+            }
             onCreateTask={(title, dueDate, notes, targetId) => {
               const taskId = onCreateTask({ title, dueDate, notes });
               if (!taskId || !targetId) return;
@@ -1447,6 +1466,138 @@ function ProjectInlineEditor({
   );
 }
 
+function ProjectPlanEditor({
+  project,
+  onSave,
+}: {
+  project: ResearchProject;
+  onSave: (patch: Pick<ProjectDraft, "currentIssues" | "nextActions">) => void;
+}) {
+  const [draft, setDraft] = useState({
+    currentIssues: project.currentIssues,
+    nextActions: project.nextActions,
+  });
+
+  useEffect(() => {
+    setDraft({ currentIssues: project.currentIssues, nextActions: project.nextActions });
+  }, [project.id, project.currentIssues, project.nextActions]);
+
+  return (
+    <DetailSection
+      title="计划编辑"
+      action={
+        <Button type="button" size="sm" onClick={() => onSave(draft)}>
+          保存计划
+        </Button>
+      }
+    >
+      <div className="grid grid-cols-1 gap-3">
+        <LabeledTextarea
+          label="当前问题"
+          value={draft.currentIssues}
+          onChange={(value) => setDraft((prev) => ({ ...prev, currentIssues: value }))}
+        />
+        <LabeledTextarea
+          label="下一步行动"
+          value={draft.nextActions}
+          onChange={(value) => setDraft((prev) => ({ ...prev, nextActions: value }))}
+        />
+      </div>
+    </DetailSection>
+  );
+}
+
+function ProjectLogCard({
+  log,
+  projectTitle,
+  onCreateTask,
+  onUpdateLog,
+  onDeleteLog,
+}: {
+  log: ProjectLog;
+  projectTitle: string;
+  onCreateTask: (title: string, dueDate?: string, notes?: string, targetId?: string) => void;
+  onUpdateLog: (logId: string, patch: Partial<ProjectLog>) => void;
+  onDeleteLog: (logId: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    date: log.date,
+    progressText: log.progressText,
+    issues: log.issues,
+    nextActions: log.nextActions,
+  });
+
+  useEffect(() => {
+    setDraft({
+      date: log.date,
+      progressText: log.progressText,
+      issues: log.issues,
+      nextActions: log.nextActions,
+    });
+  }, [log]);
+
+  if (editing) {
+    return (
+      <div className="rounded-lg border border-gray-200 p-3">
+        <div className="grid grid-cols-1 gap-3">
+          <Input type="date" value={draft.date} onChange={(event) => setDraft((prev) => ({ ...prev, date: event.target.value }))} />
+          <Textarea value={draft.progressText} onChange={(event) => setDraft((prev) => ({ ...prev, progressText: event.target.value }))} placeholder="进展内容" />
+          <Textarea value={draft.issues} onChange={(event) => setDraft((prev) => ({ ...prev, issues: event.target.value }))} placeholder="当前问题" />
+          <Textarea value={draft.nextActions} onChange={(event) => setDraft((prev) => ({ ...prev, nextActions: event.target.value }))} placeholder="下一步行动" />
+        </div>
+        <div className="mt-3 flex justify-end gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={() => setEditing(false)}>
+            取消
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              onUpdateLog(log.id, {
+                date: draft.date,
+                progressText: draft.progressText.trim(),
+                issues: draft.issues.trim(),
+                nextActions: draft.nextActions.trim(),
+              });
+              setEditing(false);
+            }}
+          >
+            保存日志
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium text-gray-900">{log.date}</p>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onCreateTask(log.nextActions || `${projectTitle} 日志跟进`, log.date, `${log.progressText}\n${log.issues}`, log.id)}
+          >
+            转任务
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)}>
+            编辑
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => onDeleteLog(log.id)}>
+            删除
+          </Button>
+        </div>
+      </div>
+      <p className="mt-2 text-sm text-gray-600">{log.progressText}</p>
+      {log.issues ? <p className="mt-2 text-sm text-gray-500">问题：{log.issues}</p> : null}
+      {log.nextActions ? <p className="mt-2 text-sm text-gray-500">下一步：{log.nextActions}</p> : null}
+    </div>
+  );
+}
+
 function ProjectDetails({
   project,
   papers,
@@ -1460,6 +1611,8 @@ function ProjectDetails({
   onEditingChange,
   onUpdateProject,
   onAddLog,
+  onUpdateLog,
+  onDeleteLog,
   onCreateTask,
   onUploadAttachments,
   onDeleteAttachment,
@@ -1476,6 +1629,8 @@ function ProjectDetails({
   onEditingChange: (value: boolean) => void;
   onUpdateProject: (value: ProjectDraft) => void;
   onAddLog: (value: ProjectLog) => void;
+  onUpdateLog: (logId: string, patch: Partial<ProjectLog>) => void;
+  onDeleteLog: (logId: string) => void;
   onCreateTask: (title: string, dueDate?: string, notes?: string, targetId?: string) => void;
   onUploadAttachments: (files: File[]) => Promise<void>;
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
@@ -1556,14 +1711,18 @@ function ProjectDetails({
             </DetailSection>
           </>
         )}
-        {activeTab === "plan" && (
-          <DetailSection title="当前计划">
-            <div className="space-y-3 text-sm text-gray-600">
-              <p><span className="font-medium text-gray-900">当前问题：</span>{project.currentIssues || "-"}</p>
-              <p><span className="font-medium text-gray-900">下一步行动：</span>{project.nextActions || "-"}</p>
-            </div>
-          </DetailSection>
-        )}
+        {activeTab === "plan" ? (
+          <ProjectPlanEditor
+            project={project}
+            onSave={(patch) =>
+              onUpdateProject({
+                ...projectDraftFromValue(project),
+                currentIssues: patch.currentIssues,
+                nextActions: patch.nextActions,
+              })
+            }
+          />
+        ) : null}
         {activeTab === "tasks" && (
           <DetailSection
             title="任务联动"
@@ -1620,22 +1779,14 @@ function ProjectDetails({
                   <p className="text-sm text-gray-500">暂无项目日志。</p>
                 ) : (
                   logs.map((item) => (
-                    <div key={item.id} className="rounded-lg border border-gray-200 p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-gray-900">{item.date}</p>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onCreateTask(item.nextActions || `${project.title} 日志跟进`, item.date, `${item.progressText}\n${item.issues}`, item.id)}
-                        >
-                          转任务
-                        </Button>
-                      </div>
-                      <p className="mt-2 text-sm text-gray-600">{item.progressText}</p>
-                      {item.issues ? <p className="mt-2 text-sm text-gray-500">问题：{item.issues}</p> : null}
-                      {item.nextActions ? <p className="mt-2 text-sm text-gray-500">下一步：{item.nextActions}</p> : null}
-                    </div>
+                    <ProjectLogCard
+                      key={item.id}
+                      log={item}
+                      projectTitle={project.title}
+                      onCreateTask={onCreateTask}
+                      onUpdateLog={onUpdateLog}
+                      onDeleteLog={onDeleteLog}
+                    />
                   ))
                 )}
               </div>

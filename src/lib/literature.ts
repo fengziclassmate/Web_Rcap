@@ -242,6 +242,36 @@ export type LiteratureExcerptInput = {
   tags: string[];
 };
 
+export type LiteratureMethodNoteInput = {
+  name: string;
+  description: string;
+  requiredData: string;
+  strengths: string;
+  weaknesses: string;
+  applicability: string;
+  plannedToUse: boolean;
+  projectId: string | null;
+  paperId: string | null;
+};
+
+export type LiteraturePaperUsageInput = {
+  paperId: string;
+  chapter: string;
+  usageType: LiteratureUsageType;
+  note: string;
+  citationStatus: LiteratureCitationStatus;
+};
+
+export type LiteratureReadingLogInput = {
+  loggedAt: string;
+  durationMinutes: number;
+  progressText: string;
+  statusAfter: LiteratureStatus;
+  linkedTaskId: string;
+  linkedEventId: string;
+  linkedLogPostId: string;
+};
+
 export type LiteratureStats = {
   total: number;
   active: number;

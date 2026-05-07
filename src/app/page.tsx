@@ -73,11 +73,14 @@ import {
   type LiteratureFormInput,
   type LiteratureItem,
   type LiteratureMethodNote,
+  type LiteratureMethodNoteInput,
   type LiteratureNote,
   type LiteratureNoteInput,
   type LiteraturePaperUsage,
+  type LiteraturePaperUsageInput,
   type LiteratureProjectLink,
   type LiteratureReadingLog,
+  type LiteratureReadingLogInput,
   type LiteratureRecord,
   type LiteratureTag,
   type LiteratureTagLink,
@@ -2528,12 +2531,34 @@ export default function Home() {
   }
 
   async function syncLiteraturePaperUsages(currentUser: User, literatureId: string, paperIds: string[]) {
-    await supabase.from("literature_paper_usages").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id);
     const cleaned = Array.from(new Set(paperIds.filter(Boolean)));
-    if (cleaned.length === 0) return;
+    const { data: existingRows, error: selectError } = await supabase
+      .from("literature_paper_usages")
+      .select("id,paper_id")
+      .eq("literature_id", literatureId)
+      .eq("user_id", currentUser.id);
+    if (selectError) throw selectError;
+
+    const existing = (existingRows ?? []).map((row) => ({
+      id: String(row.id ?? ""),
+      paperId: String(row.paper_id ?? ""),
+    }));
+    const deleteIds = existing.filter((row) => !cleaned.includes(row.paperId)).map((row) => row.id).filter(Boolean);
+    if (deleteIds.length > 0) {
+      const { error } = await supabase
+        .from("literature_paper_usages")
+        .delete()
+        .eq("user_id", currentUser.id)
+        .in("id", deleteIds);
+      if (error) throw error;
+    }
+
+    const existingPaperIds = new Set(existing.map((row) => row.paperId));
+    const newPaperIds = cleaned.filter((paperId) => !existingPaperIds.has(paperId));
+    if (newPaperIds.length === 0) return;
     const now = new Date().toISOString();
     const { error } = await supabase.from("literature_paper_usages").insert(
-      cleaned.map((paperId) => ({
+      newPaperIds.map((paperId) => ({
         literature_id: literatureId,
         user_id: currentUser.id,
         paper_id: paperId,
@@ -2647,6 +2672,8 @@ export default function Home() {
         supabase.from("literature_paper_usages").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
         supabase.from("literature_project_links").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
         supabase.from("literature_excerpts").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
+        supabase.from("literature_method_notes").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
+        supabase.from("literature_reading_logs").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
         supabase.from("literature_notes").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
         supabase.from("literature_attachments").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
       ]);
@@ -2749,6 +2776,188 @@ export default function Home() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error(`Failed to delete excerpt: ${message}`);
+    }
+  }
+
+  async function handleCreateLiteratureMethodNote(literatureId: string, input: LiteratureMethodNoteInput) {
+    if (!user) return;
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase.from("literature_method_notes").insert({
+        literature_id: literatureId,
+        user_id: user.id,
+        name: input.name.trim(),
+        description: input.description.trim(),
+        required_data: input.requiredData.trim(),
+        strengths: input.strengths.trim(),
+        weaknesses: input.weaknesses.trim(),
+        applicability: input.applicability.trim(),
+        planned_to_use: input.plannedToUse,
+        project_id: input.projectId,
+        paper_id: input.paperId,
+        created_at: now,
+        updated_at: now,
+      });
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to create method note: ${message}`);
+    }
+  }
+
+  async function handleUpdateLiteratureMethodNote(methodId: string, input: LiteratureMethodNoteInput) {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("literature_method_notes")
+        .update({
+          name: input.name.trim(),
+          description: input.description.trim(),
+          required_data: input.requiredData.trim(),
+          strengths: input.strengths.trim(),
+          weaknesses: input.weaknesses.trim(),
+          applicability: input.applicability.trim(),
+          planned_to_use: input.plannedToUse,
+          project_id: input.projectId,
+          paper_id: input.paperId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", methodId)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to update method note: ${message}`);
+    }
+  }
+
+  async function handleDeleteLiteratureMethodNote(methodId: string) {
+    if (!user) return;
+    try {
+      const { error } = await supabase.from("literature_method_notes").delete().eq("id", methodId).eq("user_id", user.id);
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete method note: ${message}`);
+    }
+  }
+
+  async function handleCreateLiteraturePaperUsage(literatureId: string, input: LiteraturePaperUsageInput) {
+    if (!user) return;
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase.from("literature_paper_usages").insert({
+        literature_id: literatureId,
+        user_id: user.id,
+        paper_id: input.paperId,
+        chapter: input.chapter.trim(),
+        usage_type: input.usageType,
+        note: input.note.trim(),
+        citation_status: input.citationStatus,
+        created_at: now,
+        updated_at: now,
+      });
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to create paper usage: ${message}`);
+    }
+  }
+
+  async function handleUpdateLiteraturePaperUsage(usageId: string, input: LiteraturePaperUsageInput) {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("literature_paper_usages")
+        .update({
+          paper_id: input.paperId,
+          chapter: input.chapter.trim(),
+          usage_type: input.usageType,
+          note: input.note.trim(),
+          citation_status: input.citationStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", usageId)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to update paper usage: ${message}`);
+    }
+  }
+
+  async function handleDeleteLiteraturePaperUsage(usageId: string) {
+    if (!user) return;
+    try {
+      const { error } = await supabase.from("literature_paper_usages").delete().eq("id", usageId).eq("user_id", user.id);
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete paper usage: ${message}`);
+    }
+  }
+
+  async function handleCreateLiteratureReadingLog(literatureId: string, input: LiteratureReadingLogInput) {
+    if (!user) return;
+    try {
+      const { error } = await supabase.from("literature_reading_logs").insert({
+        literature_id: literatureId,
+        user_id: user.id,
+        logged_at: input.loggedAt ? new Date(input.loggedAt).toISOString() : new Date().toISOString(),
+        duration_minutes: Math.max(0, Number(input.durationMinutes) || 0),
+        progress_text: input.progressText.trim(),
+        status_after: input.statusAfter,
+        linked_task_id: input.linkedTaskId.trim() || null,
+        linked_event_id: input.linkedEventId.trim() || null,
+        linked_log_post_id: input.linkedLogPostId.trim() || null,
+      });
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to create reading log: ${message}`);
+    }
+  }
+
+  async function handleUpdateLiteratureReadingLog(logId: string, input: LiteratureReadingLogInput) {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("literature_reading_logs")
+        .update({
+          logged_at: input.loggedAt ? new Date(input.loggedAt).toISOString() : new Date().toISOString(),
+          duration_minutes: Math.max(0, Number(input.durationMinutes) || 0),
+          progress_text: input.progressText.trim(),
+          status_after: input.statusAfter,
+          linked_task_id: input.linkedTaskId.trim() || null,
+          linked_event_id: input.linkedEventId.trim() || null,
+          linked_log_post_id: input.linkedLogPostId.trim() || null,
+        })
+        .eq("id", logId)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to update reading log: ${message}`);
+    }
+  }
+
+  async function handleDeleteLiteratureReadingLog(logId: string) {
+    if (!user) return;
+    try {
+      const { error } = await supabase.from("literature_reading_logs").delete().eq("id", logId).eq("user_id", user.id);
+      if (error) throw error;
+      await refreshLiteratures(user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to delete reading log: ${message}`);
     }
   }
 
@@ -3573,6 +3782,15 @@ export default function Home() {
                 onCreateExcerpt={handleCreateLiteratureExcerpt}
                 onUpdateExcerpt={handleUpdateLiteratureExcerpt}
                 onDeleteExcerpt={handleDeleteLiteratureExcerpt}
+                onCreateMethodNote={handleCreateLiteratureMethodNote}
+                onUpdateMethodNote={handleUpdateLiteratureMethodNote}
+                onDeleteMethodNote={handleDeleteLiteratureMethodNote}
+                onCreatePaperUsage={handleCreateLiteraturePaperUsage}
+                onUpdatePaperUsage={handleUpdateLiteraturePaperUsage}
+                onDeletePaperUsage={handleDeleteLiteraturePaperUsage}
+                onCreateReadingLog={handleCreateLiteratureReadingLog}
+                onUpdateReadingLog={handleUpdateLiteratureReadingLog}
+                onDeleteReadingLog={handleDeleteLiteratureReadingLog}
                 onUploadAttachments={handleUploadLiteratureAttachments}
                 onDeleteAttachment={handleDeleteLiteratureAttachment}
               />

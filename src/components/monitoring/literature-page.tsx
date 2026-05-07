@@ -21,9 +21,11 @@ import {
   groupReadingLogs,
   importanceLabel,
   literatureExcerptTypeOptions,
+  literatureCitationStatusOptions,
   literatureImportanceOptions,
   literaturePaperSectionOptions,
   literatureStatusOptions,
+  literatureUsageTypeOptions,
   paperSectionLabel,
   parseKeywordInput,
   parseTagInput,
@@ -35,7 +37,13 @@ import {
   type LiteratureFilters,
   type LiteratureFormInput,
   type LiteratureItem,
+  type LiteratureMethodNote,
+  type LiteratureMethodNoteInput,
   type LiteratureNoteInput,
+  type LiteraturePaperUsage,
+  type LiteraturePaperUsageInput,
+  type LiteratureReadingLog,
+  type LiteratureReadingLogInput,
   type LiteratureReferenceOption,
   type LiteratureTag,
 } from "@/lib/literature";
@@ -52,6 +60,15 @@ type LiteraturePageProps = {
   onCreateExcerpt: (literatureId: string, input: LiteratureExcerptInput) => Promise<void>;
   onUpdateExcerpt: (excerptId: string, input: LiteratureExcerptInput) => Promise<void>;
   onDeleteExcerpt: (excerptId: string) => Promise<void>;
+  onCreateMethodNote: (literatureId: string, input: LiteratureMethodNoteInput) => Promise<void>;
+  onUpdateMethodNote: (methodId: string, input: LiteratureMethodNoteInput) => Promise<void>;
+  onDeleteMethodNote: (methodId: string) => Promise<void>;
+  onCreatePaperUsage: (literatureId: string, input: LiteraturePaperUsageInput) => Promise<void>;
+  onUpdatePaperUsage: (usageId: string, input: LiteraturePaperUsageInput) => Promise<void>;
+  onDeletePaperUsage: (usageId: string) => Promise<void>;
+  onCreateReadingLog: (literatureId: string, input: LiteratureReadingLogInput) => Promise<void>;
+  onUpdateReadingLog: (logId: string, input: LiteratureReadingLogInput) => Promise<void>;
+  onDeleteReadingLog: (logId: string) => Promise<void>;
   onUploadAttachments: (literatureId: string, files: File[]) => Promise<void>;
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
 };
@@ -143,6 +160,15 @@ export function LiteraturePage({
   onCreateExcerpt,
   onUpdateExcerpt,
   onDeleteExcerpt,
+  onCreateMethodNote,
+  onUpdateMethodNote,
+  onDeleteMethodNote,
+  onCreatePaperUsage,
+  onUpdatePaperUsage,
+  onDeletePaperUsage,
+  onCreateReadingLog,
+  onUpdateReadingLog,
+  onDeleteReadingLog,
   onUploadAttachments,
   onDeleteAttachment,
 }: LiteraturePageProps) {
@@ -239,6 +265,15 @@ export function LiteraturePage({
                   onCreateExcerpt={onCreateExcerpt}
                   onUpdateExcerpt={onUpdateExcerpt}
                   onDeleteExcerpt={onDeleteExcerpt}
+                  onCreateMethodNote={onCreateMethodNote}
+                  onUpdateMethodNote={onUpdateMethodNote}
+                  onDeleteMethodNote={onDeleteMethodNote}
+                  onCreatePaperUsage={onCreatePaperUsage}
+                  onUpdatePaperUsage={onUpdatePaperUsage}
+                  onDeletePaperUsage={onDeletePaperUsage}
+                  onCreateReadingLog={onCreateReadingLog}
+                  onUpdateReadingLog={onUpdateReadingLog}
+                  onDeleteReadingLog={onDeleteReadingLog}
                   onUploadAttachments={onUploadAttachments}
                   onDeleteAttachment={onDeleteAttachment}
                 />
@@ -607,6 +642,15 @@ function LiteratureDetail({
   onCreateExcerpt,
   onUpdateExcerpt,
   onDeleteExcerpt,
+  onCreateMethodNote,
+  onUpdateMethodNote,
+  onDeleteMethodNote,
+  onCreatePaperUsage,
+  onUpdatePaperUsage,
+  onDeletePaperUsage,
+  onCreateReadingLog,
+  onUpdateReadingLog,
+  onDeleteReadingLog,
   onUploadAttachments,
   onDeleteAttachment,
 }: {
@@ -618,6 +662,15 @@ function LiteratureDetail({
   onCreateExcerpt: (literatureId: string, input: LiteratureExcerptInput) => Promise<void>;
   onUpdateExcerpt: (excerptId: string, input: LiteratureExcerptInput) => Promise<void>;
   onDeleteExcerpt: (excerptId: string) => Promise<void>;
+  onCreateMethodNote: (literatureId: string, input: LiteratureMethodNoteInput) => Promise<void>;
+  onUpdateMethodNote: (methodId: string, input: LiteratureMethodNoteInput) => Promise<void>;
+  onDeleteMethodNote: (methodId: string) => Promise<void>;
+  onCreatePaperUsage: (literatureId: string, input: LiteraturePaperUsageInput) => Promise<void>;
+  onUpdatePaperUsage: (usageId: string, input: LiteraturePaperUsageInput) => Promise<void>;
+  onDeletePaperUsage: (usageId: string) => Promise<void>;
+  onCreateReadingLog: (literatureId: string, input: LiteratureReadingLogInput) => Promise<void>;
+  onUpdateReadingLog: (logId: string, input: LiteratureReadingLogInput) => Promise<void>;
+  onDeleteReadingLog: (logId: string) => Promise<void>;
   onUploadAttachments: (literatureId: string, files: File[]) => Promise<void>;
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
 }) {
@@ -708,10 +761,34 @@ function LiteratureDetail({
             onDeleteAttachment={onDeleteAttachment}
           />
         ) : null}
-        {activeTab === "methods" ? <MethodsTab item={item} projects={projects} papers={papers} /> : null}
-        {activeTab === "usage" ? <UsageTab item={item} papers={papers} /> : null}
+        {activeTab === "methods" ? (
+          <MethodsTabEditable
+            item={item}
+            projects={projects}
+            papers={papers}
+            onCreateMethodNote={onCreateMethodNote}
+            onUpdateMethodNote={onUpdateMethodNote}
+            onDeleteMethodNote={onDeleteMethodNote}
+          />
+        ) : null}
+        {activeTab === "usage" ? (
+          <UsageTabEditable
+            item={item}
+            papers={papers}
+            onCreatePaperUsage={onCreatePaperUsage}
+            onUpdatePaperUsage={onUpdatePaperUsage}
+            onDeletePaperUsage={onDeletePaperUsage}
+          />
+        ) : null}
         {activeTab === "links" ? <LinksTab item={item} projects={projects} papers={papers} /> : null}
-        {activeTab === "logs" ? <ReadingLogsTab item={item} /> : null}
+        {activeTab === "logs" ? (
+          <ReadingLogsTabEditable
+            item={item}
+            onCreateReadingLog={onCreateReadingLog}
+            onUpdateReadingLog={onUpdateReadingLog}
+            onDeleteReadingLog={onDeleteReadingLog}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -1060,6 +1137,153 @@ function AttachmentsTab({
   );
 }
 
+function emptyMethodInput(): LiteratureMethodNoteInput {
+  return {
+    name: "",
+    description: "",
+    requiredData: "",
+    strengths: "",
+    weaknesses: "",
+    applicability: "",
+    plannedToUse: false,
+    projectId: null,
+    paperId: null,
+  };
+}
+
+function methodInputFromValue(value?: LiteratureMethodNote): LiteratureMethodNoteInput {
+  return value
+    ? {
+        name: value.name,
+        description: value.description,
+        requiredData: value.requiredData,
+        strengths: value.strengths,
+        weaknesses: value.weaknesses,
+        applicability: value.applicability,
+        plannedToUse: value.plannedToUse,
+        projectId: value.projectId,
+        paperId: value.paperId,
+      }
+    : emptyMethodInput();
+}
+
+function MethodsTabEditable({
+  item,
+  projects,
+  papers,
+  onCreateMethodNote,
+  onUpdateMethodNote,
+  onDeleteMethodNote,
+}: {
+  item: LiteratureItem;
+  projects: LiteratureReferenceOption[];
+  papers: LiteratureReferenceOption[];
+  onCreateMethodNote: (literatureId: string, input: LiteratureMethodNoteInput) => Promise<void>;
+  onUpdateMethodNote: (methodId: string, input: LiteratureMethodNoteInput) => Promise<void>;
+  onDeleteMethodNote: (methodId: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState<LiteratureMethodNote | null>(null);
+  const [draft, setDraft] = useState<LiteratureMethodNoteInput>(emptyMethodInput());
+
+  useEffect(() => {
+    setDraft(methodInputFromValue(editing ?? undefined));
+  }, [editing]);
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <FieldInput label="方法名称" value={draft.name} onChange={(value) => setDraft((prev) => ({ ...prev, name: value }))} />
+          <label className="space-y-2">
+            <Label>是否计划使用</Label>
+            <div className="flex h-10 items-center gap-2 rounded-md border border-gray-200 bg-white px-3 text-sm">
+              <input type="checkbox" checked={draft.plannedToUse} onChange={(event) => setDraft((prev) => ({ ...prev, plannedToUse: event.target.checked }))} />
+              <span>计划用于自己的项目或论文</span>
+            </div>
+          </label>
+          <FieldSelect
+            label="关联项目"
+            value={draft.projectId ?? "none"}
+            options={[{ value: "none", label: "不关联" }, ...projects.map((project) => ({ value: project.id, label: project.title }))]}
+            onChange={(value) => setDraft((prev) => ({ ...prev, projectId: value && value !== "none" ? value : null }))}
+          />
+          <FieldSelect
+            label="关联论文"
+            value={draft.paperId ?? "none"}
+            options={[{ value: "none", label: "不关联" }, ...papers.map((paper) => ({ value: paper.id, label: paper.title }))]}
+            onChange={(value) => setDraft((prev) => ({ ...prev, paperId: value && value !== "none" ? value : null }))}
+          />
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-3">
+          <FieldTextarea label="方法描述" value={draft.description} onChange={(value) => setDraft((prev) => ({ ...prev, description: value }))} />
+          <FieldTextarea label="所需数据" value={draft.requiredData} onChange={(value) => setDraft((prev) => ({ ...prev, requiredData: value }))} />
+          <FieldTextarea label="优点" value={draft.strengths} onChange={(value) => setDraft((prev) => ({ ...prev, strengths: value }))} />
+          <FieldTextarea label="缺点" value={draft.weaknesses} onChange={(value) => setDraft((prev) => ({ ...prev, weaknesses: value }))} />
+          <FieldTextarea label="适用性" value={draft.applicability} onChange={(value) => setDraft((prev) => ({ ...prev, applicability: value }))} />
+        </div>
+        <div className="mt-3 flex justify-end gap-2">
+          {editing ? (
+            <Button type="button" variant="outline" onClick={() => setEditing(null)}>
+              取消
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            disabled={!draft.name.trim() && !draft.description.trim()}
+            onClick={async () => {
+              const normalized = {
+                ...draft,
+                name: draft.name.trim(),
+                description: draft.description.trim(),
+                requiredData: draft.requiredData.trim(),
+                strengths: draft.strengths.trim(),
+                weaknesses: draft.weaknesses.trim(),
+                applicability: draft.applicability.trim(),
+              };
+              if (editing) {
+                await onUpdateMethodNote(editing.id, normalized);
+                setEditing(null);
+                return;
+              }
+              await onCreateMethodNote(item.id, normalized);
+              setDraft(emptyMethodInput());
+            }}
+          >
+            {editing ? "保存方法" : "添加方法"}
+          </Button>
+        </div>
+      </section>
+
+      {item.methodNotes.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">暂无方法记录。</div>
+      ) : (
+        item.methodNotes.map((method) => (
+          <div key={method.id} className="rounded-lg border border-gray-200 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{method.name || "未命名方法"}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700">{method.description || "未填写描述"}</p>
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => setEditing(method)}>编辑</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteMethodNote(method.id)}>删除</Button>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <MiniField label="所需数据" value={method.requiredData || "未填写"} />
+              <MiniField label="适用性" value={method.applicability || "未填写"} />
+              <MiniField label="优点" value={method.strengths || "未填写"} />
+              <MiniField label="缺点" value={method.weaknesses || "未填写"} />
+              <MiniField label="关联项目" value={projects.find((project) => project.id === method.projectId)?.title || "未关联"} />
+              <MiniField label="关联论文" value={papers.find((paper) => paper.id === method.paperId)?.title || "未关联"} />
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 function MethodsTab({
   item,
   projects,
@@ -1094,6 +1318,121 @@ function MethodsTab({
                 value={papers.find((item) => item.id === method.paperId)?.title || "未关联"}
               />
             </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function emptyPaperUsageInput(papers: LiteratureReferenceOption[]): LiteraturePaperUsageInput {
+  return {
+    paperId: papers[0]?.id ?? "",
+    chapter: "",
+    usageType: "background",
+    note: "",
+    citationStatus: "planned",
+  };
+}
+
+function paperUsageInputFromValue(value: LiteraturePaperUsage | undefined, papers: LiteratureReferenceOption[]): LiteraturePaperUsageInput {
+  return value
+    ? {
+        paperId: value.paperId,
+        chapter: value.chapter,
+        usageType: value.usageType,
+        note: value.note,
+        citationStatus: value.citationStatus,
+      }
+    : emptyPaperUsageInput(papers);
+}
+
+function UsageTabEditable({
+  item,
+  papers,
+  onCreatePaperUsage,
+  onUpdatePaperUsage,
+  onDeletePaperUsage,
+}: {
+  item: LiteratureItem;
+  papers: LiteratureReferenceOption[];
+  onCreatePaperUsage: (literatureId: string, input: LiteraturePaperUsageInput) => Promise<void>;
+  onUpdatePaperUsage: (usageId: string, input: LiteraturePaperUsageInput) => Promise<void>;
+  onDeletePaperUsage: (usageId: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState<LiteraturePaperUsage | null>(null);
+  const [draft, setDraft] = useState<LiteraturePaperUsageInput>(() => emptyPaperUsageInput(papers));
+
+  useEffect(() => {
+    setDraft(paperUsageInputFromValue(editing ?? undefined, papers));
+  }, [editing, papers]);
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <FieldSelect
+            label="用于论文"
+            value={draft.paperId || "none"}
+            options={[{ value: "none", label: "请选择论文" }, ...papers.map((paper) => ({ value: paper.id, label: paper.title }))]}
+            onChange={(value) => setDraft((prev) => ({ ...prev, paperId: value === "none" || !value ? "" : value }))}
+          />
+          <FieldInput label="章节 / 位置" value={draft.chapter} onChange={(value) => setDraft((prev) => ({ ...prev, chapter: value }))} />
+          <FieldSelect
+            label="用途类型"
+            value={draft.usageType}
+            options={literatureUsageTypeOptions}
+            onChange={(value) => value && setDraft((prev) => ({ ...prev, usageType: value as LiteraturePaperUsageInput["usageType"] }))}
+          />
+          <FieldSelect
+            label="引用状态"
+            value={draft.citationStatus}
+            options={literatureCitationStatusOptions}
+            onChange={(value) => value && setDraft((prev) => ({ ...prev, citationStatus: value as LiteraturePaperUsageInput["citationStatus"] }))}
+          />
+        </div>
+        <div className="mt-3">
+          <FieldTextarea label="备注" value={draft.note} onChange={(value) => setDraft((prev) => ({ ...prev, note: value }))} />
+        </div>
+        <div className="mt-3 flex justify-end gap-2">
+          {editing ? <Button type="button" variant="outline" onClick={() => setEditing(null)}>取消</Button> : null}
+          <Button
+            type="button"
+            disabled={!draft.paperId}
+            onClick={async () => {
+              const normalized = { ...draft, chapter: draft.chapter.trim(), note: draft.note.trim() };
+              if (editing) {
+                await onUpdatePaperUsage(editing.id, normalized);
+                setEditing(null);
+                return;
+              }
+              await onCreatePaperUsage(item.id, normalized);
+              setDraft(emptyPaperUsageInput(papers));
+            }}
+          >
+            {editing ? "保存使用记录" : "添加使用记录"}
+          </Button>
+        </div>
+      </section>
+
+      {item.paperUsages.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">当前没有论文使用记录。</div>
+      ) : (
+        item.paperUsages.map((usage) => (
+          <div key={usage.id} className="rounded-lg border border-gray-200 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">{papers.find((paper) => paper.id === usage.paperId)?.title || "未命名论文"}</Badge>
+                <Badge variant="secondary">{usageTypeLabel(usage.usageType)}</Badge>
+                <Badge variant="outline">{citationStatusLabel(usage.citationStatus)}</Badge>
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => setEditing(usage)}>编辑</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => void onDeletePaperUsage(usage.id)}>删除</Button>
+              </div>
+            </div>
+            <p className="mt-3 text-sm text-gray-700">章节：{usage.chapter || "未填写"}</p>
+            {usage.note ? <p className="mt-2 whitespace-pre-wrap text-sm text-gray-600">{usage.note}</p> : null}
           </div>
         ))
       )}
@@ -1156,6 +1495,138 @@ function LinksTab({
       <SectionCard title="任务联动" content={item.linkedTaskIds.length > 0 ? item.linkedTaskIds.join("、") : "第一版仅预留结构"} />
       <SectionCard title="日程联动" content={item.linkedEventIds.length > 0 ? item.linkedEventIds.join("、") : "第一版仅预留结构"} />
       <SectionCard title="动态日志联动" content={item.linkedLogPostIds.length > 0 ? item.linkedLogPostIds.join("、") : "第一版仅预留结构"} />
+    </div>
+  );
+}
+
+function emptyReadingLogInput(statusAfter: LiteratureReadingLogInput["statusAfter"]): LiteratureReadingLogInput {
+  return {
+    loggedAt: new Date().toISOString().slice(0, 16),
+    durationMinutes: 30,
+    progressText: "",
+    statusAfter,
+    linkedTaskId: "",
+    linkedEventId: "",
+    linkedLogPostId: "",
+  };
+}
+
+function readingLogInputFromValue(value: LiteratureReadingLog | undefined, statusAfter: LiteratureReadingLogInput["statusAfter"]): LiteratureReadingLogInput {
+  return value
+    ? {
+        loggedAt: value.loggedAt.slice(0, 16),
+        durationMinutes: value.durationMinutes,
+        progressText: value.progressText,
+        statusAfter: value.statusAfter,
+        linkedTaskId: value.linkedTaskId ?? "",
+        linkedEventId: value.linkedEventId ?? "",
+        linkedLogPostId: value.linkedLogPostId ?? "",
+      }
+    : emptyReadingLogInput(statusAfter);
+}
+
+function ReadingLogsTabEditable({
+  item,
+  onCreateReadingLog,
+  onUpdateReadingLog,
+  onDeleteReadingLog,
+}: {
+  item: LiteratureItem;
+  onCreateReadingLog: (literatureId: string, input: LiteratureReadingLogInput) => Promise<void>;
+  onUpdateReadingLog: (logId: string, input: LiteratureReadingLogInput) => Promise<void>;
+  onDeleteReadingLog: (logId: string) => Promise<void>;
+}) {
+  const groups = groupReadingLogs(item.readingLogs);
+  const [editing, setEditing] = useState<LiteratureReadingLog | null>(null);
+  const [draft, setDraft] = useState<LiteratureReadingLogInput>(() => emptyReadingLogInput(item.status));
+
+  useEffect(() => {
+    setDraft(readingLogInputFromValue(editing ?? undefined, item.status));
+  }, [editing, item.status]);
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>阅读时间</Label>
+            <Input type="datetime-local" value={draft.loggedAt} onChange={(event) => setDraft((prev) => ({ ...prev, loggedAt: event.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <Label>阅读时长（分钟）</Label>
+            <Input type="number" value={String(draft.durationMinutes)} onChange={(event) => setDraft((prev) => ({ ...prev, durationMinutes: Number(event.target.value) || 0 }))} />
+          </div>
+          <FieldSelect
+            label="阅读后状态"
+            value={draft.statusAfter}
+            options={literatureStatusOptions}
+            onChange={(value) => value && setDraft((prev) => ({ ...prev, statusAfter: value as LiteratureReadingLogInput["statusAfter"] }))}
+          />
+          <FieldInput label="关联任务 ID" value={draft.linkedTaskId} onChange={(value) => setDraft((prev) => ({ ...prev, linkedTaskId: value }))} />
+          <FieldInput label="关联日程 ID" value={draft.linkedEventId} onChange={(value) => setDraft((prev) => ({ ...prev, linkedEventId: value }))} />
+          <FieldInput label="关联动态日志 ID" value={draft.linkedLogPostId} onChange={(value) => setDraft((prev) => ({ ...prev, linkedLogPostId: value }))} />
+        </div>
+        <div className="mt-3">
+          <FieldTextarea label="阅读进展" value={draft.progressText} onChange={(value) => setDraft((prev) => ({ ...prev, progressText: value }))} />
+        </div>
+        <div className="mt-3 flex justify-end gap-2">
+          {editing ? <Button type="button" variant="outline" onClick={() => setEditing(null)}>取消</Button> : null}
+          <Button
+            type="button"
+            disabled={!draft.progressText.trim()}
+            onClick={async () => {
+              const normalized = {
+                ...draft,
+                progressText: draft.progressText.trim(),
+                durationMinutes: Math.max(0, Number(draft.durationMinutes) || 0),
+                linkedTaskId: draft.linkedTaskId.trim(),
+                linkedEventId: draft.linkedEventId.trim(),
+                linkedLogPostId: draft.linkedLogPostId.trim(),
+              };
+              if (editing) {
+                await onUpdateReadingLog(editing.id, normalized);
+                setEditing(null);
+                return;
+              }
+              await onCreateReadingLog(item.id, normalized);
+              setDraft(emptyReadingLogInput(item.status));
+            }}
+          >
+            {editing ? "保存阅读记录" : "添加阅读记录"}
+          </Button>
+        </div>
+      </section>
+
+      {groups.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">暂无阅读记录。</div>
+      ) : (
+        groups.map((group) => (
+          <div key={group.label}>
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-900">{group.label}</span>
+              <span className="h-px flex-1 bg-gray-200" />
+            </div>
+            <div className="space-y-3">
+              {group.logs.map((log) => (
+                <div key={log.id} className="rounded-lg border border-gray-200 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{statusLabel(log.statusAfter)}</Badge>
+                      <Badge variant="outline">{log.durationMinutes} 分钟</Badge>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={() => setEditing(log)}>编辑</Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteReadingLog(log.id)}>删除</Button>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm text-gray-800">{log.progressText || "未填写阅读进展"}</p>
+                  <p className="mt-2 text-xs text-gray-500">{format(new Date(log.loggedAt), "yyyy-MM-dd HH:mm")}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
