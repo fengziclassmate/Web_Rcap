@@ -709,7 +709,7 @@ export function ResearchWorkflowPanel({
     .sort((a, b) => b.date.localeCompare(a.date));
 
   return (
-    <section className="grid min-h-[720px] grid-cols-1 rounded-lg border border-gray-200 bg-white shadow-md lg:grid-cols-[380px_1fr]">
+    <section className="grid min-h-[720px] grid-cols-1 rounded-lg border border-gray-200 bg-white shadow-md lg:grid-cols-[360px_minmax(0,1fr)] 2xl:grid-cols-[420px_minmax(0,1fr)]">
       <div className="border-b border-gray-200 lg:border-b-0 lg:border-r">
         <header className="border-b border-gray-200 px-5 py-4">
           <div className="flex items-center justify-between gap-3">

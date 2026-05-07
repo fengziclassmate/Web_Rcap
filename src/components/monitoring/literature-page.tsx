@@ -256,7 +256,7 @@ export function LiteraturePage({
   const activeCompleteness = useMemo(() => buildLiteratureCompleteness(activeItem), [activeItem]);
 
   return (
-    <section className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+    <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)] 2xl:grid-cols-[360px_minmax(0,1fr)]">
       <aside className="space-y-4">
         <LiteratureStatsPanel stats={stats} activeItem={activeItem} completeness={activeCompleteness} />
         <LiteratureFilterPanel
@@ -296,8 +296,8 @@ export function LiteraturePage({
             className={cn(
               "grid grid-cols-1 gap-0",
               view === "board"
-                ? "xl:grid-cols-[minmax(0,520px)_minmax(0,1fr)]"
-                : "xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]",
+                ? "xl:grid-cols-[minmax(0,540px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)]"
+                : "xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)]",
             )}
           >
             <div className="border-b border-stone-200/70 xl:border-b-0 xl:border-r">
@@ -417,7 +417,7 @@ function LiteratureWorkbenchHero({
   return (
     <section className="relative overflow-hidden rounded-3xl border border-stone-200 bg-[radial-gradient(circle_at_20%_20%,rgba(245,158,11,0.18),transparent_28%),linear-gradient(135deg,#f8f5ee_0%,#edf4f1_52%,#e7eef3_100%)] p-5 shadow-[0_24px_70px_rgba(68,64,60,0.12)]">
       <div className="absolute right-6 top-5 h-24 w-24 rounded-full border border-white/60 bg-white/20 blur-sm" />
-      <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-stone-500">
             <Sparkles className="h-4 w-4" />

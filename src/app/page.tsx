@@ -3555,7 +3555,7 @@ export default function Home() {
   if (!isBooted) {
     return (
       <main className={shellClass}>
-        <div className="mx-auto grid max-w-[1520px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[1fr_460px]">
+        <div className="mx-auto grid max-w-[1880px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[1fr_460px]">
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
         </div>
@@ -3596,7 +3596,7 @@ export default function Home() {
   if (!dataReady) {
     return (
       <main className={shellClass}>
-        <div className="mx-auto grid max-w-[1520px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[1fr_460px]">
+        <div className="mx-auto grid max-w-[1880px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[1fr_460px]">
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
         </div>
@@ -3611,7 +3611,7 @@ export default function Home() {
         "pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-4",
       )}
     >
-      <div className="relative z-10 mx-auto flex max-w-[1520px] items-center justify-between gap-3 px-4 pt-4">
+      <div className="relative z-10 mx-auto flex max-w-[1880px] items-center justify-between gap-3 px-4 pt-4">
         <div className="workbench-hero min-w-0 rounded-2xl px-4 py-2">
           <p className="truncate text-xs uppercase tracking-[0.22em] text-stone-500">Current account</p>
           <p className="mt-0.5 min-w-0 truncate text-sm font-medium text-stone-900">{user.email}</p>
@@ -3638,12 +3638,12 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto flex max-w-[1520px] flex-col gap-4 px-4 py-4">
+      <div className="relative z-10 mx-auto flex max-w-[1880px] flex-col gap-4 px-4 py-4">
         <MonitoringSidebar active={activeModule} onChange={setActiveModule} />
 
         <div className="min-h-0 w-full">
           {activeModule === "schedule" ? (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(400px,460px)]">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,400px)] 2xl:grid-cols-[minmax(1120px,1fr)_minmax(380px,420px)]">
               <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
                 <WeeklyTimeGrid
                   currentWeekStart={currentWeekStart}

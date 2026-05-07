@@ -87,7 +87,7 @@ export function LogPage({
   }
 
   return (
-    <section className="grid grid-cols-1 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+    <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)]">
       <div className="space-y-4 xl:order-2">
         <LogComposer uploading={uploading} onSubmit={onCreatePost} />
         <LogTimeline

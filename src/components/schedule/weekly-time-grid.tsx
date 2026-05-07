@@ -679,10 +679,13 @@ export function WeeklyTimeGrid({
       </header>
 
       <div className="overflow-x-auto">
-        <div className="relative min-w-[1120px]">
+        <div className="relative min-w-full">
           {viewMode !== "month" ? (
             <>
-              <div className="grid grid-cols-[96px_repeat(auto-fit,minmax(140px,1fr))] border-b border-gray-200 bg-white">
+              <div
+                className="grid border-b border-gray-200 bg-white"
+                style={{ gridTemplateColumns: `84px repeat(${displayDates.length}, minmax(0, 1fr))` }}
+              >
                 <div className="border-r border-gray-200 bg-gray-50 px-3 py-3 text-sm font-medium text-gray-700">时间</div>
                 {displayDates.map((day) => (
                   <div
@@ -694,7 +697,10 @@ export function WeeklyTimeGrid({
                 ))}
               </div>
 
-              <div className="grid grid-cols-[96px_repeat(auto-fit,minmax(140px,1fr))]">
+              <div
+                className="grid"
+                style={{ gridTemplateColumns: `84px repeat(${displayDates.length}, minmax(0, 1fr))` }}
+              >
                 <div>
                   {hours.map((hour) => {
                     const isMainHour = Number.isInteger(hour);
