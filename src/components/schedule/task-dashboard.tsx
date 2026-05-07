@@ -412,8 +412,8 @@ export function TaskDashboard({
   }
 
   return (
-    <aside className="rounded-lg border border-gray-200 bg-white shadow-md">
-      <div className="px-6 py-4">
+    <aside className="module-shell">
+      <div className="module-header px-6 py-5">
         <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-900">
           <ListTodo className="h-5 w-5 text-primary" />
           任务控制台
@@ -433,13 +433,13 @@ export function TaskDashboard({
             添加
           </Button>
         </div>
-        <div className="mb-6 space-y-3 rounded-lg border border-gray-200 p-4">
+        <div className="mb-6 space-y-3 rounded-2xl subtle-card p-4">
           {annualTasks.length > 0 ? (
             <ul className="max-h-56 space-y-2 overflow-y-auto pr-1 text-sm">
               {annualTasks.map((item) => (
                 <li
                   key={item.id}
-                  className="flex items-start gap-2 rounded-md border border-gray-100 bg-gray-50/80 px-2 py-2"
+                  className="flex items-start gap-2 rounded-xl border border-stone-100 bg-white/55 px-3 py-2"
                 >
                   <Checkbox
                     checked={item.done}
@@ -484,7 +484,7 @@ export function TaskDashboard({
             patchUiPreferences({ longTaskSectionOpen: open });
           }}
         >
-          <CollapsibleTrigger className="mb-3 flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
+          <CollapsibleTrigger className="section-trigger mb-3 flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left">
             <span className="text-sm font-medium uppercase tracking-wide text-gray-600">
               长期任务 / 未完成任务
             </span>
@@ -521,7 +521,7 @@ export function TaskDashboard({
                 key={task.id}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => handleDropTask(task.id)}
-                className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-colors hover:bg-gray-50"
+                className="interactive-card rounded-2xl p-3"
               >
                 <div className="flex items-start gap-2">
                   <button
@@ -595,7 +595,7 @@ export function TaskDashboard({
                   </Button>
                 </div>
                 {task.subtasks.length > 0 && expandedTasks.has(task.id) ? (
-                  <ul className="mt-2 space-y-1 rounded-md border border-gray-200 bg-gray-50 p-2">
+                  <ul className="mt-2 space-y-1 rounded-xl border border-stone-200/70 bg-white/50 p-2">
                     {task.subtasks.map((subtask) => (
                       <li key={subtask.id} className="flex items-center gap-2 text-xs">
                         <Checkbox
@@ -616,7 +616,7 @@ export function TaskDashboard({
             ) : (
           <div className="space-y-3">
             {groupedIncompleteTasks.map((group) => (
-              <div key={group.priority} className="rounded-lg border border-gray-200 p-3">
+              <div key={group.priority} className="rounded-2xl subtle-card p-3">
                 <p className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
                   {getPriorityIcon(group.priority)}
                   {group.priority}
@@ -626,7 +626,7 @@ export function TaskDashboard({
                 ) : (
                   <ul className="space-y-1">
                     {group.items.map((task) => (
-                      <li key={task.id} className="flex items-center justify-between gap-2 rounded-md bg-gray-50 px-2 py-1.5">
+                      <li key={task.id} className="flex items-center justify-between gap-2 rounded-xl bg-white/55 px-3 py-2">
                         <button type="button" className="min-w-0 flex-1 truncate text-left text-sm" title={task.name} onClick={() => handleOpenEdit(task)}>
                           {task.name}
                         </button>
@@ -656,15 +656,15 @@ export function TaskDashboard({
         }}
         className="p-6"
       >
-        <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors duration-150">
+        <CollapsibleTrigger className="section-trigger flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm font-medium text-gray-900 transition-colors duration-150 hover:bg-white/70">
           已完成任务库
           <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${completedSectionOpen ? "" : "-rotate-90"}`} />
         </CollapsibleTrigger>
         <CollapsibleContent>
           {completedTasks.length > 0 ? (
-            <ul className="mt-4 space-y-3 border border-gray-200 rounded-lg p-4 text-sm text-gray-600">
+            <ul className="mt-4 space-y-3 rounded-2xl subtle-card p-4 text-sm text-gray-600">
               {completedTasks.map((task) => (
-                <li key={task.id} className="rounded-md border border-gray-200 bg-white px-3 py-2">
+                <li key={task.id} className="rounded-xl border border-stone-200/70 bg-white/65 px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <button
                       type="button"

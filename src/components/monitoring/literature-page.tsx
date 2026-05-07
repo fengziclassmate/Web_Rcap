@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Filter, LibraryBig, Paperclip, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +70,67 @@ const detailTabs: Array<{ value: DetailTab; label: string }> = [
   { value: "logs", label: "阅读记录" },
 ];
 
+function literatureFormFromItem(item?: LiteratureItem): LiteratureFormInput {
+  return item
+    ? {
+        title: item.title,
+        authors: item.authors,
+        year: item.year ? String(item.year) : "",
+        venue: item.venue,
+        doi: item.doi,
+        url: item.url,
+        pdfUrl: item.pdfUrl,
+        abstract: item.abstract,
+        keywords: item.keywords.join(", "),
+        status: item.status,
+        importance: item.importance,
+        summary: item.summary,
+        contributions: item.contributions,
+        limitations: item.limitations,
+        tagNames: item.tags.map((tag) => tag.name),
+        projectIds: item.projectLinks.map((link) => link.projectId),
+        paperIds: Array.from(new Set(item.paperUsages.map((usage) => usage.paperId))),
+      }
+    : {
+        title: "",
+        authors: "",
+        year: "",
+        venue: "",
+        doi: "",
+        url: "",
+        pdfUrl: "",
+        abstract: "",
+        keywords: "",
+        status: "to_read",
+        importance: "medium",
+        summary: "",
+        contributions: "",
+        limitations: "",
+        tagNames: [],
+        projectIds: [],
+        paperIds: [],
+      };
+}
+
+function normalizeLiteratureForm(draft: LiteratureFormInput, tagInput?: string): LiteratureFormInput {
+  return {
+    ...draft,
+    title: draft.title.trim(),
+    authors: draft.authors.trim(),
+    year: draft.year.trim(),
+    venue: draft.venue.trim(),
+    doi: draft.doi.trim(),
+    url: draft.url.trim(),
+    pdfUrl: draft.pdfUrl.trim(),
+    abstract: draft.abstract.trim(),
+    keywords: parseKeywordInput(draft.keywords).join(", "),
+    summary: draft.summary.trim(),
+    contributions: draft.contributions.trim(),
+    limitations: draft.limitations.trim(),
+    tagNames: parseTagInput(tagInput ?? draft.tagNames.join(", ")),
+  };
+}
+
 export function LiteraturePage({
   items,
   tags,
@@ -88,7 +149,6 @@ export function LiteraturePage({
   const [view, setView] = useState<LiteratureView>("list");
   const [filters, setFilters] = useState<LiteratureFilters>(defaultLiteratureFilters);
   const [activeId, setActiveId] = useState<string | null>(items[0]?.id ?? null);
-  const [editingItem, setEditingItem] = useState<LiteratureItem | null>(null);
   const [creating, setCreating] = useState(false);
   const [collapsedColumns, setCollapsedColumns] = useState<Record<string, boolean>>({
     to_read: false,
@@ -118,15 +178,15 @@ export function LiteraturePage({
       </aside>
 
       <div className="space-y-4">
-        <section className="rounded-lg border border-gray-200 bg-white shadow-md">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4">
+        <section className="module-shell">
+          <div className="module-header flex flex-wrap items-center justify-between gap-3 px-5 py-5">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">文献阅读管理</h2>
-              <p className="mt-1 text-sm text-gray-600">管理阅读状态、结构化笔记、摘录与论文使用位置。</p>
+              <h2 className="text-lg font-semibold tracking-tight text-stone-950">文献阅读管理</h2>
+              <p className="mt-1 text-sm text-stone-500">管理阅读状态、结构化笔记、摘录与论文使用位置。</p>
             </div>
             <div className="flex items-center gap-2">
               <ViewSwitch view={view} onChange={setView} />
-              <Button type="button" onClick={() => setCreating(true)} className="rounded-sm">
+              <Button type="button" onClick={() => setCreating(true)} className="rounded-xl">
                 <Plus className="mr-2 h-4 w-4" />
                 新建文献
               </Button>
@@ -141,7 +201,7 @@ export function LiteraturePage({
                 : "xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]",
             )}
           >
-            <div className="border-b border-gray-200 xl:border-b-0 xl:border-r">
+            <div className="border-b border-stone-200/70 xl:border-b-0 xl:border-r">
               {view === "list" ? (
                 <LiteratureList
                   items={visibleItems}
@@ -149,7 +209,7 @@ export function LiteraturePage({
                   projects={projects}
                   papers={papers}
                   onSelect={setActiveId}
-                  onEdit={setEditingItem}
+                  onEdit={(item) => setActiveId(item.id)}
                   onDelete={onDeleteLiterature}
                 />
               ) : (
@@ -174,7 +234,7 @@ export function LiteraturePage({
                   item={activeItem}
                   projects={projects}
                   papers={papers}
-                  onEdit={() => setEditingItem(activeItem)}
+                  onUpdate={onUpdateLiterature}
                   onSaveNote={onSaveNote}
                   onCreateExcerpt={onCreateExcerpt}
                   onUpdateExcerpt={onUpdateExcerpt}
@@ -193,13 +253,12 @@ export function LiteraturePage({
       </div>
 
       <LiteratureEditorModal
-        open={creating || Boolean(editingItem)}
-        item={editingItem}
+        open={creating}
+        item={null}
         projects={projects}
         papers={papers}
         onClose={() => {
           setCreating(false);
-          setEditingItem(null);
         }}
         onCreate={async (input) => {
           await onCreateLiterature(input);
@@ -207,7 +266,6 @@ export function LiteraturePage({
         }}
         onUpdate={async (id, input) => {
           await onUpdateLiterature(id, input);
-          setEditingItem(null);
         }}
       />
     </section>
@@ -239,8 +297,8 @@ function LiteratureStatsPanel({
   stats: ReturnType<typeof buildLiteratureStats>;
 }) {
   return (
-    <section className="rounded-lg border border-gray-200 bg-white shadow-md">
-      <div className="border-b border-gray-200 px-4 py-4">
+    <section className="module-shell">
+      <div className="module-header px-4 py-4">
         <div className="flex items-center gap-2">
           <LibraryBig className="h-4 w-4 text-gray-600" />
           <h3 className="text-base font-semibold text-gray-900">阅读统计</h3>
@@ -296,8 +354,8 @@ function LiteratureFilterPanel({
   onChange: (filters: LiteratureFilters) => void;
 }) {
   return (
-    <section className="rounded-lg border border-gray-200 bg-white shadow-md">
-      <div className="border-b border-gray-200 px-4 py-4">
+    <section className="module-shell">
+      <div className="module-header px-4 py-4">
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-gray-600" />
           <h3 className="text-base font-semibold text-gray-900">筛选</h3>
@@ -388,8 +446,8 @@ function LiteratureList({
                 key={item.id}
                 type="button"
                 className={cn(
-                  "block w-full px-4 py-4 text-left transition hover:bg-gray-50",
-                  activeId === item.id && "bg-gray-50",
+                  "block w-full px-4 py-4 text-left transition hover:bg-white/65",
+                  activeId === item.id && "bg-white/75",
                 )}
                 onClick={() => onSelect(item.id)}
               >
@@ -466,11 +524,11 @@ function LiteratureBoard({
           const collapsed = collapsedColumns[column.key] ?? false;
 
           return (
-            <section key={column.key} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <section key={column.key} className="overflow-hidden rounded-2xl subtle-card">
               <button
                 type="button"
                 onClick={() => onToggleColumn(column.key)}
-                className="flex w-full items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-left transition hover:bg-gray-100"
+                  className="flex w-full items-center justify-between gap-3 border-b border-stone-200/70 bg-white/45 px-4 py-3 text-left transition hover:bg-white/70"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900">{column.label}</p>
@@ -501,8 +559,8 @@ function LiteratureBoard({
                           key={item.id}
                           type="button"
                           className={cn(
-                            "block w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition hover:border-gray-300 hover:bg-gray-50",
-                            activeId === item.id && "border-black ring-1 ring-black/10",
+                            "interactive-card block w-full rounded-2xl px-4 py-3 text-left",
+                            activeId === item.id && "border-stone-950 ring-1 ring-stone-950/10",
                           )}
                           onClick={() => onSelect(item.id)}
                         >
@@ -544,7 +602,7 @@ function LiteratureDetail({
   item,
   projects,
   papers,
-  onEdit,
+  onUpdate,
   onSaveNote,
   onCreateExcerpt,
   onUpdateExcerpt,
@@ -555,7 +613,7 @@ function LiteratureDetail({
   item: LiteratureItem;
   projects: LiteratureReferenceOption[];
   papers: LiteratureReferenceOption[];
-  onEdit: () => void;
+  onUpdate: (id: string, input: LiteratureFormInput) => Promise<void>;
   onSaveNote: (literatureId: string, input: LiteratureNoteInput) => Promise<void>;
   onCreateExcerpt: (literatureId: string, input: LiteratureExcerptInput) => Promise<void>;
   onUpdateExcerpt: (excerptId: string, input: LiteratureExcerptInput) => Promise<void>;
@@ -564,6 +622,15 @@ function LiteratureDetail({
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
 }) {
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<LiteratureFormInput>(() => literatureFormFromItem(item));
+  const [tagInput, setTagInput] = useState(item.tags.map((tag) => tag.name).join(", "));
+
+  useEffect(() => {
+    setEditing(false);
+    setDraft(literatureFormFromItem(item));
+    setTagInput(item.tags.map((tag) => tag.name).join(", "));
+  }, [item.id, item.tags]);
 
   return (
     <div className="flex h-full flex-col">
@@ -581,7 +648,7 @@ function LiteratureDetail({
               {item.venue ? ` · ${item.venue}` : ""}
             </p>
           </div>
-          <Button type="button" variant="outline" onClick={onEdit}>
+          <Button type="button" variant="outline" onClick={() => setEditing((value) => !value)}>
             <Pencil className="mr-2 h-4 w-4" />
             编辑文献
           </Button>
@@ -602,6 +669,28 @@ function LiteratureDetail({
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
+        {editing ? (
+          <InlineLiteratureEditor
+            draft={draft}
+            tagInput={tagInput}
+            projects={projects}
+            papers={papers}
+            onDraftChange={setDraft}
+            onTagInputChange={(value) => {
+              setTagInput(value);
+              setDraft((prev) => ({ ...prev, tagNames: parseTagInput(value) }));
+            }}
+            onCancel={() => {
+              setDraft(literatureFormFromItem(item));
+              setTagInput(item.tags.map((tag) => tag.name).join(", "));
+              setEditing(false);
+            }}
+            onSave={async () => {
+              await onUpdate(item.id, normalizeLiteratureForm(draft, tagInput));
+              setEditing(false);
+            }}
+          />
+        ) : null}
         {activeTab === "overview" ? <OverviewTab item={item} projects={projects} papers={papers} /> : null}
         {activeTab === "notes" ? <NoteTab item={item} onSaveNote={onSaveNote} /> : null}
         {activeTab === "excerpts" ? (
@@ -625,6 +714,105 @@ function LiteratureDetail({
         {activeTab === "logs" ? <ReadingLogsTab item={item} /> : null}
       </div>
     </div>
+  );
+}
+
+function InlineLiteratureEditor({
+  draft,
+  tagInput,
+  projects,
+  papers,
+  onDraftChange,
+  onTagInputChange,
+  onCancel,
+  onSave,
+}: {
+  draft: LiteratureFormInput;
+  tagInput: string;
+  projects: LiteratureReferenceOption[];
+  papers: LiteratureReferenceOption[];
+  onDraftChange: Dispatch<SetStateAction<LiteratureFormInput>>;
+  onTagInputChange: (value: string) => void;
+  onCancel: () => void;
+  onSave: () => Promise<void>;
+}) {
+  return (
+    <section className="mb-5 rounded-2xl border border-stone-200 bg-stone-50/80 p-4 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h4 className="text-sm font-semibold text-stone-950">文献信息编辑</h4>
+          <p className="mt-1 text-xs text-stone-500">在详情页直接修改并保存，不再打开编辑弹窗。</p>
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+            取消
+          </Button>
+          <Button type="button" size="sm" disabled={!draft.title.trim()} onClick={() => void onSave()}>
+            保存修改
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <FieldInput label="标题" value={draft.title} onChange={(value) => onDraftChange((prev) => ({ ...prev, title: value }))} />
+        <FieldInput label="作者" value={draft.authors} onChange={(value) => onDraftChange((prev) => ({ ...prev, authors: value }))} />
+        <FieldInput label="年份" value={draft.year} onChange={(value) => onDraftChange((prev) => ({ ...prev, year: value }))} />
+        <FieldInput label="期刊 / 会议" value={draft.venue} onChange={(value) => onDraftChange((prev) => ({ ...prev, venue: value }))} />
+        <FieldInput label="DOI" value={draft.doi} onChange={(value) => onDraftChange((prev) => ({ ...prev, doi: value }))} />
+        <FieldInput label="URL" value={draft.url} onChange={(value) => onDraftChange((prev) => ({ ...prev, url: value }))} />
+        <FieldInput label="PDF URL / 文件路径" value={draft.pdfUrl} onChange={(value) => onDraftChange((prev) => ({ ...prev, pdfUrl: value }))} />
+        <FieldInput label="关键词" value={draft.keywords} onChange={(value) => onDraftChange((prev) => ({ ...prev, keywords: value }))} />
+        <FieldSelect
+          label="阅读状态"
+          value={draft.status}
+          options={literatureStatusOptions}
+          onChange={(value) => value && onDraftChange((prev) => ({ ...prev, status: value as LiteratureFormInput["status"] }))}
+        />
+        <FieldSelect
+          label="重要程度"
+          value={draft.importance}
+          options={literatureImportanceOptions}
+          onChange={(value) => value && onDraftChange((prev) => ({ ...prev, importance: value as LiteratureFormInput["importance"] }))}
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4">
+        <FieldTextarea label="摘要" value={draft.abstract} onChange={(value) => onDraftChange((prev) => ({ ...prev, abstract: value }))} />
+        <FieldTextarea label="一句话总结" value={draft.summary} onChange={(value) => onDraftChange((prev) => ({ ...prev, summary: value }))} />
+        <FieldTextarea label="主要贡献" value={draft.contributions} onChange={(value) => onDraftChange((prev) => ({ ...prev, contributions: value }))} />
+        <FieldTextarea label="局限性" value={draft.limitations} onChange={(value) => onDraftChange((prev) => ({ ...prev, limitations: value }))} />
+        <FieldInput label="标签" value={tagInput} onChange={onTagInputChange} placeholder="多个标签用英文逗号分隔" />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <MultiSelectSection
+          label="关联项目"
+          options={projects}
+          selectedIds={draft.projectIds}
+          onToggle={(id) =>
+            onDraftChange((prev) => ({
+              ...prev,
+              projectIds: prev.projectIds.includes(id)
+                ? prev.projectIds.filter((itemId) => itemId !== id)
+                : [...prev.projectIds, id],
+            }))
+          }
+        />
+        <MultiSelectSection
+          label="关联论文"
+          options={papers}
+          selectedIds={draft.paperIds}
+          onToggle={(id) =>
+            onDraftChange((prev) => ({
+              ...prev,
+              paperIds: prev.paperIds.includes(id)
+                ? prev.paperIds.filter((itemId) => itemId !== id)
+                : [...prev.paperIds, id],
+            }))
+          }
+        />
+      </div>
+    </section>
   );
 }
 
@@ -1024,45 +1212,7 @@ function LiteratureEditorModal({
   onCreate: (input: LiteratureFormInput) => Promise<void>;
   onUpdate: (id: string, input: LiteratureFormInput) => Promise<void>;
 }) {
-  const initialValue: LiteratureFormInput = item
-    ? {
-        title: item.title,
-        authors: item.authors,
-        year: item.year ? String(item.year) : "",
-        venue: item.venue,
-        doi: item.doi,
-        url: item.url,
-        pdfUrl: item.pdfUrl,
-        abstract: item.abstract,
-        keywords: item.keywords.join(", "),
-        status: item.status,
-        importance: item.importance,
-        summary: item.summary,
-        contributions: item.contributions,
-        limitations: item.limitations,
-        tagNames: item.tags.map((tag) => tag.name),
-        projectIds: item.projectLinks.map((link) => link.projectId),
-        paperIds: Array.from(new Set(item.paperUsages.map((usage) => usage.paperId))),
-      }
-    : {
-        title: "",
-        authors: "",
-        year: "",
-        venue: "",
-        doi: "",
-        url: "",
-        pdfUrl: "",
-        abstract: "",
-        keywords: "",
-        status: "to_read",
-        importance: "medium",
-        summary: "",
-        contributions: "",
-        limitations: "",
-        tagNames: [],
-        projectIds: [],
-        paperIds: [],
-      };
+  const initialValue = literatureFormFromItem(item ?? undefined);
 
   const [draft, setDraft] = useState<LiteratureFormInput>(initialValue);
   const [tagInput, setTagInput] = useState(initialValue.tagNames.join(", "));
@@ -1162,21 +1312,7 @@ function LiteratureEditorModal({
             type="button"
             disabled={!draft.title.trim()}
             onClick={async () => {
-              const normalized = {
-                ...draft,
-                title: draft.title.trim(),
-                authors: draft.authors.trim(),
-                venue: draft.venue.trim(),
-                doi: draft.doi.trim(),
-                url: draft.url.trim(),
-                pdfUrl: draft.pdfUrl.trim(),
-                abstract: draft.abstract.trim(),
-                keywords: parseKeywordInput(draft.keywords).join(", "),
-                summary: draft.summary.trim(),
-                contributions: draft.contributions.trim(),
-                limitations: draft.limitations.trim(),
-                tagNames: parseTagInput(tagInput),
-              };
+              const normalized = normalizeLiteratureForm(draft, tagInput);
               if (item) {
                 await onUpdate(item.id, normalized);
                 return;

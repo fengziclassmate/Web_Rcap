@@ -189,6 +189,49 @@
       linear-gradient(135deg, color-mix(in oklch, var(--moss) 72%, white), color-mix(in oklch, var(--fjord) 64%, white));
     box-shadow: 0 12px 26px color-mix(in oklch, var(--fjord) 24%, transparent);
   }
+
+  .module-shell {
+    overflow: hidden;
+    border-radius: 1.35rem;
+    border: 1px solid color-mix(in oklch, var(--border) 74%, white);
+    background:
+      linear-gradient(145deg, color-mix(in oklch, white 82%, transparent), color-mix(in oklch, var(--paper) 88%, transparent)),
+      radial-gradient(circle at 16% 0%, color-mix(in oklch, var(--moss) 8%, transparent), transparent 34%);
+    box-shadow:
+      0 1px 0 color-mix(in oklch, white 76%, transparent) inset,
+      0 24px 70px color-mix(in oklch, var(--foreground) 9%, transparent);
+    backdrop-filter: blur(16px);
+  }
+
+  .module-header {
+    border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, white);
+    background:
+      linear-gradient(135deg, color-mix(in oklch, white 72%, transparent), color-mix(in oklch, var(--secondary) 74%, transparent));
+  }
+
+  .subtle-card {
+    border: 1px solid color-mix(in oklch, var(--border) 76%, white);
+    background: color-mix(in oklch, white 68%, transparent);
+    box-shadow: 0 10px 28px color-mix(in oklch, var(--foreground) 5%, transparent);
+  }
+
+  .interactive-card {
+    border: 1px solid color-mix(in oklch, var(--border) 78%, white);
+    background: color-mix(in oklch, white 72%, transparent);
+    box-shadow: 0 8px 20px color-mix(in oklch, var(--foreground) 4%, transparent);
+    transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .interactive-card:hover {
+    border-color: color-mix(in oklch, var(--moss) 34%, var(--border));
+    background: color-mix(in oklch, white 88%, transparent);
+    box-shadow: 0 16px 32px color-mix(in oklch, var(--foreground) 7%, transparent);
+  }
+
+  .section-trigger {
+    border: 1px solid color-mix(in oklch, var(--border) 76%, white);
+    background: color-mix(in oklch, white 58%, transparent);
+  }
 }
 
 .workbench-shell section.rounded-lg.border,

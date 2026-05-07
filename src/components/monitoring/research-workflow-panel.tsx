@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
 import {
   FileText,
   Filter,
@@ -292,6 +292,7 @@ export function ResearchWorkflowPanel({
     meetings: "basic",
   });
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
+  const [inlineEditingProjectId, setInlineEditingProjectId] = useState<string | null>(null);
   const [paperDialogOpen, setPaperDialogOpen] = useState(false);
   const [submissionDialogOpen, setSubmissionDialogOpen] = useState(false);
   const [meetingDialogOpen, setMeetingDialogOpen] = useState(false);
@@ -409,8 +410,9 @@ export function ResearchWorkflowPanel({
 
   function openEditDialog(id: string) {
     if (module === "research") {
-      setProjectDraft(projectDraftFromValue(workflow.projects.find((item) => item.id === id)));
-      setProjectDialogOpen(true);
+      setSelectedIdState((prev) => ({ ...prev, research: id }));
+      setDetailTabState((prev) => ({ ...prev, research: "overview" }));
+      setInlineEditingProjectId(id);
       return;
     }
     if (module === "paper") {
@@ -859,7 +861,44 @@ export function ResearchWorkflowPanel({
             attachments={selectedProjectAttachments}
             timeline={selectedTimelines}
             activeTab={selectedTab}
+            editing={inlineEditingProjectId === selectedProject.id}
             onTabChange={(tab) => setDetailTabState((prev) => ({ ...prev, research: tab }))}
+            onEditingChange={(editing) => setInlineEditingProjectId(editing ? selectedProject.id : null)}
+            onUpdateProject={(draft) => {
+              const plannedTaskIds = draft.plannedTaskIdsText
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean);
+              commit((prev) => ({
+                ...prev,
+                projects: prev.projects.map((item) =>
+                  item.id === selectedProject.id
+                    ? {
+                        ...item,
+                        title: draft.title.trim(),
+                        summary: draft.summary.trim(),
+                        status: draft.status,
+                        priority: draft.priority,
+                        progress: clampProgress(draft.progress),
+                        startDate: draft.startDate,
+                        targetEndDate: draft.targetEndDate,
+                        researchQuestion: draft.researchQuestion.trim(),
+                        hypothesis: draft.hypothesis.trim(),
+                        method: draft.method.trim(),
+                        dataSources: draft.dataSources.trim(),
+                        currentIssues: draft.currentIssues.trim(),
+                        nextActions: draft.nextActions.trim(),
+                        plannedTaskIds,
+                      }
+                    : item,
+                ),
+                timelineEntries: [
+                  createTimelineEntry("project", selectedProject.id, todayISO(), draft.title.trim() || selectedProject.title, "项目详情已更新"),
+                  ...prev.timelineEntries,
+                ],
+              }));
+              setInlineEditingProjectId(null);
+            }}
             onAddLog={(log) =>
               commit((prev) => ({
                 ...prev,
@@ -1351,6 +1390,63 @@ function LinkedItemList({ labels }: { labels: string[] }) {
   );
 }
 
+function ProjectInlineEditor({
+  draft,
+  onDraftChange,
+  onCancel,
+  onSave,
+}: {
+  draft: ProjectDraft;
+  onDraftChange: Dispatch<SetStateAction<ProjectDraft>>;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <DetailSection
+      title="项目详情编辑"
+      action={
+        <div className="flex gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+            取消
+          </Button>
+          <Button type="button" size="sm" disabled={!draft.title.trim()} onClick={onSave}>
+            保存修改
+          </Button>
+        </div>
+      }
+    >
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <LabeledInput label="标题" value={draft.title} onChange={(value) => onDraftChange((prev) => ({ ...prev, title: value }))} />
+        <LabeledInput label="进度" type="number" value={String(draft.progress)} onChange={(value) => onDraftChange((prev) => ({ ...prev, progress: Number(value) || 0 }))} />
+        <LabeledSelect
+          label="状态"
+          value={draft.status}
+          options={researchProjectStatusOptions}
+          onChange={(value) => value && onDraftChange((prev) => ({ ...prev, status: value as ResearchProjectStatus }))}
+        />
+        <LabeledSelect
+          label="优先级"
+          value={draft.priority}
+          options={priorityOptions}
+          onChange={(value) => value && onDraftChange((prev) => ({ ...prev, priority: value as WorkflowPriority }))}
+        />
+        <LabeledInput label="开始日期" type="date" value={draft.startDate} onChange={(value) => onDraftChange((prev) => ({ ...prev, startDate: value }))} />
+        <LabeledInput label="目标结束日期" type="date" value={draft.targetEndDate} onChange={(value) => onDraftChange((prev) => ({ ...prev, targetEndDate: value }))} />
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-3">
+        <LabeledTextarea label="简介" value={draft.summary} onChange={(value) => onDraftChange((prev) => ({ ...prev, summary: value }))} />
+        <LabeledTextarea label="研究问题" value={draft.researchQuestion} onChange={(value) => onDraftChange((prev) => ({ ...prev, researchQuestion: value }))} />
+        <LabeledTextarea label="研究假设" value={draft.hypothesis} onChange={(value) => onDraftChange((prev) => ({ ...prev, hypothesis: value }))} />
+        <LabeledTextarea label="方法" value={draft.method} onChange={(value) => onDraftChange((prev) => ({ ...prev, method: value }))} />
+        <LabeledTextarea label="数据来源" value={draft.dataSources} onChange={(value) => onDraftChange((prev) => ({ ...prev, dataSources: value }))} />
+        <LabeledTextarea label="当前问题" value={draft.currentIssues} onChange={(value) => onDraftChange((prev) => ({ ...prev, currentIssues: value }))} />
+        <LabeledTextarea label="下一步行动" value={draft.nextActions} onChange={(value) => onDraftChange((prev) => ({ ...prev, nextActions: value }))} />
+        <LabeledInput label="预留任务 ID" value={draft.plannedTaskIdsText} onChange={(value) => onDraftChange((prev) => ({ ...prev, plannedTaskIdsText: value }))} />
+      </div>
+    </DetailSection>
+  );
+}
+
 function ProjectDetails({
   project,
   papers,
@@ -1359,7 +1455,10 @@ function ProjectDetails({
   attachments,
   timeline,
   activeTab,
+  editing,
   onTabChange,
+  onEditingChange,
+  onUpdateProject,
   onAddLog,
   onCreateTask,
   onUploadAttachments,
@@ -1372,12 +1471,16 @@ function ProjectDetails({
   attachments: ProjectAttachment[];
   timeline: TimelineEntry[];
   activeTab: string;
+  editing: boolean;
   onTabChange: (value: string) => void;
+  onEditingChange: (value: boolean) => void;
+  onUpdateProject: (value: ProjectDraft) => void;
   onAddLog: (value: ProjectLog) => void;
   onCreateTask: (title: string, dueDate?: string, notes?: string, targetId?: string) => void;
   onUploadAttachments: (files: File[]) => Promise<void>;
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
 }) {
+  const [projectDraft, setProjectDraft] = useState<ProjectDraft>(() => projectDraftFromValue(project));
   const [logDraft, setLogDraft] = useState({
     date: todayISO(),
     progressText: "",
@@ -1386,14 +1489,23 @@ function ProjectDetails({
     syncToActivityLog: true,
   });
 
+  useEffect(() => {
+    setProjectDraft(projectDraftFromValue(project));
+  }, [project]);
+
   return (
     <div className="h-full">
       <header className="border-b border-gray-200 px-5 py-4">
-        <div className="flex items-center gap-2">
-          <FlaskConical className="h-4 w-4 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">{project.title}</h2>
-          <Badge variant="secondary">{statusLabel(project.status)}</Badge>
-          <Badge variant="secondary">{priorityLabel(project.priority)}</Badge>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <FlaskConical className="h-4 w-4 text-gray-600" />
+            <h2 className="text-lg font-semibold text-gray-900">{project.title}</h2>
+            <Badge variant="secondary">{statusLabel(project.status)}</Badge>
+            <Badge variant="secondary">{priorityLabel(project.priority)}</Badge>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => onEditingChange(!editing)}>
+            {editing ? "收起编辑" : "编辑项目"}
+          </Button>
         </div>
         <p className="mt-2 text-sm text-gray-600">{project.summary || "暂无简介"}</p>
       </header>
@@ -1412,6 +1524,17 @@ function ProjectDetails({
         onChange={onTabChange}
       />
       <div className="space-y-4 p-5">
+        {editing ? (
+          <ProjectInlineEditor
+            draft={projectDraft}
+            onDraftChange={setProjectDraft}
+            onCancel={() => {
+              setProjectDraft(projectDraftFromValue(project));
+              onEditingChange(false);
+            }}
+            onSave={() => onUpdateProject(projectDraft)}
+          />
+        ) : null}
         {activeTab === "overview" && (
           <>
             <DetailSection title="项目状态">
