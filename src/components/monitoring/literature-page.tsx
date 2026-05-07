@@ -1,7 +1,23 @@
 "use client";
 
-import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Filter, LibraryBig, Paperclip, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from "react";
+import {
+  ArrowRight,
+  BookOpenCheck,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  ClipboardCheck,
+  Filter,
+  Gauge,
+  LibraryBig,
+  Paperclip,
+  Pencil,
+  Plus,
+  Search,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -148,6 +164,54 @@ function normalizeLiteratureForm(draft: LiteratureFormInput, tagInput?: string):
   };
 }
 
+type LiteratureCompleteness = {
+  score: number;
+  done: number;
+  total: number;
+  missing: string[];
+  strengths: string[];
+};
+
+function buildLiteratureCompleteness(item: LiteratureItem | null): LiteratureCompleteness {
+  if (!item) return { score: 0, done: 0, total: 0, missing: [], strengths: [] };
+
+  const checks: Array<{ label: string; done: boolean; strength?: string }> = [
+    { label: "作者", done: Boolean(item.authors.trim()) },
+    { label: "年份", done: Boolean(item.year) },
+    { label: "期刊 / 会议", done: Boolean(item.venue.trim()) },
+    { label: "摘要", done: Boolean(item.abstract.trim()) },
+    { label: "关键词", done: item.keywords.length > 0 },
+    { label: "标签", done: item.tags.length > 0, strength: `${item.tags.length} 个标签` },
+    { label: "一句话总结", done: Boolean(item.summary.trim()) },
+    { label: "主要贡献", done: Boolean(item.contributions.trim()) },
+    { label: "局限性", done: Boolean(item.limitations.trim()) },
+    { label: "结构化笔记", done: Boolean(item.note), strength: item.note ? "已写阅读笔记" : undefined },
+    { label: "摘录观点", done: item.excerpts.length > 0, strength: item.excerpts.length > 0 ? `${item.excerpts.length} 条摘录` : undefined },
+    { label: "方法借鉴", done: item.methodNotes.length > 0, strength: item.methodNotes.length > 0 ? `${item.methodNotes.length} 个方法` : undefined },
+    { label: "论文使用", done: item.paperUsages.length > 0, strength: item.paperUsages.length > 0 ? `${item.paperUsages.length} 处使用` : undefined },
+    { label: "关联项目", done: item.projectLinks.length > 0 },
+    { label: "阅读记录", done: item.readingLogs.length > 0, strength: item.readingLogs.length > 0 ? `${item.readingLogs.length} 次阅读` : undefined },
+    { label: "附件", done: item.attachments.length > 0 },
+  ];
+  const done = checks.filter((check) => check.done).length;
+  return {
+    score: Math.round((done / checks.length) * 100),
+    done,
+    total: checks.length,
+    missing: checks.filter((check) => !check.done).map((check) => check.label).slice(0, 6),
+    strengths: checks
+      .map((check) => (check.done ? check.strength : null))
+      .filter((value): value is string => Boolean(value))
+      .slice(0, 4),
+  };
+}
+
+function statusToneClass(score: number) {
+  if (score >= 80) return "from-emerald-500 to-teal-500";
+  if (score >= 55) return "from-amber-500 to-orange-400";
+  return "from-stone-400 to-slate-500";
+}
+
 export function LiteraturePage({
   items,
   tags,
@@ -189,11 +253,12 @@ export function LiteraturePage({
     [visibleItems, activeId],
   );
   const stats = useMemo(() => buildLiteratureStats(items, tags), [items, tags]);
+  const activeCompleteness = useMemo(() => buildLiteratureCompleteness(activeItem), [activeItem]);
 
   return (
     <section className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
       <aside className="space-y-4">
-        <LiteratureStatsPanel stats={stats} />
+        <LiteratureStatsPanel stats={stats} activeItem={activeItem} completeness={activeCompleteness} />
         <LiteratureFilterPanel
           filters={filters}
           tags={tags}
@@ -204,6 +269,14 @@ export function LiteraturePage({
       </aside>
 
       <div className="space-y-4">
+        <LiteratureWorkbenchHero
+          stats={stats}
+          activeItem={activeItem}
+          visibleCount={visibleItems.length}
+          totalCount={items.length}
+          completeness={activeCompleteness}
+          onCreate={() => setCreating(true)}
+        />
         <section className="module-shell">
           <div className="module-header flex flex-wrap items-center justify-between gap-3 px-5 py-5">
             <div>
@@ -326,10 +399,101 @@ function ViewSwitch({
   );
 }
 
-function LiteratureStatsPanel({
+function LiteratureWorkbenchHero({
   stats,
+  activeItem,
+  visibleCount,
+  totalCount,
+  completeness,
+  onCreate,
 }: {
   stats: ReturnType<typeof buildLiteratureStats>;
+  activeItem: LiteratureItem | null;
+  visibleCount: number;
+  totalCount: number;
+  completeness: LiteratureCompleteness;
+  onCreate: () => void;
+}) {
+  return (
+    <section className="relative overflow-hidden rounded-3xl border border-stone-200 bg-[radial-gradient(circle_at_20%_20%,rgba(245,158,11,0.18),transparent_28%),linear-gradient(135deg,#f8f5ee_0%,#edf4f1_52%,#e7eef3_100%)] p-5 shadow-[0_24px_70px_rgba(68,64,60,0.12)]">
+      <div className="absolute right-6 top-5 h-24 w-24 rounded-full border border-white/60 bg-white/20 blur-sm" />
+      <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-stone-500">
+            <Sparkles className="h-4 w-4" />
+            Literature cockpit
+          </div>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-stone-950">文献阅读研究台</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
+            用阅读状态、摘录、方法借鉴和论文使用位置，把文献从“收藏”推进到“可写作、可复用、可沉淀”。
+          </p>
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <HeroMetric label="筛选结果" value={`${visibleCount}/${totalCount}`} />
+            <HeroMetric label="核心文献" value={String(stats.core)} />
+            <HeroMetric label="阅读中" value={String(stats.active)} />
+            <HeroMetric label="连续阅读" value={`${stats.recentReadingDays} 天`} />
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-white/70 bg-white/65 p-4 shadow-sm backdrop-blur">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-stone-400">当前文献</p>
+              <h3 className="mt-2 line-clamp-2 text-base font-semibold text-stone-950">
+                {activeItem?.title ?? "暂无选中文献"}
+              </h3>
+            </div>
+            <div className="shrink-0 text-right">
+              <div className={cn("rounded-2xl bg-gradient-to-br px-3 py-2 text-white shadow-sm", statusToneClass(completeness.score))}>
+                <div className="text-lg font-semibold">{completeness.score}%</div>
+                <div className="text-[10px] uppercase tracking-wide opacity-90">Ready</div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-stone-200">
+            <div
+              className={cn("h-full rounded-full bg-gradient-to-r transition-all", statusToneClass(completeness.score))}
+              style={{ width: `${completeness.score}%` }}
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {completeness.strengths.length > 0 ? (
+              completeness.strengths.map((item) => (
+                <span key={item} className="rounded-full bg-white px-2.5 py-1 text-xs text-stone-600 shadow-sm">
+                  {item}
+                </span>
+              ))
+            ) : (
+              <span className="rounded-full bg-white px-2.5 py-1 text-xs text-stone-500 shadow-sm">等待补全阅读信息</span>
+            )}
+          </div>
+          <Button type="button" className="mt-4 w-full rounded-2xl" onClick={onCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            新建文献
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HeroMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/70 bg-white/55 px-3 py-3 shadow-sm backdrop-blur">
+      <div className="text-lg font-semibold text-stone-950">{value}</div>
+      <div className="mt-1 text-xs text-stone-500">{label}</div>
+    </div>
+  );
+}
+
+function LiteratureStatsPanel({
+  stats,
+  activeItem,
+  completeness,
+}: {
+  stats: ReturnType<typeof buildLiteratureStats>;
+  activeItem: LiteratureItem | null;
+  completeness: LiteratureCompleteness;
 }) {
   return (
     <section className="module-shell">
@@ -340,6 +504,24 @@ function LiteratureStatsPanel({
         </div>
       </div>
       <div className="space-y-4 p-4">
+        <div className="rounded-2xl border border-stone-200 bg-gradient-to-br from-stone-50 to-white p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium text-stone-500">当前完整度</p>
+              <p className="mt-1 line-clamp-1 text-sm font-semibold text-stone-900">{activeItem?.title ?? "未选择文献"}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xl font-semibold text-stone-950">{completeness.score}%</p>
+              <p className="text-[11px] text-stone-500">{completeness.done}/{completeness.total}</p>
+            </div>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-200">
+            <div
+              className={cn("h-full rounded-full bg-gradient-to-r", statusToneClass(completeness.score))}
+              style={{ width: `${completeness.score}%` }}
+            />
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="文献总数" value={String(stats.total)} />
           <StatCard label="阅读中" value={String(stats.active)} />
@@ -388,6 +570,15 @@ function LiteratureFilterPanel({
   papers: LiteratureReferenceOption[];
   onChange: (filters: LiteratureFilters) => void;
 }) {
+  const activeFilters = [
+    filters.query.trim() ? `关键词：${filters.query.trim()}` : null,
+    filters.status !== "all" ? `状态：${statusLabel(filters.status)}` : null,
+    filters.importance !== "all" ? `重要度：${importanceLabel(filters.importance)}` : null,
+    filters.tagId !== "all" ? `标签：${tags.find((tag) => tag.id === filters.tagId)?.name ?? filters.tagId}` : null,
+    filters.projectId !== "all" ? `项目：${projects.find((project) => project.id === filters.projectId)?.title ?? filters.projectId}` : null,
+    filters.paperId !== "all" ? `论文：${papers.find((paper) => paper.id === filters.paperId)?.title ?? filters.paperId}` : null,
+  ].filter((value): value is string => Boolean(value));
+
   return (
     <section className="module-shell">
       <div className="module-header px-4 py-4">
@@ -397,6 +588,15 @@ function LiteratureFilterPanel({
         </div>
       </div>
       <div className="space-y-4 p-4">
+        {activeFilters.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {activeFilters.map((filter) => (
+              <span key={filter} className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs text-stone-600">
+                {filter}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
@@ -678,6 +878,7 @@ function LiteratureDetail({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<LiteratureFormInput>(() => literatureFormFromItem(item));
   const [tagInput, setTagInput] = useState(item.tags.map((tag) => tag.name).join(", "));
+  const completeness = useMemo(() => buildLiteratureCompleteness(item), [item]);
 
   useEffect(() => {
     setEditing(false);
@@ -722,6 +923,12 @@ function LiteratureDetail({
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
+        <LiteratureReadinessStrip
+          item={item}
+          completeness={completeness}
+          onEdit={() => setEditing(true)}
+          onJump={setActiveTab}
+        />
         {editing ? (
           <InlineLiteratureEditor
             draft={draft}
@@ -744,7 +951,7 @@ function LiteratureDetail({
             }}
           />
         ) : null}
-        {activeTab === "overview" ? <OverviewTab item={item} projects={projects} papers={papers} /> : null}
+        {activeTab === "overview" ? <OverviewTabV2 item={item} projects={projects} papers={papers} /> : null}
         {activeTab === "notes" ? <NoteTab item={item} onSaveNote={onSaveNote} /> : null}
         {activeTab === "excerpts" ? (
           <ExcerptTab
@@ -890,6 +1097,207 @@ function InlineLiteratureEditor({
         />
       </div>
     </section>
+  );
+}
+
+function LiteratureReadinessStrip({
+  item,
+  completeness,
+  onEdit,
+  onJump,
+}: {
+  item: LiteratureItem;
+  completeness: LiteratureCompleteness;
+  onEdit: () => void;
+  onJump: (tab: DetailTab) => void;
+}) {
+  const quickActions: Array<{ label: string; tab: DetailTab; icon: ReactNode; hint: string }> = [
+    { label: "写笔记", tab: "notes", icon: <BookOpenCheck className="h-4 w-4" />, hint: item.note ? "继续完善" : "补结构化笔记" },
+    { label: "加摘录", tab: "excerpts", icon: <ClipboardCheck className="h-4 w-4" />, hint: `${item.excerpts.length} 条摘录` },
+    { label: "论文使用", tab: "usage", icon: <ArrowRight className="h-4 w-4" />, hint: `${item.paperUsages.length} 处使用` },
+    { label: "阅读记录", tab: "logs", icon: <Gauge className="h-4 w-4" />, hint: `${item.readingLogs.length} 次记录` },
+  ];
+
+  return (
+    <section className="mb-5 overflow-hidden rounded-3xl border border-stone-200 bg-gradient-to-br from-white to-stone-50 shadow-sm">
+      <div className="grid gap-4 p-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="rounded-2xl bg-stone-950 p-4 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-stone-400">Readiness</p>
+              <p className="mt-2 text-3xl font-semibold">{completeness.score}%</p>
+            </div>
+            <CheckCircle2 className="h-8 w-8 text-emerald-300" />
+          </div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/15">
+            <div
+              className={cn("h-full rounded-full bg-gradient-to-r", statusToneClass(completeness.score))}
+              style={{ width: `${completeness.score}%` }}
+            />
+          </div>
+          <p className="mt-3 text-xs text-stone-300">
+            已完成 {completeness.done}/{completeness.total} 项文献沉淀。
+          </p>
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-stone-950">下一步建议</p>
+              <p className="mt-1 text-sm text-stone-500">
+                {completeness.missing.length > 0
+                  ? `优先补全：${completeness.missing.join("、")}`
+                  : "这篇文献已经具备较完整的研究沉淀。"}
+              </p>
+            </div>
+            <Button type="button" size="sm" variant="outline" className="rounded-xl" onClick={onEdit}>
+              编辑基础信息
+            </Button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {quickActions.map((action) => (
+              <button
+                key={action.tab}
+                type="button"
+                className="rounded-2xl border border-stone-200 bg-white px-3 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
+                onClick={() => onJump(action.tab)}
+              >
+                <div className="flex items-center gap-2 text-stone-900">
+                  {action.icon}
+                  <span className="text-sm font-semibold">{action.label}</span>
+                </div>
+                <p className="mt-1 text-xs text-stone-500">{action.hint}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function OverviewTabV2({
+  item,
+  projects,
+  papers,
+}: {
+  item: LiteratureItem;
+  projects: LiteratureReferenceOption[];
+  papers: LiteratureReferenceOption[];
+}) {
+  const linkedProjects = item.projectLinks
+    .map((link) => projects.find((project) => project.id === link.projectId)?.title)
+    .filter((value): value is string => Boolean(value));
+  const linkedPapers = item.paperUsages
+    .map((usage) => papers.find((paper) => paper.id === usage.paperId)?.title)
+    .filter((value): value is string => Boolean(value));
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
+        <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+            <BookOpenCheck className="h-4 w-4" />
+            Reading abstract
+          </div>
+          <h4 className="mt-4 text-sm font-semibold text-stone-950">一句话总结</h4>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-stone-700">{item.summary || "未填写"}</p>
+          <div className="mt-5 rounded-2xl bg-stone-50 p-4">
+            <h4 className="text-sm font-semibold text-stone-950">摘要</h4>
+            <p className="mt-2 max-h-44 overflow-y-auto whitespace-pre-wrap pr-2 text-sm leading-7 text-stone-600">
+              {item.abstract || "未填写"}
+            </p>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-stone-200 bg-stone-950 p-5 text-white shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">Source</p>
+          <div className="mt-4 space-y-3">
+            <CompactMeta label="DOI" value={item.doi || "未填写"} />
+            <CompactMeta label="URL" value={item.url || "未填写"} />
+            <CompactMeta label="PDF" value={item.pdfUrl || "未填写"} />
+            <CompactMeta label="关键词" value={item.keywords.length > 0 ? item.keywords.join(" / ") : "未填写"} />
+          </div>
+        </section>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <InsightCard title="主要贡献" content={item.contributions || "未填写"} tone="emerald" />
+        <InsightCard title="局限性" content={item.limitations || "未填写"} tone="amber" />
+      </div>
+
+      <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold text-stone-950">写作与项目使用</h4>
+            <p className="mt-1 text-sm text-stone-500">查看这篇文献已经进入哪些项目、论文和章节。</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary">{item.excerpts.length} 条摘录</Badge>
+            <Badge variant="secondary">{item.methodNotes.length} 个方法</Badge>
+            <Badge variant="secondary">{item.paperUsages.length} 处论文使用</Badge>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <RelationBox title="关联项目" items={linkedProjects} emptyText="未关联项目" />
+          <RelationBox title="关联论文" items={linkedPapers} emptyText="未关联论文" />
+        </div>
+
+        {item.tags.length > 0 ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {item.tags.map((tag) => (
+              <Badge key={tag.id} variant="secondary">
+                #{tag.name}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+function CompactMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-stone-400">{label}</p>
+      <p className="mt-1 break-words text-sm text-stone-100">{value}</p>
+    </div>
+  );
+}
+
+function InsightCard({ title, content, tone }: { title: string; content: string; tone: "emerald" | "amber" }) {
+  return (
+    <section
+      className={cn(
+        "rounded-3xl border p-5 shadow-sm",
+        tone === "emerald" ? "border-emerald-100 bg-emerald-50/70" : "border-amber-100 bg-amber-50/70",
+      )}
+    >
+      <h4 className="text-sm font-semibold text-stone-950">{title}</h4>
+      <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-stone-700">{content}</p>
+    </section>
+  );
+}
+
+function RelationBox({ title, items, emptyText }: { title: string; items: string[]; emptyText: string }) {
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4">
+      <p className="text-sm font-semibold text-stone-950">{title}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <span key={item} className="rounded-full bg-white px-3 py-1 text-xs text-stone-600 shadow-sm">
+              {item}
+            </span>
+          ))
+        ) : (
+          <span className="text-sm text-stone-500">{emptyText}</span>
+        )}
+      </div>
+    </div>
   );
 }
 
