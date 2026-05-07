@@ -1,6 +1,6 @@
 "use client";
 
-import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from "react";
+import { type ClipboardEvent, type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   BookOpenCheck,
@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Filter,
   Gauge,
+  Image as ImageIcon,
   LibraryBig,
   Paperclip,
   Pencil,
@@ -52,6 +53,7 @@ import {
   type LiteratureExcerptInput,
   type LiteratureFilters,
   type LiteratureFormInput,
+  type LiteratureAttachment,
   type LiteratureItem,
   type LiteratureMethodNote,
   type LiteratureMethodNoteInput,
@@ -204,12 +206,6 @@ function buildLiteratureCompleteness(item: LiteratureItem | null): LiteratureCom
       .filter((value): value is string => Boolean(value))
       .slice(0, 4),
   };
-}
-
-function statusToneClass(score: number) {
-  if (score >= 80) return "from-emerald-500 to-teal-500";
-  if (score >= 55) return "from-amber-500 to-orange-400";
-  return "from-stone-400 to-slate-500";
 }
 
 export function LiteraturePage({
@@ -415,8 +411,7 @@ function LiteratureWorkbenchHero({
   onCreate: () => void;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-stone-200 bg-[radial-gradient(circle_at_20%_20%,rgba(245,158,11,0.18),transparent_28%),linear-gradient(135deg,#f8f5ee_0%,#edf4f1_52%,#e7eef3_100%)] p-5 shadow-[0_24px_70px_rgba(68,64,60,0.12)]">
-      <div className="absolute right-6 top-5 h-24 w-24 rounded-full border border-white/60 bg-white/20 blur-sm" />
+    <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
       <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-stone-500">
@@ -435,7 +430,7 @@ function LiteratureWorkbenchHero({
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/70 bg-white/65 p-4 shadow-sm backdrop-blur">
+        <div className="rounded-2xl border border-stone-200 bg-stone-50/60 p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-stone-400">当前文献</p>
@@ -444,7 +439,7 @@ function LiteratureWorkbenchHero({
               </h3>
             </div>
             <div className="shrink-0 text-right">
-              <div className={cn("rounded-2xl bg-gradient-to-br px-3 py-2 text-white shadow-sm", statusToneClass(completeness.score))}>
+              <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-stone-900">
                 <div className="text-lg font-semibold">{completeness.score}%</div>
                 <div className="text-[10px] uppercase tracking-wide opacity-90">Ready</div>
               </div>
@@ -452,7 +447,7 @@ function LiteratureWorkbenchHero({
           </div>
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-stone-200">
             <div
-              className={cn("h-full rounded-full bg-gradient-to-r transition-all", statusToneClass(completeness.score))}
+              className="h-full rounded-full bg-stone-900 transition-all"
               style={{ width: `${completeness.score}%` }}
             />
           </div>
@@ -479,7 +474,7 @@ function LiteratureWorkbenchHero({
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/70 bg-white/55 px-3 py-3 shadow-sm backdrop-blur">
+    <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3">
       <div className="text-lg font-semibold text-stone-950">{value}</div>
       <div className="mt-1 text-xs text-stone-500">{label}</div>
     </div>
@@ -504,7 +499,7 @@ function LiteratureStatsPanel({
         </div>
       </div>
       <div className="space-y-4 p-4">
-        <div className="rounded-2xl border border-stone-200 bg-gradient-to-br from-stone-50 to-white p-3">
+        <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-medium text-stone-500">当前完整度</p>
@@ -517,7 +512,7 @@ function LiteratureStatsPanel({
           </div>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-200">
             <div
-              className={cn("h-full rounded-full bg-gradient-to-r", statusToneClass(completeness.score))}
+              className="h-full rounded-full bg-stone-900"
               style={{ width: `${completeness.score}%` }}
             />
           </div>
@@ -962,7 +957,7 @@ function LiteratureDetail({
           />
         ) : null}
         {activeTab === "attachments" ? (
-          <AttachmentsTab
+          <AttachmentsTabV2
             item={item}
             onUploadAttachments={onUploadAttachments}
             onDeleteAttachment={onDeleteAttachment}
@@ -1119,23 +1114,23 @@ function LiteratureReadinessStrip({
   ];
 
   return (
-    <section className="mb-5 overflow-hidden rounded-3xl border border-stone-200 bg-gradient-to-br from-white to-stone-50 shadow-sm">
+    <section className="mb-5 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
       <div className="grid gap-4 p-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <div className="rounded-2xl bg-stone-950 p-4 text-white">
+        <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-stone-900">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-stone-400">Readiness</p>
               <p className="mt-2 text-3xl font-semibold">{completeness.score}%</p>
             </div>
-            <CheckCircle2 className="h-8 w-8 text-emerald-300" />
+            <CheckCircle2 className="h-8 w-8 text-stone-500" />
           </div>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/15">
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-stone-200">
             <div
-              className={cn("h-full rounded-full bg-gradient-to-r", statusToneClass(completeness.score))}
+              className="h-full rounded-full bg-stone-900"
               style={{ width: `${completeness.score}%` }}
             />
           </div>
-          <p className="mt-3 text-xs text-stone-300">
+          <p className="mt-3 text-xs text-stone-500">
             已完成 {completeness.done}/{completeness.total} 项文献沉淀。
           </p>
         </div>
@@ -1160,7 +1155,7 @@ function LiteratureReadinessStrip({
               <button
                 key={action.tab}
                 type="button"
-                className="rounded-2xl border border-stone-200 bg-white px-3 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
+                className="rounded-xl border border-stone-200 bg-white px-3 py-3 text-left transition hover:border-stone-300 hover:bg-stone-50"
                 onClick={() => onJump(action.tab)}
               >
                 <div className="flex items-center gap-2 text-stone-900">
@@ -1196,14 +1191,14 @@ function OverviewTabV2({
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-        <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
             <BookOpenCheck className="h-4 w-4" />
             Reading abstract
           </div>
           <h4 className="mt-4 text-sm font-semibold text-stone-950">一句话总结</h4>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-stone-700">{item.summary || "未填写"}</p>
-          <div className="mt-5 rounded-2xl bg-stone-50 p-4">
+          <div className="mt-5 rounded-xl border border-stone-200 bg-stone-50 p-4">
             <h4 className="text-sm font-semibold text-stone-950">摘要</h4>
             <p className="mt-2 max-h-44 overflow-y-auto whitespace-pre-wrap pr-2 text-sm leading-7 text-stone-600">
               {item.abstract || "未填写"}
@@ -1211,7 +1206,7 @@ function OverviewTabV2({
           </div>
         </section>
 
-        <section className="rounded-3xl border border-stone-200 bg-stone-950 p-5 text-white shadow-sm">
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">Source</p>
           <div className="mt-4 space-y-3">
             <CompactMeta label="DOI" value={item.doi || "未填写"} />
@@ -1227,7 +1222,7 @@ function OverviewTabV2({
         <InsightCard title="局限性" content={item.limitations || "未填写"} tone="amber" />
       </div>
 
-      <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h4 className="text-sm font-semibold text-stone-950">写作与项目使用</h4>
@@ -1261,9 +1256,9 @@ function OverviewTabV2({
 
 function CompactMeta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+    <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
       <p className="text-[11px] uppercase tracking-[0.16em] text-stone-400">{label}</p>
-      <p className="mt-1 break-words text-sm text-stone-100">{value}</p>
+      <p className="mt-1 break-words text-sm text-stone-700">{value}</p>
     </div>
   );
 }
@@ -1272,8 +1267,7 @@ function InsightCard({ title, content, tone }: { title: string; content: string;
   return (
     <section
       className={cn(
-        "rounded-3xl border p-5 shadow-sm",
-        tone === "emerald" ? "border-emerald-100 bg-emerald-50/70" : "border-amber-100 bg-amber-50/70",
+        "rounded-2xl border border-stone-200 bg-white p-5 shadow-sm",
       )}
     >
       <h4 className="text-sm font-semibold text-stone-950">{title}</h4>
@@ -1284,12 +1278,12 @@ function InsightCard({ title, content, tone }: { title: string; content: string;
 
 function RelationBox({ title, items, emptyText }: { title: string; items: string[]; emptyText: string }) {
   return (
-    <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4">
+    <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-4">
       <p className="text-sm font-semibold text-stone-950">{title}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {items.length > 0 ? (
           items.map((item) => (
-            <span key={item} className="rounded-full bg-white px-3 py-1 text-xs text-stone-600 shadow-sm">
+            <span key={item} className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs text-stone-600">
               {item}
             </span>
           ))
@@ -1472,6 +1466,193 @@ function ExcerptTab({
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+function isImageAttachment(attachment: LiteratureAttachment) {
+  return (
+    attachment.fileType.startsWith("image/") ||
+    /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(attachment.fileName)
+  );
+}
+
+function AttachmentsTabV2({
+  item,
+  onUploadAttachments,
+  onDeleteAttachment,
+}: {
+  item: LiteratureItem;
+  onUploadAttachments: (literatureId: string, files: File[]) => Promise<void>;
+  onDeleteAttachment: (attachmentId: string) => Promise<void>;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<LiteratureAttachment | null>(null);
+  const imageAttachments = item.attachments.filter(isImageAttachment);
+  const fileAttachments = item.attachments.filter((attachment) => !isImageAttachment(attachment));
+
+  async function uploadFiles(files: File[]) {
+    if (files.length === 0) return;
+    setUploading(true);
+    try {
+      await onUploadAttachments(item.id, files);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handlePaste(event: ClipboardEvent<HTMLElement>) {
+    const files = Array.from(event.clipboardData.items)
+      .filter((clipboardItem) => clipboardItem.kind === "file" && clipboardItem.type.startsWith("image/"))
+      .map((clipboardItem, index) => {
+        const file = clipboardItem.getAsFile();
+        if (!file) return null;
+        const extension = file.type.split("/")[1] || "png";
+        return new File([file], `literature-figure-${Date.now()}-${index}.${extension}`, { type: file.type });
+      })
+      .filter((file): file is File => Boolean(file));
+
+    if (files.length > 0) {
+      event.preventDefault();
+      await uploadFiles(files);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <section
+        tabIndex={0}
+        onPaste={(event) => void handlePaste(event)}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          void uploadFiles(Array.from(event.dataTransfer.files));
+        }}
+        className="rounded-2xl border border-dashed border-stone-300 bg-white p-5 outline-none transition focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-stone-200 bg-stone-50">
+              <ImageIcon className="h-5 w-5 text-stone-600" />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-stone-950">图表与截图收藏</h4>
+              <p className="mt-1 text-sm leading-6 text-stone-500">
+                可直接在这里粘贴论文截图、实验结果图、框架图；也支持拖拽或选择图片和普通附件。
+              </p>
+            </div>
+          </div>
+          <label className="inline-flex cursor-pointer items-center rounded-xl border border-stone-200 bg-stone-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-stone-800">
+            {uploading ? "上传中..." : "上传文件"}
+            <input
+              type="file"
+              className="hidden"
+              multiple
+              accept="image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.pdf,.txt,.md,.csv"
+              disabled={uploading}
+              onChange={(event) => {
+                const files = Array.from(event.target.files ?? []);
+                void uploadFiles(files);
+                event.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-500">
+          使用方式：点击此区域后按 Ctrl+V 粘贴截图，或把图片文件拖进来。图片会进入下方图表墙，其他文件进入附件列表。
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold text-stone-950">图表墙</h4>
+            <p className="mt-1 text-xs text-stone-500">{imageAttachments.length} 张图片</p>
+          </div>
+        </div>
+
+        {imageAttachments.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-dashed border-stone-300 bg-stone-50 p-6 text-center text-sm text-stone-500">
+            还没有保存图片。复制论文中的图表或实验结果截图后，在上方区域粘贴即可保存。
+          </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+            {imageAttachments.map((attachment) => (
+              <figure key={attachment.id} className="overflow-hidden rounded-xl border border-stone-200 bg-stone-50">
+                <button type="button" className="block w-full bg-white" onClick={() => setPreview(attachment)}>
+                  <img
+                    src={attachment.fileUrl}
+                    alt={attachment.fileName}
+                    className="h-48 w-full object-contain"
+                    loading="lazy"
+                  />
+                </button>
+                <figcaption className="flex items-start justify-between gap-2 border-t border-stone-200 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-stone-800" title={attachment.fileName}>
+                      {attachment.fileName}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-stone-500">
+                      {formatFileSize(attachment.fileSize)} · {attachment.createdAt.slice(0, 10)}
+                    </p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteAttachment(attachment.id)}>
+                    删除
+                  </Button>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Paperclip className="h-4 w-4 text-stone-500" />
+          <h4 className="text-sm font-semibold text-stone-950">普通附件</h4>
+          <span className="text-xs text-stone-500">{fileAttachments.length} 个文件</span>
+        </div>
+
+        {fileAttachments.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-dashed border-stone-300 bg-stone-50 p-4 text-sm text-stone-500">
+            还没有普通附件。
+          </div>
+        ) : (
+          <div className="mt-4 divide-y divide-stone-200 rounded-xl border border-stone-200">
+            {fileAttachments.map((attachment) => (
+              <div key={attachment.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <a
+                    href={attachment.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block truncate text-sm font-medium text-stone-900 underline-offset-4 hover:underline"
+                  >
+                    {attachment.fileName}
+                  </a>
+                  <p className="mt-1 text-xs text-stone-500">
+                    {attachment.fileType || "未知类型"} · {formatFileSize(attachment.fileSize)} · {attachment.createdAt.slice(0, 10)}
+                  </p>
+                </div>
+                <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteAttachment(attachment.id)}>
+                  删除
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <Dialog open={Boolean(preview)} onOpenChange={(open) => !open && setPreview(null)}>
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{preview?.fileName ?? "图片预览"}</DialogTitle>
+          </DialogHeader>
+          {preview ? (
+            <img src={preview.fileUrl} alt={preview.fileName} className="max-h-[76vh] w-full object-contain" />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
