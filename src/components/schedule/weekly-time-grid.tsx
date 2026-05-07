@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { addDays, format, parse } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import {
@@ -107,7 +108,7 @@ export type TimeGranularity = 5 | 15 | 30 | 60;
 
 const hourCellHeight = 60;
 const contextMenuWidth = 208;
-const contextMenuHeight = 320;
+const contextMenuHeight = 360;
 const contextMenuViewportPadding = 12;
 
 const defaultCategoryPalette: CategoryPalette[] = [
@@ -492,8 +493,10 @@ export function WeeklyTimeGrid({
 
   function handleContextMenu(event: React.MouseEvent, eventId: string) {
     event.preventDefault();
-    const maxX = window.innerWidth - contextMenuWidth - contextMenuViewportPadding;
-    const maxY = window.innerHeight - contextMenuHeight - contextMenuViewportPadding;
+    const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    const maxX = viewportWidth - contextMenuWidth - contextMenuViewportPadding;
+    const maxY = viewportHeight - contextMenuHeight - contextMenuViewportPadding;
     setContextMenu({
       x: Math.max(contextMenuViewportPadding, Math.min(event.clientX, maxX)),
       y: Math.max(contextMenuViewportPadding, Math.min(event.clientY, maxY)),
@@ -615,6 +618,10 @@ export function WeeklyTimeGrid({
       window.removeEventListener("scroll", handleGlobalClose, true);
     };
   }, [contextMenu]);
+
+  const contextMenuEvent = contextMenu
+    ? expandedEvents.find((event) => event.id === contextMenu.eventId) ?? null
+    : null;
 
   return (
     <section className="rounded-lg border border-gray-200 bg-white shadow-md">
@@ -741,7 +748,7 @@ export function WeeklyTimeGrid({
                           return (
                             <div
                               key={event.id}
-                              className={`pointer-events-auto absolute flex min-h-0 flex-col overflow-hidden rounded-lg border text-left text-sm shadow-md transition-all hover:shadow-lg ${getCategoryColor(categories, event.category)}`}
+                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden rounded-xl border text-left text-sm shadow-[0_10px_24px_rgba(68,64,60,0.12)] ring-1 ring-white/60 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(68,64,60,0.18)] ${getCategoryColor(categories, event.category)}`}
                               style={getEventStyle(event)}
                               draggable={!parseSyntheticEventId(event.id)}
                               onDragStart={() => setDraggingEventId(event.id)}
@@ -750,11 +757,11 @@ export function WeeklyTimeGrid({
                             >
                               <button
                                 type="button"
-                                className={`flex min-h-0 w-full min-w-0 flex-1 flex-col text-left ${compactCard ? "justify-start px-2 pb-1 pt-1" : "justify-center px-2 py-1.5"}`}
+                                className={`flex min-h-0 w-full min-w-0 flex-1 flex-col text-left ${compactCard ? "justify-start px-2 pb-1 pt-1 pr-7" : "justify-start px-2.5 py-2 pr-8"}`}
                                 onClick={() => handleOpenEdit(event)}
                               >
                                 <div className={`flex min-h-0 min-w-0 flex-col gap-1 ${compactCard ? "" : "flex-1"}`}>
-                                  <div className={`min-w-0 ${compactCard ? "" : "flex flex-1 flex-col justify-center overflow-y-auto"}`}>
+                                  <div className={`min-w-0 ${compactCard ? "" : "flex min-h-0 flex-1 flex-col overflow-hidden"}`}>
                                     <div className="flex items-start gap-1.5">
                                       {event.tag ? (
                                         <span className={`shrink-0 text-sm font-bold ${getTagInfo(event.tag).color}`}>
@@ -765,23 +772,35 @@ export function WeeklyTimeGrid({
                                         <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600" aria-hidden />
                                       ) : null}
                                       <p
-                                        className={`min-w-0 flex-1 truncate font-medium leading-snug ${event.isCompleted ? "line-through decoration-2" : ""}`}
+                                        className={`min-w-0 flex-1 overflow-hidden font-semibold leading-snug ${compactCard ? "truncate" : "[display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"} ${event.isCompleted ? "line-through decoration-2" : ""}`}
                                         title={`${event.title} (${formatHour(event.startHour)} - ${formatHour(event.endHour)})`}
                                       >
                                         {event.title}
                                       </p>
                                       {event.isCompleted ? <Check className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden /> : null}
                                     </div>
+                                    {!compactCard && event.notes ? (
+                                      <p className="mt-1 min-h-0 overflow-hidden text-xs leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
+                                        {event.notes}
+                                      </p>
+                                    ) : null}
                                   </div>
-                                  <p className="shrink-0 text-xs leading-tight text-gray-700">
-                                    {formatHour(event.startHour)} - {formatHour(event.endHour)}
-                                  </p>
+                                  <div className="mt-1 flex shrink-0 items-center justify-between gap-1 text-[11px] leading-tight text-gray-700">
+                                    <span className="rounded-full bg-white/55 px-1.5 py-0.5">
+                                      {formatHour(event.startHour)} - {formatHour(event.endHour)}
+                                    </span>
+                                    {!compactCard && event.requirements.length > 0 ? (
+                                      <span className="truncate rounded-full bg-white/40 px-1.5 py-0.5">
+                                        {event.requirements.length} 项准备
+                                      </span>
+                                    ) : null}
+                                  </div>
                                 </div>
                               </button>
 
                               <button
                                 type="button"
-                                className="absolute right-1 top-1 z-10 rounded-full border border-gray-300 bg-white p-1 text-black shadow-sm hover:bg-gray-100"
+                                className="absolute right-1.5 top-1.5 z-10 rounded-full border border-white/80 bg-white/90 p-1 text-black opacity-75 shadow-sm transition hover:bg-white hover:opacity-100 group-hover:opacity-100"
                                 onClick={(mouseEvent) => {
                                   mouseEvent.stopPropagation();
                                   resetCreateDialog({ date: event.date, startHour: event.startHour });
@@ -1278,38 +1297,43 @@ export function WeeklyTimeGrid({
           </Dialog>
         </div>
 
-        {contextMenu ? (
+        {contextMenu && typeof document !== "undefined" ? createPortal(
           <div
-            className="fixed z-50 w-52 max-h-[calc(100vh-24px)] overflow-y-auto rounded-sm border border-gray-200 bg-white py-1 shadow-lg"
+            className="fixed z-[1000] w-52 max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl border border-stone-200 bg-white/95 p-1.5 shadow-[0_24px_60px_rgba(68,64,60,0.28)] backdrop-blur-md"
             style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
             onClick={(event) => event.stopPropagation()}
           >
-            <button className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" onClick={() => handleReschedule(contextMenu.eventId)}>
+            <div className="border-b border-stone-100 px-3 py-2">
+              <p className="truncate text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">Schedule Action</p>
+              <p className="mt-1 truncate text-sm font-semibold text-stone-900">{contextMenuEvent?.title ?? "行程操作"}</p>
+            </div>
+            <button className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleReschedule(contextMenu.eventId)}>
               改约
             </button>
-            <button className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" onClick={() => handleExtendTime(contextMenu.eventId)}>
+            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleExtendTime(contextMenu.eventId)}>
               加时
             </button>
-            <button className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" onClick={() => handleToggleComplete(contextMenu.eventId)}>
-              {expandedEvents.find((event) => event.id === contextMenu.eventId)?.isCompleted ? "标记为未完成" : "标记为已完成"}
+            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleToggleComplete(contextMenu.eventId)}>
+              {contextMenuEvent?.isCompleted ? "标记为未完成" : "标记为已完成"}
             </button>
-            <button className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50" onClick={() => handleDeleteFromContext(contextMenu.eventId)}>
+            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50" onClick={() => handleDeleteFromContext(contextMenu.eventId)}>
               删除该行程
             </button>
-            <div className="my-1 border-t border-gray-200" />
-            <button className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" onClick={() => handleSetTag(contextMenu.eventId, "待定")}>
+            <div className="my-1 border-t border-stone-100" />
+            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleSetTag(contextMenu.eventId, "待定")}>
               标记为待定
             </button>
-            <button className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" onClick={() => handleSetTag(contextMenu.eventId, "不着急")}>
+            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleSetTag(contextMenu.eventId, "不着急")}>
               标记为不着急
             </button>
-            <button className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" onClick={() => handleSetTag(contextMenu.eventId, "不可后退")}>
+            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleSetTag(contextMenu.eventId, "不可后退")}>
               标记为不可后退
             </button>
-            <button className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100" onClick={() => handleSetTag(contextMenu.eventId, null)}>
+            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleSetTag(contextMenu.eventId, null)}>
               移除标记
             </button>
-          </div>
+          </div>,
+          document.body,
         ) : null}
       </div>
     </section>
