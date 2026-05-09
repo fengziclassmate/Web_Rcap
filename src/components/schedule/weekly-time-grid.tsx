@@ -202,6 +202,24 @@ function getCategoryColor(categories: Category[], categoryName: string) {
   );
 }
 
+function getCategoryAccentColor(categories: Category[], categoryName: string) {
+  const color = getCategoryColor(categories, categoryName);
+  if (color.includes("sky")) return "bg-sky-400";
+  if (color.includes("teal")) return "bg-teal-400";
+  if (color.includes("indigo")) return "bg-indigo-400";
+  if (color.includes("cyan")) return "bg-cyan-400";
+  if (color.includes("violet")) return "bg-violet-400";
+  if (color.includes("amber")) return "bg-amber-400";
+  if (color.includes("emerald")) return "bg-emerald-400";
+  if (color.includes("rose")) return "bg-rose-400";
+  if (color.includes("orange")) return "bg-orange-400";
+  if (color.includes("lime")) return "bg-lime-400";
+  if (color.includes("fuchsia")) return "bg-fuchsia-400";
+  if (color.includes("slate")) return "bg-slate-400";
+  if (color.includes("zinc")) return "bg-zinc-400";
+  return "bg-stone-400";
+}
+
 function normalizeCategoryName(categoryName: string) {
   return categoryAliasMap[categoryName] ?? categoryName;
 }
@@ -754,19 +772,25 @@ export function WeeklyTimeGrid({
                           return (
                             <div
                               key={event.id}
-                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden rounded-xl border text-left text-sm shadow-[0_10px_24px_rgba(68,64,60,0.12)] ring-1 ring-white/60 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(68,64,60,0.18)] ${getCategoryColor(categories, event.category)}`}
+                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden rounded-lg border text-left text-sm shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""}`}
                               style={getEventStyle(event)}
                               draggable={!parseSyntheticEventId(event.id)}
                               onDragStart={() => setDraggingEventId(event.id)}
                               onDragEnd={() => setDraggingEventId(null)}
                               onContextMenu={(mouseEvent) => handleContextMenu(mouseEvent, event.id)}
                             >
+                              <div
+                                className={`pointer-events-none absolute inset-y-1 left-1 w-1 rounded-full ${getCategoryAccentColor(categories, event.category)} ${event.isCompleted ? "opacity-80" : "opacity-95"}`}
+                              />
+                              {event.isCompleted ? (
+                                <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.22)_0px,rgba(255,255,255,0.22)_1px,transparent_1px,transparent_8px)]" />
+                              ) : null}
                               <button
                                 type="button"
-                                className={`flex min-h-0 w-full min-w-0 flex-1 flex-col text-left ${compactCard ? "justify-start px-2 pb-1 pt-1 pr-7" : "justify-start px-2.5 py-2 pr-8"}`}
+                                className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 flex-col text-left ${compactCard ? "justify-start pb-1 pl-4 pr-7 pt-1" : "justify-start py-2 pl-5 pr-8"}`}
                                 onClick={() => handleOpenEdit(event)}
                               >
-                                <div className={`flex min-h-0 min-w-0 flex-col gap-1 ${compactCard ? "" : "flex-1"}`}>
+                                <div className={`flex min-h-0 min-w-0 flex-col ${compactCard ? "gap-0.5" : "flex-1 gap-1.5"}`}>
                                   <div className={`min-w-0 ${compactCard ? "" : "flex min-h-0 flex-1 flex-col overflow-hidden"}`}>
                                     <div className="flex items-start gap-1.5">
                                       {event.tag ? (
@@ -778,12 +802,17 @@ export function WeeklyTimeGrid({
                                         <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600" aria-hidden />
                                       ) : null}
                                       <p
-                                        className={`min-w-0 flex-1 overflow-hidden font-semibold leading-snug ${compactCard ? "truncate" : "[display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"} ${event.isCompleted ? "line-through decoration-2" : ""}`}
+                                        className={`min-w-0 flex-1 overflow-hidden font-semibold leading-snug tracking-tight ${compactCard ? "truncate" : "[display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"} ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
                                         title={`${event.title} (${formatHour(event.startHour)} - ${formatHour(event.endHour)})`}
                                       >
                                         {event.title}
                                       </p>
-                                      {event.isCompleted ? <Check className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden /> : null}
+                                      {event.isCompleted ? (
+                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-white/75 px-1.5 py-0.5 text-[10px] font-medium leading-none text-emerald-700 shadow-sm">
+                                          <Check className="h-3 w-3" aria-hidden />
+                                          {!compactCard ? "已完成" : ""}
+                                        </span>
+                                      ) : null}
                                     </div>
                                     {!compactCard && event.notes ? (
                                       <p className="mt-1 min-h-0 overflow-hidden text-xs leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
@@ -792,11 +821,11 @@ export function WeeklyTimeGrid({
                                     ) : null}
                                   </div>
                                   <div className="mt-1 flex shrink-0 items-center justify-between gap-1 text-[11px] leading-tight text-gray-700">
-                                    <span className="rounded-full bg-white/55 px-1.5 py-0.5">
+                                    <span className="rounded-md border border-white/65 bg-white/65 px-1.5 py-0.5 shadow-[0_1px_2px_rgba(68,64,60,0.05)]">
                                       {formatHour(event.startHour)} - {formatHour(event.endHour)}
                                     </span>
                                     {!compactCard && event.requirements.length > 0 ? (
-                                      <span className="truncate rounded-full bg-white/40 px-1.5 py-0.5">
+                                      <span className="truncate rounded-md border border-white/50 bg-white/45 px-1.5 py-0.5">
                                         {event.requirements.length} 项准备
                                       </span>
                                     ) : null}
@@ -806,7 +835,7 @@ export function WeeklyTimeGrid({
 
                               <button
                                 type="button"
-                                className="absolute right-1.5 top-1.5 z-10 rounded-full border border-white/80 bg-white/90 p-1 text-black opacity-75 shadow-sm transition hover:bg-white hover:opacity-100 group-hover:opacity-100"
+                                className="absolute right-1.5 top-1.5 z-20 rounded-full border border-white/80 bg-white/80 p-1 text-stone-700 opacity-0 shadow-sm transition hover:bg-white hover:text-black group-hover:opacity-100 focus-visible:opacity-100"
                                 onClick={(mouseEvent) => {
                                   mouseEvent.stopPropagation();
                                   resetCreateDialog({ date: event.date, startHour: event.startHour });
