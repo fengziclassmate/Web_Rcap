@@ -14,7 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { EventTag, ScheduleEvent } from "@/app/page";
+import type { EventTag, ScheduleEvent } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,13 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { createId } from "@/lib/id";
+import {
+  CATEGORY_COLORS,
+  DEFAULT_CATEGORY_PALETTE,
+  getScheduleCategoryAccentColor,
+  getScheduleCategoryColor,
+  normalizeScheduleCategory,
+} from "@/lib/categories";
 import {
   expandScheduleEvents,
   parseExceptionDateList,
@@ -128,24 +135,9 @@ const defaultCategoryPalette: CategoryPalette[] = [
   { name: "弹性缓冲", color: "bg-zinc-50 border-zinc-200 text-zinc-900" },
 ];
 
-const selectableColors = [
-  "bg-sky-50 border-sky-200 text-sky-950",
-  "bg-teal-50 border-teal-200 text-teal-950",
-  "bg-indigo-50 border-indigo-200 text-indigo-950",
-  "bg-cyan-50 border-cyan-200 text-cyan-950",
-  "bg-violet-50 border-violet-200 text-violet-950",
-  "bg-amber-50 border-amber-200 text-amber-950",
-  "bg-emerald-50 border-emerald-200 text-emerald-950",
-  "bg-stone-50 border-stone-200 text-stone-900",
-  "bg-rose-50 border-rose-200 text-rose-950",
-  "bg-orange-50 border-orange-200 text-orange-950",
-  "bg-lime-50 border-lime-200 text-lime-950",
-  "bg-fuchsia-50 border-fuchsia-200 text-fuchsia-950",
-  "bg-slate-100 border-slate-200 text-slate-900",
-  "bg-zinc-50 border-zinc-200 text-zinc-900",
-] as const;
+const selectableColors = CATEGORY_COLORS;
 
-const defaultCategories: Category[] = defaultCategoryPalette.map((item, index) => ({
+const defaultCategories: Category[] = DEFAULT_CATEGORY_PALETTE.map((item, index) => ({
   id: String(index + 1),
   name: item.name,
   color: item.color,
@@ -198,30 +190,16 @@ function getCategoryColor(categories: Category[], categoryName: string) {
   const normalized = normalizeCategoryName(categoryName);
   return (
     categories.find((category) => category.name === normalized)?.color ??
-    "bg-white border-gray-300 text-gray-900"
+    getScheduleCategoryColor(normalized)
   );
 }
 
 function getCategoryAccentColor(categories: Category[], categoryName: string) {
-  const color = getCategoryColor(categories, categoryName);
-  if (color.includes("sky")) return "bg-sky-400";
-  if (color.includes("teal")) return "bg-teal-400";
-  if (color.includes("indigo")) return "bg-indigo-400";
-  if (color.includes("cyan")) return "bg-cyan-400";
-  if (color.includes("violet")) return "bg-violet-400";
-  if (color.includes("amber")) return "bg-amber-400";
-  if (color.includes("emerald")) return "bg-emerald-400";
-  if (color.includes("rose")) return "bg-rose-400";
-  if (color.includes("orange")) return "bg-orange-400";
-  if (color.includes("lime")) return "bg-lime-400";
-  if (color.includes("fuchsia")) return "bg-fuchsia-400";
-  if (color.includes("slate")) return "bg-slate-400";
-  if (color.includes("zinc")) return "bg-zinc-400";
-  return "bg-stone-400";
+  return getScheduleCategoryAccentColor(normalizeCategoryName(categoryName));
 }
 
 function normalizeCategoryName(categoryName: string) {
-  return categoryAliasMap[categoryName] ?? categoryName;
+  return normalizeScheduleCategory(categoryName);
 }
 
 function getTagInfo(tag: EventTag) {

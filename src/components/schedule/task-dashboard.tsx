@@ -27,7 +27,7 @@ import type {
   Priority,
   ProjectCheckin,
   SubTask,
-} from "@/app/page";
+} from "@/lib/types";
 import {
   Collapsible,
   CollapsibleContent,

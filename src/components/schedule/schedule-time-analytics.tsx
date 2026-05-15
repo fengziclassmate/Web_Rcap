@@ -1,7 +1,8 @@
 "use client";
 
 import { addDays, format } from "date-fns";
-import type { ScheduleEvent } from "@/app/page";
+import type { ScheduleEvent } from "@/lib/types";
+import { getScheduleCategoryVisual, normalizeScheduleCategory } from "@/lib/categories";
 import { expandScheduleEvents } from "@/lib/recurrence";
 import { cn } from "@/lib/utils";
 
@@ -78,12 +79,11 @@ const fallbackVisual: CategoryVisual = {
 };
 
 function normalizeCategoryName(value: string) {
-  return categoryAliasMap[value] ?? (value || fallbackVisual.name);
+  return normalizeScheduleCategory(value);
 }
 
 function getVisual(category: string) {
-  const normalized = normalizeCategoryName(category);
-  return categoryVisuals.find((item) => item.name === normalized) ?? { ...fallbackVisual, name: normalized };
+  return getScheduleCategoryVisual(category);
 }
 
 function durationMinutes(event: ScheduleEvent) {
