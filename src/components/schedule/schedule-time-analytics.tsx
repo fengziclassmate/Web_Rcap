@@ -112,7 +112,6 @@ export function ScheduleTimeAnalytics({ events, currentWeekStart, viewMode = "we
     <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-200 px-4 py-3">
         <h2 className="text-sm font-semibold text-gray-900">时间分布分析</h2>
-        <p className="mt-1 text-xs text-gray-500">按行程分类查看当天顺序和当前视图范围内的时间占比。</p>
       </div>
 
       <div className="space-y-6 p-4">

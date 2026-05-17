@@ -233,7 +233,6 @@ export function LLMChatSidebar() {
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold">科研对话助手</h2>
-            <p className="text-xs text-gray-500">支持上下文注入和历史对话归档</p>
           </div>
           <div className="flex gap-1">
             <Button type="button" size="icon-sm" variant="ghost" onClick={startNewSession} title="新对话">

@@ -76,7 +76,6 @@ export function PaperProgressPanel({
     <section className="rounded-lg border border-gray-200 bg-white shadow-md">
       <header className="border-b border-gray-200 px-6 py-4">
         <h2 className="text-lg font-semibold tracking-tight text-gray-900">论文进度</h2>
-        <p className="mt-1 text-sm text-gray-600">维护论文基础信息与日/周/月写作计划。</p>
       </header>
 
       <div className="space-y-5 p-6">
@@ -87,7 +86,7 @@ export function PaperProgressPanel({
               id="paper-title"
               value={draft.title}
               onChange={(e) => patch({ title: e.target.value })}
-              placeholder="例如：……"
+              placeholder="输入论文题目"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -147,7 +146,6 @@ export function PaperProgressPanel({
           onAdd={(content, date) => addPlan("weeklyPlans", content, date)}
           onToggle={(id) => togglePlan("weeklyPlans", id)}
           onDelete={(id) => deletePlan("weeklyPlans", id)}
-          dateHint="（建议填本周周一日期）"
         />
         <PaperPlanEditor
           title="每月写作计划"
@@ -155,7 +153,6 @@ export function PaperProgressPanel({
           onAdd={(content, date) => addPlan("monthlyPlans", content, date)}
           onToggle={(id) => togglePlan("monthlyPlans", id)}
           onDelete={(id) => deletePlan("monthlyPlans", id)}
-          dateHint="（建议填当月 01 号日期）"
         />
 
         <Button
@@ -261,4 +258,3 @@ function PaperPlanEditor({
     </div>
   );
 }
-

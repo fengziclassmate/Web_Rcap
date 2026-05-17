@@ -92,7 +92,6 @@ export function GroupMeetingsPanel({
       <header className="flex items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">组会记录</h2>
-          <p className="mt-1 text-sm text-gray-600">记录每次组会要点与后续行动项。</p>
         </div>
         <Button type="button" size="sm" onClick={openCreate}>
           <Plus className="mr-1 h-4 w-4" />
@@ -178,7 +177,7 @@ export function GroupMeetingsPanel({
                   id="gm-attendees"
                   value={form.attendees}
                   onChange={(e) => setForm((p) => ({ ...p, attendees: e.target.value }))}
-                  placeholder="例如：导师A、同学B"
+                  placeholder="输入参会人"
                 />
               </div>
             </div>
@@ -188,7 +187,7 @@ export function GroupMeetingsPanel({
                 id="gm-topic"
                 value={form.topic}
                 onChange={(e) => setForm((p) => ({ ...p, topic: e.target.value }))}
-                placeholder="例如：阶段汇报 / 论文讨论 / 实验复盘"
+                placeholder="输入会议标题"
               />
             </div>
             <div className="space-y-2">
@@ -206,7 +205,7 @@ export function GroupMeetingsPanel({
                 id="gm-actions"
                 value={form.actionItems}
                 onChange={(e) => setForm((p) => ({ ...p, actionItems: e.target.value }))}
-                placeholder="可按行写：\n- 补充实验 X\n- 下周提交第 2 章修改稿"
+                placeholder="输入行动项"
                 className="min-h-24"
               />
             </div>
@@ -219,4 +218,3 @@ export function GroupMeetingsPanel({
     </section>
   );
 }
-

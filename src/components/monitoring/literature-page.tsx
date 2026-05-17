@@ -16,7 +16,6 @@ import {
   Pencil,
   Plus,
   Search,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -279,7 +278,6 @@ export function LiteraturePage({
           <div className="module-header flex flex-wrap items-center justify-between gap-3 px-5 py-5">
             <div>
               <h2 className="text-lg font-semibold tracking-tight text-stone-950">文献阅读管理</h2>
-              <p className="mt-1 text-sm text-stone-500">管理阅读状态、结构化笔记、摘录与论文使用位置。</p>
             </div>
             <div className="flex items-center gap-2">
               <ViewSwitch view={view} onChange={setView} />
@@ -416,14 +414,7 @@ function LiteratureWorkbenchHero({
     <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
       <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-stone-500">
-            <Sparkles className="h-4 w-4" />
-            Literature cockpit
-          </div>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-stone-950">文献阅读研究台</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
-            用阅读状态、摘录、方法借鉴和论文使用位置，把文献从“收藏”推进到“可写作、可复用、可沉淀”。
-          </p>
+          <h2 className="text-2xl font-semibold tracking-tight text-stone-950">文献阅读研究台</h2>
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <HeroMetric label="筛选结果" value={`${visibleCount}/${totalCount}`} />
             <HeroMetric label="核心文献" value={String(stats.core)} />
@@ -764,7 +755,6 @@ function LiteratureBoard({
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900">{column.label}</p>
-                  <p className="mt-1 text-xs text-gray-500">按阅读状态分组浏览文献</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="rounded-full px-2.5 py-0.5">
@@ -1059,7 +1049,6 @@ function InlineLiteratureEditor({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h4 className="text-sm font-semibold text-stone-950">文献信息编辑</h4>
-          <p className="mt-1 text-xs text-stone-500">在详情页直接修改并保存，不再打开编辑弹窗。</p>
         </div>
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" onClick={onCancel}>
@@ -1145,11 +1134,11 @@ function LiteratureReadinessStrip({
   onEdit: () => void;
   onJump: (tab: DetailTab) => void;
 }) {
-  const quickActions: Array<{ label: string; tab: DetailTab; icon: ReactNode; hint: string }> = [
-    { label: "写笔记", tab: "notes", icon: <BookOpenCheck className="h-4 w-4" />, hint: item.note ? "继续完善" : "补结构化笔记" },
-    { label: "加摘录", tab: "excerpts", icon: <ClipboardCheck className="h-4 w-4" />, hint: `${item.excerpts.length} 条摘录` },
-    { label: "论文使用", tab: "usage", icon: <ArrowRight className="h-4 w-4" />, hint: `${item.paperUsages.length} 处使用` },
-    { label: "阅读记录", tab: "logs", icon: <Gauge className="h-4 w-4" />, hint: `${item.readingLogs.length} 次记录` },
+  const quickActions: Array<{ label: string; tab: DetailTab; icon: ReactNode }> = [
+    { label: "写笔记", tab: "notes", icon: <BookOpenCheck className="h-4 w-4" /> },
+    { label: "加摘录", tab: "excerpts", icon: <ClipboardCheck className="h-4 w-4" /> },
+    { label: "论文使用", tab: "usage", icon: <ArrowRight className="h-4 w-4" /> },
+    { label: "阅读记录", tab: "logs", icon: <Gauge className="h-4 w-4" /> },
   ];
 
   return (
@@ -1175,15 +1164,7 @@ function LiteratureReadinessStrip({
         </div>
 
         <div className="min-w-0">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-stone-950">下一步建议</p>
-              <p className="mt-1 text-sm text-stone-500">
-                {completeness.missing.length > 0
-                  ? `优先补全：${completeness.missing.join("、")}`
-                  : "这篇文献已经具备较完整的研究沉淀。"}
-              </p>
-            </div>
+          <div className="flex justify-end">
             <Button type="button" size="sm" variant="outline" className="rounded-xl" onClick={onEdit}>
               编辑基础信息
             </Button>
@@ -1201,7 +1182,6 @@ function LiteratureReadinessStrip({
                   {action.icon}
                   <span className="text-sm font-semibold">{action.label}</span>
                 </div>
-                <p className="mt-1 text-xs text-stone-500">{action.hint}</p>
               </button>
             ))}
           </div>
@@ -1265,7 +1245,6 @@ function OverviewTabV2({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h4 className="text-sm font-semibold text-stone-950">写作与项目使用</h4>
-            <p className="mt-1 text-sm text-stone-500">查看这篇文献已经进入哪些项目、论文和章节。</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">{item.excerpts.length} 条摘录</Badge>
@@ -1576,9 +1555,6 @@ function AttachmentsTabV2({
             </div>
             <div>
               <h4 className="text-sm font-semibold text-stone-950">图表与截图收藏</h4>
-              <p className="mt-1 text-sm leading-6 text-stone-500">
-                可直接在这里粘贴论文截图、实验结果图、框架图；也支持拖拽或选择图片和普通附件。
-              </p>
             </div>
           </div>
           <label className="inline-flex cursor-pointer items-center rounded-xl border border-stone-200 bg-stone-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-stone-800">
@@ -1712,7 +1688,6 @@ function AttachmentsTab({
           <Paperclip className="mt-0.5 h-4 w-4 text-gray-500" />
           <div>
             <p className="text-sm font-medium text-gray-900">附件记录</p>
-            <p className="mt-1 text-sm text-gray-500">支持 Word、PPT、Excel、PDF、TXT、CSV、Markdown 等文件，默认私有存储。</p>
           </div>
         </div>
         <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50">

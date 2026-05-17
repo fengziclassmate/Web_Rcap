@@ -110,7 +110,6 @@ export function SubmissionsPanel({
       <header className="flex items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">投稿记录</h2>
-          <p className="mt-1 text-sm text-gray-600">添加投稿信息并跟踪进度。</p>
         </div>
         <Button type="button" size="sm" onClick={openCreate}>
           <Plus className="mr-1 h-4 w-4" />
@@ -181,7 +180,7 @@ export function SubmissionsPanel({
                 id="sub-content"
                 value={form.content}
                 onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))}
-                placeholder="例如：某篇论文/某个方向的短文/系统报告"
+                placeholder="输入投稿内容"
               />
             </div>
             <div className="space-y-2">
@@ -190,7 +189,7 @@ export function SubmissionsPanel({
                 id="sub-journal"
                 value={form.journal}
                 onChange={(e) => setForm((p) => ({ ...p, journal: e.target.value }))}
-                placeholder="例如：XXXX Transactions"
+                placeholder="输入期刊或会议"
               />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -230,7 +229,7 @@ export function SubmissionsPanel({
                 id="sub-note"
                 value={form.resultNote}
                 onChange={(e) => setForm((p) => ({ ...p, resultNote: e.target.value }))}
-                placeholder="例如：收到审稿意见、修改要点、拒稿原因等"
+                placeholder="输入备注"
                 className="min-h-24"
               />
             </div>
@@ -243,4 +242,3 @@ export function SubmissionsPanel({
     </section>
   );
 }
-

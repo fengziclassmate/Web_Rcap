@@ -71,7 +71,6 @@ export function FootprintsPanel({
       <header className="flex items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">足迹跟踪</h2>
-          <p className="mt-1 text-sm text-gray-600">记录“上一次做某事”的日期，自动显示间隔天数。</p>
         </div>
         <Button type="button" size="sm" onClick={() => setAddOpen(true)}>
           <Plus className="mr-1 h-4 w-4" />
@@ -153,7 +152,7 @@ export function FootprintsPanel({
                 id="fp-name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="例如：换牙刷 / 深度清洁 / 复查某代码"
+                placeholder="输入事项"
               />
             </div>
             <Button
@@ -214,4 +213,3 @@ export function FootprintsPanel({
     </section>
   );
 }
-

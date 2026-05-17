@@ -496,7 +496,7 @@ export function TaskDashboard({
             </ul>
           ) : (
             <p className="text-center text-sm text-gray-500">
-              尚未添加年度任务。可在此记录全年级目标，与下方按截止日管理的长期任务互补。
+              尚未添加年度任务。
             </p>
           )}
         </div>

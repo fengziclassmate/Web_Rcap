@@ -21,12 +21,6 @@ type QuickEventInputProps = {
   onAddAnnualTask: (name: string) => void;
 };
 
-const examplePrompts = [
-  "明天下午3-5点写论文",
-  "下周五前完成文献综述",
-  "今年完成毕业论文初稿",
-];
-
 function typeLabel(type: QuickCreateResult["type"]) {
   if (type === "event") return "日程";
   if (type === "annual") return "年度计划";
@@ -100,10 +94,7 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
               <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-black text-white">
                 <Sparkles className="h-4 w-4" />
               </span>
-              <div>
-                <h2 className="text-sm font-semibold text-stone-950">智能快速创建</h2>
-                <p className="text-xs text-stone-500">直接写一句话，AI 自动判断创建日程、长期任务或年度计划。</p>
-              </div>
+              <h2 className="text-sm font-semibold text-stone-950">智能快速创建</h2>
             </div>
           </div>
 
@@ -111,7 +102,7 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
             <Input
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="例如：明天下午3-5点写论文 / 下周五前完成综述 / 今年完成毕业论文初稿"
+              placeholder="写下要创建的内容"
               className="h-11 rounded-2xl border-stone-200 bg-white/90 px-4"
               onKeyDown={(event) => {
                 if (event.key === "Enter") void handleAnalyze();
@@ -126,19 +117,6 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
               <Sparkles className="h-4 w-4" />
               {loading ? "识别中" : "智能识别"}
             </Button>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {examplePrompts.map((example) => (
-              <button
-                key={example}
-                type="button"
-                className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs text-stone-600 transition hover:border-stone-300 hover:bg-white"
-                onClick={() => setInput(example)}
-              >
-                {example}
-              </button>
-            ))}
           </div>
         </div>
       </div>

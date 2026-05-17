@@ -88,7 +88,6 @@ export function AchievementsPanel({
       <header className="flex items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">成就记录栏</h2>
-          <p className="mt-1 text-sm text-gray-600">记录每天完成的亮点，支持云端同步。</p>
         </div>
         <Button type="button" size="sm" onClick={openCreate}>
           <Plus className="mr-1 h-4 w-4" />
@@ -171,7 +170,7 @@ export function AchievementsPanel({
                 id="ach-title"
                 value={form.title}
                 onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-                placeholder="例如：完成了某个关键实验 / 读完一章文献 / 跑通某个 pipeline"
+                placeholder="输入成就"
               />
             </div>
             <div className="space-y-2">
@@ -193,4 +192,3 @@ export function AchievementsPanel({
     </section>
   );
 }
-

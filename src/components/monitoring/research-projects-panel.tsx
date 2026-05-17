@@ -133,7 +133,6 @@ export function ResearchProjectsPanel({
       <header className="flex items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">科研项目进度</h2>
-          <p className="mt-1 text-sm text-gray-600">维护项目基础信息与日/周/月计划。</p>
         </div>
         <Button type="button" size="sm" onClick={openCreate}>
           <Plus className="mr-1 h-4 w-4" />
@@ -205,7 +204,7 @@ export function ResearchProjectsPanel({
                 id="rp-name"
                 value={form.name}
                 onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                placeholder="例如：基于 X 的模型改进 / 数据集构建 / 系统实现"
+                placeholder="输入项目名称"
               />
             </div>
 
@@ -267,7 +266,6 @@ export function ResearchProjectsPanel({
               onAdd={(content, date) => addPlan("weeklyPlans", content, date)}
               onToggle={(id) => togglePlan("weeklyPlans", id)}
               onDelete={(id) => deletePlan("weeklyPlans", id)}
-              dateHint="（建议填本周周一日期）"
             />
             <PlanEditor
               title="每月完成计划"
@@ -276,7 +274,6 @@ export function ResearchProjectsPanel({
               onAdd={(content, date) => addPlan("monthlyPlans", content, date)}
               onToggle={(id) => togglePlan("monthlyPlans", id)}
               onDelete={(id) => deletePlan("monthlyPlans", id)}
-              dateHint="（建议填当月 01 号日期）"
             />
 
             <Button type="button" className="w-full" onClick={save}>
@@ -381,4 +378,3 @@ function PlanEditor({
     </div>
   );
 }
-

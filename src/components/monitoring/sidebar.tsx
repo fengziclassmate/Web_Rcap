@@ -62,7 +62,6 @@ export function MonitoringSidebar({
           </div>
           <div className="min-w-0">
             <p className="truncate text-base font-semibold tracking-tight text-stone-950">个人科研与生活工作台</p>
-            <p className="mt-0.5 truncate text-xs uppercase tracking-[0.24em] text-stone-500">Nordic research cockpit</p>
           </div>
         </div>
 

@@ -39,7 +39,7 @@ export function QuickNoteFab() {
           <Textarea
             value={content}
             onChange={(event) => setContent(event.target.value)}
-            placeholder="先记下来，稍后再整理..."
+            placeholder="输入速记"
             className="min-h-28"
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) save();
@@ -63,7 +63,6 @@ export function QuickNotesPanel() {
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold">速记</h2>
-          <p className="text-xs text-gray-500">本地保存，适合临时想法和待整理事项。</p>
         </div>
         {notes.length > 0 ? (
           <Button type="button" size="sm" variant="ghost" onClick={clearNotes}>

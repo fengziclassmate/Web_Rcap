@@ -111,7 +111,6 @@ export function ProjectCheckinsPanel({
       <header className="flex items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">Project 打卡记录</h2>
-          <p className="mt-1 text-sm text-gray-600">独立管理长期项目的连续打卡、进度和历史记录。</p>
         </div>
         <Button type="button" size="sm" onClick={() => setShowAddProjectDialog(true)}>
           <Plus className="mr-1 h-4 w-4" />

@@ -2276,7 +2276,6 @@ export default function Home() {
         <div className="mx-auto max-w-lg px-4 py-16">
           <section className="rounded-sm border border-gray-200 bg-white p-6">
             <h1 className="text-lg font-semibold">邮箱登录</h1>
-            <p className="mt-1 text-sm text-gray-600">输入邮箱，使用魔法链接登录，数据将按账号隔离保存。</p>
             <div className="mt-4 space-y-3">
               <Input
                 type="email"

@@ -165,7 +165,6 @@ export function LogComposer({
     <section className="rounded-lg border border-gray-200 bg-white shadow-md">
       <div className="border-b border-gray-200 px-5 py-4">
         <h2 className="text-lg font-semibold text-gray-900">动态日志</h2>
-        <p className="mt-1 text-sm text-gray-600">记录生活、科研、论文、任务和情绪变化。</p>
       </div>
       <div className="p-5">
         <button

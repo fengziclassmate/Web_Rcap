@@ -40,7 +40,6 @@ export function LiteratureAssistantPanel({ item, onInsertToNote }: LiteratureAss
             <Bot className="h-4 w-4" />
             文献精读助手
           </h3>
-          <p className="mt-1 text-xs text-gray-500">基于当前文献信息分析，不会替你编造缺失内容。</p>
         </div>
         <Button type="button" size="sm" variant="outline" disabled={!answer} onClick={() => onInsertToNote(answer)}>
           <Plus className="h-4 w-4" />
@@ -67,7 +66,7 @@ export function LiteratureAssistantPanel({ item, onInsertToNote }: LiteratureAss
         <Textarea
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="自由提问，例如：这篇文献的方法能如何用于我的论文？"
+          placeholder="输入问题"
           className="min-h-16"
         />
         <Button

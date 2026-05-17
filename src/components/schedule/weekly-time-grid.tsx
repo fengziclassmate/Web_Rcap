@@ -1153,7 +1153,7 @@ export function WeeklyTimeGrid({
                             onChange={(event) =>
                               setCreateRecurrence((prev) => ({ ...prev, exceptionText: event.target.value }))
                             }
-                            placeholder={"每行一个或用逗号分隔，例如：\n2026-04-12\n2026-04-20"}
+                            placeholder={"每行一个或用逗号分隔"}
                             className="min-h-[72px]"
                           />
                         </div>
@@ -1183,7 +1183,7 @@ export function WeeklyTimeGrid({
                       onChange={(event) =>
                         setCreateForm((prev) => ({ ...prev, requirements: event.target.value }))
                       }
-                      placeholder="每行一项，例如：笔记本、笔"
+                      placeholder="每行一项"
                     />
                   </div>
                   <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-4">
@@ -1417,9 +1417,6 @@ export function WeeklyTimeGrid({
                   <Palette className="h-4 w-4" />
                   分类管理
                 </DialogTitle>
-                <p className="text-xs text-stone-500">
-                  自定义分类会保存到本机，内置分类用于保持历史行程和图表统计稳定。
-                </p>
               </DialogHeader>
 
               <div className="grid min-h-0 grid-cols-1 gap-0 md:grid-cols-[1fr_310px]">
@@ -1427,7 +1424,6 @@ export function WeeklyTimeGrid({
                   <div className="flex items-center justify-between px-5 py-3">
                     <div>
                       <h3 className="text-sm font-semibold text-stone-900">现有分类</h3>
-                      <p className="text-xs text-stone-500">{categoryDefs.length} 个分类，按使用顺序展示</p>
                     </div>
                     <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600">
                       {events.length} 个行程
@@ -1564,7 +1560,6 @@ export function WeeklyTimeGrid({
 
                   <div className="rounded-2xl border border-stone-200 bg-white p-4">
                     <h3 className="text-sm font-semibold text-stone-900">添加新分类</h3>
-                    <p className="mt-1 text-xs text-stone-500">建议按真实使用场景命名，例如“通勤外出”或“论文返修”。</p>
                     <div className="mt-4 space-y-3">
                       <div className="space-y-1.5">
                         <Label htmlFor="category-name">分类名称</Label>

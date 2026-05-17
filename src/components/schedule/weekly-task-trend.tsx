@@ -33,7 +33,6 @@ export function WeeklyTaskTrend({ tasks, currentWeekStart }: WeeklyTaskTrendProp
     <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-gray-900">本周任务趋势</h3>
-        <p className="text-xs text-gray-500">按截止日期统计任务完成与待处理数量。</p>
       </div>
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">

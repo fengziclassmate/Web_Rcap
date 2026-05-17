@@ -68,7 +68,6 @@ export function PriorityBubbleChart({ tasks }: PriorityBubbleChartProps) {
     <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-gray-900">优先级分布</h3>
-        <p className="text-xs text-gray-500">气泡越大，当前未完成任务越多。</p>
       </div>
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">

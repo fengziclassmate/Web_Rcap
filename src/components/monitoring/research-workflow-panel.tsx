@@ -718,7 +718,6 @@ export function ResearchWorkflowPanel({
                 {moduleIcons[module]}
                 <span>{moduleLabels[module]}</span>
               </div>
-              <p className="mt-1 text-sm text-gray-600">搜索、筛选并查看工作流状态。</p>
             </div>
             <Button type="button" size="sm" onClick={openCreateDialog}>
               <Plus className="mr-1 h-4 w-4" />
@@ -1816,7 +1815,6 @@ function ProjectDetails({
             }
           >
             <div className="space-y-3">
-              <p className="text-sm text-gray-500">支持 Word、PPT、Excel、PDF、TXT、CSV、Markdown 等文件，附件默认私有存储。</p>
               {attachments.length === 0 ? (
                 <p className="text-sm text-gray-500">当前没有附件。</p>
               ) : (
@@ -2513,7 +2511,6 @@ function MeetingDetails({
             }
           >
             <div className="space-y-3">
-              <p className="text-sm text-gray-500">支持 Word、PPT、Excel、PDF、TXT、CSV 等文件，附件默认私有存储。</p>
               {attachments.length === 0 ? (
                 <p className="text-sm text-gray-500">当前没有附件。</p>
               ) : (
