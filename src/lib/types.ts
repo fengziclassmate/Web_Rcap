@@ -73,3 +73,11 @@ export type DashboardUiPreferences = {
   expandedProjects: string[];
   expandedFootprints: string[];
 };
+
+export type QuickNote = {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  source: "manual";
+};

@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { LiteratureAssistantPanel } from "@/components/llm/literature-assistant-panel";
 import { cn } from "@/lib/utils";
 import {
   buildLiteratureStats,
@@ -924,6 +925,31 @@ function LiteratureDetail({
           onEdit={() => setEditing(true)}
           onJump={setActiveTab}
         />
+        <div className="mb-5">
+          <LiteratureAssistantPanel
+            item={item}
+            onInsertToNote={async (content) => {
+              const existing = item.note
+                ? {
+                    researchQuestion: item.note.researchQuestion,
+                    researchBackground: item.note.researchBackground,
+                    dataSource: item.note.dataSource,
+                    method: item.note.method,
+                    findings: item.note.findings,
+                    innovations: item.note.innovations,
+                    shortcomings: item.note.shortcomings,
+                    inspiration: item.note.inspiration,
+                    quotableContent: item.note.quotableContent,
+                  }
+                : createEmptyLiteratureNoteInput();
+              await onSaveNote(item.id, {
+                ...existing,
+                inspiration: [existing.inspiration, `AI 分析：\n${content}`].filter(Boolean).join("\n\n"),
+              });
+              setActiveTab("notes");
+            }}
+          />
+        </div>
         {editing ? (
           <InlineLiteratureEditor
             draft={draft}

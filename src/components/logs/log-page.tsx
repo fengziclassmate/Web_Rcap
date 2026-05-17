@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { QuickNotesPanel } from "@/components/llm/quick-note-fab";
 import {
   buildLogStats,
   categoryLabel,
@@ -101,6 +102,7 @@ export function LogPage({
       </div>
 
       <aside className="space-y-4 xl:order-1">
+        <QuickNotesPanel />
         <LogStatsPanel stats={stats} />
         <LogFilterPanel filters={filters} tags={tags} onChange={setFilters} />
       </aside>

@@ -40,6 +40,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { TaskDecompositionDialog } from "@/components/llm/task-decomposition-dialog";
 
 type TaskDashboardProps = {
   tasks: LongTask[];
@@ -1248,7 +1249,42 @@ export function TaskDashboard({
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>子任务</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>子任务</Label>
+                  <TaskDecompositionDialog
+                    task={{
+                      id: taskDraft.id,
+                      name: taskDraft.name,
+                      dueDate: taskDraft.dueDate,
+                      done: taskDraft.done,
+                      notes: taskDraft.notes,
+                      precautions: taskDraft.precautionsText
+                        .split("\n")
+                        .map((item) => item.trim())
+                        .filter(Boolean),
+                      completionLog: taskDraft.completionLog,
+                      priority: taskDraft.priority,
+                      subtasks: taskDraft.subtasks,
+                    }}
+                    onImport={(names) =>
+                      setTaskDraft((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              subtasks: [
+                                ...prev.subtasks,
+                                ...names.map((name, index) => ({
+                                  id: `ai-subtask-${Date.now()}-${index}`,
+                                  name,
+                                  done: false,
+                                })),
+                              ],
+                            }
+                          : prev,
+                      )
+                    }
+                  />
+                </div>
                 <div className="space-y-2 border border-gray-200 p-3 rounded-sm">
                   {taskDraft.subtasks.map((subtask) => (
                     <div key={subtask.id} className="flex items-center gap-2">

@@ -126,6 +126,12 @@ import {
 import { LogPage } from "@/components/logs/log-page";
 import { LiteraturePage } from "@/components/monitoring/literature-page";
 import { ResearchWorkflowPanel } from "@/components/monitoring/research-workflow-panel";
+import { EfficiencyAnalysisDialog } from "@/components/llm/analysis-dialog";
+import { LLMChatSidebar } from "@/components/llm/chat-sidebar";
+import { QuickEventInput } from "@/components/llm/quick-event-input";
+import { QuickNoteFab } from "@/components/llm/quick-note-fab";
+import { LLMSettingsButton } from "@/components/llm/settings-button";
+import { WeeklyReportDialog } from "@/components/llm/weekly-report-dialog";
 import { buildResearchWorkflowFromLegacy } from "@/lib/research-workflow-legacy";
 import {
   defaultResearchWorkflowState,
@@ -2314,6 +2320,19 @@ export default function Home() {
           <p className="mt-0.5 min-w-0 truncate text-sm font-medium text-stone-900">{user.email}</p>
         </div>
         <div className="flex items-center gap-2">
+          <WeeklyReportDialog
+            currentWeekStart={currentWeekStart}
+            events={events}
+            tasks={tasks}
+            achievements={achievements}
+          />
+          <EfficiencyAnalysisDialog
+            events={events}
+            tasks={tasks}
+            achievements={achievements}
+            logs={logPosts}
+          />
+          <LLMSettingsButton />
           <Button
             type="button"
             variant="outline"
@@ -2342,6 +2361,7 @@ export default function Home() {
           {activeModule === "schedule" ? (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,400px)] 2xl:grid-cols-[minmax(1120px,1fr)_minmax(380px,420px)]">
               <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
+                <QuickEventInput onCreateEvent={handleCreateEvent} />
                 <WeeklyTimeGrid
                   currentWeekStart={currentWeekStart}
                   weekRange={weekRange}
@@ -2547,6 +2567,8 @@ export default function Home() {
           <span>浠诲姟</span>
         </button>
       </nav>
+      <LLMChatSidebar />
+      <QuickNoteFab />
     </main>
   );
 }
