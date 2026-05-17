@@ -9,8 +9,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Palette,
+  Pencil,
   Plus,
   Repeat,
+  ShieldCheck,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -30,12 +33,21 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { createId } from "@/lib/id";
 import {
-  CATEGORY_COLORS,
-  DEFAULT_CATEGORY_PALETTE,
+  CATEGORY_VISUALS,
+  DEFAULT_SCHEDULE_CATEGORY,
+  UNCATEGORIZED_SCHEDULE_CATEGORY,
+  createCategoryId,
+  getCategoryVisualByClass,
+  getCategoryVisualByName,
   getScheduleCategoryAccentColor,
   getScheduleCategoryColor,
+  isBuiltInCategory,
+  isCategoryNameTaken,
+  loadCategoryDefs,
   normalizeScheduleCategory,
+  saveCategoryDefs,
 } from "@/lib/categories";
+import type { ScheduleCategoryDef, ScheduleCategoryVisual } from "@/lib/categories";
 import {
   expandScheduleEvents,
   parseExceptionDateList,
@@ -64,6 +76,11 @@ type EventFormState = {
   isCompleted: boolean;
   category: string;
   tag: EventTag;
+};
+
+type CategoryPalette = {
+  name: string;
+  color: string;
 };
 
 type ResizeState = {
@@ -99,11 +116,6 @@ type WeeklyTimeGridProps = {
   timeGranularity?: TimeGranularity;
 };
 
-type CategoryPalette = {
-  name: string;
-  color: string;
-};
-
 type ContextMenuState = {
   x: number;
   y: number;
@@ -136,12 +148,12 @@ const defaultCategoryPalette: CategoryPalette[] = [
   { name: "弹性缓冲", color: "bg-zinc-50 border-zinc-200 text-zinc-900" },
 ];
 
-const selectableColors = CATEGORY_COLORS;
+const selectableColors = CATEGORY_VISUALS.map((item) => item.twClass);
 
-const defaultCategories: Category[] = DEFAULT_CATEGORY_PALETTE.map((item, index) => ({
-  id: String(index + 1),
+const defaultCategories: Category[] = CATEGORY_VISUALS.map((item, index) => ({
+  id: `__default__${index}`,
   name: item.name,
-  color: item.color,
+  color: item.twClass,
 }));
 
 const categoryAliasMap: Record<string, string> = {
@@ -172,7 +184,7 @@ const defaultForm: EventFormState = {
   notes: "",
   requirements: "",
   isCompleted: false,
-  category: defaultCategories[0].name,
+  category: DEFAULT_SCHEDULE_CATEGORY,
   tag: null,
 };
 
@@ -201,6 +213,40 @@ function getCategoryAccentColor(categories: Category[], categoryName: string) {
 
 function normalizeCategoryName(categoryName: string) {
   return normalizeScheduleCategory(categoryName);
+}
+
+function ColorSwatch({
+  visual,
+  selected,
+  onClick,
+  size = "md",
+}: {
+  visual: ScheduleCategoryVisual;
+  selected: boolean;
+  onClick: () => void;
+  size?: "sm" | "md";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg border-2 transition ${
+        size === "sm" ? "h-6 w-6" : "h-8 w-8"
+      } ${selected ? "scale-105 border-stone-950 ring-2 ring-stone-200" : "border-white hover:border-stone-300"}`}
+      style={{ backgroundColor: visual.hex }}
+      title={visual.name}
+    />
+  );
+}
+
+function CategorySelectLabel({ category }: { category: Category }) {
+  const visual = getCategoryVisualByName(category.name);
+  return (
+    <span className="flex items-center gap-2">
+      <span className="h-3 w-3 rounded-full border border-black/10" style={{ backgroundColor: visual.hex }} />
+      <span>{category.name}</span>
+    </span>
+  );
 }
 
 function getTagInfo(tag: EventTag) {
@@ -286,11 +332,23 @@ export function WeeklyTimeGrid({
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
-  const [categories, setCategories] = useState<Category[]>(defaultCategories);
+  const [categoryDefs, setCategoryDefs] = useState<ScheduleCategoryDef[]>(() => loadCategoryDefs());
+  const categories = useMemo<Category[]>(
+    () =>
+      categoryDefs
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((item) => ({ id: item.id, name: item.name, color: item.color })),
+    [categoryDefs],
+  );
   const [newCategory, setNewCategory] = useState<{ name: string; color: string }>({
     name: "",
-    color: selectableColors[0],
+    color: CATEGORY_VISUALS[0].twClass,
   });
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [editingCategoryColor, setEditingCategoryColor] = useState(CATEGORY_VISUALS[0].twClass);
+  const [confirmDeleteCategoryId, setConfirmDeleteCategoryId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [createRecurrence, setCreateRecurrence] = useState<{
     enabled: boolean;
@@ -317,6 +375,10 @@ export function WeeklyTimeGrid({
     }
     return values;
   }, [timeGranularity]);
+
+  useEffect(() => {
+    saveCategoryDefs(categoryDefs);
+  }, [categoryDefs]);
 
   const displayDates = useMemo(() => {
     if (viewMode === "day") return [currentWeekStart];
@@ -568,26 +630,73 @@ export function WeeklyTimeGrid({
 
   function handleAddCategory() {
     const name = newCategory.name.trim();
-    if (!name) return;
-    if (categories.some((category) => category.name === name)) {
-      toast.error("分类名称已存在。");
+    if (!name) {
+      toast.error("请输入分类名称");
       return;
     }
-    setCategories((prev) => [
+    if (isCategoryNameTaken(categoryDefs, name)) {
+      toast.error("分类名称已存在");
+      return;
+    }
+    const maxOrder = Math.max(...categoryDefs.map((item) => item.sortOrder), -1);
+    setCategoryDefs((prev) => [
       ...prev,
       {
-        id: createId("category"),
+        id: createCategoryId(),
         name,
         color: newCategory.color,
+        sortOrder: maxOrder + 1,
       },
     ]);
-    setNewCategory({ name: "", color: selectableColors[0] });
-    setShowCategoryManager(false);
-    toast.success("分类已添加");
+    setNewCategory({ name: "", color: CATEGORY_VISUALS[0].twClass });
+    toast.success(`已添加分类「${name}」`);
   }
 
   function handleDeleteCategory(categoryId: string) {
-    setCategories((prev) => prev.filter((category) => category.id !== categoryId));
+    const target = categoryDefs.find((category) => category.id === categoryId);
+    if (!target || isBuiltInCategory(target)) return;
+    setCategoryDefs((prev) => prev.filter((category) => category.id !== categoryId));
+    events
+      .filter((event) => normalizeCategoryName(event.category) === target.name)
+      .forEach((event) => onUpdateEvent(event.id, { category: UNCATEGORIZED_SCHEDULE_CATEGORY }));
+    setConfirmDeleteCategoryId(null);
+    toast.success(`已删除分类「${target.name}」`);
+  }
+
+  function handleStartEditCategory(category: ScheduleCategoryDef) {
+    if (isBuiltInCategory(category)) return;
+    setEditingCategoryId(category.id);
+    setEditingCategoryName(category.name);
+    setEditingCategoryColor(category.color);
+  }
+
+  function handleSaveEditCategory(categoryId: string) {
+    const name = editingCategoryName.trim();
+    if (!name) {
+      toast.error("分类名称不能为空");
+      return;
+    }
+    if (isCategoryNameTaken(categoryDefs, name, categoryId)) {
+      toast.error("分类名称已存在");
+      return;
+    }
+    const previous = categoryDefs.find((category) => category.id === categoryId);
+    setCategoryDefs((prev) =>
+      prev.map((category) =>
+        category.id === categoryId ? { ...category, name, color: editingCategoryColor } : category,
+      ),
+    );
+    if (previous && previous.name !== name) {
+      events
+        .filter((event) => normalizeCategoryName(event.category) === previous.name)
+        .forEach((event) => onUpdateEvent(event.id, { category: name }));
+    }
+    setEditingCategoryId(null);
+    toast.success("分类已更新");
+  }
+
+  function getCategoryUsageCount(categoryName: string) {
+    return events.filter((event) => normalizeCategoryName(event.category) === categoryName).length;
   }
 
   useEffect(() => {
@@ -943,7 +1052,7 @@ export function WeeklyTimeGrid({
                       <SelectContent>
                         {categories.map((category) => (
                           <SelectItem key={category.id} value={category.name}>
-                            {category.name}
+                            <CategorySelectLabel category={category} />
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1132,7 +1241,7 @@ export function WeeklyTimeGrid({
                       <SelectContent>
                         {categories.map((category) => (
                           <SelectItem key={category.id} value={category.name}>
-                            {category.name}
+                            <CategorySelectLabel category={category} />
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1292,63 +1401,209 @@ export function WeeklyTimeGrid({
             ) : null}
           </Dialog>
 
-          <Dialog open={showCategoryManager} onOpenChange={setShowCategoryManager}>
-            <DialogContent className="rounded-lg border-gray-200 shadow-lg">
-              <DialogHeader>
-                <DialogTitle className="text-lg font-semibold text-gray-900">分类管理</DialogTitle>
+          <Dialog
+            open={showCategoryManager}
+            onOpenChange={(open) => {
+              setShowCategoryManager(open);
+              if (!open) {
+                setEditingCategoryId(null);
+                setConfirmDeleteCategoryId(null);
+              }
+            }}
+          >
+            <DialogContent className="max-h-[84vh] overflow-hidden rounded-3xl border-stone-200 bg-stone-50 p-0 shadow-[0_28px_80px_rgba(28,25,23,0.24)] sm:max-w-4xl">
+              <DialogHeader className="border-b border-stone-200 bg-white px-5 py-4">
+                <DialogTitle className="flex items-center gap-2 text-base font-semibold text-stone-950">
+                  <Palette className="h-4 w-4" />
+                  分类管理
+                </DialogTitle>
+                <p className="text-xs text-stone-500">
+                  自定义分类会保存到本机，内置分类用于保持历史行程和图表统计稳定。
+                </p>
               </DialogHeader>
-              <div className="mt-4 space-y-5">
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium uppercase tracking-wide text-gray-700">现有分类</h3>
-                  <div className="space-y-3">
-                    {categories.map((category) => (
-                      <div key={category.id} className="flex items-center justify-between rounded-lg p-3 transition-colors hover:bg-gray-50">
-                        <div className="flex items-center gap-4">
-                          <div className={`h-6 w-6 rounded-md border ${category.color}`} />
-                          <span className="text-sm font-medium text-gray-800">{category.name}</span>
-                        </div>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-9 w-9 hover:bg-red-50 hover:text-red-500"
-                          onClick={() => handleDeleteCategory(category.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
 
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium uppercase tracking-wide text-gray-700">添加新分类</h3>
-                  <div className="space-y-3">
-                    <Label htmlFor="category-name">分类名称</Label>
-                    <Input
-                      id="category-name"
-                      value={newCategory.name}
-                      onChange={(event) => setNewCategory((prev) => ({ ...prev, name: event.target.value }))}
-                      placeholder="输入分类名称"
-                    />
-                    <Label>分类颜色</Label>
-                    <div className="grid grid-cols-6 gap-4">
-                      {selectableColors.map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          onClick={() => setNewCategory((prev) => ({ ...prev, color }))}
-                          className={`h-12 w-12 rounded-md border transition-all ${newCategory.color === color ? "scale-110 ring-2 ring-primary ring-offset-2" : "hover:scale-105 hover:ring-1 hover:ring-gray-300"} ${color}`}
-                          title={color}
+              <div className="grid min-h-0 grid-cols-1 gap-0 md:grid-cols-[1fr_310px]">
+                <section className="min-h-0 border-b border-stone-200 bg-white md:border-b-0 md:border-r">
+                  <div className="flex items-center justify-between px-5 py-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-stone-900">现有分类</h3>
+                      <p className="text-xs text-stone-500">{categoryDefs.length} 个分类，按使用顺序展示</p>
+                    </div>
+                    <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600">
+                      {events.length} 个行程
+                    </span>
+                  </div>
+
+                  <div className="max-h-[46vh] space-y-2 overflow-y-auto px-5 pb-5 pr-3 md:max-h-[58vh]">
+                    {categoryDefs
+                      .slice()
+                      .sort((a, b) => a.sortOrder - b.sortOrder)
+                      .map((category) => {
+                        const visual = getCategoryVisualByClass(category.color);
+                        const builtIn = isBuiltInCategory(category);
+                        const eventCount = getCategoryUsageCount(category.name);
+                        const isEditing = editingCategoryId === category.id;
+
+                        return (
+                          <div
+                            key={category.id}
+                            className={`rounded-2xl border px-3 py-2.5 transition ${
+                              isEditing
+                                ? "border-stone-300 bg-stone-50 shadow-sm"
+                                : "border-stone-200 bg-white hover:border-stone-300"
+                            }`}
+                          >
+                            {isEditing ? (
+                              <div className="space-y-3">
+                                <Input
+                                  value={editingCategoryName}
+                                  onChange={(event) => setEditingCategoryName(event.target.value)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") handleSaveEditCategory(category.id);
+                                  }}
+                                  autoFocus
+                                />
+                                <div className="flex flex-wrap gap-1.5">
+                                  {CATEGORY_VISUALS.map((item) => (
+                                    <ColorSwatch
+                                      key={item.hex}
+                                      visual={item}
+                                      selected={editingCategoryColor === item.twClass}
+                                      onClick={() => setEditingCategoryColor(item.twClass)}
+                                      size="sm"
+                                    />
+                                  ))}
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                  <Button type="button" size="sm" variant="outline" onClick={() => setEditingCategoryId(null)}>
+                                    取消
+                                  </Button>
+                                  <Button type="button" size="sm" onClick={() => handleSaveEditCategory(category.id)}>
+                                    保存
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className="h-8 w-8 shrink-0 rounded-xl border border-black/10"
+                                  style={{ backgroundColor: visual.hex }}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <p className="truncate text-sm font-semibold text-stone-900">{category.name}</p>
+                                    {builtIn ? (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-500">
+                                        <ShieldCheck className="h-3 w-3" />
+                                        内置
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <p className="mt-0.5 text-xs text-stone-500">{eventCount} 个行程正在使用</p>
+                                </div>
+                                {builtIn ? null : (
+                                  <div className="flex shrink-0 gap-1">
+                                    <Button
+                                      type="button"
+                                      size="icon-sm"
+                                      variant="ghost"
+                                      onClick={() => handleStartEditCategory(category)}
+                                      title="编辑分类"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="icon-sm"
+                                      variant="ghost"
+                                      className="text-red-600 hover:bg-red-50"
+                                      onClick={() => setConfirmDeleteCategoryId(category.id)}
+                                      title="删除分类"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </section>
+
+                <aside className="max-h-[46vh] overflow-y-auto bg-stone-50 p-5 md:max-h-[58vh]">
+                  {confirmDeleteCategoryId ? (
+                    <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+                      {(() => {
+                        const target = categoryDefs.find((item) => item.id === confirmDeleteCategoryId);
+                        const eventCount = target ? getCategoryUsageCount(target.name) : 0;
+                        return (
+                          <>
+                            <p className="text-sm font-semibold text-red-800">
+                              确认删除「{target?.name ?? "该分类"}」？
+                            </p>
+                            <p className="mt-1 text-xs leading-5 text-red-700">
+                              {eventCount > 0
+                                ? `${eventCount} 个行程会自动归入「${UNCATEGORIZED_SCHEDULE_CATEGORY}」。`
+                                : "该操作不可撤销。"}
+                            </p>
+                            <div className="mt-3 flex gap-2">
+                              <Button type="button" size="sm" variant="destructive" onClick={() => handleDeleteCategory(confirmDeleteCategoryId)}>
+                                确认删除
+                              </Button>
+                              <Button type="button" size="sm" variant="outline" onClick={() => setConfirmDeleteCategoryId(null)}>
+                                取消
+                              </Button>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  ) : null}
+
+                  <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                    <h3 className="text-sm font-semibold text-stone-900">添加新分类</h3>
+                    <p className="mt-1 text-xs text-stone-500">建议按真实使用场景命名，例如“通勤外出”或“论文返修”。</p>
+                    <div className="mt-4 space-y-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="category-name">分类名称</Label>
+                        <Input
+                          id="category-name"
+                          value={newCategory.name}
+                          onChange={(event) => setNewCategory((prev) => ({ ...prev, name: event.target.value }))}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") handleAddCategory();
+                          }}
+                          placeholder="输入分类名称"
                         />
+                      </div>
+
+                      {(["cold", "warm", "neutral"] as const).map((hue) => (
+                        <div key={hue}>
+                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-400">
+                            {hue === "cold" ? "冷色 · 科研学习" : hue === "warm" ? "暖色 · 生活沟通" : "中性色 · 事务缓冲"}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {CATEGORY_VISUALS.filter((item) => item.hue === hue).map((item) => (
+                              <ColorSwatch
+                                key={item.hex}
+                                visual={item}
+                                selected={newCategory.color === item.twClass}
+                                onClick={() => setNewCategory((prev) => ({ ...prev, color: item.twClass }))}
+                              />
+                            ))}
+                          </div>
+                        </div>
                       ))}
+
+                      <Button type="button" className="w-full" onClick={handleAddCategory}>
+                        <Plus className="mr-1.5 h-4 w-4" />
+                        添加分类
+                      </Button>
                     </div>
                   </div>
-                </div>
-
-                <Button type="button" className="w-full" onClick={handleAddCategory}>
-                  添加分类
-                </Button>
+                </aside>
               </div>
             </DialogContent>
           </Dialog>

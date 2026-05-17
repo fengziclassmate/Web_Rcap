@@ -1,7 +1,7 @@
 # 日程安排 App — Prompt 索引
 
 > 项目路径：`C:\Users\25371\Desktop\日程安排_app`
-> total: 15 个 prompt — 7 个 LLM 功能 + 2 个重构 + 1 个缓存 + 1 个架构改造 + 1 个可视化 + 1 个 Bugfix + 1 个速记 + 1 个新功能
+> total: 16 个 prompt — 7 个 LLM 功能 + 2 个重构 + 1 个缓存 + 1 个架构改造 + 1 个可视化 + 1 个 Bugfix + 1 个速记 + 2 个新功能
 
 ---
 
@@ -30,6 +30,7 @@
 
 第 4 梯队 ─── 打磨
 ├── Prompt 15 (Bug 修复+体验打磨)   — 可随时独立执行
+├── Prompt 16 (分类管理+颜色重构)   — 可随时独立执行
 ```
 
 ## 文件清单
@@ -51,6 +52,7 @@
 | `13-data-visualization.md` | 新功能 | 环形图/趋势图/气泡图 — recharts 交互图表 |
 | `14-offline-first-idb.md` | 架构改造 | IndexedDB 主存储 + 后台同步引擎 |
 | `15-bugfixes-polish.md` | Bug 修复 | 月视图翻页/足迹天数/confirm 样式/scope 记忆等 |
+| `16-category-color-refactor.md` | 功能重写 | 分类管理+颜色体系全面重构，hex 色值/色板分组/编辑分类 |
 
 ## 各 prompt 新增文件总览（01~08 — LLM 功能）
 
@@ -115,6 +117,8 @@ src/
 │   └── context-badge.tsx      ← 12
 ├── components/ui/
 │   └── confirm-dialog.tsx     ← 15
+├── lib/
+│   └── category-colors.ts     ← 16（可选，色板分组常量）
 ├── hooks/
 │   └── useChatHistory.ts      ← 12
 ├── hooks/ (if pattern)

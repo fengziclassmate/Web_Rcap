@@ -15,6 +15,7 @@ import type { PlanItem, ResearchProject } from "@/components/monitoring/research
 import type { PaperPlanItem, PaperProgress } from "@/components/monitoring/paper-progress-panel";
 import type { SubmissionRecord } from "@/components/monitoring/submissions-panel";
 import type { GroupMeetingRecord } from "@/components/monitoring/group-meetings-panel";
+import { DEFAULT_SCHEDULE_CATEGORY } from "@/lib/categories";
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   longTaskSectionOpen: true,
@@ -308,7 +309,7 @@ export function normalizeEvents(payload: unknown): ScheduleEvent[] {
         ? value.requirements.filter((item): item is string => typeof item === "string")
         : [],
       isCompleted: Boolean(value.isCompleted),
-      category: value.category ?? "\u4efb\u52a1\u63a8\u8fdb",
+      category: value.category ?? DEFAULT_SCHEDULE_CATEGORY,
       tag: (value.tag as EventTag) ?? null,
       recurrence: recurrence ?? undefined,
       exceptionDates: Array.isArray(value.exceptionDates)

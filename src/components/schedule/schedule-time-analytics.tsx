@@ -5,7 +5,6 @@ import { useMemo } from "react";
 import type { ScheduleEvent } from "@/lib/types";
 import { getScheduleCategoryVisual } from "@/lib/categories";
 import { expandScheduleEvents } from "@/lib/recurrence";
-import { cn } from "@/lib/utils";
 import { CategoryPieChart } from "@/components/schedule/category-pie-chart";
 
 type ViewMode = "day" | "week" | "month";
@@ -19,7 +18,7 @@ type TimelineSegment = {
   minutes: number;
   width: number;
   offset: number;
-  accent: string;
+  color: string;
 };
 
 type ScheduleTimeAnalyticsProps = {
@@ -99,7 +98,7 @@ export function ScheduleTimeAnalytics({ events, currentWeekStart, viewMode = "we
         minutes,
         width: Math.max(2, (minutes / (24 * 60)) * 100),
         offset: (event.startHour / 24) * 100,
-        accent: visual.accent,
+        color: visual.hex,
       };
     });
 
@@ -138,8 +137,8 @@ export function ScheduleTimeAnalytics({ events, currentWeekStart, viewMode = "we
                 {timelineSegments.map((segment) => (
                   <div
                     key={segment.id}
-                    className={cn("absolute top-0 h-full border-r border-white/70", segment.accent)}
-                    style={{ left: `${segment.offset}%`, width: `${segment.width}%` }}
+                    className="absolute top-0 h-full border-r border-white/70"
+                    style={{ left: `${segment.offset}%`, width: `${segment.width}%`, backgroundColor: segment.color }}
                     title={`${segment.startLabel}-${segment.endLabel} ${segment.title}`}
                   />
                 ))}
@@ -147,7 +146,7 @@ export function ScheduleTimeAnalytics({ events, currentWeekStart, viewMode = "we
               <div className="space-y-2">
                 {timelineSegments.map((segment) => (
                   <div key={segment.id} className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                    <span className={cn("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", segment.accent)} />
+                    <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-gray-900">{segment.title}</p>
                       <p className="mt-0.5 text-xs text-gray-500">

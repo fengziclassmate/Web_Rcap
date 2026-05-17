@@ -15,7 +15,7 @@ describe("schedule categories", () => {
   });
 
   it("normalizes legacy category aliases", () => {
-    expect(normalizeScheduleCategory("life&other")).toBe("\u751f\u6d3b\u4e8b\u52a1");
+    expect(normalizeScheduleCategory("life&other")).toBe("\u5403\u996d\u4f11\u606f");
     expect(normalizeScheduleCategory("浠诲姟鎺ㄨ繘")).toBe("\u4efb\u52a1\u63a8\u8fdb");
   });
 
