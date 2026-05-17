@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ContextBadge } from "@/components/llm/context-badge";
 import { LiteratureAssistantPanel } from "@/components/llm/literature-assistant-panel";
 import { cn } from "@/lib/utils";
 import {
@@ -898,10 +899,22 @@ function LiteratureDetail({
               {item.venue ? ` · ${item.venue}` : ""}
             </p>
           </div>
-          <Button type="button" variant="outline" onClick={() => setEditing((value) => !value)}>
-            <Pencil className="mr-2 h-4 w-4" />
-            编辑文献
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <ContextBadge
+              source={{
+                kind: "literature",
+                id: item.id,
+                title: item.title,
+                authors: item.authors,
+                year: item.year ?? undefined,
+                status: statusLabel(item.status),
+              }}
+            />
+            <Button type="button" variant="outline" onClick={() => setEditing((value) => !value)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              编辑文献
+            </Button>
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {detailTabs.map((tab) => (

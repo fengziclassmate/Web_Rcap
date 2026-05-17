@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { addDays, addWeeks, format, startOfWeek } from "date-fns";
+import { addDays, addMonths, addWeeks, format, startOfMonth, startOfWeek } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import type { User } from "@supabase/supabase-js";
 import { TaskDashboard } from "@/components/schedule/task-dashboard";
@@ -224,6 +224,10 @@ export default function Home() {
     const end = format(addDays(currentWeekStart, 6), "yyyy/MM/dd", { locale: zhCN });
     return `${start} - ${end}`;
   }, [currentWeekStart]);
+  const displayRangeLabel = useMemo(() => {
+    if (viewMode === "month") return format(currentWeekStart, "yyyy年 M月", { locale: zhCN });
+    return weekRange;
+  }, [currentWeekStart, viewMode, weekRange]);
   const persistedPayload = useMemo<PersistedSchedulePayload>(
     () => ({
       events,
@@ -1794,7 +1798,7 @@ export default function Home() {
     } else if (viewMode === 'week') {
       setCurrentWeekStart((prev) => addWeeks(prev ?? getCurrentWeekStart(), -1));
     } else if (viewMode === 'month') {
-      setCurrentWeekStart((prev) => addWeeks(prev ?? getCurrentWeekStart(), -4));
+      setCurrentWeekStart((prev) => startOfMonth(addMonths(prev ?? getCurrentWeekStart(), -1)));
     }
   }
 
@@ -1804,7 +1808,7 @@ export default function Home() {
     } else if (viewMode === 'week') {
       setCurrentWeekStart((prev) => addWeeks(prev ?? getCurrentWeekStart(), 1));
     } else if (viewMode === 'month') {
-      setCurrentWeekStart((prev) => addWeeks(prev ?? getCurrentWeekStart(), 4));
+      setCurrentWeekStart((prev) => startOfMonth(addMonths(prev ?? getCurrentWeekStart(), 1)));
     }
   }
 
@@ -1816,7 +1820,7 @@ export default function Home() {
     }
     if (mode === "month") {
       setCurrentWeekStart((prev) =>
-        startOfWeek(prev ?? getCurrentWeekStart(), { weekStartsOn: 1 }),
+        startOfMonth(prev ?? getCurrentWeekStart()),
       );
     }
     setViewMode(mode);
@@ -2364,7 +2368,7 @@ export default function Home() {
                 <QuickEventInput onCreateEvent={handleCreateEvent} />
                 <WeeklyTimeGrid
                   currentWeekStart={currentWeekStart}
-                  weekRange={weekRange}
+                  weekRange={displayRangeLabel}
                   events={events}
                   onCreateEvent={handleCreateEvent}
                   onUpdateEvent={handleUpdateEvent}
@@ -2406,8 +2410,9 @@ export default function Home() {
                   confirmDangerousActions={confirmDangerousActions}
                   uiPreferences={dashboardUiPreferences}
                   onUiPreferencesChange={setDashboardUiPreferences}
+                  currentWeekStart={currentWeekStart}
                 />
-                <ScheduleTimeAnalytics events={events} currentWeekStart={currentWeekStart} />
+                <ScheduleTimeAnalytics events={events} currentWeekStart={currentWeekStart} viewMode={viewMode} />
               </section>
             </div>
           ) : activeModule === "achievements" ? (

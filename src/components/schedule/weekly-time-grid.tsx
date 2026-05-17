@@ -117,6 +117,7 @@ const hourCellHeight = 60;
 const contextMenuWidth = 208;
 const contextMenuHeight = 360;
 const contextMenuViewportPadding = 12;
+const recurrenceEditScopeStorageKey = "recurrence-edit-scope";
 
 const defaultCategoryPalette: CategoryPalette[] = [
   { name: "深度科研", color: "bg-sky-50 border-sky-200 text-sky-950" },
@@ -277,7 +278,11 @@ export function WeeklyTimeGrid({
   const [selectedCell, setSelectedCell] = useState<GridCell | null>(null);
   const [createForm, setCreateForm] = useState<EventFormState>(defaultForm);
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
-  const [editScope, setEditScope] = useState<"occurrence" | "series">("occurrence");
+  const [editScope, setEditScope] = useState<"occurrence" | "series">(() => {
+    if (typeof window === "undefined") return "occurrence";
+    const stored = window.localStorage.getItem(recurrenceEditScopeStorageKey);
+    return stored === "series" || stored === "occurrence" ? stored : "occurrence";
+  });
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
@@ -375,7 +380,9 @@ export function WeeklyTimeGrid({
 
   function handleOpenEdit(event: ScheduleEvent) {
     setEditingEventId(event.id);
-    setEditScope("occurrence");
+    const savedScope =
+      typeof window === "undefined" ? null : window.localStorage.getItem(recurrenceEditScopeStorageKey);
+    setEditScope((parseSyntheticEventId(event.id) || event.recurrence) && savedScope === "series" ? "series" : "occurrence");
     setEditForm({
       title: event.title,
       startHour: event.startHour,
@@ -454,6 +461,9 @@ export function WeeklyTimeGrid({
 
     const parsed = parseSyntheticEventId(selectedEvent.id);
     if (parsed) {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(recurrenceEditScopeStorageKey, editScope);
+      }
       onUpdateEvent(selectedEvent.id, patch, {
         scope: editScope === "series" ? "series" : "occurrence",
       });
@@ -462,6 +472,20 @@ export function WeeklyTimeGrid({
     }
 
     setEditingEventId(null);
+  }
+
+  function handleAskAiForEvent(eventId: string) {
+    const target = expandedEvents.find((event) => event.id === eventId);
+    if (!target) return;
+    window.__injectLLMContext?.({
+      kind: "event",
+      id: target.id,
+      title: target.title,
+      date: target.date,
+      category: normalizeCategoryName(target.category),
+      time: `${formatHour(target.startHour)}-${formatHour(target.endHour)}`,
+    });
+    closeContextMenu();
   }
 
   function handleDropEvent(targetDate: string, targetHour: number) {
@@ -558,6 +582,8 @@ export function WeeklyTimeGrid({
       },
     ]);
     setNewCategory({ name: "", color: selectableColors[0] });
+    setShowCategoryManager(false);
+    toast.success("分类已添加");
   }
 
   function handleDeleteCategory(categoryId: string) {
@@ -1069,7 +1095,15 @@ export function WeeklyTimeGrid({
 
           <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => !open && setEditingEventId(null)}>
             {selectedEvent ? (
-              <DialogContent className="rounded-lg border-gray-200 shadow-lg">
+              <DialogContent
+                className="rounded-lg border-gray-200 shadow-lg"
+                onKeyDown={(event) => {
+                  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                    event.preventDefault();
+                    handleSaveEdit();
+                  }
+                }}
+              >
                 <DialogHeader>
                   <DialogTitle className="text-lg font-semibold text-gray-900">编辑行程详情</DialogTitle>
                 </DialogHeader>
@@ -1171,7 +1205,12 @@ export function WeeklyTimeGrid({
                             type="button"
                             size="sm"
                             variant={editScope === "occurrence" ? "default" : "outline"}
-                            onClick={() => setEditScope("occurrence")}
+                            onClick={() => {
+                              setEditScope("occurrence");
+                              if (typeof window !== "undefined") {
+                                window.localStorage.setItem(recurrenceEditScopeStorageKey, "occurrence");
+                              }
+                            }}
                           >
                             仅此日
                           </Button>
@@ -1179,7 +1218,12 @@ export function WeeklyTimeGrid({
                             type="button"
                             size="sm"
                             variant={editScope === "series" ? "default" : "outline"}
-                            onClick={() => setEditScope("series")}
+                            onClick={() => {
+                              setEditScope("series");
+                              if (typeof window !== "undefined") {
+                                window.localStorage.setItem(recurrenceEditScopeStorageKey, "series");
+                              }
+                            }}
                           >
                             整个系列
                           </Button>
@@ -1328,6 +1372,9 @@ export function WeeklyTimeGrid({
             </button>
             <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleToggleComplete(contextMenu.eventId)}>
               {contextMenuEvent?.isCompleted ? "标记为未完成" : "标记为已完成"}
+            </button>
+            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleAskAiForEvent(contextMenu.eventId)}>
+              问 AI 分析该行程
             </button>
             <button className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50" onClick={() => handleDeleteFromContext(contextMenu.eventId)}>
               删除该行程

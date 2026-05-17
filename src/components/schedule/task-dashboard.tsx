@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { startOfWeek } from "date-fns";
 import {
   CalendarRange,
   ChevronDown,
@@ -41,6 +42,10 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { TaskDecompositionDialog } from "@/components/llm/task-decomposition-dialog";
+import { ContextBadge } from "@/components/llm/context-badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PriorityBubbleChart } from "@/components/schedule/priority-bubble-chart";
+import { WeeklyTaskTrend } from "@/components/schedule/weekly-task-trend";
 
 type TaskDashboardProps = {
   tasks: LongTask[];
@@ -73,6 +78,7 @@ type TaskDashboardProps = {
   ) => void;
   showFootprintsSection?: boolean;
   showProjectSection?: boolean;
+  currentWeekStart?: Date;
   confirmDangerousActions: boolean;
   uiPreferences: DashboardUiPreferences;
   onUiPreferencesChange: (value: DashboardUiPreferences) => void;
@@ -129,6 +135,7 @@ export function TaskDashboard({
   onUpdateFootprint,
   showFootprintsSection = true,
   showProjectSection = true,
+  currentWeekStart,
   confirmDangerousActions,
   uiPreferences,
   onUiPreferencesChange,
@@ -176,6 +183,12 @@ export function TaskDashboard({
   const [expandedFootprints, setExpandedFootprints] = useState<Set<string>>(
     () => new Set(uiPreferences.expandedFootprints),
   );
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  } | null>(null);
   const incompleteTasks = tasks.filter((task) => !task.done);
   const completedTasks = tasks.filter((task) => task.done);
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
@@ -351,15 +364,25 @@ export function TaskDashboard({
     onDeleteProjectCheckin(projectId);
   }
 
+  function daysSince(startIso: string) {
+    const start = new Date(`${startIso}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const ms = Math.max(0, today.getTime() - start.getTime());
+    return Math.floor(ms / (24 * 60 * 60 * 1000));
+  }
+
   function withOptionalConfirm(message: string, action: () => void) {
     if (!confirmDangerousActions) {
       action();
       return;
     }
-    if (typeof window !== "undefined" && !window.confirm(message)) {
-      return;
-    }
-    action();
+    setConfirmState({
+      open: true,
+      title: "确认操作",
+      description: message,
+      onConfirm: action,
+    });
   }
 
   function openEditProject(project: ProjectCheckin) {
@@ -478,6 +501,11 @@ export function TaskDashboard({
           )}
         </div>
 
+        <div className="mb-6 grid gap-3 xl:grid-cols-2">
+          <WeeklyTaskTrend tasks={tasks} currentWeekStart={currentWeekStart ?? startOfWeek(new Date(), { weekStartsOn: 1 })} />
+          <PriorityBubbleChart tasks={tasks} />
+        </div>
+
         <Collapsible
           open={longTaskSectionOpen}
           onOpenChange={(open) => {
@@ -581,6 +609,17 @@ export function TaskDashboard({
                       ) : null}
                     </div>
                   </button>
+                  <ContextBadge
+                    source={{
+                      kind: "task",
+                      id: task.id,
+                      title: task.name,
+                      priority: task.priority,
+                      dueDate: task.dueDate,
+                      done: task.done,
+                    }}
+                    className="mt-0.5 shrink-0"
+                  />
                   <Button
                     type="button"
                     size="icon"
@@ -911,7 +950,8 @@ export function TaskDashboard({
                 <div className="grid grid-cols-2 gap-3">
                   {footprints.map((item) => {
                     const itemExpanded = expandedFootprints.has(item.id);
-                    const days = daysBetweenInclusive(item.lastDate, getTodayISODate()) - 1;
+                    const days = daysSince(item.lastDate);
+                    const dayLabel = days === 0 ? "今天" : `${days} 天`;
                     return (
                       <div key={item.id} className="rounded-lg border border-gray-200 p-3 text-center">
                         <button
@@ -938,7 +978,7 @@ export function TaskDashboard({
                         </button>
                         {itemExpanded ? (
                           <>
-                            <p className="mt-2 text-lg font-semibold">{days} 天</p>
+                            <p className="mt-2 text-lg font-semibold">{dayLabel}</p>
                             <p className="text-xs text-gray-500">距上次</p>
                             <Button
                               type="button"
@@ -1416,6 +1456,17 @@ export function TaskDashboard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {confirmState ? (
+        <ConfirmDialog
+          open={confirmState.open}
+          onOpenChange={(open) => setConfirmState(open ? confirmState : null)}
+          title={confirmState.title}
+          description={confirmState.description}
+          confirmLabel="确认"
+          onConfirm={confirmState.onConfirm}
+        />
+      ) : null}
     </aside>
   );
 }
