@@ -2365,7 +2365,11 @@ export default function Home() {
           {activeModule === "schedule" ? (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,400px)] 2xl:grid-cols-[minmax(1120px,1fr)_minmax(380px,420px)]">
               <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
-                <QuickEventInput onCreateEvent={handleCreateEvent} />
+                <QuickEventInput
+                  onCreateEvent={handleCreateEvent}
+                  onAddTask={handleAddTask}
+                  onAddAnnualTask={handleAddAnnualTask}
+                />
                 <WeeklyTimeGrid
                   currentWeekStart={currentWeekStart}
                   weekRange={displayRangeLabel}
