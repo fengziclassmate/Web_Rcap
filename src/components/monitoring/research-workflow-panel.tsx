@@ -2,12 +2,14 @@
 
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
 import {
+  Archive,
   FileText,
   Filter,
   FlaskConical,
   LayoutGrid,
   List,
   Plus,
+  RotateCcw,
   Search,
   Send,
   Table2,
@@ -75,6 +77,7 @@ import {
 
 type WorkflowModule = "research" | "paper" | "submissions" | "meetings";
 type ViewMode = "cards" | "table" | "kanban";
+type ProjectScope = "active" | "archived";
 
 type ResearchWorkflowPanelProps = {
   module: WorkflowModule;
@@ -273,6 +276,7 @@ export function ResearchWorkflowPanel({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortKey, setSortKey] = useState("recent");
+  const [projectScope, setProjectScope] = useState<ProjectScope>("active");
   const [viewState, setViewState] = useState<Record<WorkflowModule, ViewMode>>({
     research: "cards",
     paper: "cards",
@@ -304,6 +308,11 @@ export function ResearchWorkflowPanel({
   const currentView = viewState[module];
   const selectedId = selectedIdState[module];
   const selectedTab = detailTabState[module];
+  const activeProjectCount = workflow.projects.filter((item) => item.status !== "archived").length;
+  const archivedProjectCount = workflow.projects.filter((item) => item.status === "archived").length;
+  const projectStatusOptionsForScope = researchProjectStatusOptions.filter((item) =>
+    projectScope === "archived" ? item.value === "archived" : item.value !== "archived",
+  );
 
   const primaryItems = useMemo(() => {
     if (module === "research") return workflow.projects;
@@ -315,6 +324,11 @@ export function ResearchWorkflowPanel({
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
     const list = [...primaryItems].filter((item) => {
+      if (module === "research") {
+        const archived = (item as ResearchProject).status === "archived";
+        if (projectScope === "active" && archived) return false;
+        if (projectScope === "archived" && !archived) return false;
+      }
       const matchesStatus =
         statusFilter === "all" ||
         ("status" in item && item.status === statusFilter) ||
@@ -372,7 +386,7 @@ export function ResearchWorkflowPanel({
       return bDate.localeCompare(aDate);
     });
     return list;
-  }, [module, primaryItems, search, sortKey, statusFilter]);
+  }, [module, primaryItems, projectScope, search, sortKey, statusFilter]);
 
   const effectiveSelectedId =
     selectedId && filteredItems.some((item) => item.id === selectedId)
@@ -663,6 +677,36 @@ export function ResearchWorkflowPanel({
     }));
   }
 
+  function setProjectArchived(projectId: string, archived: boolean) {
+    const nextStatus: ResearchProjectStatus = archived ? "archived" : "completed";
+    commit((prev) => {
+      const target = prev.projects.find((item) => item.id === projectId);
+      return {
+        ...prev,
+        projects: prev.projects.map((item) =>
+          item.id === projectId
+            ? { ...item, status: nextStatus, progress: archived ? 100 : item.progress }
+            : item,
+        ),
+        timelineEntries: target
+          ? [
+              createTimelineEntry(
+                "project",
+                projectId,
+                todayISO(),
+                target.title,
+                archived ? "项目已归档" : "项目已恢复",
+              ),
+              ...prev.timelineEntries,
+            ]
+          : prev.timelineEntries,
+      };
+    });
+    setStatusFilter("all");
+    setProjectScope(archived ? "archived" : "active");
+    setSelectedIdState((prev) => ({ ...prev, research: projectId }));
+  }
+
   const selectedProjectLogs = selectedProject
     ? workflow.projectLogs.filter((item) => item.projectId === selectedProject.id)
     : [];
@@ -716,7 +760,7 @@ export function ResearchWorkflowPanel({
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                 {moduleIcons[module]}
-                <span>{moduleLabels[module]}</span>
+                <span>{module === "research" && projectScope === "archived" ? "科研项目归档库" : moduleLabels[module]}</span>
               </div>
             </div>
             <Button type="button" size="sm" onClick={openCreateDialog}>
@@ -724,6 +768,36 @@ export function ResearchWorkflowPanel({
               新建
             </Button>
           </div>
+          {module === "research" ? (
+            <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setProjectScope("active");
+                  setStatusFilter("all");
+                }}
+                className={cn(
+                  "rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition",
+                  projectScope === "active" && "bg-white text-gray-950 shadow-sm",
+                )}
+              >
+                项目列表 {activeProjectCount}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setProjectScope("archived");
+                  setStatusFilter("all");
+                }}
+                className={cn(
+                  "rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition",
+                  projectScope === "archived" && "bg-white text-gray-950 shadow-sm",
+                )}
+              >
+                归档库 {archivedProjectCount}
+              </button>
+            </div>
+          ) : null}
           <div className="mt-4 grid grid-cols-1 gap-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -742,7 +816,7 @@ export function ResearchWorkflowPanel({
                 <SelectContent>
                   <SelectItem value="all">全部状态</SelectItem>
                   {module === "research" &&
-                    researchProjectStatusOptions.map((item) => (
+                    projectStatusOptionsForScope.map((item) => (
                       <SelectItem key={item.value} value={item.value}>
                         {item.label}
                       </SelectItem>
@@ -829,6 +903,7 @@ export function ResearchWorkflowPanel({
               onSelect={(id) => setSelectedIdState((prev) => ({ ...prev, [module]: id }))}
               onEdit={openEditDialog}
               onDelete={removePrimaryItem}
+              onToggleArchive={module === "research" ? setProjectArchived : undefined}
             />
           ) : currentView === "kanban" ? (
             <KanbanList
@@ -845,6 +920,7 @@ export function ResearchWorkflowPanel({
               onSelect={(id) => setSelectedIdState((prev) => ({ ...prev, [module]: id }))}
               onEdit={openEditDialog}
               onDelete={removePrimaryItem}
+              onToggleArchive={module === "research" ? setProjectArchived : undefined}
             />
           )}
         </div>
@@ -939,6 +1015,7 @@ export function ResearchWorkflowPanel({
             }}
             onUploadAttachments={(files) => onUploadProjectAttachments(selectedProject.id, files)}
             onDeleteAttachment={onDeleteProjectAttachment}
+            onToggleArchive={(archived) => setProjectArchived(selectedProject.id, archived)}
           />
         ) : module === "paper" && selectedPaper ? (
           <PaperDetails
@@ -1149,6 +1226,7 @@ function CardList({
   onSelect,
   onEdit,
   onDelete,
+  onToggleArchive,
 }: {
   module: WorkflowModule;
   items: Array<ResearchProject | ResearchPaper | SubmissionRecord | GroupMeetingRecord>;
@@ -1156,6 +1234,7 @@ function CardList({
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onToggleArchive?: (id: string, archived: boolean) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -1184,6 +1263,7 @@ function CardList({
                   })();
         const badgeText =
           "status" in item ? statusLabel(item.status) : "meetingType" in item ? item.meetingType : "";
+        const isArchivedProject = module === "research" && (item as ResearchProject).status === "archived";
         return (
           <div
             key={item.id}
@@ -1207,6 +1287,16 @@ function CardList({
               <Button type="button" variant="outline" size="sm" onClick={() => onEdit(item.id)}>
                 编辑
               </Button>
+              {module === "research" && onToggleArchive ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onToggleArchive(item.id, !isArchivedProject)}
+                >
+                  {isArchivedProject ? "恢复" : "归档"}
+                </Button>
+              ) : null}
               <Button type="button" variant="outline" size="sm" onClick={() => onDelete(item.id)}>
                 删除
               </Button>
@@ -1225,6 +1315,7 @@ function TableList({
   onSelect,
   onEdit,
   onDelete,
+  onToggleArchive,
 }: {
   module: WorkflowModule;
   items: Array<ResearchProject | ResearchPaper | SubmissionRecord | GroupMeetingRecord>;
@@ -1232,6 +1323,7 @@ function TableList({
   onSelect: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onToggleArchive?: (id: string, archived: boolean) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200">
@@ -1244,31 +1336,44 @@ function TableList({
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => (
-            <tr
-              key={item.id}
-              className={cn("border-t border-gray-200", item.id === selectedId && "bg-gray-50")}
-            >
-              <td className="px-3 py-3">
-                <button type="button" className="font-medium text-gray-900" onClick={() => onSelect(item.id)}>
-                  {entityTitle(module, item)}
-                </button>
-              </td>
-              <td className="px-3 py-3 text-gray-600">
-                {"status" in item ? statusLabel(item.status) : "meetingType" in item ? item.meetingType : ""}
-              </td>
-              <td className="px-3 py-3">
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => onEdit(item.id)}>
-                    编辑
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => onDelete(item.id)}>
-                    删除
-                  </Button>
-                </div>
-              </td>
-            </tr>
-          ))}
+          {items.map((item) => {
+            const isArchivedProject = module === "research" && (item as ResearchProject).status === "archived";
+            return (
+              <tr
+                key={item.id}
+                className={cn("border-t border-gray-200", item.id === selectedId && "bg-gray-50")}
+              >
+                <td className="px-3 py-3">
+                  <button type="button" className="font-medium text-gray-900" onClick={() => onSelect(item.id)}>
+                    {entityTitle(module, item)}
+                  </button>
+                </td>
+                <td className="px-3 py-3 text-gray-600">
+                  {"status" in item ? statusLabel(item.status) : "meetingType" in item ? item.meetingType : ""}
+                </td>
+                <td className="px-3 py-3">
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => onEdit(item.id)}>
+                      编辑
+                    </Button>
+                    {module === "research" && onToggleArchive ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onToggleArchive(item.id, !isArchivedProject)}
+                      >
+                        {isArchivedProject ? "恢复" : "归档"}
+                      </Button>
+                    ) : null}
+                    <Button type="button" variant="outline" size="sm" onClick={() => onDelete(item.id)}>
+                      删除
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -1615,6 +1720,7 @@ function ProjectDetails({
   onCreateTask,
   onUploadAttachments,
   onDeleteAttachment,
+  onToggleArchive,
 }: {
   project: ResearchProject;
   papers: ResearchPaper[];
@@ -1633,8 +1739,10 @@ function ProjectDetails({
   onCreateTask: (title: string, dueDate?: string, notes?: string, targetId?: string) => void;
   onUploadAttachments: (files: File[]) => Promise<void>;
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
+  onToggleArchive: (archived: boolean) => void;
 }) {
   const [projectDraft, setProjectDraft] = useState<ProjectDraft>(() => projectDraftFromValue(project));
+  const isArchived = project.status === "archived";
   const [logDraft, setLogDraft] = useState({
     date: todayISO(),
     progressText: "",
@@ -1657,9 +1765,19 @@ function ProjectDetails({
             <Badge variant="secondary">{statusLabel(project.status)}</Badge>
             <Badge variant="secondary">{priorityLabel(project.priority)}</Badge>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => onEditingChange(!editing)}>
-            {editing ? "收起编辑" : "编辑项目"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => onToggleArchive(!isArchived)}>
+              {isArchived ? (
+                <RotateCcw className="h-4 w-4" />
+              ) : (
+                <Archive className="h-4 w-4" />
+              )}
+              {isArchived ? "恢复项目" : "归档项目"}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => onEditingChange(!editing)}>
+              {editing ? "收起编辑" : "编辑项目"}
+            </Button>
+          </div>
         </div>
         <p className="mt-2 text-sm text-gray-600">{project.summary || "暂无简介"}</p>
       </header>

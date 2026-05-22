@@ -9,7 +9,8 @@ export type ResearchProjectStatus =
   | "blocked"
   | "writing"
   | "completed"
-  | "paused";
+  | "paused"
+  | "archived";
 
 export type ResearchPaperStatus =
   | "planning"
@@ -261,6 +262,7 @@ export const researchProjectStatusOptions: Array<{ value: ResearchProjectStatus;
   { value: "writing", label: "写作中" },
   { value: "completed", label: "已完成" },
   { value: "paused", label: "暂停" },
+  { value: "archived", label: "归档" },
 ];
 
 export const researchPaperStatusOptions: Array<{ value: ResearchPaperStatus; label: string }> = [
