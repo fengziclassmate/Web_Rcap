@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppProviders } from "@/app/app-providers";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -21,13 +20,13 @@ const siteUrl =
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "个人日程管理",
-  description: "极简黑白风格的个人日程管理 Web 应用",
-  applicationName: "个人日程管理",
+  title: "研究手札与日常切片",
+  description: "一个面向科研人员的个人研究空间，记录研究项目、文献阅读、日程节律与日常观察。",
+  applicationName: "研究手札与日常切片",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "个人日程管理",
+    title: "研究手札与日常切片",
     statusBarStyle: "default",
   },
   formatDetection: {
@@ -50,7 +49,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <AppProviders>{children}</AppProviders>
+        {children}
         <Toaster position="top-center" />
       </body>
     </html>

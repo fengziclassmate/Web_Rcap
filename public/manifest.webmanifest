@@ -1,7 +1,7 @@
 {
-  "name": "个人日程管理",
-  "short_name": "日程",
-  "description": "个人日程与任务管理",
+  "name": "研究手札与日常切片",
+  "short_name": "研究手札",
+  "description": "科研人员的个人研究空间、日程工作台与日常记录。",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

@@ -19,10 +19,10 @@ export default function Icon() {
           color: "#000000",
           fontSize: 280,
           fontWeight: 700,
-          letterSpacing: "-0.05em",
+          letterSpacing: 0,
         }}
       >
-        日
+        研
       </div>
     ),
     { ...size },

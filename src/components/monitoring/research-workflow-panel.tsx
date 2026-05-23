@@ -753,23 +753,55 @@ export function ResearchWorkflowPanel({
     .sort((a, b) => b.date.localeCompare(a.date));
 
   return (
-    <section className="grid min-h-[720px] grid-cols-1 rounded-lg border border-gray-200 bg-white shadow-md lg:grid-cols-[360px_minmax(0,1fr)] 2xl:grid-cols-[420px_minmax(0,1fr)]">
-      <div className="border-b border-gray-200 lg:border-b-0 lg:border-r">
-        <header className="border-b border-gray-200 px-5 py-4">
+    <section
+      className={cn(
+        "grid min-h-[720px] grid-cols-1 overflow-hidden border bg-white",
+        module === "research"
+          ? "rounded-[1.75rem] border-stone-200/80 bg-stone-50/70 shadow-[0_24px_80px_rgba(68,64,60,0.11)] lg:grid-cols-[390px_minmax(0,1fr)] 2xl:grid-cols-[430px_minmax(0,1fr)]"
+          : "rounded-lg border-gray-200 shadow-md lg:grid-cols-[360px_minmax(0,1fr)] 2xl:grid-cols-[420px_minmax(0,1fr)]",
+      )}
+    >
+      <div
+        className={cn(
+          "border-b lg:border-b-0 lg:border-r",
+          module === "research" ? "border-stone-200/80 bg-stone-50/70" : "border-gray-200",
+        )}
+      >
+        <header
+          className={cn(
+            "border-b px-5 py-4",
+            module === "research"
+              ? "border-stone-200/80 bg-[radial-gradient(circle_at_12%_0%,rgba(186,230,253,0.36),transparent_32%),linear-gradient(135deg,#ffffff_0%,#fafaf9_54%,#eef6f0_100%)]"
+              : "border-gray-200",
+          )}
+        >
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                {moduleIcons[module]}
+              <div className={cn("flex items-center gap-2 text-sm font-semibold", module === "research" ? "text-stone-950" : "text-gray-900")}>
+                <span
+                  className={cn(
+                    module === "research"
+                      ? "flex size-9 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-700 shadow-sm"
+                      : "",
+                  )}
+                >
+                  {moduleIcons[module]}
+                </span>
                 <span>{module === "research" && projectScope === "archived" ? "科研项目归档库" : moduleLabels[module]}</span>
               </div>
             </div>
-            <Button type="button" size="sm" onClick={openCreateDialog}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={openCreateDialog}
+              className={cn(module === "research" && "rounded-xl bg-stone-950 text-white hover:bg-stone-800")}
+            >
               <Plus className="mr-1 h-4 w-4" />
               新建
             </Button>
           </div>
           {module === "research" ? (
-            <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1">
+            <div className="mt-4 grid grid-cols-2 gap-1 rounded-2xl border border-stone-200/80 bg-white/72 p-1 shadow-sm">
               <button
                 type="button"
                 onClick={() => {
@@ -777,8 +809,8 @@ export function ResearchWorkflowPanel({
                   setStatusFilter("all");
                 }}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition",
-                  projectScope === "active" && "bg-white text-gray-950 shadow-sm",
+                  "rounded-xl px-3 py-2 text-sm font-medium text-stone-500 transition",
+                  projectScope === "active" && "bg-stone-950 text-white shadow-sm",
                 )}
               >
                 项目列表 {activeProjectCount}
@@ -790,27 +822,27 @@ export function ResearchWorkflowPanel({
                   setStatusFilter("all");
                 }}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition",
-                  projectScope === "archived" && "bg-white text-gray-950 shadow-sm",
+                  "rounded-xl px-3 py-2 text-sm font-medium text-stone-500 transition",
+                  projectScope === "archived" && "bg-stone-950 text-white shadow-sm",
                 )}
               >
                 归档库 {archivedProjectCount}
               </button>
             </div>
           ) : null}
-          <div className="mt-4 grid grid-cols-1 gap-2">
+          <div className={cn("mt-4 grid grid-cols-1 gap-2", module === "research" && "gap-3")}>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={`搜索${moduleLabels[module]}`}
-                className="pl-9"
+                className={cn("pl-9", module === "research" && "h-11 rounded-2xl border-stone-200 bg-white/82")}
               />
             </div>
-            <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+            <div className={cn("grid grid-cols-[1fr_1fr_auto] gap-2", module === "research" && "items-center")}>
               <Select value={statusFilter} onValueChange={(value) => value && setStatusFilter(value)}>
-                <SelectTrigger>
+                <SelectTrigger className={cn(module === "research" && "h-10 rounded-xl border-stone-200 bg-white/82")}>
                   <SelectValue placeholder="筛选状态" />
                 </SelectTrigger>
                 <SelectContent>
@@ -842,7 +874,7 @@ export function ResearchWorkflowPanel({
                 </SelectContent>
               </Select>
               <Select value={sortKey} onValueChange={(value) => value && setSortKey(value)}>
-                <SelectTrigger>
+                <SelectTrigger className={cn(module === "research" && "h-10 rounded-xl border-stone-200 bg-white/82")}>
                   <SelectValue placeholder="排序" />
                 </SelectTrigger>
                 <SelectContent>
@@ -851,13 +883,13 @@ export function ResearchWorkflowPanel({
                   <SelectItem value="status">状态</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1">
+              <div className={cn("flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1", module === "research" && "h-10 rounded-xl border-stone-200 bg-white/72")}>
                 <button
                   type="button"
                   onClick={() => setViewState((prev) => ({ ...prev, [module]: "cards" }))}
                   className={cn(
                     "rounded p-1.5 text-gray-500",
-                    currentView === "cards" && "bg-white text-black shadow-sm",
+                    currentView === "cards" && (module === "research" ? "bg-stone-950 text-white shadow-sm" : "bg-white text-black shadow-sm"),
                   )}
                   aria-label="卡片视图"
                 >
@@ -868,7 +900,7 @@ export function ResearchWorkflowPanel({
                   onClick={() => setViewState((prev) => ({ ...prev, [module]: "table" }))}
                   className={cn(
                     "rounded p-1.5 text-gray-500",
-                    currentView === "table" && "bg-white text-black shadow-sm",
+                    currentView === "table" && (module === "research" ? "bg-stone-950 text-white shadow-sm" : "bg-white text-black shadow-sm"),
                   )}
                   aria-label="表格视图"
                 >
@@ -879,7 +911,7 @@ export function ResearchWorkflowPanel({
                   onClick={() => setViewState((prev) => ({ ...prev, [module]: "kanban" }))}
                   className={cn(
                     "rounded p-1.5 text-gray-500",
-                    currentView === "kanban" && "bg-white text-black shadow-sm",
+                    currentView === "kanban" && (module === "research" ? "bg-stone-950 text-white shadow-sm" : "bg-white text-black shadow-sm"),
                   )}
                   aria-label="看板视图"
                 >
@@ -890,7 +922,7 @@ export function ResearchWorkflowPanel({
           </div>
         </header>
 
-        <div className="max-h-[760px] overflow-y-auto p-4">
+        <div className={cn("max-h-[760px] overflow-y-auto p-4", module === "research" && "space-y-3 p-5")}>
           {filteredItems.length === 0 ? (
             <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-500">
               没有符合条件的记录。
@@ -1263,28 +1295,56 @@ function CardList({
                   })();
         const badgeText =
           "status" in item ? statusLabel(item.status) : "meetingType" in item ? item.meetingType : "";
-        const isArchivedProject = module === "research" && (item as ResearchProject).status === "archived";
+        const researchItem = module === "research" ? (item as ResearchProject) : null;
+        const isArchivedProject = researchItem?.status === "archived";
         return (
           <div
             key={item.id}
             className={cn(
               "rounded-lg border border-gray-200 p-4 transition",
-              selected && "border-black bg-gray-50",
+              module === "research" &&
+                "group rounded-3xl border-stone-200/80 bg-white/82 p-0 shadow-sm hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-[0_16px_42px_rgba(68,64,60,0.10)]",
+              selected && (module === "research" ? "border-stone-950 bg-white ring-2 ring-stone-950/5" : "border-black bg-gray-50"),
             )}
           >
-            <button type="button" className="w-full text-left" onClick={() => onSelect(item.id)}>
+            <button
+              type="button"
+              className={cn("w-full text-left", module === "research" && "p-4 pb-3")}
+              onClick={() => onSelect(item.id)}
+            >
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-gray-900">{title}</p>
-                  <p className="mt-2 line-clamp-3 text-sm text-gray-600">{secondary || "暂无补充信息"}</p>
+                <div className="min-w-0 flex-1">
+                  <p className={cn("truncate text-sm font-semibold text-gray-900", module === "research" && "text-[15px] text-stone-950")}>{title}</p>
+                  <p className={cn("mt-2 line-clamp-3 text-sm text-gray-600", module === "research" && "line-clamp-2 leading-6 text-stone-600")}>{secondary || "暂无补充信息"}</p>
                 </div>
-                <Badge variant="secondary" className="shrink-0">
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    "shrink-0",
+                    module === "research" && "rounded-full border border-stone-200 bg-stone-100 px-2.5 py-1 text-[11px] text-stone-700",
+                    isArchivedProject && "border-slate-200 bg-slate-100 text-slate-600",
+                  )}
+                >
                   {badgeText}
                 </Badge>
               </div>
+              {researchItem ? (
+                <div className="mt-4 space-y-3">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-stone-700 via-teal-600 to-sky-500"
+                      style={{ width: `${researchItem.progress}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-xs text-stone-500">
+                    <span>{researchItem.progress}%</span>
+                    <span>{researchItem.targetEndDate || researchItem.startDate || "-"}</span>
+                  </div>
+                </div>
+              ) : null}
             </button>
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => onEdit(item.id)}>
+            <div className={cn("mt-3 flex items-center justify-between gap-2", module === "research" && "mt-0 border-t border-stone-100 px-4 py-3")}>
+              <Button type="button" variant="outline" size="sm" className={cn(module === "research" && "rounded-xl border-stone-200 bg-white/80")} onClick={() => onEdit(item.id)}>
                 编辑
               </Button>
               {module === "research" && onToggleArchive ? (
@@ -1292,12 +1352,13 @@ function CardList({
                   type="button"
                   variant="outline"
                   size="sm"
+                  className="rounded-xl border-stone-200 bg-white/80"
                   onClick={() => onToggleArchive(item.id, !isArchivedProject)}
                 >
                   {isArchivedProject ? "恢复" : "归档"}
                 </Button>
               ) : null}
-              <Button type="button" variant="outline" size="sm" onClick={() => onDelete(item.id)}>
+              <Button type="button" variant="outline" size="sm" className={cn(module === "research" && "rounded-xl border-stone-200 bg-white/80 text-stone-500 hover:text-red-600")} onClick={() => onDelete(item.id)}>
                 删除
               </Button>
             </div>
@@ -1326,13 +1387,18 @@ function TableList({
   onToggleArchive?: (id: string, archived: boolean) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200">
+    <div
+      className={cn(
+        "overflow-hidden rounded-lg border border-gray-200",
+        module === "research" && "rounded-3xl border-stone-200/80 bg-white/86 shadow-sm",
+      )}
+    >
       <table className="w-full text-left text-sm">
-        <thead className="bg-gray-50 text-xs text-gray-500">
+        <thead className={cn("bg-gray-50 text-xs text-gray-500", module === "research" && "bg-stone-100/70 text-stone-500")}>
           <tr>
-            <th className="px-3 py-2">标题</th>
-            <th className="px-3 py-2">状态</th>
-            <th className="px-3 py-2">操作</th>
+            <th className={cn("px-3 py-2", module === "research" && "px-4 py-3")}>标题</th>
+            <th className={cn("px-3 py-2", module === "research" && "px-4 py-3")}>状态</th>
+            <th className={cn("px-3 py-2", module === "research" && "px-4 py-3")}>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -1341,19 +1407,38 @@ function TableList({
             return (
               <tr
                 key={item.id}
-                className={cn("border-t border-gray-200", item.id === selectedId && "bg-gray-50")}
+                className={cn(
+                  "border-t border-gray-200",
+                  module === "research" && "border-stone-100",
+                  item.id === selectedId && (module === "research" ? "bg-stone-50/80" : "bg-gray-50"),
+                )}
               >
-                <td className="px-3 py-3">
-                  <button type="button" className="font-medium text-gray-900" onClick={() => onSelect(item.id)}>
+                <td className={cn("px-3 py-3", module === "research" && "px-4 py-4")}>
+                  <button
+                    type="button"
+                    className={cn("font-medium text-gray-900", module === "research" && "text-stone-950 hover:text-teal-700")}
+                    onClick={() => onSelect(item.id)}
+                  >
                     {entityTitle(module, item)}
                   </button>
                 </td>
-                <td className="px-3 py-3 text-gray-600">
-                  {"status" in item ? statusLabel(item.status) : "meetingType" in item ? item.meetingType : ""}
+                <td className={cn("px-3 py-3 text-gray-600", module === "research" && "px-4 py-4 text-stone-600")}>
+                  <Badge
+                    variant="secondary"
+                    className={cn(module === "research" && "rounded-full border border-stone-200 bg-stone-100 text-stone-700")}
+                  >
+                    {"status" in item ? statusLabel(item.status) : "meetingType" in item ? item.meetingType : ""}
+                  </Badge>
                 </td>
-                <td className="px-3 py-3">
+                <td className={cn("px-3 py-3", module === "research" && "px-4 py-4")}>
                   <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => onEdit(item.id)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={cn(module === "research" && "rounded-xl border-stone-200 bg-white/80")}
+                      onClick={() => onEdit(item.id)}
+                    >
                       编辑
                     </Button>
                     {module === "research" && onToggleArchive ? (
@@ -1361,12 +1446,19 @@ function TableList({
                         type="button"
                         variant="outline"
                         size="sm"
+                        className="rounded-xl border-stone-200 bg-white/80"
                         onClick={() => onToggleArchive(item.id, !isArchivedProject)}
                       >
                         {isArchivedProject ? "恢复" : "归档"}
                       </Button>
                     ) : null}
-                    <Button type="button" variant="outline" size="sm" onClick={() => onDelete(item.id)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={cn(module === "research" && "rounded-xl border-stone-200 bg-white/80 text-stone-500 hover:text-red-600")}
+                      onClick={() => onDelete(item.id)}
+                    >
                       删除
                     </Button>
                   </div>
@@ -1403,15 +1495,20 @@ function KanbanList({
   }, [items]);
 
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", module === "research" && "space-y-4")}>
       {groups.map(([group, groupItems]) => (
-        <div key={group} className="rounded-lg border border-gray-200">
-          <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
-            <Filter className="h-4 w-4" />
+        <div key={group} className={cn("rounded-lg border border-gray-200", module === "research" && "rounded-3xl border-stone-200/80 bg-white/86 shadow-sm")}>
+          <div
+            className={cn(
+              "flex items-center gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700",
+              module === "research" && "border-stone-100 bg-stone-100/60 px-4 py-3 text-stone-800",
+            )}
+          >
+            <Filter className={cn("h-4 w-4", module === "research" && "text-teal-700")} />
             <span>{group}</span>
-            <Badge variant="secondary">{groupItems.length}</Badge>
+            <Badge variant="secondary" className={cn(module === "research" && "ml-auto rounded-full bg-white text-stone-700")}>{groupItems.length}</Badge>
           </div>
-          <div className="space-y-2 p-3">
+          <div className={cn("space-y-2 p-3", module === "research" && "p-4")}>
             {groupItems.map((item) => (
               <button
                 type="button"
@@ -1419,7 +1516,8 @@ function KanbanList({
                 onClick={() => onSelect(item.id)}
                 className={cn(
                   "w-full rounded-md border border-gray-200 px-3 py-2 text-left text-sm",
-                  item.id === selectedId && "border-black bg-gray-50",
+                  module === "research" && "rounded-2xl border-stone-200 bg-white/70 px-4 py-3 text-stone-800 hover:border-stone-300 hover:bg-stone-50",
+                  item.id === selectedId && (module === "research" ? "border-stone-950 bg-stone-50 shadow-sm" : "border-black bg-gray-50"),
                 )}
               >
                 {entityTitle(module, item)}
@@ -1442,15 +1540,15 @@ function DetailTabs({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2 border-b border-gray-200 px-5 py-3">
+    <div className="flex flex-wrap gap-2 border-b border-stone-200/80 bg-white/65 px-5 py-3">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
           onClick={() => onChange(tab.id)}
           className={cn(
-            "rounded-full px-3 py-1.5 text-sm text-gray-500",
-            value === tab.id && "bg-black text-white",
+            "rounded-2xl px-3.5 py-2 text-sm font-medium text-stone-500 transition hover:bg-stone-100 hover:text-stone-900",
+            value === tab.id && "bg-stone-950 text-white shadow-sm hover:bg-stone-950 hover:text-white",
           )}
         >
           {tab.label}
@@ -1470,9 +1568,9 @@ function DetailSection({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-gray-200 p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+    <section className="rounded-3xl border border-stone-200/80 bg-white/88 p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h3 className="text-[15px] font-semibold tracking-tight text-stone-950">{title}</h3>
         {action}
       </div>
       {children}
@@ -1484,15 +1582,15 @@ function TimelineList({ items }: { items: TimelineEntry[] }) {
   return (
     <div className="space-y-3">
       {items.length === 0 ? (
-        <p className="text-sm text-gray-500">暂无时间线记录。</p>
+        <p className="text-sm text-stone-500">暂无时间线记录。</p>
       ) : (
         items.map((item) => (
-          <div key={item.id} className="rounded-lg border border-gray-200 p-3">
+          <div key={item.id} className="rounded-2xl border border-stone-200 bg-white/85 p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium text-gray-900">{item.title}</p>
-              <span className="text-xs text-gray-500">{item.date}</span>
+              <p className="text-sm font-medium text-stone-950">{item.title}</p>
+              <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-500">{item.date}</span>
             </div>
-            <p className="mt-2 text-sm text-gray-600">{item.description}</p>
+            <p className="mt-2 text-sm leading-6 text-stone-600">{item.description}</p>
           </div>
         ))
       )}
@@ -1501,11 +1599,11 @@ function TimelineList({ items }: { items: TimelineEntry[] }) {
 }
 
 function LinkedItemList({ labels }: { labels: string[] }) {
-  if (labels.length === 0) return <p className="text-sm text-gray-500">暂无关联。</p>;
+  if (labels.length === 0) return <p className="text-sm text-stone-500">暂无关联。</p>;
   return (
     <div className="flex flex-wrap gap-2">
       {labels.map((label) => (
-        <Badge key={label} variant="secondary">
+        <Badge key={label} variant="secondary" className="rounded-full border border-stone-200 bg-stone-100 px-2.5 py-1 text-stone-700">
           {label}
         </Badge>
       ))}
@@ -1529,10 +1627,10 @@ function ProjectInlineEditor({
       title="项目详情编辑"
       action={
         <div className="flex gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+          <Button type="button" size="sm" variant="outline" className="rounded-xl border-stone-200 bg-white/80" onClick={onCancel}>
             取消
           </Button>
-          <Button type="button" size="sm" disabled={!draft.title.trim()} onClick={onSave}>
+          <Button type="button" size="sm" className="rounded-xl bg-stone-950 text-white hover:bg-stone-800" disabled={!draft.title.trim()} onClick={onSave}>
             保存修改
           </Button>
         </div>
@@ -1590,7 +1688,7 @@ function ProjectPlanEditor({
     <DetailSection
       title="计划编辑"
       action={
-        <Button type="button" size="sm" onClick={() => onSave(draft)}>
+        <Button type="button" size="sm" className="rounded-xl bg-stone-950 text-white hover:bg-stone-800" onClick={() => onSave(draft)}>
           保存计划
         </Button>
       }
@@ -1643,7 +1741,7 @@ function ProjectLogCard({
 
   if (editing) {
     return (
-      <div className="rounded-lg border border-gray-200 p-3">
+      <div className="rounded-2xl border border-stone-200 bg-stone-50/60 p-4">
         <div className="grid grid-cols-1 gap-3">
           <Input type="date" value={draft.date} onChange={(event) => setDraft((prev) => ({ ...prev, date: event.target.value }))} />
           <Textarea value={draft.progressText} onChange={(event) => setDraft((prev) => ({ ...prev, progressText: event.target.value }))} placeholder="进展内容" />
@@ -1651,12 +1749,13 @@ function ProjectLogCard({
           <Textarea value={draft.nextActions} onChange={(event) => setDraft((prev) => ({ ...prev, nextActions: event.target.value }))} placeholder="下一步行动" />
         </div>
         <div className="mt-3 flex justify-end gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={() => setEditing(false)}>
+          <Button type="button" size="sm" variant="outline" className="rounded-xl border-stone-200 bg-white/80" onClick={() => setEditing(false)}>
             取消
           </Button>
           <Button
             type="button"
             size="sm"
+            className="rounded-xl bg-stone-950 text-white hover:bg-stone-800"
             onClick={() => {
               onUpdateLog(log.id, {
                 date: draft.date,
@@ -1675,29 +1774,30 @@ function ProjectLogCard({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 p-3">
+    <div className="rounded-2xl border border-stone-200 bg-white/85 p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium text-gray-900">{log.date}</p>
+        <p className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">{log.date}</p>
         <div className="flex gap-2">
           <Button
             type="button"
             size="sm"
             variant="outline"
+            className="rounded-xl border-stone-200 bg-white/80"
             onClick={() => onCreateTask(log.nextActions || `${projectTitle} 日志跟进`, log.date, `${log.progressText}\n${log.issues}`, log.id)}
           >
             转任务
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)}>
+          <Button type="button" size="sm" variant="outline" className="rounded-xl border-stone-200 bg-white/80" onClick={() => setEditing(true)}>
             编辑
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => onDeleteLog(log.id)}>
+          <Button type="button" size="sm" variant="outline" className="rounded-xl border-stone-200 bg-white/80 text-stone-500 hover:text-red-600" onClick={() => onDeleteLog(log.id)}>
             删除
           </Button>
         </div>
       </div>
-      <p className="mt-2 text-sm text-gray-600">{log.progressText}</p>
-      {log.issues ? <p className="mt-2 text-sm text-gray-500">问题：{log.issues}</p> : null}
-      {log.nextActions ? <p className="mt-2 text-sm text-gray-500">下一步：{log.nextActions}</p> : null}
+      <p className="mt-3 text-sm leading-6 text-stone-700">{log.progressText}</p>
+      {log.issues ? <p className="mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">问题：{log.issues}</p> : null}
+      {log.nextActions ? <p className="mt-2 rounded-2xl bg-teal-50 px-3 py-2 text-sm leading-6 text-teal-800">下一步：{log.nextActions}</p> : null}
     </div>
   );
 }
@@ -1757,16 +1857,49 @@ function ProjectDetails({
 
   return (
     <div className="h-full">
-      <header className="border-b border-gray-200 px-5 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <FlaskConical className="h-4 w-4 text-gray-600" />
-            <h2 className="text-lg font-semibold text-gray-900">{project.title}</h2>
-            <Badge variant="secondary">{statusLabel(project.status)}</Badge>
-            <Badge variant="secondary">{priorityLabel(project.priority)}</Badge>
+      <header className="border-b border-stone-200/80 bg-[radial-gradient(circle_at_90%_0%,rgba(125,211,252,0.22),transparent_28%),linear-gradient(135deg,#ffffff_0%,#fafaf9_58%,#f0f7f2_100%)] px-5 py-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex size-10 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-700 shadow-sm">
+                <FlaskConical className="h-4 w-4" />
+              </span>
+              <h2 className="min-w-0 truncate text-xl font-semibold tracking-tight text-stone-950">{project.title}</h2>
+              <Badge variant="secondary" className="rounded-full border border-stone-200 bg-white/85 px-2.5 py-1 text-stone-700">
+                {statusLabel(project.status)}
+              </Badge>
+              <Badge variant="secondary" className="rounded-full border border-stone-200 bg-white/85 px-2.5 py-1 text-stone-700">
+                {priorityLabel(project.priority)}
+              </Badge>
+            </div>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">{project.summary || "暂无简介"}</p>
+            <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="rounded-2xl border border-stone-200 bg-white/72 px-3 py-2 shadow-sm">
+                <p className="text-[11px] text-stone-500">进度</p>
+                <p className="mt-1 text-lg font-semibold text-stone-950">{project.progress}%</p>
+              </div>
+              <div className="rounded-2xl border border-stone-200 bg-white/72 px-3 py-2 shadow-sm">
+                <p className="text-[11px] text-stone-500">开始</p>
+                <p className="mt-1 truncate text-sm font-semibold text-stone-950">{project.startDate || "-"}</p>
+              </div>
+              <div className="rounded-2xl border border-stone-200 bg-white/72 px-3 py-2 shadow-sm">
+                <p className="text-[11px] text-stone-500">目标</p>
+                <p className="mt-1 truncate text-sm font-semibold text-stone-950">{project.targetEndDate || "-"}</p>
+              </div>
+              <div className="rounded-2xl border border-stone-200 bg-white/72 px-3 py-2 shadow-sm">
+                <p className="text-[11px] text-stone-500">资料</p>
+                <p className="mt-1 text-lg font-semibold text-stone-950">{attachments.length}</p>
+              </div>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/80 ring-1 ring-stone-200">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-stone-800 via-teal-600 to-sky-500"
+                style={{ width: `${project.progress}%` }}
+              />
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => onToggleArchive(!isArchived)}>
+            <Button type="button" variant="outline" size="sm" className="rounded-xl border-stone-200 bg-white/82" onClick={() => onToggleArchive(!isArchived)}>
               {isArchived ? (
                 <RotateCcw className="h-4 w-4" />
               ) : (
@@ -1774,12 +1907,11 @@ function ProjectDetails({
               )}
               {isArchived ? "恢复项目" : "归档项目"}
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => onEditingChange(!editing)}>
+            <Button type="button" variant="outline" size="sm" className="rounded-xl border-stone-200 bg-white/82" onClick={() => onEditingChange(!editing)}>
               {editing ? "收起编辑" : "编辑项目"}
             </Button>
           </div>
         </div>
-        <p className="mt-2 text-sm text-gray-600">{project.summary || "暂无简介"}</p>
       </header>
       <DetailTabs
         tabs={[
@@ -1795,7 +1927,7 @@ function ProjectDetails({
         value={activeTab}
         onChange={onTabChange}
       />
-      <div className="space-y-4 p-5">
+      <div className="space-y-4 bg-stone-50/35 p-5">
         {editing ? (
           <ProjectInlineEditor
             draft={projectDraft}
@@ -1809,21 +1941,33 @@ function ProjectDetails({
         ) : null}
         {activeTab === "overview" && (
           <>
-            <DetailSection title="项目状态">
-              <div className="grid grid-cols-2 gap-3 text-sm text-gray-600 sm:grid-cols-4">
-                <InfoStat label="进度" value={`${project.progress}%`} />
-                <InfoStat label="开始日期" value={project.startDate || "-"} />
-                <InfoStat label="目标结束" value={project.targetEndDate || "-"} />
-                <InfoStat label="附件数量" value={String(attachments.length)} />
+            <DetailSection title="项目档案">
+              <div className="grid grid-cols-2 gap-3 text-sm text-stone-600 md:grid-cols-5">
+                <InfoStat label="关联论文" value={String(papers.length)} />
+                <InfoStat label="组会记录" value={String(meetings.length)} />
+                <InfoStat label="项目日志" value={String(logs.length)} />
+                <InfoStat label="附件资料" value={String(attachments.length)} />
                 <InfoStat label="预留任务链接" value={String(project.linkedTaskIds.length)} />
               </div>
             </DetailSection>
             <DetailSection title="核心问题">
-              <div className="space-y-3 text-sm text-gray-600">
-                <p><span className="font-medium text-gray-900">研究问题：</span>{project.researchQuestion || "-"}</p>
-                <p><span className="font-medium text-gray-900">研究假设：</span>{project.hypothesis || "-"}</p>
-                <p><span className="font-medium text-gray-900">方法：</span>{project.method || "-"}</p>
-                <p><span className="font-medium text-gray-900">数据来源：</span>{project.dataSources || "-"}</p>
+              <div className="grid gap-3 text-sm text-stone-600 md:grid-cols-2">
+                <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                  <p className="text-xs font-medium text-stone-500">研究问题</p>
+                  <p className="mt-2 leading-6 text-stone-800">{project.researchQuestion || "-"}</p>
+                </div>
+                <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                  <p className="text-xs font-medium text-stone-500">研究假设</p>
+                  <p className="mt-2 leading-6 text-stone-800">{project.hypothesis || "-"}</p>
+                </div>
+                <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                  <p className="text-xs font-medium text-stone-500">方法</p>
+                  <p className="mt-2 leading-6 text-stone-800">{project.method || "-"}</p>
+                </div>
+                <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                  <p className="text-xs font-medium text-stone-500">数据来源</p>
+                  <p className="mt-2 leading-6 text-stone-800">{project.dataSources || "-"}</p>
+                </div>
               </div>
             </DetailSection>
           </>
@@ -1842,13 +1986,14 @@ function ProjectDetails({
         ) : null}
         {activeTab === "tasks" && (
           <DetailSection
-            title="任务联动"
-            action={
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => onCreateTask(project.nextActions || `${project.title} 跟进`, project.targetEndDate, project.currentIssues)}
-              >
+              title="任务联动"
+              action={
+                <Button
+                  type="button"
+                  size="sm"
+                  className="rounded-xl bg-stone-950 text-white hover:bg-stone-800"
+                  onClick={() => onCreateTask(project.nextActions || `${project.title} 跟进`, project.targetEndDate, project.currentIssues)}
+                >
                 一键转任务
               </Button>
             }
@@ -1864,6 +2009,7 @@ function ProjectDetails({
                 <Button
                   type="button"
                   size="sm"
+                  className="rounded-xl bg-stone-950 text-white hover:bg-stone-800"
                   onClick={() => {
                     if (!logDraft.progressText.trim()) return;
                     onAddLog({
@@ -1914,7 +2060,7 @@ function ProjectDetails({
           <DetailSection
             title="附件记录"
             action={
-              <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50">
+              <label className="inline-flex cursor-pointer items-center rounded-xl border border-stone-200 bg-white/80 px-3 py-2 text-sm text-stone-700 transition hover:bg-stone-50">
                 上传附件
                 <input
                   type="file"
@@ -1934,24 +2080,24 @@ function ProjectDetails({
           >
             <div className="space-y-3">
               {attachments.length === 0 ? (
-                <p className="text-sm text-gray-500">当前没有附件。</p>
+                <p className="text-sm text-stone-500">当前没有附件。</p>
               ) : (
                 attachments.map((attachment) => (
-                  <div key={attachment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-3">
+                  <div key={attachment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white/85 p-4 shadow-sm">
                     <div className="min-w-0">
                       <a
                         href={attachment.fileUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="block truncate text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
+                        className="block truncate text-sm font-medium text-stone-950 underline-offset-4 hover:underline"
                       >
                         {attachment.fileName}
                       </a>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-stone-500">
                         {attachment.fileType || "未知类型"} · {formatFileSize(attachment.fileSize)} · 上传于 {attachment.createdAt.slice(0, 10)}
                       </p>
                     </div>
-                    <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteAttachment(attachment.id)}>
+                    <Button type="button" size="sm" variant="outline" className="rounded-xl border-stone-200 bg-white/80 text-stone-500 hover:text-red-600" onClick={() => void onDeleteAttachment(attachment.id)}>
                       删除附件
                     </Button>
                   </div>
@@ -2786,9 +2932,9 @@ function MeetingDetails({
 
 function InfoStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="mt-1 text-sm font-medium text-gray-900">{value}</p>
+    <div className="rounded-2xl border border-stone-200 bg-stone-50/90 p-4">
+      <p className="text-xs font-medium text-stone-500">{label}</p>
+      <p className="mt-2 text-base font-semibold text-stone-950">{value}</p>
     </div>
   );
 }
