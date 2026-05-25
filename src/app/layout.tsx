@@ -41,6 +41,8 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
 };
 
+import { AppProviders } from "@/app/app-providers";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -49,7 +51,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        {children}
+        <AppProviders>{children}</AppProviders>
         <Toaster position="top-center" />
       </body>
     </html>
