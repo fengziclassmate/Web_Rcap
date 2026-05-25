@@ -105,7 +105,7 @@ import {
 } from "@/lib/research-workflow-mappers";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { CalendarDays, Home as HomeIcon, ListTodo } from "lucide-react";
+import { CalendarDays, ListTodo } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { todayISO } from "@/lib/date-utils";
 import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
@@ -2324,13 +2324,6 @@ export default function Home() {
           <p className="mt-0.5 min-w-0 truncate text-sm font-medium text-stone-900">{user.email}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href="/"
-            className="inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-xl border border-stone-200/80 bg-white/65 px-2.5 text-[0.8rem] font-medium text-stone-700 shadow-sm backdrop-blur transition hover:bg-white"
-          >
-            <HomeIcon className="size-4" aria-hidden />
-            公开主页
-          </Link>
           <WeeklyReportDialog
             currentWeekStart={currentWeekStart}
             events={events}
