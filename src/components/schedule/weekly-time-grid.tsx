@@ -131,7 +131,7 @@ type TimelineDayLayout = {
 export type ViewMode = "day" | "week" | "month";
 export type TimeGranularity = 5 | 15 | 30 | 60;
 
-const hourCellHeight = 60;
+const hourCellHeight = 80;
 const contextMenuWidth = 208;
 const contextMenuHeight = 360;
 const contextMenuViewportPadding = 12;
@@ -834,7 +834,7 @@ export function WeeklyTimeGrid({
         </div>
       </header>
 
-      <div className="overflow-x-hidden">
+      <div className="overflow-hidden">
         <div className="relative min-w-0">
           {viewMode !== "month" ? (
             <>
@@ -910,13 +910,13 @@ export function WeeklyTimeGrid({
                         {dayLayout.events.map((event) => {
                           const durationHour = event.endHour - event.startHour;
                           const denseCard = event.laneCount > 1;
-                          const compactCard = durationHour <= 1.25 || (denseCard && durationHour < 1.75);
+                          const compactCard = durationHour <= 1.1 || (denseCard && durationHour < 1.6);
                           const showDetails = durationHour >= 2 && !denseCard;
                           const timeLabel = `${formatHour(event.startHour)}-${formatHour(event.endHour)}`;
                           return (
                             <div
                               key={event.id}
-                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-visible rounded-lg border text-left text-xs shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""}`}
+                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden rounded-lg border text-left text-sm shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""}`}
                               style={getEventStyle(event)}
                               draggable={!parseSyntheticEventId(event.id)}
                               onDragStart={() => setDraggingEventId(event.id)}
@@ -931,22 +931,30 @@ export function WeeklyTimeGrid({
                               ) : null}
                               <button
                                 type="button"
-                                className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-[inherit] text-left outline-none focus-visible:ring-2 focus-visible:ring-stone-900/20 ${compactCard ? "justify-start pb-1 pl-3 pr-6 pt-1" : "justify-start py-1.5 pl-4 pr-7"}`}
+                                className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-[inherit] text-left outline-none focus-visible:ring-2 focus-visible:ring-stone-900/20 ${compactCard ? "justify-start pb-1.5 pl-4 pr-6 pt-1.5" : "justify-start py-2 pl-5 pr-8"}`}
                                 onClick={() => handleOpenEdit(event)}
                               >
                                 <div className={`flex min-h-0 min-w-0 flex-col ${compactCard ? "gap-0.5" : "flex-1 gap-1.5"}`}>
                                   <div className="flex min-w-0 items-center justify-between gap-1">
                                     <span
-                                      className="min-w-0 truncate rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
+                                      className="min-w-0 truncate rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
                                       title={timeLabel}
                                     >
                                       {timeLabel}
                                     </span>
-                                    {denseCard ? (
-                                      <span className="shrink-0 rounded-md border border-white/50 bg-white/45 px-1.5 py-0.5 text-[10px] font-medium leading-none text-gray-700">
-                                        {event.lane + 1}/{event.laneCount}
-                                      </span>
-                                    ) : null}
+                                    <span className="flex shrink-0 items-center gap-1">
+                                      {denseCard ? (
+                                        <span className="rounded-md border border-white/50 bg-white/45 px-1.5 py-0.5 text-[10px] font-medium leading-none text-gray-700">
+                                          {event.lane + 1}/{event.laneCount}
+                                        </span>
+                                      ) : null}
+                                      {event.isCompleted ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white/75 px-1.5 py-0.5 text-[10px] font-medium leading-none text-emerald-700 shadow-sm">
+                                          <Check className="h-3 w-3" aria-hidden />
+                                          {!compactCard && !denseCard ? "已完成" : ""}
+                                        </span>
+                                      ) : null}
+                                    </span>
                                   </div>
 
                                   <div className={`min-w-0 ${compactCard ? "" : "flex min-h-0 flex-1 flex-col overflow-hidden"}`}>
@@ -960,17 +968,11 @@ export function WeeklyTimeGrid({
                                         <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600" aria-hidden />
                                       ) : null}
                                       <p
-                                        className={`min-w-0 flex-1 overflow-hidden font-semibold leading-snug ${compactCard ? "truncate text-[11px]" : "text-[12px] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"} ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
+                                        className={`min-w-0 flex-1 overflow-hidden font-semibold leading-snug ${compactCard ? "text-[13px] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]" : "text-sm [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"} ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
                                         title={`${event.title} (${timeLabel})`}
                                       >
                                         {event.title}
                                       </p>
-                                      {event.isCompleted ? (
-                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-white/75 px-1.5 py-0.5 text-[10px] font-medium leading-none text-emerald-700 shadow-sm">
-                                          <Check className="h-3 w-3" aria-hidden />
-                                          {!compactCard && !denseCard ? "已完成" : ""}
-                                        </span>
-                                      ) : null}
                                     </div>
                                     {showDetails && event.notes ? (
                                       <p className="mt-1 min-h-0 overflow-hidden text-[11px] leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
@@ -987,23 +989,6 @@ export function WeeklyTimeGrid({
                                   ) : null}
                                 </div>
                               </button>
-
-                              {denseCard || compactCard ? (
-                                <div className="pointer-events-none absolute left-0 top-full z-50 mt-1 hidden min-w-[220px] max-w-[280px] rounded-xl border border-stone-200 bg-white px-3 py-2 text-stone-800 shadow-[0_18px_44px_rgba(68,64,60,0.2)] group-hover:block group-focus-within:block">
-                                  <div className="flex items-center justify-between gap-3 text-[11px] font-semibold text-stone-500 [font-variant-numeric:tabular-nums]">
-                                    <span>{timeLabel}</span>
-                                    {denseCard ? <span>并行 {event.lane + 1}/{event.laneCount}</span> : null}
-                                  </div>
-                                  <p className={`mt-1 text-sm font-semibold leading-snug text-stone-950 ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}>
-                                    {event.title}
-                                  </p>
-                                  {event.notes ? (
-                                    <p className="mt-1 overflow-hidden text-xs leading-5 text-stone-600 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
-                                      {event.notes}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              ) : null}
 
                               <button
                                 type="button"
