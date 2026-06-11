@@ -1,0 +1,12 @@
+
+> schedule-app@0.1.0 dev
+> next dev --port 3000
+
+▲ Next.js 16.2.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.56.1:3000
+- Environments: .env.local
+✓ Ready in 763ms
+
+ GET / 200 in 762ms (next.js: 229ms, application-code: 533ms)
+ GET / 200 in 281ms (next.js: 74ms, application-code: 207ms)
