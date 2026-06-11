@@ -2368,7 +2368,7 @@ export function WorkbenchApp() {
 
         <div className="min-h-0 w-full">
           {activeModule === "schedule" ? (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,400px)] 2xl:grid-cols-[minmax(1120px,1fr)_minmax(380px,420px)]">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] 2xl:grid-cols-[minmax(1180px,1fr)_minmax(340px,380px)]">
               <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
                 <QuickEventInput
                   onCreateEvent={handleCreateEvent}
@@ -2586,6 +2586,5 @@ export function WorkbenchApp() {
     </main>
   );
 }
-
 
 

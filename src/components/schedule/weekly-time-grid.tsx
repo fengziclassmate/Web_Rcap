@@ -401,7 +401,7 @@ export function WeeklyTimeGrid({
   }, [displayDates, expandedEvents, viewMode]);
 
   const timelineGridTemplateColumns = useMemo(
-    () => `${viewMode === "day" ? 76 : 64}px repeat(${timelineDayLayouts.length}, minmax(0, 1fr))`,
+    () => `${viewMode === "day" ? 72 : 56}px repeat(${timelineDayLayouts.length}, minmax(0, 1fr))`,
     [timelineDayLayouts.length, viewMode],
   );
 
@@ -842,7 +842,7 @@ export function WeeklyTimeGrid({
                 className="grid border-b border-gray-200 bg-white"
                 style={{ gridTemplateColumns: timelineGridTemplateColumns }}
               >
-                <div className="border-r border-gray-200 bg-gray-50 px-2 py-3 text-sm font-medium text-gray-700">时间</div>
+                <div className="border-r border-gray-200 bg-gray-50 px-1.5 py-3 text-xs font-medium text-gray-700">时间</div>
                 {timelineDayLayouts.map((day) => (
                   <div
                     key={day.dateIso}
@@ -868,7 +868,7 @@ export function WeeklyTimeGrid({
                     return (
                       <div
                         key={`hour-label-${hour}`}
-                        className={`border-r border-b px-2 py-1 text-sm ${isMainHour ? "border-gray-200 bg-gray-50 text-gray-500" : "border-gray-100 text-gray-400"}`}
+                        className={`border-r border-b px-1.5 py-1 text-xs ${isMainHour ? "border-gray-200 bg-gray-50 text-gray-500" : "border-gray-100 text-gray-400"}`}
                         style={{
                           height: `${cellHeight}px`,
                           borderBottomStyle: isMainHour ? "solid" : "dashed",
@@ -910,12 +910,13 @@ export function WeeklyTimeGrid({
                         {dayLayout.events.map((event) => {
                           const durationHour = event.endHour - event.startHour;
                           const denseCard = event.laneCount > 1;
-                          const compactCard = durationHour < 1 || (denseCard && durationHour < 1.5);
+                          const compactCard = durationHour <= 1.25 || (denseCard && durationHour < 1.75);
+                          const showDetails = durationHour >= 2 && !denseCard;
                           const timeLabel = `${formatHour(event.startHour)}-${formatHour(event.endHour)}`;
                           return (
                             <div
                               key={event.id}
-                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-visible rounded-lg border text-left text-sm shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""}`}
+                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-visible rounded-lg border text-left text-xs shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""}`}
                               style={getEventStyle(event)}
                               draggable={!parseSyntheticEventId(event.id)}
                               onDragStart={() => setDraggingEventId(event.id)}
@@ -930,13 +931,13 @@ export function WeeklyTimeGrid({
                               ) : null}
                               <button
                                 type="button"
-                                className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-[inherit] text-left outline-none focus-visible:ring-2 focus-visible:ring-stone-900/20 ${compactCard ? "justify-start pb-1 pl-4 pr-7 pt-1" : "justify-start py-2 pl-5 pr-8"}`}
+                                className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-[inherit] text-left outline-none focus-visible:ring-2 focus-visible:ring-stone-900/20 ${compactCard ? "justify-start pb-1 pl-3 pr-6 pt-1" : "justify-start py-1.5 pl-4 pr-7"}`}
                                 onClick={() => handleOpenEdit(event)}
                               >
                                 <div className={`flex min-h-0 min-w-0 flex-col ${compactCard ? "gap-0.5" : "flex-1 gap-1.5"}`}>
                                   <div className="flex min-w-0 items-center justify-between gap-1">
                                     <span
-                                      className="min-w-0 truncate rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
+                                      className="min-w-0 truncate rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
                                       title={timeLabel}
                                     >
                                       {timeLabel}
@@ -959,7 +960,7 @@ export function WeeklyTimeGrid({
                                         <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600" aria-hidden />
                                       ) : null}
                                       <p
-                                        className={`min-w-0 flex-1 overflow-hidden font-semibold leading-snug ${compactCard ? "truncate text-xs" : "[display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"} ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
+                                        className={`min-w-0 flex-1 overflow-hidden font-semibold leading-snug ${compactCard ? "truncate text-[11px]" : "text-[12px] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"} ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
                                         title={`${event.title} (${timeLabel})`}
                                       >
                                         {event.title}
@@ -967,17 +968,17 @@ export function WeeklyTimeGrid({
                                       {event.isCompleted ? (
                                         <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-white/75 px-1.5 py-0.5 text-[10px] font-medium leading-none text-emerald-700 shadow-sm">
                                           <Check className="h-3 w-3" aria-hidden />
-                                          {!compactCard ? "已完成" : ""}
+                                          {!compactCard && !denseCard ? "已完成" : ""}
                                         </span>
                                       ) : null}
                                     </div>
-                                    {!compactCard && event.notes ? (
-                                      <p className="mt-1 min-h-0 overflow-hidden text-xs leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
+                                    {showDetails && event.notes ? (
+                                      <p className="mt-1 min-h-0 overflow-hidden text-[11px] leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
                                         {event.notes}
                                       </p>
                                     ) : null}
                                   </div>
-                                  {!compactCard && event.requirements.length > 0 ? (
+                                  {durationHour >= 1.5 && !compactCard && event.requirements.length > 0 ? (
                                     <div className="flex shrink-0 justify-end text-[11px] leading-tight text-gray-700">
                                       <span className="truncate rounded-md border border-white/50 bg-white/45 px-1.5 py-0.5">
                                         {event.requirements.length} 项准备
