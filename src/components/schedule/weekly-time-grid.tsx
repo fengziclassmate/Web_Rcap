@@ -126,7 +126,6 @@ type TimelineDayLayout = {
   dateIso: string;
   events: PositionedScheduleEvent[];
   laneCount: number;
-  columnMinWidth: number;
 };
 
 export type ViewMode = "day" | "week" | "month";
@@ -273,14 +272,6 @@ function normalizeTimeValue(value: number) {
   return Math.max(0, Math.min(24, value));
 }
 
-function getTimelineColumnMinWidth(laneCount: number, viewMode: ViewMode) {
-  if (viewMode === "day") {
-    return Math.min(760, Math.max(360, 240 + laneCount * 120));
-  }
-
-  return Math.min(380, 180 + Math.max(0, laneCount - 1) * 76);
-}
-
 function monthWeekdayHeaders() {
   return ["日", "一", "二", "三", "四", "五", "六"];
 }
@@ -405,17 +396,13 @@ export function WeeklyTimeGrid({
         dateIso,
         events: positionedEvents,
         laneCount,
-        columnMinWidth: getTimelineColumnMinWidth(laneCount, viewMode),
       };
     });
   }, [displayDates, expandedEvents, viewMode]);
 
   const timelineGridTemplateColumns = useMemo(
-    () =>
-      `84px ${timelineDayLayouts
-        .map((day) => `minmax(${day.columnMinWidth}px, 1fr)`)
-        .join(" ")}`,
-    [timelineDayLayouts],
+    () => `${viewMode === "day" ? 76 : 64}px repeat(${timelineDayLayouts.length}, minmax(0, 1fr))`,
+    [timelineDayLayouts.length, viewMode],
   );
 
   const selectedEvent = useMemo(
@@ -437,12 +424,26 @@ export function WeeklyTimeGrid({
   function getEventStyle(event: PositionedScheduleEvent) {
     const top = event.startHour * hourCellHeight + 4;
     const height = (event.endHour - event.startHour) * hourCellHeight - 8;
-    const laneGap = event.laneCount > 1 ? 6 : 8;
+    if (event.laneCount === 1) {
+      return {
+        top: `${top}px`,
+        height: `${Math.max(height, 28)}px`,
+        left: "4px",
+        width: "calc(100% - 8px)",
+      };
+    }
+
+    const laneOffsetX = Math.min(14, Math.max(8, 34 / event.laneCount));
+    const laneOffsetY = Math.min(20, Math.max(12, 54 / event.laneCount));
+    const deckWidthLoss = (event.laneCount - 1) * laneOffsetX;
+    const deckHeightLoss = event.lane * Math.min(8, laneOffsetY / 2);
+
     return {
-      top: `${top}px`,
-      height: `${Math.max(height, event.laneCount > 1 ? 32 : 28)}px`,
-      left: `calc(${(event.lane / event.laneCount) * 100}% + ${laneGap / 2}px)`,
-      width: `calc(${100 / event.laneCount}% - ${laneGap}px)`,
+      top: `${top + event.lane * laneOffsetY}px`,
+      height: `${Math.max(height - deckHeightLoss, 36)}px`,
+      left: `${4 + event.lane * laneOffsetX}px`,
+      width: `calc(100% - ${8 + deckWidthLoss}px)`,
+      zIndex: event.lane + 1,
     };
   }
 
@@ -833,15 +834,15 @@ export function WeeklyTimeGrid({
         </div>
       </header>
 
-      <div className="overflow-x-auto">
-        <div className="relative min-w-full">
+      <div className="overflow-x-hidden">
+        <div className="relative min-w-0">
           {viewMode !== "month" ? (
             <>
               <div
                 className="grid border-b border-gray-200 bg-white"
                 style={{ gridTemplateColumns: timelineGridTemplateColumns }}
               >
-                <div className="border-r border-gray-200 bg-gray-50 px-3 py-3 text-sm font-medium text-gray-700">时间</div>
+                <div className="border-r border-gray-200 bg-gray-50 px-2 py-3 text-sm font-medium text-gray-700">时间</div>
                 {timelineDayLayouts.map((day) => (
                   <div
                     key={day.dateIso}
@@ -850,7 +851,7 @@ export function WeeklyTimeGrid({
                     <div>{dayTitle(day.date)}</div>
                     {day.laneCount > 1 ? (
                       <div className="mt-1 text-[11px] font-medium text-gray-500">
-                        {day.laneCount} 列并行
+                        {day.laneCount} 个并行
                       </div>
                     ) : null}
                   </div>
@@ -867,7 +868,7 @@ export function WeeklyTimeGrid({
                     return (
                       <div
                         key={`hour-label-${hour}`}
-                        className={`border-r border-b px-3 py-1 text-sm ${isMainHour ? "border-gray-200 bg-gray-50 text-gray-500" : "border-gray-100 text-gray-400"}`}
+                        className={`border-r border-b px-2 py-1 text-sm ${isMainHour ? "border-gray-200 bg-gray-50 text-gray-500" : "border-gray-100 text-gray-400"}`}
                         style={{
                           height: `${cellHeight}px`,
                           borderBottomStyle: isMainHour ? "solid" : "dashed",
