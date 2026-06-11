@@ -935,13 +935,30 @@ export function WeeklyTimeGrid({
                                 onClick={() => handleOpenEdit(event)}
                               >
                                 <div className={`flex min-h-0 min-w-0 flex-col ${compactCard ? "gap-0.5" : "flex-1 gap-1.5"}`}>
-                                  <div className="flex min-w-0 items-center justify-between gap-1">
+                                  <div className="flex min-w-0 items-start gap-1.5">
                                     <span
-                                      className="min-w-0 truncate rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
+                                      className="shrink-0 whitespace-nowrap rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
                                       title={timeLabel}
                                     >
                                       {timeLabel}
                                     </span>
+
+                                    {event.tag ? (
+                                      <span className={`mt-0.5 shrink-0 text-sm font-bold leading-none ${getTagInfo(event.tag).color}`}>
+                                        {getTagInfo(event.tag).icon}
+                                      </span>
+                                    ) : null}
+                                    {parseSyntheticEventId(event.id) ? (
+                                      <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600" aria-hidden />
+                                    ) : null}
+
+                                    <p
+                                      className={`min-w-0 flex-1 overflow-hidden font-semibold leading-snug ${compactCard ? "truncate text-[13px]" : "text-sm [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"} ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
+                                      title={`${event.title} (${timeLabel})`}
+                                    >
+                                      {event.title}
+                                    </p>
+
                                     <span className="flex shrink-0 items-center gap-1">
                                       {denseCard ? (
                                         <span className="rounded-md border border-white/50 bg-white/45 px-1.5 py-0.5 text-[10px] font-medium leading-none text-gray-700">
@@ -949,37 +966,27 @@ export function WeeklyTimeGrid({
                                         </span>
                                       ) : null}
                                       {event.isCompleted ? (
-                                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white/75 px-1.5 py-0.5 text-[10px] font-medium leading-none text-emerald-700 shadow-sm">
+                                        <span
+                                          className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white/80 p-0.5 text-emerald-700 shadow-sm"
+                                          title="已完成"
+                                          aria-label="已完成"
+                                        >
                                           <Check className="h-3 w-3" aria-hidden />
-                                          {!compactCard && !denseCard ? "已完成" : ""}
                                         </span>
                                       ) : null}
                                     </span>
                                   </div>
 
-                                  <div className={`min-w-0 ${compactCard ? "" : "flex min-h-0 flex-1 flex-col overflow-hidden"}`}>
-                                    <div className="flex items-start gap-1.5">
-                                      {event.tag ? (
-                                        <span className={`shrink-0 text-sm font-bold ${getTagInfo(event.tag).color}`}>
-                                          {getTagInfo(event.tag).icon}
-                                        </span>
+                                  {!compactCard ? (
+                                    <div className="min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden pl-0.5">
+                                      {showDetails && event.notes ? (
+                                        <p className="min-h-0 overflow-hidden text-[11px] leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
+                                          {event.notes}
+                                        </p>
                                       ) : null}
-                                      {parseSyntheticEventId(event.id) ? (
-                                        <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600" aria-hidden />
-                                      ) : null}
-                                      <p
-                                        className={`min-w-0 flex-1 overflow-hidden font-semibold leading-snug ${compactCard ? "text-[13px] [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]" : "text-sm [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"} ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
-                                        title={`${event.title} (${timeLabel})`}
-                                      >
-                                        {event.title}
-                                      </p>
                                     </div>
-                                    {showDetails && event.notes ? (
-                                      <p className="mt-1 min-h-0 overflow-hidden text-[11px] leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
-                                        {event.notes}
-                                      </p>
-                                    ) : null}
-                                  </div>
+                                  ) : null}
+
                                   {durationHour >= 1.5 && !compactCard && event.requirements.length > 0 ? (
                                     <div className="flex shrink-0 justify-end text-[11px] leading-tight text-gray-700">
                                       <span className="truncate rounded-md border border-white/50 bg-white/45 px-1.5 py-0.5">
@@ -1031,15 +1038,17 @@ export function WeeklyTimeGrid({
                         <span className="text-sm font-medium">{format(day, "d")}</span>
                         <button
                           type="button"
-                          className="text-xs text-gray-500 hover:text-black"
+                          className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                           onClick={() => resetCreateDialog({ date: dayIso, startHour: 9 })}
+                          aria-label="新增行程"
                         >
-                          新建
+                          <Plus className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <div className="flex-1 space-y-1 overflow-y-auto pr-1">
+
+                      <div className="space-y-1 overflow-hidden">
                         {dayEvents.length === 0 ? (
-                          <div className="text-xs text-gray-400">暂无安排</div>
+                          <span className="text-xs text-gray-400">无行程</span>
                         ) : (
                           dayEvents.map((event) => (
                             <div
@@ -1062,7 +1071,6 @@ export function WeeklyTimeGrid({
               </div>
             </div>
           )}
-
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             {selectedCell ? (
               <DialogContent className="rounded-lg border-gray-200 shadow-lg">
