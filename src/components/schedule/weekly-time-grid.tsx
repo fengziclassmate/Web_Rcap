@@ -910,7 +910,7 @@ export function WeeklyTimeGrid({
                         {dayLayout.events.map((event) => {
                           const durationHour = event.endHour - event.startHour;
                           const denseCard = event.laneCount > 1;
-                          const compactCard = durationHour <= 1.1 || (denseCard && durationHour < 1.6);
+                          const compactCard = durationHour < 1;
                           const showDetails = durationHour >= 2 && !denseCard;
                           const timeLabel = `${formatHour(event.startHour)}-${formatHour(event.endHour)}`;
                           return (
