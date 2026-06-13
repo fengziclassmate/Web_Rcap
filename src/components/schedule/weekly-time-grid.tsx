@@ -33,8 +33,12 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { createId } from "@/lib/id";
 import {
+  getScheduleEventDurationHour,
   layoutOverlappingScheduleEvents,
   type PositionedScheduleEvent,
+  type ScheduleEventSegment,
+  splitScheduleEventByDay,
+  toSourceScheduleEvent,
 } from "@/lib/schedule-layout";
 import {
   CATEGORY_VISUALS,
@@ -124,14 +128,21 @@ type ContextMenuState = {
 type TimelineDayLayout = {
   date: Date;
   dateIso: string;
-  events: PositionedScheduleEvent[];
+  events: PositionedScheduleEvent<TimelineEventSegment>[];
   laneCount: number;
 };
+
+type TimelineEventSegment = ScheduleEventSegment<ScheduleEvent>;
 
 export type ViewMode = "day" | "week" | "month";
 export type TimeGranularity = 5 | 15 | 30 | 60;
 
 const hourCellHeight = 80;
+const minutesPerHour = 60;
+const hoursPerDay = 24;
+const minutesPerDay = hoursPerDay * minutesPerHour;
+const maxStartMinute = minutesPerDay - 1;
+const minimumDurationHour = 1 / minutesPerHour;
 const contextMenuWidth = 208;
 const contextMenuHeight = 360;
 const contextMenuViewportPadding = 12;
@@ -195,9 +206,51 @@ const defaultForm: EventFormState = {
 };
 
 function formatHour(hour: number) {
-  const hours = Math.floor(hour);
-  const minutes = Math.round((hour - hours) * 60);
+  const totalMinutes = Math.max(0, Math.min(minutesPerDay, Math.round(hour * minutesPerHour)));
+  const hours = Math.floor(totalMinutes / minutesPerHour);
+  const minutes = totalMinutes % minutesPerHour;
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+}
+
+function formatEventTimeRange(event: Pick<ScheduleEvent, "startHour" | "endHour">) {
+  const endLabel =
+    event.endHour < event.startHour ? `次日 ${formatHour(event.endHour)}` : formatHour(event.endHour);
+  return `${formatHour(event.startHour)}-${endLabel}`;
+}
+
+function formatTimelineSegmentTimeRange(event: TimelineEventSegment) {
+  if (event.segmentRole === "starts") return `${formatHour(event.startHour)}-${formatHour(24)}`;
+  if (event.segmentRole === "continues") return `${formatHour(0)}-${formatHour(event.endHour)}`;
+  return formatEventTimeRange(event);
+}
+
+function normalizeStartTimeValue(value: number) {
+  return Math.max(0, Math.min(maxStartMinute / minutesPerHour, value));
+}
+
+function normalizeEndTimeValue(value: number) {
+  return Math.max(0, Math.min(hoursPerDay, value));
+}
+
+function resolveFormTimeRange(startValue: number, endValue: number) {
+  const startHour = normalizeStartTimeValue(startValue);
+  const rawEndHour = normalizeEndTimeValue(endValue);
+  const endHour =
+    rawEndHour === startHour
+      ? Math.min(hoursPerDay, startHour + minimumDurationHour)
+      : rawEndHour;
+  return { startHour, endHour };
+}
+
+function getEndHourFromStartAndDuration(startHour: number, durationHour: number) {
+  const boundedDuration = Math.max(
+    minimumDurationHour,
+    Math.min(hoursPerDay - minimumDurationHour, durationHour),
+  );
+  const absoluteEndHour = startHour + boundedDuration;
+  if (absoluteEndHour < hoursPerDay) return absoluteEndHour;
+  if (absoluteEndHour === hoursPerDay) return hoursPerDay;
+  return absoluteEndHour - hoursPerDay;
 }
 
 function dayTitle(date: Date) {
@@ -268,8 +321,13 @@ function getTagInfo(tag: EventTag) {
   }
 }
 
-function normalizeTimeValue(value: number) {
-  return Math.max(0, Math.min(24, value));
+function getTimeSelectParts(value: number, allowEndBoundary = false) {
+  const maxMinute = allowEndBoundary ? minutesPerDay : maxStartMinute;
+  const totalMinutes = Math.max(0, Math.min(maxMinute, Math.round(value * minutesPerHour)));
+  return {
+    hours: Math.floor(totalMinutes / minutesPerHour),
+    minutes: totalMinutes % minutesPerHour,
+  };
 }
 
 function monthWeekdayHeaders() {
@@ -368,19 +426,32 @@ export function WeeklyTimeGrid({
 
   const expandedEvents = useMemo(() => {
     if (displayDates.length === 0) return [] as ScheduleEvent[];
-    const first = format(displayDates[0], "yyyy-MM-dd");
+    const first = format(addDays(displayDates[0], -1), "yyyy-MM-dd");
     const last = format(displayDates[displayDates.length - 1], "yyyy-MM-dd");
     return expandScheduleEvents(events, first, last) as ScheduleEvent[];
   }, [displayDates, events]);
 
+  const displayDateKeys = useMemo(
+    () => new Set(displayDates.map((date) => format(date, "yyyy-MM-dd"))),
+    [displayDates],
+  );
+
+  const displayEventSegments = useMemo(
+    () =>
+      expandedEvents
+        .flatMap((event) => splitScheduleEventByDay(event))
+        .filter((segment) => displayDateKeys.has(segment.displayDate)),
+    [displayDateKeys, expandedEvents],
+  );
+
   const timelineDayLayouts = useMemo<TimelineDayLayout[]>(() => {
     if (viewMode === "month") return [];
 
-    const eventsByDate = new Map<string, ScheduleEvent[]>();
-    expandedEvents.forEach((event) => {
-      const dayEvents = eventsByDate.get(event.date) ?? [];
+    const eventsByDate = new Map<string, TimelineEventSegment[]>();
+    displayEventSegments.forEach((event) => {
+      const dayEvents = eventsByDate.get(event.displayDate) ?? [];
       dayEvents.push(event);
-      eventsByDate.set(event.date, dayEvents);
+      eventsByDate.set(event.displayDate, dayEvents);
     });
 
     return displayDates.map((date) => {
@@ -398,7 +469,7 @@ export function WeeklyTimeGrid({
         laneCount,
       };
     });
-  }, [displayDates, expandedEvents, viewMode]);
+  }, [displayDates, displayEventSegments, viewMode]);
 
   const timelineGridTemplateColumns = useMemo(
     () => `${viewMode === "day" ? 72 : 56}px repeat(${timelineDayLayouts.length}, minmax(0, 1fr))`,
@@ -485,8 +556,7 @@ export function WeeklyTimeGrid({
   function handleCreateEvent() {
     if (!selectedCell || !createForm.title.trim()) return;
 
-    const startHour = normalizeTimeValue(createForm.startHour);
-    const endHour = Math.max(startHour + 1 / 60, normalizeTimeValue(createForm.endHour));
+    const { startHour, endHour } = resolveFormTimeRange(createForm.startHour, createForm.endHour);
 
     const baseEvent: ScheduleEvent = {
       id: createId("event"),
@@ -532,8 +602,7 @@ export function WeeklyTimeGrid({
   function handleSaveEdit() {
     if (!selectedEvent || !editForm.title.trim()) return;
 
-    const startHour = normalizeTimeValue(editForm.startHour);
-    const endHour = Math.max(startHour + 1 / 60, normalizeTimeValue(editForm.endHour));
+    const { startHour, endHour } = resolveFormTimeRange(editForm.startHour, editForm.endHour);
 
     const patch: Partial<ScheduleEvent> = {
       title: editForm.title.trim(),
@@ -570,7 +639,7 @@ export function WeeklyTimeGrid({
       title: target.title,
       date: target.date,
       category: normalizeCategoryName(target.category),
-      time: `${formatHour(target.startHour)}-${formatHour(target.endHour)}`,
+      time: formatEventTimeRange(target),
     });
     closeContextMenu();
   }
@@ -586,9 +655,9 @@ export function WeeklyTimeGrid({
     const source = expandedEvents.find((event) => event.id === draggingEventId);
     if (!source) return;
 
-    const duration = Math.max(1 / 60, source.endHour - source.startHour);
-    const nextStartHour = Math.min(23.9833, targetHour);
-    const nextEndHour = Math.min(24, nextStartHour + duration);
+    const duration = getScheduleEventDurationHour(source);
+    const nextStartHour = normalizeStartTimeValue(targetHour);
+    const nextEndHour = getEndHourFromStartAndDuration(nextStartHour, duration);
 
     onUpdateEvent(source.id, {
       date: targetDate,
@@ -624,8 +693,9 @@ export function WeeklyTimeGrid({
   function handleExtendTime(eventId: string) {
     const target = expandedEvents.find((event) => event.id === eventId);
     if (target) {
+      const duration = getScheduleEventDurationHour(target);
       onUpdateEvent(eventId, {
-        endHour: Math.min(24, target.endHour + 1),
+        endHour: getEndHourFromStartAndDuration(target.startHour, duration + 1),
       });
     }
     closeContextMenu();
@@ -908,14 +978,22 @@ export function WeeklyTimeGrid({
 
                       <div className="pointer-events-none absolute inset-0 p-1">
                         {dayLayout.events.map((event) => {
-                          const durationHour = event.endHour - event.startHour;
+                          const sourceEvent = toSourceScheduleEvent(event);
+                          const durationHour = getScheduleEventDurationHour(event);
                           const denseCard = event.laneCount > 1;
                           const compactCard = durationHour < 1;
                           const showDetails = durationHour >= 2 && !denseCard;
-                          const timeLabel = `${formatHour(event.startHour)}-${formatHour(event.endHour)}`;
+                          const timeLabel = formatTimelineSegmentTimeRange(event);
+                          const fullTimeLabel = formatEventTimeRange(sourceEvent);
+                          const segmentLabel =
+                            event.segmentRole === "starts"
+                              ? "跨日"
+                              : event.segmentRole === "continues"
+                                ? "延续"
+                                : null;
                           return (
                             <div
-                              key={event.id}
+                              key={event.segmentId}
                               className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden rounded-lg border text-left text-sm shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""}`}
                               style={getEventStyle(event)}
                               draggable={!parseSyntheticEventId(event.id)}
@@ -932,17 +1010,22 @@ export function WeeklyTimeGrid({
                               <button
                                 type="button"
                                 className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-[inherit] text-left outline-none focus-visible:ring-2 focus-visible:ring-stone-900/20 ${compactCard ? "justify-start pb-1.5 pl-4 pr-6 pt-1.5" : "justify-start py-2 pl-5 pr-8"}`}
-                                onClick={() => handleOpenEdit(event)}
+                                onClick={() => handleOpenEdit(sourceEvent)}
                               >
                                 <div className={`flex min-h-0 min-w-0 flex-col ${compactCard ? "gap-0.5" : "flex-1 gap-1.5"}`}>
                                   {compactCard ? (
                                     <div className="flex min-w-0 items-start gap-1.5">
                                       <span
                                         className="shrink-0 whitespace-nowrap rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
-                                        title={timeLabel}
+                                        title={fullTimeLabel}
                                       >
                                         {timeLabel}
                                       </span>
+                                      {segmentLabel ? (
+                                        <span className="mt-0.5 shrink-0 rounded-full border border-white/60 bg-white/55 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-gray-600">
+                                          {segmentLabel}
+                                        </span>
+                                      ) : null}
                                       {event.tag ? (
                                         <span className={`mt-0.5 shrink-0 text-sm font-bold leading-none ${getTagInfo(event.tag).color}`}>
                                           {getTagInfo(event.tag).icon}
@@ -953,7 +1036,7 @@ export function WeeklyTimeGrid({
                                       ) : null}
                                       <p
                                         className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-snug ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
-                                        title={`${event.title} (${timeLabel})`}
+                                        title={`${event.title} (${fullTimeLabel})`}
                                       >
                                         {event.title}
                                       </p>
@@ -972,10 +1055,15 @@ export function WeeklyTimeGrid({
                                       <div className="flex min-w-0 items-center gap-1.5">
                                         <span
                                           className="shrink-0 whitespace-nowrap rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
-                                          title={timeLabel}
+                                          title={fullTimeLabel}
                                         >
                                           {timeLabel}
                                         </span>
+                                        {segmentLabel ? (
+                                          <span className="shrink-0 rounded-full border border-white/60 bg-white/55 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-gray-600">
+                                            {segmentLabel}
+                                          </span>
+                                        ) : null}
                                         {event.tag ? (
                                           <span className={`shrink-0 text-sm font-bold leading-none ${getTagInfo(event.tag).color}`}>
                                             {getTagInfo(event.tag).icon}
@@ -1003,7 +1091,7 @@ export function WeeklyTimeGrid({
 
                                       <p
                                         className={`min-w-0 flex-1 overflow-hidden break-words text-sm font-semibold leading-snug ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
-                                        title={`${event.title} (${timeLabel})`}
+                                        title={`${event.title} (${fullTimeLabel})`}
                                       >
                                         {event.title}
                                       </p>
@@ -1031,7 +1119,7 @@ export function WeeklyTimeGrid({
                                 className="absolute right-1.5 top-1.5 z-20 rounded-full border border-white/80 bg-white/80 p-1 text-stone-700 opacity-0 shadow-sm transition hover:bg-white hover:text-black group-hover:opacity-100 focus-visible:opacity-100"
                                 onClick={(mouseEvent) => {
                                   mouseEvent.stopPropagation();
-                                  resetCreateDialog({ date: event.date, startHour: event.startHour });
+                                  resetCreateDialog({ date: event.displayDate, startHour: event.startHour });
                                 }}
                                 aria-label={`在 ${event.title} 同时段新建行程`}
                               >
@@ -1056,7 +1144,7 @@ export function WeeklyTimeGrid({
                 ))}
                 {displayDates.map((day) => {
                   const dayIso = format(day, "yyyy-MM-dd");
-                  const dayEvents = expandedEvents.filter((event) => event.date === dayIso);
+                  const dayEvents = displayEventSegments.filter((event) => event.displayDate === dayIso);
 
                   return (
                     <div
@@ -1079,19 +1167,37 @@ export function WeeklyTimeGrid({
                         {dayEvents.length === 0 ? (
                           <span className="text-xs text-gray-400">无行程</span>
                         ) : (
-                          dayEvents.map((event) => (
-                            <div
-                              key={event.id}
-                              className={`cursor-pointer rounded border px-2 py-1 text-xs ${getCategoryColor(categories, event.category)}`}
-                              title={`${event.title} (${formatHour(event.startHour)} - ${formatHour(event.endHour)})`}
-                              onClick={() => handleOpenEdit(event)}
-                            >
-                              <div className="flex items-center gap-1">
-                                {event.isCompleted ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> : null}
-                                <span className={event.isCompleted ? "line-through decoration-2" : ""}>{event.title}</span>
+                          dayEvents.map((event) => {
+                            const sourceEvent = toSourceScheduleEvent(event);
+                            const timeLabel = formatTimelineSegmentTimeRange(event);
+                            const fullTimeLabel = formatEventTimeRange(sourceEvent);
+                            const segmentLabel =
+                              event.segmentRole === "starts"
+                                ? "跨日"
+                                : event.segmentRole === "continues"
+                                  ? "延续"
+                                  : null;
+
+                            return (
+                              <div
+                                key={event.segmentId}
+                                className={`cursor-pointer rounded border px-2 py-1 text-xs ${getCategoryColor(categories, event.category)}`}
+                                title={`${event.title} (${fullTimeLabel})`}
+                                onClick={() => handleOpenEdit(sourceEvent)}
+                              >
+                                <div className="flex min-w-0 items-center gap-1">
+                                  {event.isCompleted ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> : null}
+                                  <span className="shrink-0 text-[10px] font-semibold text-gray-600">{timeLabel}</span>
+                                  {segmentLabel ? (
+                                    <span className="shrink-0 rounded-full bg-white/60 px-1 text-[10px] font-semibold text-gray-500">
+                                      {segmentLabel}
+                                    </span>
+                                  ) : null}
+                                  <span className={`min-w-0 truncate ${event.isCompleted ? "line-through decoration-2" : ""}`}>{event.title}</span>
+                                </div>
                               </div>
-                            </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
                     </div>
@@ -1742,17 +1848,22 @@ function TimeRangeEditor({
   onStartHourChange: (value: number) => void;
   onEndHourChange: (value: number) => void;
 }) {
+  const startParts = getTimeSelectParts(startHour);
+  const endParts = getTimeSelectParts(endHour, true);
+  const minuteOptions = Array.from({ length: 60 }, (_, minute) => minute);
+  const endMinuteOptions = endParts.hours === 24 ? [0] : minuteOptions;
+  const crossesMidnight = endHour < startHour;
+
   return (
     <div className="grid grid-cols-2 gap-4">
       <div className="space-y-3">
         <Label>开始时间</Label>
         <div className="flex gap-3">
           <Select
-            value={String(Math.floor(startHour))}
+            value={String(startParts.hours)}
             onValueChange={(value) => {
               const hours = Number(value);
-              const minutes = startHour - Math.floor(startHour);
-              onStartHourChange(hours + minutes);
+              onStartHourChange(hours + startParts.minutes / minutesPerHour);
             }}
           >
             <SelectTrigger>
@@ -1767,17 +1878,16 @@ function TimeRangeEditor({
             </SelectContent>
           </Select>
           <Select
-            value={String(Math.round((startHour - Math.floor(startHour)) * 60))}
+            value={String(startParts.minutes)}
             onValueChange={(value) => {
-              const hours = Math.floor(startHour);
-              onStartHourChange(hours + Number(value) / 60);
+              onStartHourChange(startParts.hours + Number(value) / minutesPerHour);
             }}
           >
             <SelectTrigger>
               <SelectValue placeholder="分" />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: 60 }, (_, minute) => (
+              {minuteOptions.map((minute) => (
                 <SelectItem key={minute} value={String(minute)}>
                   {minute.toString().padStart(2, "0")}
                 </SelectItem>
@@ -1788,21 +1898,29 @@ function TimeRangeEditor({
       </div>
 
       <div className="space-y-3">
-        <Label>结束时间</Label>
+        <Label className="flex items-center gap-2">
+          结束时间
+          {crossesMidnight ? (
+            <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
+              次日
+            </span>
+          ) : null}
+        </Label>
         <div className="flex gap-3">
           <Select
-            value={String(Math.floor(endHour))}
+            value={String(endParts.hours)}
             onValueChange={(value) => {
               const hours = Number(value);
-              const minutes = endHour - Math.floor(endHour);
-              onEndHourChange(hours + minutes);
+              onEndHourChange(
+                hours === 24 ? 24 : hours + endParts.minutes / minutesPerHour,
+              );
             }}
           >
             <SelectTrigger>
               <SelectValue placeholder="时" />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: 24 }, (_, hour) => (
+              {Array.from({ length: 25 }, (_, hour) => (
                 <SelectItem key={hour} value={String(hour)}>
                   {hour.toString().padStart(2, "0")}
                 </SelectItem>
@@ -1810,17 +1928,18 @@ function TimeRangeEditor({
             </SelectContent>
           </Select>
           <Select
-            value={String(Math.round((endHour - Math.floor(endHour)) * 60))}
+            value={String(endParts.minutes)}
             onValueChange={(value) => {
-              const hours = Math.floor(endHour);
-              onEndHourChange(hours + Number(value) / 60);
+              onEndHourChange(
+                endParts.hours === 24 ? 24 : endParts.hours + Number(value) / minutesPerHour,
+              );
             }}
           >
             <SelectTrigger>
               <SelectValue placeholder="分" />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: 60 }, (_, minute) => (
+              {endMinuteOptions.map((minute) => (
                 <SelectItem key={minute} value={String(minute)}>
                   {minute.toString().padStart(2, "0")}
                 </SelectItem>

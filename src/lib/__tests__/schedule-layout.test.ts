@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   doScheduleEventsOverlap,
+  getScheduleEventDurationHour,
   layoutOverlappingScheduleEvents,
+  splitScheduleEventByDay,
+  toSourceScheduleEvent,
 } from "../schedule-layout";
 import type { ScheduleEvent } from "../types";
 
@@ -54,5 +57,34 @@ describe("schedule event layout", () => {
 
     expect(positioned.map((item) => item.laneCount)).toEqual([3, 3, 3]);
     expect(new Set(positioned.map((item) => item.lane))).toEqual(new Set([0, 1, 2]));
+  });
+
+  it("splits a cross-day event into start and continuation display segments", () => {
+    const segments = splitScheduleEventByDay(
+      event({ id: "sleep", date: "2026-06-11", startHour: 22, endHour: 7 }),
+    );
+
+    expect(
+      segments.map((segment) => ({
+        displayDate: segment.displayDate,
+        startHour: segment.startHour,
+        endHour: segment.endHour,
+        role: segment.segmentRole,
+      })),
+    ).toEqual([
+      { displayDate: "2026-06-11", startHour: 22, endHour: 24, role: "starts" },
+      { displayDate: "2026-06-12", startHour: 0, endHour: 7, role: "continues" },
+    ]);
+    expect(toSourceScheduleEvent(segments[1])).toMatchObject({
+      id: "sleep",
+      date: "2026-06-11",
+      startHour: 22,
+      endHour: 7,
+    });
+  });
+
+  it("calculates duration across midnight", () => {
+    expect(getScheduleEventDurationHour(event({ startHour: 22, endHour: 7 }))).toBe(9);
+    expect(getScheduleEventDurationHour(event({ startHour: 22, endHour: 24 }))).toBe(2);
   });
 });
