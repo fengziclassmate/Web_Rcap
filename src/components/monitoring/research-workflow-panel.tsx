@@ -3,16 +3,28 @@
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
 import {
   Archive,
+  AlertTriangle,
+  ArrowUpRight,
+  CalendarDays,
+  CircleDot,
+  Clock3,
   FileText,
   Filter,
   FlaskConical,
+  Gauge,
   LayoutGrid,
+  Link2,
   List,
+  NotebookPen,
+  Paperclip,
+  Pencil,
   Plus,
   RotateCcw,
   Search,
   Send,
   Table2,
+  Target,
+  Trash2,
   Users,
 } from "lucide-react";
 import { createId } from "@/lib/id";
@@ -180,6 +192,45 @@ function priorityLabel(value: WorkflowPriority) {
   return priorityOptions.find((item) => item.value === value)?.label ?? value;
 }
 
+const projectStatusTone: Record<ResearchProjectStatus, string> = {
+  idea: "border-sky-200 bg-sky-50 text-sky-700",
+  design: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  running: "border-teal-200 bg-teal-50 text-teal-700",
+  blocked: "border-red-200 bg-red-50 text-red-700",
+  writing: "border-amber-200 bg-amber-50 text-amber-700",
+  completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  paused: "border-stone-200 bg-stone-100 text-stone-600",
+  archived: "border-slate-200 bg-slate-100 text-slate-600",
+};
+
+const projectPriorityTone: Record<WorkflowPriority, string> = {
+  critical: "border-red-200 bg-red-50 text-red-700",
+  high: "border-orange-200 bg-orange-50 text-orange-700",
+  medium: "border-sky-200 bg-sky-50 text-sky-700",
+  low: "border-stone-200 bg-stone-100 text-stone-600",
+};
+
+function projectProgressTone(progress: number) {
+  if (progress >= 80) return "from-emerald-600 via-teal-500 to-sky-500";
+  if (progress >= 45) return "from-teal-600 via-sky-500 to-indigo-500";
+  if (progress > 0) return "from-amber-500 via-orange-500 to-red-500";
+  return "from-stone-300 via-stone-300 to-stone-300";
+}
+
+function projectDueLabel(project: ResearchProject) {
+  if (project.targetEndDate) return project.targetEndDate;
+  if (project.startDate) return project.startDate;
+  return "-";
+}
+
+function projectNextText(project: ResearchProject) {
+  return project.nextActions || project.currentIssues || project.summary || "暂无下一步行动";
+}
+
+function activeProjectList(projects: ResearchProject[]) {
+  return projects.filter((item) => item.status !== "archived");
+}
+
 function entityTitle(module: WorkflowModule, entity: ResearchProject | ResearchPaper | SubmissionRecord | GroupMeetingRecord) {
   if (module === "research") return (entity as ResearchProject).title;
   if (module === "paper") return (entity as ResearchPaper).title;
@@ -308,11 +359,42 @@ export function ResearchWorkflowPanel({
   const currentView = viewState[module];
   const selectedId = selectedIdState[module];
   const selectedTab = detailTabState[module];
-  const activeProjectCount = workflow.projects.filter((item) => item.status !== "archived").length;
+  const activeProjectCount = activeProjectList(workflow.projects).length;
   const archivedProjectCount = workflow.projects.filter((item) => item.status === "archived").length;
   const projectStatusOptionsForScope = researchProjectStatusOptions.filter((item) =>
     projectScope === "archived" ? item.value === "archived" : item.value !== "archived",
   );
+  const statusOptionsForModule =
+    module === "research"
+      ? projectStatusOptionsForScope
+      : module === "paper"
+        ? researchPaperStatusOptions
+        : module === "submissions"
+          ? submissionStatusOptions
+          : meetingTypeOptions;
+  const statusFilterDisplay =
+    statusFilter === "all"
+      ? "全部状态"
+      : statusOptionsForModule.find((item) => item.value === statusFilter)?.label ?? statusFilter;
+  const sortDisplay = sortKey === "title" ? "标题" : sortKey === "status" ? "状态" : "最近时间";
+  const researchSummary = useMemo(() => {
+    const scoped =
+      projectScope === "archived"
+        ? workflow.projects.filter((item) => item.status === "archived")
+        : activeProjectList(workflow.projects);
+    const averageProgress =
+      scoped.length > 0
+        ? Math.round(scoped.reduce((sum, item) => sum + clampProgress(item.progress), 0) / scoped.length)
+        : 0;
+
+    return {
+      total: scoped.length,
+      averageProgress,
+      blocked: scoped.filter((item) => item.status === "blocked").length,
+      completed: scoped.filter((item) => item.status === "completed").length,
+      inMotion: scoped.filter((item) => item.status === "running" || item.status === "writing").length,
+    };
+  }, [projectScope, workflow.projects]);
 
   const primaryItems = useMemo(() => {
     if (module === "research") return workflow.projects;
@@ -757,31 +839,31 @@ export function ResearchWorkflowPanel({
       className={cn(
         "grid min-h-[720px] grid-cols-1 overflow-hidden border bg-white",
         module === "research"
-          ? "rounded-[1.75rem] border-stone-200/80 bg-stone-50/70 shadow-[0_24px_80px_rgba(68,64,60,0.11)] lg:grid-cols-[390px_minmax(0,1fr)] 2xl:grid-cols-[430px_minmax(0,1fr)]"
+          ? "rounded-2xl border-stone-200/90 bg-stone-50/70 shadow-[0_24px_70px_rgba(68,64,60,0.10)] lg:grid-cols-[410px_minmax(0,1fr)] 2xl:grid-cols-[440px_minmax(0,1fr)]"
           : "rounded-lg border-gray-200 shadow-md lg:grid-cols-[360px_minmax(0,1fr)] 2xl:grid-cols-[420px_minmax(0,1fr)]",
       )}
     >
       <div
         className={cn(
           "border-b lg:border-b-0 lg:border-r",
-          module === "research" ? "border-stone-200/80 bg-stone-50/70" : "border-gray-200",
+          module === "research" ? "border-stone-200/90 bg-stone-50/75" : "border-gray-200",
         )}
       >
         <header
           className={cn(
             "border-b px-5 py-4",
             module === "research"
-              ? "border-stone-200/80 bg-[radial-gradient(circle_at_12%_0%,rgba(186,230,253,0.36),transparent_32%),linear-gradient(135deg,#ffffff_0%,#fafaf9_54%,#eef6f0_100%)]"
+              ? "border-stone-200/90 bg-[linear-gradient(135deg,#ffffff_0%,#fbfaf6_52%,#eef7f1_100%)]"
               : "border-gray-200",
           )}
         >
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className={cn("flex items-center gap-2 text-sm font-semibold", module === "research" ? "text-stone-950" : "text-gray-900")}>
                 <span
                   className={cn(
                     module === "research"
-                      ? "flex size-9 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-700 shadow-sm"
+                      ? "flex size-9 items-center justify-center rounded-lg border border-stone-200 bg-white text-teal-700 shadow-sm"
                       : "",
                   )}
                 >
@@ -789,12 +871,15 @@ export function ResearchWorkflowPanel({
                 </span>
                 <span>{module === "research" && projectScope === "archived" ? "科研项目归档库" : moduleLabels[module]}</span>
               </div>
+              {module === "research" ? (
+                <p className="mt-2 text-xs leading-5 text-stone-500">项目节奏、研究问题和论文联动集中管理</p>
+              ) : null}
             </div>
             <Button
               type="button"
               size="sm"
               onClick={openCreateDialog}
-              className={cn(module === "research" && "rounded-xl bg-stone-950 text-white hover:bg-stone-800")}
+              className={cn(module === "research" && "h-9 rounded-lg bg-stone-950 px-3 text-white hover:bg-stone-800")}
             >
               <Plus className="mr-1 h-4 w-4" />
               新建
@@ -830,6 +915,34 @@ export function ResearchWorkflowPanel({
               </button>
             </div>
           ) : null}
+          {module === "research" ? (
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <ResearchScopeStat
+                icon={<Target className="h-4 w-4" aria-hidden />}
+                label="项目数"
+                value={String(researchSummary.total)}
+                tone="teal"
+              />
+              <ResearchScopeStat
+                icon={<Gauge className="h-4 w-4" aria-hidden />}
+                label="平均进度"
+                value={`${researchSummary.averageProgress}%`}
+                tone="sky"
+              />
+              <ResearchScopeStat
+                icon={<CircleDot className="h-4 w-4" aria-hidden />}
+                label="推进中"
+                value={String(researchSummary.inMotion)}
+                tone="amber"
+              />
+              <ResearchScopeStat
+                icon={<AlertTriangle className="h-4 w-4" aria-hidden />}
+                label={projectScope === "archived" ? "已完成" : "阻塞"}
+                value={String(projectScope === "archived" ? researchSummary.completed : researchSummary.blocked)}
+                tone={projectScope === "archived" ? "emerald" : "red"}
+              />
+            </div>
+          ) : null}
           <div className={cn("mt-4 grid grid-cols-1 gap-2", module === "research" && "gap-3")}>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -841,48 +954,45 @@ export function ResearchWorkflowPanel({
               />
             </div>
             <div className={cn("grid grid-cols-[1fr_1fr_auto] gap-2", module === "research" && "items-center")}>
-              <Select value={statusFilter} onValueChange={(value) => value && setStatusFilter(value)}>
-                <SelectTrigger className={cn(module === "research" && "h-10 rounded-xl border-stone-200 bg-white/82")}>
-                  <SelectValue placeholder="筛选状态" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部状态</SelectItem>
-                  {module === "research" &&
-                    projectStatusOptionsForScope.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  {module === "paper" &&
-                    researchPaperStatusOptions.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  {module === "submissions" &&
-                    submissionStatusOptions.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  {module === "meetings" &&
-                    meetingTypeOptions.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <Select value={sortKey} onValueChange={(value) => value && setSortKey(value)}>
-                <SelectTrigger className={cn(module === "research" && "h-10 rounded-xl border-stone-200 bg-white/82")}>
-                  <SelectValue placeholder="排序" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="recent">最近时间</SelectItem>
-                  <SelectItem value="title">标题</SelectItem>
-                  <SelectItem value="status">状态</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                  className={cn(
+                    "h-8 w-full rounded-lg border border-input bg-white/70 px-2.5 text-sm text-transparent outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                    module === "research" && "h-10 rounded-xl border-stone-200 bg-white/82",
+                  )}
+                  aria-label="筛选状态"
+                >
+                  <option value="all" label="全部状态">全部状态</option>
+                  {statusOptionsForModule.map((item) => (
+                    <option key={item.value} value={item.value} label={item.label}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute left-3 top-1/2 max-w-[calc(100%-2rem)] -translate-y-1/2 truncate text-sm text-stone-700">
+                  {statusFilterDisplay}
+                </span>
+              </div>
+              <div className="relative">
+                <select
+                  value={sortKey}
+                  onChange={(event) => setSortKey(event.target.value)}
+                  className={cn(
+                    "h-8 w-full rounded-lg border border-input bg-white/70 px-2.5 text-sm text-transparent outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                    module === "research" && "h-10 rounded-xl border-stone-200 bg-white/82",
+                  )}
+                  aria-label="排序"
+                >
+                  <option value="recent" label="最近时间">最近时间</option>
+                  <option value="title" label="标题">标题</option>
+                  <option value="status" label="状态">状态</option>
+                </select>
+                <span className="pointer-events-none absolute left-3 top-1/2 max-w-[calc(100%-2rem)] -translate-y-1/2 truncate text-sm text-stone-700">
+                  {sortDisplay}
+                </span>
+              </div>
               <div className={cn("flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1", module === "research" && "h-10 rounded-xl border-stone-200 bg-white/72")}>
                 <button
                   type="button"
@@ -1297,6 +1407,128 @@ function CardList({
           "status" in item ? statusLabel(item.status) : "meetingType" in item ? item.meetingType : "";
         const researchItem = module === "research" ? (item as ResearchProject) : null;
         const isArchivedProject = researchItem?.status === "archived";
+        if (researchItem) {
+          return (
+            <article
+              key={item.id}
+              className={cn(
+                "group overflow-hidden rounded-lg border border-stone-200/90 bg-white/90 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-[0_16px_38px_rgba(68,64,60,0.10)]",
+                selected && "border-stone-950 bg-white ring-2 ring-stone-950/5",
+              )}
+            >
+              <button type="button" className="w-full text-left" onClick={() => onSelect(item.id)}>
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant="secondary"
+                          className={cn("rounded-full border px-2.5 py-1 text-[11px]", projectStatusTone[researchItem.status])}
+                        >
+                          {badgeText}
+                        </Badge>
+                        <Badge
+                          variant="secondary"
+                          className={cn("rounded-full border px-2.5 py-1 text-[11px]", projectPriorityTone[researchItem.priority])}
+                        >
+                          {priorityLabel(researchItem.priority)}
+                        </Badge>
+                      </div>
+                      <h3 className="mt-3 truncate text-[15px] font-semibold tracking-tight text-stone-950">
+                        {title}
+                      </h3>
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-stone-600">
+                        {secondary || "暂无补充信息"}
+                      </p>
+                    </div>
+                    <span className="mt-1 inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-stone-50 text-stone-500 transition group-hover:border-teal-200 group-hover:bg-teal-50 group-hover:text-teal-700">
+                      <ArrowUpRight className="h-4 w-4" aria-hidden />
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg border border-stone-200/75 bg-stone-50/70 px-3 py-2">
+                      <div className="flex items-center gap-1.5 text-stone-500">
+                        <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+                        <span>目标日期</span>
+                      </div>
+                      <p className="mt-1 truncate font-semibold text-stone-800">{projectDueLabel(researchItem)}</p>
+                    </div>
+                    <div className="rounded-lg border border-stone-200/75 bg-stone-50/70 px-3 py-2">
+                      <div className="flex items-center gap-1.5 text-stone-500">
+                        <Link2 className="h-3.5 w-3.5" aria-hidden />
+                        <span>任务链接</span>
+                      </div>
+                      <p className="mt-1 font-semibold text-stone-800">{researchItem.linkedTaskIds.length}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between gap-3 text-xs text-stone-500">
+                      <span>进度</span>
+                      <span className="font-semibold text-stone-800">{researchItem.progress}%</span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-stone-100">
+                      <div
+                        className={cn("h-full rounded-full bg-gradient-to-r", projectProgressTone(researchItem.progress))}
+                        style={{ width: `${clampProgress(researchItem.progress)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="mt-4 flex items-start gap-2 rounded-lg bg-teal-50/70 px-3 py-2 text-xs leading-5 text-teal-900">
+                    <NotebookPen className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span className="line-clamp-2">{projectNextText(researchItem)}</span>
+                  </p>
+                </div>
+              </button>
+
+              <div className="flex items-center justify-between border-t border-stone-100 bg-stone-50/45 px-3 py-2">
+                <div className="flex items-center gap-1 text-xs text-stone-500">
+                  <Clock3 className="h-3.5 w-3.5" aria-hidden />
+                  <span>{researchItem.startDate || "未设开始"}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="rounded-lg text-stone-500 hover:bg-white hover:text-stone-950"
+                    onClick={() => onEdit(item.id)}
+                    aria-label="编辑项目"
+                    title="编辑项目"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  {onToggleArchive ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="rounded-lg text-stone-500 hover:bg-white hover:text-stone-950"
+                      onClick={() => onToggleArchive(item.id, !isArchivedProject)}
+                      aria-label={isArchivedProject ? "恢复项目" : "归档项目"}
+                      title={isArchivedProject ? "恢复项目" : "归档项目"}
+                    >
+                      {isArchivedProject ? <RotateCcw className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="rounded-lg text-stone-500 hover:bg-red-50 hover:text-red-600"
+                    onClick={() => onDelete(item.id)}
+                    aria-label="删除项目"
+                    title="删除项目"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </article>
+          );
+        }
         return (
           <div
             key={item.id}
@@ -1328,20 +1560,6 @@ function CardList({
                   {badgeText}
                 </Badge>
               </div>
-              {researchItem ? (
-                <div className="mt-4 space-y-3">
-                  <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-stone-700 via-teal-600 to-sky-500"
-                      style={{ width: `${researchItem.progress}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-3 text-xs text-stone-500">
-                    <span>{researchItem.progress}%</span>
-                    <span>{researchItem.targetEndDate || researchItem.startDate || "-"}</span>
-                  </div>
-                </div>
-              ) : null}
             </button>
             <div className={cn("mt-3 flex items-center justify-between gap-2", module === "research" && "mt-0 border-t border-stone-100 px-4 py-3")}>
               <Button type="button" variant="outline" size="sm" className={cn(module === "research" && "rounded-xl border-stone-200 bg-white/80")} onClick={() => onEdit(item.id)}>
@@ -1390,7 +1608,7 @@ function TableList({
     <div
       className={cn(
         "overflow-hidden rounded-lg border border-gray-200",
-        module === "research" && "rounded-3xl border-stone-200/80 bg-white/86 shadow-sm",
+        module === "research" && "rounded-lg border-stone-200/80 bg-white/86 shadow-sm",
       )}
     >
       <table className="w-full text-left text-sm">
@@ -1404,6 +1622,7 @@ function TableList({
         <tbody>
           {items.map((item) => {
             const isArchivedProject = module === "research" && (item as ResearchProject).status === "archived";
+            const researchItem = module === "research" ? (item as ResearchProject) : null;
             return (
               <tr
                 key={item.id}
@@ -1416,19 +1635,29 @@ function TableList({
                 <td className={cn("px-3 py-3", module === "research" && "px-4 py-4")}>
                   <button
                     type="button"
-                    className={cn("font-medium text-gray-900", module === "research" && "text-stone-950 hover:text-teal-700")}
+                    className={cn("text-left font-medium text-gray-900", module === "research" && "text-stone-950 hover:text-teal-700")}
                     onClick={() => onSelect(item.id)}
                   >
-                    {entityTitle(module, item)}
+                    <span>{entityTitle(module, item)}</span>
+                    {researchItem ? (
+                      <span className="mt-1 block line-clamp-1 text-xs font-normal text-stone-500">
+                        {projectNextText(researchItem)}
+                      </span>
+                    ) : null}
                   </button>
                 </td>
                 <td className={cn("px-3 py-3 text-gray-600", module === "research" && "px-4 py-4 text-stone-600")}>
                   <Badge
                     variant="secondary"
-                    className={cn(module === "research" && "rounded-full border border-stone-200 bg-stone-100 text-stone-700")}
+                    className={cn(
+                      module === "research" && researchItem
+                        ? cn("rounded-full border px-2.5 py-1 text-[11px]", projectStatusTone[researchItem.status])
+                        : "",
+                    )}
                   >
                     {"status" in item ? statusLabel(item.status) : "meetingType" in item ? item.meetingType : ""}
                   </Badge>
+                  {researchItem ? <p className="mt-2 text-xs text-stone-500">{researchItem.progress}% · {projectDueLabel(researchItem)}</p> : null}
                 </td>
                 <td className={cn("px-3 py-3", module === "research" && "px-4 py-4")}>
                   <div className="flex items-center gap-2">
@@ -1497,7 +1726,7 @@ function KanbanList({
   return (
     <div className={cn("space-y-3", module === "research" && "space-y-4")}>
       {groups.map(([group, groupItems]) => (
-        <div key={group} className={cn("rounded-lg border border-gray-200", module === "research" && "rounded-3xl border-stone-200/80 bg-white/86 shadow-sm")}>
+        <div key={group} className={cn("rounded-lg border border-gray-200", module === "research" && "rounded-lg border-stone-200/80 bg-white/86 shadow-sm")}>
           <div
             className={cn(
               "flex items-center gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700",
@@ -1509,20 +1738,37 @@ function KanbanList({
             <Badge variant="secondary" className={cn(module === "research" && "ml-auto rounded-full bg-white text-stone-700")}>{groupItems.length}</Badge>
           </div>
           <div className={cn("space-y-2 p-3", module === "research" && "p-4")}>
-            {groupItems.map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                onClick={() => onSelect(item.id)}
-                className={cn(
-                  "w-full rounded-md border border-gray-200 px-3 py-2 text-left text-sm",
-                  module === "research" && "rounded-2xl border-stone-200 bg-white/70 px-4 py-3 text-stone-800 hover:border-stone-300 hover:bg-stone-50",
-                  item.id === selectedId && (module === "research" ? "border-stone-950 bg-stone-50 shadow-sm" : "border-black bg-gray-50"),
-                )}
-              >
-                {entityTitle(module, item)}
-              </button>
-            ))}
+            {groupItems.map((item) => {
+              const researchItem = module === "research" ? (item as ResearchProject) : null;
+              return (
+                <button
+                  type="button"
+                  key={item.id}
+                  onClick={() => onSelect(item.id)}
+                  className={cn(
+                    "w-full rounded-md border border-gray-200 px-3 py-2 text-left text-sm",
+                    module === "research" && "rounded-lg border-stone-200 bg-white/78 px-4 py-3 text-stone-800 hover:border-teal-300 hover:bg-teal-50/35",
+                    item.id === selectedId && (module === "research" ? "border-stone-950 bg-stone-50 shadow-sm" : "border-black bg-gray-50"),
+                  )}
+                >
+                  <span className="font-medium">{entityTitle(module, item)}</span>
+                  {researchItem ? (
+                    <span className="mt-3 block">
+                      <span className="flex items-center justify-between gap-2 text-xs text-stone-500">
+                        <span>{priorityLabel(researchItem.priority)}</span>
+                        <span>{researchItem.progress}%</span>
+                      </span>
+                      <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-stone-100">
+                        <span
+                          className={cn("block h-full rounded-full bg-gradient-to-r", projectProgressTone(researchItem.progress))}
+                          style={{ width: `${clampProgress(researchItem.progress)}%` }}
+                        />
+                      </span>
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -1540,14 +1786,14 @@ function DetailTabs({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2 border-b border-stone-200/80 bg-white/65 px-5 py-3">
+    <div className="flex flex-wrap gap-2 border-b border-stone-200/90 bg-white/70 px-5 py-3">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
           onClick={() => onChange(tab.id)}
           className={cn(
-            "rounded-2xl px-3.5 py-2 text-sm font-medium text-stone-500 transition hover:bg-stone-100 hover:text-stone-900",
+            "rounded-lg px-3.5 py-2 text-sm font-medium text-stone-500 transition hover:bg-stone-100 hover:text-stone-900",
             value === tab.id && "bg-stone-950 text-white shadow-sm hover:bg-stone-950 hover:text-white",
           )}
         >
@@ -1568,7 +1814,7 @@ function DetailSection({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-3xl border border-stone-200/80 bg-white/88 p-5 shadow-sm">
+    <section className="rounded-lg border border-stone-200/85 bg-white/90 p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-2">
         <h3 className="text-[15px] font-semibold tracking-tight text-stone-950">{title}</h3>
         {action}
@@ -1607,6 +1853,81 @@ function LinkedItemList({ labels }: { labels: string[] }) {
           {label}
         </Badge>
       ))}
+    </div>
+  );
+}
+
+function ResearchScopeStat({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  tone: "teal" | "sky" | "amber" | "red" | "emerald";
+}) {
+  const toneClass = {
+    teal: "border-teal-200 bg-teal-50 text-teal-700",
+    sky: "border-sky-200 bg-sky-50 text-sky-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    red: "border-red-200 bg-red-50 text-red-700",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  }[tone];
+
+  return (
+    <div className="rounded-lg border border-stone-200/80 bg-white/82 p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-stone-500">{label}</span>
+        <span className={cn("inline-flex size-7 items-center justify-center rounded-lg border", toneClass)}>
+          {icon}
+        </span>
+      </div>
+      <p className="mt-2 text-xl font-semibold tracking-tight text-stone-950">{value}</p>
+    </div>
+  );
+}
+
+function ProjectHeroStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white/78 px-3 py-2 shadow-sm">
+      <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <p className="mt-1 truncate text-sm font-semibold text-stone-950">{value}</p>
+    </div>
+  );
+}
+
+function ResearchBrief({
+  icon,
+  title,
+  text,
+  tone,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  text: string;
+  tone: "teal" | "sky" | "amber" | "stone";
+}) {
+  const toneClass = {
+    teal: "border-teal-200 bg-teal-50 text-teal-800",
+    sky: "border-sky-200 bg-sky-50 text-sky-800",
+    amber: "border-amber-200 bg-amber-50 text-amber-800",
+    stone: "border-stone-200 bg-stone-50 text-stone-700",
+  }[tone];
+
+  return (
+    <div className="rounded-lg border border-stone-200/85 bg-white/82 p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold text-stone-500">
+        <span className={cn("inline-flex size-7 items-center justify-center rounded-lg border", toneClass)}>
+          {icon}
+        </span>
+        <span>{title}</span>
+      </div>
+      <p className="mt-3 line-clamp-4 text-sm leading-6 text-stone-800">{text || "-"}</p>
     </div>
   );
 }
@@ -1680,10 +2001,6 @@ function ProjectPlanEditor({
     nextActions: project.nextActions,
   });
 
-  useEffect(() => {
-    setDraft({ currentIssues: project.currentIssues, nextActions: project.nextActions });
-  }, [project.id, project.currentIssues, project.nextActions]);
-
   return (
     <DetailSection
       title="计划编辑"
@@ -1730,14 +2047,15 @@ function ProjectLogCard({
     nextActions: log.nextActions,
   });
 
-  useEffect(() => {
+  function openLogEditor() {
     setDraft({
       date: log.date,
       progressText: log.progressText,
       issues: log.issues,
       nextActions: log.nextActions,
     });
-  }, [log]);
+    setEditing(true);
+  }
 
   if (editing) {
     return (
@@ -1787,7 +2105,7 @@ function ProjectLogCard({
           >
             转任务
           </Button>
-          <Button type="button" size="sm" variant="outline" className="rounded-xl border-stone-200 bg-white/80" onClick={() => setEditing(true)}>
+          <Button type="button" size="sm" variant="outline" className="rounded-xl border-stone-200 bg-white/80" onClick={openLogEditor}>
             编辑
           </Button>
           <Button type="button" size="sm" variant="outline" className="rounded-xl border-stone-200 bg-white/80 text-stone-500 hover:text-red-600" onClick={() => onDeleteLog(log.id)}>
@@ -1857,60 +2175,66 @@ function ProjectDetails({
 
   return (
     <div className="h-full">
-      <header className="border-b border-stone-200/80 bg-[radial-gradient(circle_at_90%_0%,rgba(125,211,252,0.22),transparent_28%),linear-gradient(135deg,#ffffff_0%,#fafaf9_58%,#f0f7f2_100%)] px-5 py-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
+      <header className="border-b border-stone-200/90 bg-[linear-gradient(135deg,#ffffff_0%,#fbfaf6_55%,#eef8f1_100%)] px-5 py-5">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex size-10 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-700 shadow-sm">
-                <FlaskConical className="h-4 w-4" />
+              <span className="flex size-10 items-center justify-center rounded-lg border border-stone-200 bg-white text-teal-700 shadow-sm">
+                <FlaskConical className="h-4 w-4" aria-hidden />
               </span>
-              <h2 className="min-w-0 truncate text-xl font-semibold tracking-tight text-stone-950">{project.title}</h2>
-              <Badge variant="secondary" className="rounded-full border border-stone-200 bg-white/85 px-2.5 py-1 text-stone-700">
+              <h2 className="min-w-0 flex-1 truncate text-xl font-semibold tracking-tight text-stone-950">
+                {project.title}
+              </h2>
+              <Badge variant="secondary" className={cn("rounded-full border px-2.5 py-1 text-[11px]", projectStatusTone[project.status])}>
                 {statusLabel(project.status)}
               </Badge>
-              <Badge variant="secondary" className="rounded-full border border-stone-200 bg-white/85 px-2.5 py-1 text-stone-700">
+              <Badge variant="secondary" className={cn("rounded-full border px-2.5 py-1 text-[11px]", projectPriorityTone[project.priority])}>
                 {priorityLabel(project.priority)}
               </Badge>
             </div>
+
             <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">{project.summary || "暂无简介"}</p>
+
+            <div className="mt-5">
+              <div className="flex items-center justify-between gap-3 text-xs text-stone-500">
+                <span>整体进度</span>
+                <span className="font-semibold text-stone-900">{clampProgress(project.progress)}%</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/80 ring-1 ring-stone-200">
+                <div
+                  className={cn("h-full rounded-full bg-gradient-to-r", projectProgressTone(project.progress))}
+                  style={{ width: `${clampProgress(project.progress)}%` }}
+                />
+              </div>
+            </div>
+
             <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-              <div className="rounded-2xl border border-stone-200 bg-white/72 px-3 py-2 shadow-sm">
-                <p className="text-[11px] text-stone-500">进度</p>
-                <p className="mt-1 text-lg font-semibold text-stone-950">{project.progress}%</p>
-              </div>
-              <div className="rounded-2xl border border-stone-200 bg-white/72 px-3 py-2 shadow-sm">
-                <p className="text-[11px] text-stone-500">开始</p>
-                <p className="mt-1 truncate text-sm font-semibold text-stone-950">{project.startDate || "-"}</p>
-              </div>
-              <div className="rounded-2xl border border-stone-200 bg-white/72 px-3 py-2 shadow-sm">
-                <p className="text-[11px] text-stone-500">目标</p>
-                <p className="mt-1 truncate text-sm font-semibold text-stone-950">{project.targetEndDate || "-"}</p>
-              </div>
-              <div className="rounded-2xl border border-stone-200 bg-white/72 px-3 py-2 shadow-sm">
-                <p className="text-[11px] text-stone-500">资料</p>
-                <p className="mt-1 text-lg font-semibold text-stone-950">{attachments.length}</p>
-              </div>
-            </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/80 ring-1 ring-stone-200">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-stone-800 via-teal-600 to-sky-500"
-                style={{ width: `${project.progress}%` }}
-              />
+              <ProjectHeroStat icon={<CalendarDays className="h-4 w-4" aria-hidden />} label="开始" value={project.startDate || "-"} />
+              <ProjectHeroStat icon={<Target className="h-4 w-4" aria-hidden />} label="目标" value={project.targetEndDate || "-"} />
+              <ProjectHeroStat icon={<Paperclip className="h-4 w-4" aria-hidden />} label="资料" value={String(attachments.length)} />
+              <ProjectHeroStat icon={<Link2 className="h-4 w-4" aria-hidden />} label="任务" value={String(project.linkedTaskIds.length)} />
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" className="rounded-xl border-stone-200 bg-white/82" onClick={() => onToggleArchive(!isArchived)}>
-              {isArchived ? (
-                <RotateCcw className="h-4 w-4" />
-              ) : (
-                <Archive className="h-4 w-4" />
-              )}
-              {isArchived ? "恢复项目" : "归档项目"}
-            </Button>
-            <Button type="button" variant="outline" size="sm" className="rounded-xl border-stone-200 bg-white/82" onClick={() => onEditingChange(!editing)}>
-              {editing ? "收起编辑" : "编辑项目"}
-            </Button>
-          </div>
+
+          <aside className="flex flex-col justify-between gap-4 rounded-lg border border-teal-200/80 bg-teal-50/70 p-4">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-teal-800">
+                <NotebookPen className="h-4 w-4" aria-hidden />
+                下一步
+              </div>
+              <p className="mt-3 text-sm leading-6 text-teal-950">{projectNextText(project)}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" className="rounded-lg border-teal-200 bg-white/82" onClick={() => onToggleArchive(!isArchived)}>
+                {isArchived ? <RotateCcw className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                {isArchived ? "恢复项目" : "归档项目"}
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="rounded-lg border-teal-200 bg-white/82" onClick={() => onEditingChange(!editing)}>
+                <Pencil className="h-4 w-4" />
+                {editing ? "收起编辑" : "编辑项目"}
+              </Button>
+            </div>
+          </aside>
         </div>
       </header>
       <DetailTabs
@@ -1950,30 +2274,51 @@ function ProjectDetails({
                 <InfoStat label="预留任务链接" value={String(project.linkedTaskIds.length)} />
               </div>
             </DetailSection>
-            <DetailSection title="核心问题">
-              <div className="grid gap-3 text-sm text-stone-600 md:grid-cols-2">
-                <div className="rounded-2xl bg-stone-50 px-4 py-3">
-                  <p className="text-xs font-medium text-stone-500">研究问题</p>
-                  <p className="mt-2 leading-6 text-stone-800">{project.researchQuestion || "-"}</p>
+            <DetailSection title="研究逻辑">
+              <div className="grid gap-3 md:grid-cols-2">
+                <ResearchBrief icon={<Target className="h-4 w-4" aria-hidden />} title="研究问题" text={project.researchQuestion} tone="teal" />
+                <ResearchBrief icon={<CircleDot className="h-4 w-4" aria-hidden />} title="研究假设" text={project.hypothesis} tone="sky" />
+                <ResearchBrief icon={<FlaskConical className="h-4 w-4" aria-hidden />} title="方法" text={project.method} tone="amber" />
+                <ResearchBrief icon={<FileText className="h-4 w-4" aria-hidden />} title="数据来源" text={project.dataSources} tone="stone" />
+              </div>
+            </DetailSection>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <DetailSection title="当前问题">
+                <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4 text-sm leading-6 text-amber-900">
+                  {project.currentIssues || "暂无记录"}
                 </div>
-                <div className="rounded-2xl bg-stone-50 px-4 py-3">
-                  <p className="text-xs font-medium text-stone-500">研究假设</p>
-                  <p className="mt-2 leading-6 text-stone-800">{project.hypothesis || "-"}</p>
+              </DetailSection>
+              <DetailSection
+                title="下一步行动"
+                action={
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="rounded-lg bg-stone-950 text-white hover:bg-stone-800"
+                    onClick={() => onCreateTask(project.nextActions || `${project.title} 跟进`, project.targetEndDate, project.currentIssues)}
+                  >
+                    <ArrowUpRight className="h-4 w-4" />
+                    转任务
+                  </Button>
+                }
+              >
+                <div className="rounded-lg border border-teal-200 bg-teal-50/80 p-4 text-sm leading-6 text-teal-950">
+                  {project.nextActions || "暂无记录"}
                 </div>
-                <div className="rounded-2xl bg-stone-50 px-4 py-3">
-                  <p className="text-xs font-medium text-stone-500">方法</p>
-                  <p className="mt-2 leading-6 text-stone-800">{project.method || "-"}</p>
-                </div>
-                <div className="rounded-2xl bg-stone-50 px-4 py-3">
-                  <p className="text-xs font-medium text-stone-500">数据来源</p>
-                  <p className="mt-2 leading-6 text-stone-800">{project.dataSources || "-"}</p>
-                </div>
+              </DetailSection>
+            </div>
+            <DetailSection title="关联线索">
+              <div className="grid gap-3 md:grid-cols-3">
+                <ResearchBrief icon={<FileText className="h-4 w-4" aria-hidden />} title="论文" text={papers.map((item) => item.title).join("，")} tone="stone" />
+                <ResearchBrief icon={<Users className="h-4 w-4" aria-hidden />} title="组会" text={meetings.map((item) => item.title).join("，")} tone="sky" />
+                <ResearchBrief icon={<Paperclip className="h-4 w-4" aria-hidden />} title="附件" text={attachments.map((item) => item.fileName).join("，")} tone="teal" />
               </div>
             </DetailSection>
           </>
         )}
         {activeTab === "plan" ? (
           <ProjectPlanEditor
+            key={`${project.id}-${project.currentIssues}-${project.nextActions}`}
             project={project}
             onSave={(patch) =>
               onUpdateProject({
@@ -2932,7 +3277,7 @@ function MeetingDetails({
 
 function InfoStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-stone-200 bg-stone-50/90 p-4">
+    <div className="rounded-lg border border-stone-200 bg-stone-50/90 p-4">
       <p className="text-xs font-medium text-stone-500">{label}</p>
       <p className="mt-2 text-base font-semibold text-stone-950">{value}</p>
     </div>
@@ -2954,27 +3299,63 @@ function ProjectDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>科研项目</DialogTitle>
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-lg border-stone-200 p-0 sm:max-w-4xl">
+        <DialogHeader className="border-b border-stone-200 bg-[linear-gradient(135deg,#ffffff_0%,#f8faf8_100%)] px-5 py-4">
+          <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-stone-950">
+            <span className="inline-flex size-8 items-center justify-center rounded-lg border border-stone-200 bg-white text-teal-700">
+              <FlaskConical className="h-4 w-4" aria-hidden />
+            </span>
+            科研项目
+          </DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <LabeledInput label="标题" value={draft.title} onChange={(value) => onChange({ ...draft, title: value })} />
-          <LabeledSelect label="状态" value={draft.status} options={researchProjectStatusOptions} onChange={(value) => onChange({ ...draft, status: value as ResearchProjectStatus })} />
-          <LabeledSelect label="优先级" value={draft.priority} options={priorityOptions} onChange={(value) => onChange({ ...draft, priority: value as WorkflowPriority })} />
-          <LabeledInput label="进度" type="number" value={String(draft.progress)} onChange={(value) => onChange({ ...draft, progress: Number(value) })} />
-          <LabeledInput label="开始日期" type="date" value={draft.startDate} onChange={(value) => onChange({ ...draft, startDate: value })} />
-          <LabeledInput label="目标结束日期" type="date" value={draft.targetEndDate} onChange={(value) => onChange({ ...draft, targetEndDate: value })} />
-          <LabeledTextarea className="md:col-span-2" label="简介" value={draft.summary} onChange={(value) => onChange({ ...draft, summary: value })} />
-          <LabeledTextarea label="研究问题" value={draft.researchQuestion} onChange={(value) => onChange({ ...draft, researchQuestion: value })} />
-          <LabeledTextarea label="研究假设" value={draft.hypothesis} onChange={(value) => onChange({ ...draft, hypothesis: value })} />
-          <LabeledTextarea label="方法" value={draft.method} onChange={(value) => onChange({ ...draft, method: value })} />
-          <LabeledTextarea label="数据来源" value={draft.dataSources} onChange={(value) => onChange({ ...draft, dataSources: value })} />
-          <LabeledTextarea label="当前问题" value={draft.currentIssues} onChange={(value) => onChange({ ...draft, currentIssues: value })} />
-          <LabeledTextarea label="下一步行动" value={draft.nextActions} onChange={(value) => onChange({ ...draft, nextActions: value })} />
-          <LabeledInput className="md:col-span-2" label="预留任务 ID（逗号分隔）" value={draft.plannedTaskIdsText} onChange={(value) => onChange({ ...draft, plannedTaskIdsText: value })} />
+        <div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="space-y-4">
+            <section className="rounded-lg border border-stone-200 bg-white/90 p-4">
+              <h3 className="text-sm font-semibold text-stone-950">基础信息</h3>
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <LabeledInput className="md:col-span-2" label="标题" value={draft.title} onChange={(value) => onChange({ ...draft, title: value })} />
+                <LabeledInput label="开始日期" type="date" value={draft.startDate} onChange={(value) => onChange({ ...draft, startDate: value })} />
+                <LabeledInput label="目标结束日期" type="date" value={draft.targetEndDate} onChange={(value) => onChange({ ...draft, targetEndDate: value })} />
+                <LabeledTextarea className="md:col-span-2" label="简介" value={draft.summary} onChange={(value) => onChange({ ...draft, summary: value })} />
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-stone-200 bg-white/90 p-4">
+              <h3 className="text-sm font-semibold text-stone-950">研究设计</h3>
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <LabeledTextarea label="研究问题" value={draft.researchQuestion} onChange={(value) => onChange({ ...draft, researchQuestion: value })} />
+                <LabeledTextarea label="研究假设" value={draft.hypothesis} onChange={(value) => onChange({ ...draft, hypothesis: value })} />
+                <LabeledTextarea label="方法" value={draft.method} onChange={(value) => onChange({ ...draft, method: value })} />
+                <LabeledTextarea label="数据来源" value={draft.dataSources} onChange={(value) => onChange({ ...draft, dataSources: value })} />
+              </div>
+            </section>
+          </div>
+
+          <aside className="space-y-4">
+            <section className="rounded-lg border border-teal-200 bg-teal-50/70 p-4">
+              <h3 className="text-sm font-semibold text-teal-950">执行状态</h3>
+              <div className="mt-4 space-y-4">
+                <LabeledSelect label="状态" value={draft.status} options={researchProjectStatusOptions} onChange={(value) => onChange({ ...draft, status: value as ResearchProjectStatus })} />
+                <LabeledSelect label="优先级" value={draft.priority} options={priorityOptions} onChange={(value) => onChange({ ...draft, priority: value as WorkflowPriority })} />
+                <LabeledInput label="进度" type="number" value={String(draft.progress)} onChange={(value) => onChange({ ...draft, progress: Number(value) })} />
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-stone-200 bg-white/90 p-4">
+              <h3 className="text-sm font-semibold text-stone-950">当前推进</h3>
+              <div className="mt-4 space-y-4">
+                <LabeledTextarea label="当前问题" value={draft.currentIssues} onChange={(value) => onChange({ ...draft, currentIssues: value })} />
+                <LabeledTextarea label="下一步行动" value={draft.nextActions} onChange={(value) => onChange({ ...draft, nextActions: value })} />
+                <LabeledInput label="预留任务 ID（逗号分隔）" value={draft.plannedTaskIdsText} onChange={(value) => onChange({ ...draft, plannedTaskIdsText: value })} />
+              </div>
+            </section>
+          </aside>
         </div>
-        <Button type="button" onClick={onSave}>保存项目</Button>
+        <div className="border-t border-stone-200 bg-stone-50/80 px-5 py-4">
+          <Button type="button" className="h-9 w-full rounded-lg bg-stone-950 text-white hover:bg-stone-800" onClick={onSave}>
+            保存项目
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
