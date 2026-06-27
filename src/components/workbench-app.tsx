@@ -23,15 +23,16 @@ import {
   parseSyntheticEventId,
   pickRecurrenceOverridePatch,
 } from "@/lib/recurrence";
-import type {
-  AnnualTask,
-  DashboardUiPreferences,
-  EventTag,
-  FootprintItem,
-  LongTask,
-  Priority,
-  ProjectCheckin,
-  ScheduleEvent,
+import {
+  ROUTINE_CHECKIN_PROJECT_ID,
+  type AnnualTask,
+  type DashboardUiPreferences,
+  type EventTag,
+  type FootprintItem,
+  type LongTask,
+  type Priority,
+  type ProjectCheckin,
+  type ScheduleEvent,
 } from "@/lib/types";
 import {
   defaultDashboardUiPreferences,
@@ -2134,6 +2135,31 @@ export function WorkbenchApp() {
     );
   }
 
+  function handleUpdateRoutineCheckins(
+    patch: Partial<Pick<ProjectCheckin, "dailyCheckins" | "dailyCompletions">>,
+  ) {
+    setProjectCheckins((prev) => {
+      const existing = prev.find((project) => project.id === ROUTINE_CHECKIN_PROJECT_ID);
+      if (existing) {
+        return prev.map((project) =>
+          project.id === ROUTINE_CHECKIN_PROJECT_ID ? { ...project, ...patch } : project,
+        );
+      }
+      return [
+        ...prev,
+        {
+          id: ROUTINE_CHECKIN_PROJECT_ID,
+          name: "日常时段打卡",
+          description: "",
+          startDate: todayISO(),
+          checkins: [],
+          dailyCheckins: patch.dailyCheckins ?? [],
+          dailyCompletions: patch.dailyCompletions ?? [],
+        },
+      ];
+    });
+  }
+
   function handleUpdateProjectCheckinEntry(projectId: string, date: string, note: string) {
     setProjectCheckins((prev) =>
       prev.map((project) => {
@@ -2409,6 +2435,7 @@ export function WorkbenchApp() {
                   onCheckinProject={handleCheckinProject}
                   onDeleteProjectCheckin={handleDeleteProjectCheckin}
                   onUpdateProjectCheckin={handleUpdateProjectCheckin}
+                  onUpdateRoutineCheckins={handleUpdateRoutineCheckins}
                   onUpdateProjectCheckinEntry={handleUpdateProjectCheckinEntry}
                   onDeleteProjectCheckinEntry={handleDeleteProjectCheckinEntry}
                   achievements={achievements}

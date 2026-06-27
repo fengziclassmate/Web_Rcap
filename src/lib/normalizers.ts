@@ -21,6 +21,7 @@ export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   longTaskSectionOpen: true,
   completedSectionOpen: true,
   projectSectionOpen: true,
+  routineCheckinSectionOpen: true,
   achievementSectionOpen: true,
   footprintSectionOpen: true,
   expandedTasks: [],
@@ -264,6 +265,8 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
       typeof value.completedSectionOpen === "boolean" ? value.completedSectionOpen : true,
     projectSectionOpen:
       typeof value.projectSectionOpen === "boolean" ? value.projectSectionOpen : true,
+    routineCheckinSectionOpen:
+      typeof value.routineCheckinSectionOpen === "boolean" ? value.routineCheckinSectionOpen : true,
     achievementSectionOpen:
       typeof value.achievementSectionOpen === "boolean" ? value.achievementSectionOpen : true,
     footprintSectionOpen:

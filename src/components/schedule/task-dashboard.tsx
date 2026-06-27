@@ -21,14 +21,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import type {
-  AnnualTask,
-  DashboardUiPreferences,
-  FootprintItem,
-  LongTask,
-  Priority,
-  ProjectCheckin,
-  SubTask,
+import {
+  ROUTINE_CHECKIN_PROJECT_ID,
+  type AnnualTask,
+  type DashboardUiPreferences,
+  type FootprintItem,
+  type LongTask,
+  type Priority,
+  type ProjectCheckin,
+  type SubTask,
 } from "@/lib/types";
 import {
   Collapsible,
@@ -65,6 +66,9 @@ type TaskDashboardProps = {
   onUpdateProjectCheckin: (
     projectId: string,
     patch: Partial<Omit<ProjectCheckin, "id">>,
+  ) => void;
+  onUpdateRoutineCheckins: (
+    patch: Partial<Pick<ProjectCheckin, "dailyCheckins" | "dailyCompletions">>,
   ) => void;
   onUpdateProjectCheckinEntry: (projectId: string, date: string, note: string) => void;
   onDeleteProjectCheckinEntry: (projectId: string, date: string) => void;
@@ -144,6 +148,7 @@ export function TaskDashboard({
   onCheckinProject,
   onDeleteProjectCheckin,
   onUpdateProjectCheckin,
+  onUpdateRoutineCheckins,
   onUpdateProjectCheckinEntry,
   onDeleteProjectCheckinEntry,
   achievements,
@@ -181,6 +186,7 @@ export function TaskDashboard({
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
   const [showAddAnnualDialog, setShowAddAnnualDialog] = useState(false);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
+  const [showRoutineCheckinForm, setShowRoutineCheckinForm] = useState(false);
   const [showAchievementDialog, setShowAchievementDialog] = useState(false);
   const [showAddFootprintDialog, setShowAddFootprintDialog] = useState(false);
   const [historyProjectId, setHistoryProjectId] = useState<string | null>(null);
@@ -205,6 +211,9 @@ export function TaskDashboard({
     uiPreferences.completedSectionOpen ?? true,
   );
   const [projectSectionOpen, setProjectSectionOpen] = useState(uiPreferences.projectSectionOpen);
+  const [routineCheckinSectionOpen, setRoutineCheckinSectionOpen] = useState(
+    uiPreferences.routineCheckinSectionOpen ?? true,
+  );
   const [achievementSectionOpen, setAchievementSectionOpen] = useState(
     uiPreferences.achievementSectionOpen ?? true,
   );
@@ -224,8 +233,43 @@ export function TaskDashboard({
   const incompleteTasks = tasks.filter((task) => !task.done);
   const completedTasks = tasks.filter((task) => task.done);
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
+  const todayDate = getTodayISODate();
 
   const orderedIncompleteTasks = useMemo(() => [...incompleteTasks], [incompleteTasks]);
+  const visibleProjectCheckins = useMemo(
+    () => projectCheckins.filter((project) => project.id !== ROUTINE_CHECKIN_PROJECT_ID),
+    [projectCheckins],
+  );
+  const routineProject = useMemo<ProjectCheckin>(
+    () =>
+      projectCheckins.find((project) => project.id === ROUTINE_CHECKIN_PROJECT_ID) ?? {
+        id: ROUTINE_CHECKIN_PROJECT_ID,
+        name: "日常时段打卡",
+        description: "",
+        startDate: todayDate,
+        checkins: [],
+        dailyCheckins: [],
+        dailyCompletions: [],
+      },
+    [projectCheckins, todayDate],
+  );
+  const dailyCheckinEntries = useMemo(
+    () =>
+      projectCheckins
+        .flatMap((project) =>
+          (project.dailyCheckins ?? []).map((slot) => ({
+            project,
+            slot,
+          })),
+        )
+        .sort((a, b) => a.slot.time.localeCompare(b.slot.time)),
+    [projectCheckins],
+  );
+  const completedDailyCheckinCount = dailyCheckinEntries.filter(({ project, slot }) =>
+    (project.dailyCompletions ?? []).some(
+      (completion) => completion.date === todayDate && completion.slotId === slot.id,
+    ),
+  ).length;
 
   const groupedIncompleteTasks = useMemo(
     () =>
@@ -421,6 +465,17 @@ export function TaskDashboard({
     }));
   }
 
+  function updateDailyCheckinProject(
+    project: ProjectCheckin,
+    patch: Partial<Pick<ProjectCheckin, "dailyCheckins" | "dailyCompletions">>,
+  ) {
+    if (project.id === ROUTINE_CHECKIN_PROJECT_ID) {
+      onUpdateRoutineCheckins(patch);
+      return;
+    }
+    onUpdateProjectCheckin(project.id, patch);
+  }
+
   function handleAddDailyCheckin(project: ProjectCheckin) {
     const draft = getDailyCheckinDraft(project.id);
     const label = draft.label.trim();
@@ -440,8 +495,9 @@ export function TaskDashboard({
       },
     ].sort((a, b) => a.time.localeCompare(b.time));
 
-    onUpdateProjectCheckin(project.id, { dailyCheckins: nextDailyCheckins });
+    updateDailyCheckinProject(project, { dailyCheckins: nextDailyCheckins });
     setDailyCheckinDrafts((prev) => ({ ...prev, [project.id]: { label: "", time: "" } }));
+    setShowRoutineCheckinForm(false);
   }
 
   function handleToggleDailyCheckin(project: ProjectCheckin, slotId: string, checked: boolean) {
@@ -466,11 +522,11 @@ export function TaskDashboard({
           (completion) => !(completion.date === today && completion.slotId === slotId),
         );
 
-    onUpdateProjectCheckin(project.id, { dailyCompletions: nextDailyCompletions });
+    updateDailyCheckinProject(project, { dailyCompletions: nextDailyCompletions });
   }
 
   function handleDeleteDailyCheckin(project: ProjectCheckin, slotId: string) {
-    onUpdateProjectCheckin(project.id, {
+    updateDailyCheckinProject(project, {
       dailyCheckins: (project.dailyCheckins ?? []).filter((slot) => slot.id !== slotId),
       dailyCompletions: (project.dailyCompletions ?? []).filter(
         (completion) => completion.slotId !== slotId,
@@ -950,22 +1006,22 @@ export function TaskDashboard({
             patchUiPreferences({ projectSectionOpen: open });
           }}
         >
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
-            <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
-              <KanbanSquare className="h-4 w-4 text-primary" />
-              Project 打卡记录栏
-            </h3>
-            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${projectSectionOpen ? "" : "-rotate-90"}`} />
-          </CollapsibleTrigger>
+          <div className="flex items-center gap-2">
+            <CollapsibleTrigger className="flex min-h-11 flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
+              <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
+                <KanbanSquare className="h-4 w-4 shrink-0 text-primary" />
+                <span className="truncate">Project 打卡记录栏</span>
+              </h3>
+              <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${projectSectionOpen ? "" : "-rotate-90"}`} />
+            </CollapsibleTrigger>
+            <Button type="button" size="sm" className="shrink-0" onClick={() => setShowAddProjectDialog(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              添加
+            </Button>
+          </div>
           <CollapsibleContent className="mt-3 space-y-3">
-            <div className="flex justify-end">
-              <Button type="button" size="sm" onClick={() => setShowAddProjectDialog(true)}>
-                <Plus className="mr-1 h-4 w-4" />
-                添加
-              </Button>
-            </div>
             <div className="space-y-3">
-              {projectCheckins.map((project) => {
+              {visibleProjectCheckins.map((project) => {
                 const projectExpanded = expandedProjects.has(project.id);
             const today = getTodayISODate();
             const doneCount = project.checkins.length;
@@ -974,18 +1030,6 @@ export function TaskDashboard({
             const recentCheckins = [...project.checkins]
               .sort((a, b) => b.date.localeCompare(a.date))
               .slice(0, 5);
-            const dailySlots = [...(project.dailyCheckins ?? [])].sort((a, b) =>
-              a.time.localeCompare(b.time),
-            );
-            const todayCompletions = new Set(
-              (project.dailyCompletions ?? [])
-                .filter((completion) => completion.date === today)
-                .map((completion) => completion.slotId),
-            );
-            const completedDailyCount = dailySlots.filter((slot) =>
-              todayCompletions.has(slot.id),
-            ).length;
-            const dailyDraft = getDailyCheckinDraft(project.id);
             return (
               <div key={project.id} className="rounded-lg border border-gray-200 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -1047,90 +1091,6 @@ export function TaskDashboard({
                       </Button>
                     </div>
 
-                    <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
-                          日常时段打卡
-                        </p>
-                        <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-emerald-700">
-                          今日 {completedDailyCount}/{dailySlots.length}
-                        </span>
-                      </div>
-
-                      {dailySlots.length > 0 ? (
-                        <div className="mt-3 space-y-2">
-                          {dailySlots.map((slot) => {
-                            const checked = todayCompletions.has(slot.id);
-                            return (
-                              <div
-                                key={slot.id}
-                                className="flex items-center gap-2 rounded-lg border border-white/80 bg-white/70 px-2 py-2"
-                              >
-                                <Checkbox
-                                  checked={checked}
-                                  onCheckedChange={(value) =>
-                                    handleToggleDailyCheckin(project, slot.id, value === true)
-                                  }
-                                  aria-label={`${slot.time} ${slot.label} 打卡状态`}
-                                />
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-medium text-gray-900">
-                                    {slot.label}
-                                  </p>
-                                  <p className="text-xs tabular-nums text-gray-500">{slot.time}</p>
-                                </div>
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 shrink-0 rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600"
-                                  onClick={() =>
-                                    withOptionalConfirm("确认删除这个日常打卡时间点吗？", () =>
-                                      handleDeleteDailyCheckin(project, slot.id),
-                                    )
-                                  }
-                                  aria-label={`删除 ${slot.time} ${slot.label}`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="mt-3 rounded-lg border border-dashed border-emerald-200 bg-white/60 px-3 py-2 text-xs text-emerald-700">
-                          还没有日常时段。可以添加 07:50 喝水、08:40 站立这类提醒点。
-                        </p>
-                      )}
-
-                      <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_104px_auto]">
-                        <Input
-                          value={dailyDraft.label}
-                          onChange={(event) =>
-                            patchDailyCheckinDraft(project.id, { label: event.target.value })
-                          }
-                          placeholder="喝水 / 站立"
-                          aria-label={`${project.name} 新日常打卡名称`}
-                        />
-                        <Input
-                          type="time"
-                          value={dailyDraft.time}
-                          onChange={(event) =>
-                            patchDailyCheckinDraft(project.id, { time: event.target.value })
-                          }
-                          aria-label={`${project.name} 新日常打卡时间`}
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => handleAddDailyCheckin(project)}
-                          disabled={!dailyDraft.label.trim() || !dailyDraft.time.trim()}
-                        >
-                          <Plus className="mr-1 h-4 w-4" />
-                          加时段
-                        </Button>
-                      </div>
-                    </div>
                     <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2">
                       <p className="mb-1 text-xs font-medium text-gray-600">最近打卡记录</p>
                       {recentCheckins.length === 0 ? (
@@ -1163,7 +1123,7 @@ export function TaskDashboard({
               </div>
             );
               })}
-              {projectCheckins.length === 0 ? <p className="text-xs text-gray-500">暂无 Project 打卡项</p> : null}
+              {visibleProjectCheckins.length === 0 ? <p className="text-xs text-gray-500">暂无 Project 打卡项</p> : null}
             </div>
           </CollapsibleContent>
         </Collapsible>
@@ -1175,31 +1135,160 @@ export function TaskDashboard({
 
       <section className="space-y-4 p-6">
         <Collapsible
+          open={routineCheckinSectionOpen}
+          onOpenChange={(open) => {
+            setRoutineCheckinSectionOpen(open);
+            patchUiPreferences({ routineCheckinSectionOpen: open });
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <CollapsibleTrigger className="flex min-h-11 flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
+              <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
+                <Clock className="h-4 w-4 shrink-0 text-primary" />
+                <span className="truncate">日常时段打卡任务</span>
+              </h3>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${
+                  routineCheckinSectionOpen ? "" : "-rotate-90"
+                }`}
+              />
+            </CollapsibleTrigger>
+            <Button
+              type="button"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setShowRoutineCheckinForm((open) => !open)}
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              添加
+            </Button>
+          </div>
+
+          <CollapsibleContent className="mt-3 space-y-3">
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                  今日打卡
+                </p>
+                <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-emerald-700">
+                  {completedDailyCheckinCount}/{dailyCheckinEntries.length}
+                </span>
+              </div>
+
+              {showRoutineCheckinForm ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_104px_auto]">
+                  <Input
+                    value={getDailyCheckinDraft(routineProject.id).label}
+                    onChange={(event) =>
+                      patchDailyCheckinDraft(routineProject.id, { label: event.target.value })
+                    }
+                    placeholder="喝水 / 站立"
+                    aria-label="新日常打卡名称"
+                  />
+                  <Input
+                    type="time"
+                    value={getDailyCheckinDraft(routineProject.id).time}
+                    onChange={(event) =>
+                      patchDailyCheckinDraft(routineProject.id, { time: event.target.value })
+                    }
+                    aria-label="新日常打卡时间"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleAddDailyCheckin(routineProject)}
+                    disabled={
+                      !getDailyCheckinDraft(routineProject.id).label.trim() ||
+                      !getDailyCheckinDraft(routineProject.id).time.trim()
+                    }
+                  >
+                    保存
+                  </Button>
+                </div>
+              ) : null}
+
+              {dailyCheckinEntries.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {dailyCheckinEntries.map(({ project, slot }) => {
+                    const checked = (project.dailyCompletions ?? []).some(
+                      (completion) => completion.date === todayDate && completion.slotId === slot.id,
+                    );
+                    const fromProject = project.id !== ROUTINE_CHECKIN_PROJECT_ID;
+                    return (
+                      <div
+                        key={`${project.id}-${slot.id}`}
+                        className="flex items-center gap-2 rounded-lg border border-white/80 bg-white/70 px-2 py-2"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) =>
+                            handleToggleDailyCheckin(project, slot.id, value === true)
+                          }
+                          aria-label={`${slot.time} ${slot.label} 打卡状态`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-gray-900">{slot.label}</p>
+                          <p className="text-xs tabular-nums text-gray-500">
+                            {slot.time}
+                            {fromProject ? ` · 来自 ${project.name}` : ""}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 shrink-0 rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          onClick={() =>
+                            withOptionalConfirm("确认删除这个日常打卡时间点吗？", () =>
+                              handleDeleteDailyCheckin(project, slot.id),
+                            )
+                          }
+                          aria-label={`删除 ${slot.time} ${slot.label}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg border border-dashed border-emerald-200 bg-white/60 px-3 py-2 text-xs text-emerald-700">
+                  还没有日常打卡任务。可以添加 07:50 喝水、08:40 站立这类固定时间点。
+                </p>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </section>
+
+      <Separator />
+
+      <section className="space-y-4 p-6">
+        <Collapsible
           open={achievementSectionOpen}
           onOpenChange={(open) => {
             setAchievementSectionOpen(open);
             patchUiPreferences({ achievementSectionOpen: open });
           }}
         >
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
-            <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
-              <Trophy className="h-4 w-4 text-primary" />
-              成就记录栏
-            </h3>
-            <ChevronDown
-              className={`h-4 w-4 text-gray-500 transition-transform ${
-                achievementSectionOpen ? "" : "-rotate-90"
-              }`}
-            />
-          </CollapsibleTrigger>
+          <div className="flex items-center gap-2">
+            <CollapsibleTrigger className="flex min-h-11 flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
+              <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
+                <Trophy className="h-4 w-4 shrink-0 text-primary" />
+                <span className="truncate">成就记录栏</span>
+              </h3>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${
+                  achievementSectionOpen ? "" : "-rotate-90"
+                }`}
+              />
+            </CollapsibleTrigger>
+            <Button type="button" size="sm" className="shrink-0" onClick={openCreateAchievement}>
+              <Plus className="mr-1 h-4 w-4" />
+              添加
+            </Button>
+          </div>
           <CollapsibleContent className="mt-3 space-y-3">
-            <div className="flex justify-end">
-              <Button type="button" size="sm" onClick={openCreateAchievement}>
-                <Plus className="mr-1 h-4 w-4" />
-                添加
-              </Button>
-            </div>
-
             {groupedAchievements.length === 0 ? (
               <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-500">
                 暂无成就记录。可以把今天完成的重要进展记下来。
