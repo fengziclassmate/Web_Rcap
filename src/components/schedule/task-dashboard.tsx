@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   CalendarRange,
   ChevronDown,
@@ -117,8 +117,19 @@ type AchievementForm = {
   note: string;
 };
 
+function formatDateToISODate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function getTodayISODate() {
-  return new Date().toISOString().slice(0, 10);
+  return formatDateToISODate(new Date());
+}
+
+function isISODateString(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 function daysBetweenInclusive(startIso: string, endIso: string) {
@@ -169,6 +180,7 @@ export function TaskDashboard({
   const [taskName, setTaskName] = useState("");
   const [annualTaskName, setAnnualTaskName] = useState("");
   const [dueDate, setDueDate] = useState(getTodayISODate);
+  const [todayDate, setTodayDate] = useState(getTodayISODate);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -233,7 +245,17 @@ export function TaskDashboard({
   const incompleteTasks = tasks.filter((task) => !task.done);
   const completedTasks = tasks.filter((task) => task.done);
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
-  const todayDate = getTodayISODate();
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setTodayDate((currentDate) => {
+        const nextDate = getTodayISODate();
+        return currentDate === nextDate ? currentDate : nextDate;
+      });
+    }, 60 * 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const orderedIncompleteTasks = useMemo(() => [...incompleteTasks], [incompleteTasks]);
   const visibleProjectCheckins = useMemo(
@@ -270,6 +292,62 @@ export function TaskDashboard({
       (completion) => completion.date === todayDate && completion.slotId === slot.id,
     ),
   ).length;
+  const dailyCheckinArchive = useMemo(() => {
+    const dates = new Set<string>();
+    const startDateCandidates: string[] = [];
+
+    for (const { project } of dailyCheckinEntries) {
+      if (isISODateString(project.startDate)) {
+        startDateCandidates.push(project.startDate);
+      }
+
+      for (const completion of project.dailyCompletions ?? []) {
+        if (isISODateString(completion.date)) {
+          startDateCandidates.push(completion.date);
+          if (completion.date < todayDate) {
+            dates.add(completion.date);
+          }
+        }
+      }
+    }
+
+    const archiveStartDate = startDateCandidates.sort()[0];
+    if (archiveStartDate && archiveStartDate < todayDate) {
+      const cursor = new Date(`${archiveStartDate}T00:00:00`);
+      const end = new Date(`${todayDate}T00:00:00`);
+
+      while (cursor < end) {
+        dates.add(formatDateToISODate(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+
+    return [...dates]
+      .sort((a, b) => b.localeCompare(a))
+      .map((date) => {
+        const entries = dailyCheckinEntries.map(({ project, slot }) => {
+          const completion = (project.dailyCompletions ?? []).find(
+            (item) => item.date === date && item.slotId === slot.id,
+          );
+
+          return {
+            id: `${project.id}-${slot.id}`,
+            label: slot.label,
+            time: slot.time,
+            projectName: project.id === ROUTINE_CHECKIN_PROJECT_ID ? "" : project.name,
+            completed: Boolean(completion),
+          };
+        });
+        const completedCount = entries.filter((entry) => entry.completed).length;
+
+        return {
+          date,
+          entries,
+          completedCount,
+          totalCount: entries.length,
+        };
+      });
+  }, [dailyCheckinEntries, todayDate]);
 
   const groupedIncompleteTasks = useMemo(
     () =>
@@ -1174,6 +1252,9 @@ export function TaskDashboard({
                   {completedDailyCheckinCount}/{dailyCheckinEntries.length}
                 </span>
               </div>
+              <p className="mt-1 text-xs leading-5 text-emerald-700">
+                今日记录只属于 {todayDate}；跨过当天后，列表会自动重新开始，旧日期会进入归档。
+              </p>
 
               {showRoutineCheckinForm ? (
                 <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_104px_auto]">
@@ -1254,6 +1335,60 @@ export function TaskDashboard({
               ) : (
                 <p className="mt-3 rounded-lg border border-dashed border-emerald-200 bg-white/60 px-3 py-2 text-xs text-emerald-700">
                   还没有日常打卡任务。可以添加 07:50 喝水、08:40 站立这类固定时间点。
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white/80 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-700">
+                  <CalendarRange className="h-4 w-4 text-gray-500" />
+                  历史归档
+                </p>
+                <span className="text-[11px] text-gray-500">按日期自动整理</span>
+              </div>
+
+              {dailyCheckinArchive.length > 0 ? (
+                <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+                  {dailyCheckinArchive.map((day) => (
+                    <div key={day.date} className="rounded-lg border border-gray-200 bg-gray-50/70 p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-gray-800">{day.date}</p>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                          {day.completedCount}/{day.totalCount}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {day.entries.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1.5"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-medium text-gray-800">{entry.label}</p>
+                              <p className="text-[11px] tabular-nums text-gray-500">
+                                {entry.time}
+                                {entry.projectName ? ` · 来自 ${entry.projectName}` : ""}
+                              </p>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                entry.completed
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-gray-100 text-gray-400"
+                              }`}
+                            >
+                              {entry.completed ? "已打卡" : "未打卡"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">
+                  还没有过往归档。今天完成的勾选会按日期保存，明天会在这里看到今天的记录。
                 </p>
               )}
             </div>

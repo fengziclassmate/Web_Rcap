@@ -524,25 +524,25 @@ export function WeeklyTimeGrid({
   function getEventStyle(event: PositionedScheduleEvent) {
     const top = event.startHour * hourCellHeight + 4;
     const height = (event.endHour - event.startHour) * hourCellHeight - 8;
+    const minHeight = event.laneCount === 1 ? 30 : 34;
     if (event.laneCount === 1) {
       return {
         top: `${top}px`,
-        height: `${Math.max(height, 28)}px`,
+        height: `${Math.max(height, minHeight)}px`,
         left: "4px",
         width: "calc(100% - 8px)",
       };
     }
 
-    const laneOffsetX = Math.min(14, Math.max(8, 34 / event.laneCount));
-    const laneOffsetY = Math.min(20, Math.max(12, 54 / event.laneCount));
-    const deckWidthLoss = (event.laneCount - 1) * laneOffsetX;
-    const deckHeightLoss = event.lane * Math.min(8, laneOffsetY / 2);
+    const laneWidthPercent = 100 / event.laneCount;
+    const leadingInset = event.lane === 0 ? 4 : 2;
+    const trailingInset = event.lane === event.laneCount - 1 ? 4 : 2;
 
     return {
-      top: `${top + event.lane * laneOffsetY}px`,
-      height: `${Math.max(height - deckHeightLoss, 36)}px`,
-      left: `${4 + event.lane * laneOffsetX}px`,
-      width: `calc(100% - ${8 + deckWidthLoss}px)`,
+      top: `${top}px`,
+      height: `${Math.max(height, minHeight)}px`,
+      left: `calc(${event.lane * laneWidthPercent}% + ${leadingInset}px)`,
+      width: `calc(${laneWidthPercent}% - ${leadingInset + trailingInset}px)`,
       zIndex: event.lane + 1,
     };
   }
@@ -1010,7 +1010,8 @@ export function WeeklyTimeGrid({
                           const sourceEvent = toSourceScheduleEvent(event);
                           const durationHour = getScheduleEventDurationHour(event);
                           const denseCard = event.laneCount > 1;
-                          const compactCard = durationHour < 1;
+                          const compactCard = durationHour < 0.55;
+                          const mediumCard = durationHour < 1;
                           const showDetails = durationHour >= 2 && !denseCard;
                           const timeLabel = formatTimelineSegmentTimeRange(event);
                           const fullTimeLabel = formatEventTimeRange(sourceEvent);
@@ -1039,10 +1040,16 @@ export function WeeklyTimeGrid({
                               ) : null}
                               <button
                                 type="button"
-                                className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-[inherit] text-left outline-none focus-visible:ring-2 focus-visible:ring-stone-900/20 ${compactCard ? "justify-start pb-1.5 pl-4 pr-6 pt-1.5" : "justify-start py-2 pl-5 pr-8"}`}
+                                className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-[inherit] text-left outline-none focus-visible:ring-2 focus-visible:ring-stone-900/20 ${
+                                  compactCard
+                                    ? "justify-start pb-1.5 pl-4 pr-6 pt-1.5"
+                                    : mediumCard
+                                      ? "justify-start py-1.5 pl-5 pr-7"
+                                      : "justify-start py-2 pl-5 pr-8"
+                                }`}
                                 onClick={() => handleOpenEdit(sourceEvent)}
                               >
-                                <div className={`flex min-h-0 min-w-0 flex-col ${compactCard ? "gap-0.5" : "flex-1 gap-1.5"}`}>
+                                <div className={`flex min-h-0 min-w-0 flex-col ${compactCard ? "gap-0.5" : mediumCard ? "flex-1 gap-1" : "flex-1 gap-1.5"}`}>
                                   {compactCard ? (
                                     <div className="flex min-w-0 items-start gap-1.5">
                                       <span
@@ -1132,7 +1139,11 @@ export function WeeklyTimeGrid({
                                       </div>
 
                                       <p
-                                        className={`min-w-0 flex-1 overflow-hidden break-words text-sm font-semibold leading-snug ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
+                                        className={`min-w-0 flex-1 overflow-hidden break-words text-sm font-semibold leading-snug ${
+                                          mediumCard || denseCard
+                                            ? "[display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
+                                            : ""
+                                        } ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
                                         title={`${event.title} (${fullTimeLabel})`}
                                       >
                                         {event.title}
