@@ -1,4 +1,21 @@
 export type CategoryHue = "cold" | "warm" | "neutral";
+export type ScheduleCategoryGroup = "routine" | "meals" | "social" | "academic" | "other";
+export type ScheduleCategoryIcon =
+  | "moon"
+  | "droplets"
+  | "coffee"
+  | "utensils"
+  | "pause"
+  | "users"
+  | "gamepad"
+  | "video"
+  | "book"
+  | "graduation"
+  | "flask"
+  | "dumbbell"
+  | "car"
+  | "house"
+  | "circle";
 
 export type ScheduleCategoryVisual = {
   name: string;
@@ -8,6 +25,8 @@ export type ScheduleCategoryVisual = {
   twAccent: string;
   hex: string;
   hue: CategoryHue;
+  group: ScheduleCategoryGroup;
+  icon: ScheduleCategoryIcon;
   isBuiltIn: boolean;
 };
 
@@ -21,26 +40,26 @@ export type ScheduleCategoryDef = {
 const DEFAULT_CATEGORY_ID_PREFIX = "__default__";
 const CATEGORY_STORAGE_KEY = "schedule-user-categories";
 
-export const DEFAULT_SCHEDULE_CATEGORY = "\u6df1\u5ea6\u79d1\u7814";
-export const UNCATEGORIZED_SCHEDULE_CATEGORY = "\u672a\u5206\u7c7b";
+export const DEFAULT_SCHEDULE_CATEGORY = "科研";
+export const UNCATEGORIZED_SCHEDULE_CATEGORY = "其他";
 
 const names = {
-  deepResearch: "\u6df1\u5ea6\u79d1\u7814",
-  experimentData: "\u5b9e\u9a8c\u6570\u636e",
-  paperWriting: "\u8bba\u6587\u5199\u4f5c",
-  literatureReading: "\u6587\u732e\u9605\u8bfb",
-  courseStudy: "\u8bfe\u7a0b\u5b66\u4e60",
-  meeting: "\u4f1a\u8bae\u6c9f\u901a",
-  taskProgress: "\u4efb\u52a1\u63a8\u8fdb",
-  admin: "\u884c\u653f\u4e8b\u52a1",
-  mealsRest: "\u5403\u996d\u4f11\u606f",
-  health: "\u5065\u5eb7\u8fd0\u52a8",
-  chores: "\u5bb6\u52a1\u6742\u4e8b",
-  social: "\u793e\u4ea4\u5a31\u4e50",
-  commute: "\u901a\u52e4\u5916\u51fa",
-  moodReview: "\u60c5\u7eea\u590d\u76d8",
-  buffer: "\u5f39\u6027\u7f13\u51b2",
-  uncategorized: UNCATEGORIZED_SCHEDULE_CATEGORY,
+  sleep: "睡眠",
+  wash: "洗漱",
+  breakfast: "早餐",
+  lunch: "中餐",
+  dinner: "晚餐",
+  rest: "休息",
+  social: "社交",
+  entertainment: "娱乐",
+  meeting: "会议",
+  literatureReading: "文献阅读",
+  study: "学习",
+  research: "科研",
+  exercise: "运动",
+  commute: "通勤",
+  chores: "家务",
+  other: "其他",
 };
 
 function visual(
@@ -49,6 +68,8 @@ function visual(
   twAccent: string,
   hex: string,
   hue: CategoryHue,
+  group: ScheduleCategoryGroup,
+  icon: ScheduleCategoryIcon,
   isBuiltIn = true,
 ): ScheduleCategoryVisual {
   return {
@@ -59,29 +80,50 @@ function visual(
     twAccent,
     hex,
     hue,
+    group,
+    icon,
     isBuiltIn,
   };
 }
 
+export const SCHEDULE_CATEGORY_GROUP_ORDER: ScheduleCategoryGroup[] = [
+  "routine",
+  "meals",
+  "social",
+  "academic",
+  "other",
+];
+
+export const SCHEDULE_CATEGORY_GROUP_LABELS: Record<ScheduleCategoryGroup, string> = {
+  routine: "生活作息",
+  meals: "饮食",
+  social: "社交娱乐",
+  academic: "学术工作",
+  other: "其他安排",
+};
+
 export const CATEGORY_VISUALS: ScheduleCategoryVisual[] = [
-  visual(names.deepResearch, "bg-blue-50 border-blue-300 text-blue-950", "bg-blue-500", "#3b82f6", "cold"),
-  visual(names.experimentData, "bg-teal-50 border-teal-300 text-teal-950", "bg-teal-500", "#14b8a6", "cold"),
-  visual(names.paperWriting, "bg-indigo-50 border-indigo-300 text-indigo-950", "bg-indigo-500", "#6366f1", "cold"),
-  visual(names.literatureReading, "bg-cyan-50 border-cyan-300 text-cyan-950", "bg-cyan-500", "#06b6d4", "cold"),
-  visual(names.courseStudy, "bg-sky-50 border-sky-300 text-sky-950", "bg-sky-500", "#0ea5e9", "cold"),
-  visual(names.taskProgress, "bg-emerald-50 border-emerald-300 text-emerald-950", "bg-emerald-500", "#10b981", "cold"),
-  visual(names.meeting, "bg-amber-50 border-amber-300 text-amber-950", "bg-amber-500", "#f59e0b", "warm"),
-  visual(names.mealsRest, "bg-rose-50 border-rose-300 text-rose-950", "bg-rose-400", "#fb7185", "warm"),
-  visual(names.health, "bg-orange-50 border-orange-300 text-orange-950", "bg-orange-500", "#f97316", "warm"),
-  visual(names.social, "bg-pink-50 border-pink-300 text-pink-950", "bg-pink-500", "#ec4899", "warm"),
-  visual(names.commute, "bg-yellow-50 border-yellow-300 text-yellow-950", "bg-yellow-500", "#eab308", "warm"),
-  visual(names.moodReview, "bg-purple-50 border-purple-300 text-purple-950", "bg-purple-500", "#a855f7", "warm"),
-  visual(names.admin, "bg-slate-50 border-slate-300 text-slate-950", "bg-slate-400", "#94a3b8", "neutral"),
-  visual(names.chores, "bg-stone-50 border-stone-300 text-stone-950", "bg-stone-400", "#a8a29e", "neutral"),
-  visual(names.buffer, "bg-zinc-50 border-zinc-300 text-zinc-950", "bg-zinc-400", "#a1a1aa", "neutral"),
+  visual(names.sleep, "bg-indigo-50 border-indigo-300 text-indigo-950", "bg-indigo-500", "#6366f1", "cold", "routine", "moon"),
+  visual(names.wash, "bg-sky-50 border-sky-300 text-sky-950", "bg-sky-500", "#0ea5e9", "cold", "routine", "droplets"),
+  visual(names.breakfast, "bg-amber-50 border-amber-300 text-amber-950", "bg-amber-500", "#f59e0b", "warm", "meals", "coffee"),
+  visual(names.lunch, "bg-orange-50 border-orange-300 text-orange-950", "bg-orange-500", "#f97316", "warm", "meals", "utensils"),
+  visual(names.dinner, "bg-rose-50 border-rose-300 text-rose-950", "bg-rose-500", "#f43f5e", "warm", "meals", "utensils"),
+  visual(names.rest, "bg-emerald-50 border-emerald-300 text-emerald-950", "bg-emerald-500", "#10b981", "cold", "routine", "pause"),
+  visual(names.social, "bg-pink-50 border-pink-300 text-pink-950", "bg-pink-500", "#ec4899", "warm", "social", "users"),
+  visual(names.entertainment, "bg-purple-50 border-purple-300 text-purple-950", "bg-purple-500", "#a855f7", "warm", "social", "gamepad"),
+  visual(names.meeting, "bg-blue-50 border-blue-300 text-blue-950", "bg-blue-500", "#3b82f6", "cold", "academic", "video"),
+  visual(names.literatureReading, "bg-cyan-50 border-cyan-300 text-cyan-950", "bg-cyan-500", "#06b6d4", "cold", "academic", "book"),
+  visual(names.study, "bg-violet-50 border-violet-300 text-violet-950", "bg-violet-500", "#8b5cf6", "cold", "academic", "graduation"),
+  visual(names.research, "bg-blue-50 border-blue-400 text-blue-950", "bg-blue-600", "#2563eb", "cold", "academic", "flask"),
+  visual(names.exercise, "bg-lime-50 border-lime-300 text-lime-950", "bg-lime-500", "#84cc16", "cold", "other", "dumbbell"),
+  visual(names.commute, "bg-yellow-50 border-yellow-300 text-yellow-950", "bg-yellow-500", "#eab308", "warm", "other", "car"),
+  visual(names.chores, "bg-stone-50 border-stone-300 text-stone-950", "bg-stone-400", "#a8a29e", "neutral", "other", "house"),
+  visual(names.other, "bg-zinc-50 border-zinc-300 text-zinc-950", "bg-zinc-400", "#a1a1aa", "neutral", "other", "circle"),
 ];
 
 export const CATEGORY_COLORS = CATEGORY_VISUALS.map((item) => item.twClass);
+export const SCHEDULE_CATEGORY_NAMES = CATEGORY_VISUALS.map((item) => item.name);
+export const SCHEDULE_CATEGORY_PROMPT_LIST = SCHEDULE_CATEGORY_NAMES.join("、");
 
 export const DEFAULT_CATEGORY_PALETTE = CATEGORY_VISUALS.map((item) => ({
   name: item.name,
@@ -89,52 +131,92 @@ export const DEFAULT_CATEGORY_PALETTE = CATEGORY_VISUALS.map((item) => ({
 }));
 
 export const CATEGORY_ALIAS_MAP: Record<string, string> = {
-  "\u4e2a\u4eba": names.mealsRest,
-  "\u5de5\u4f5c\u63d0\u5347": names.taskProgress,
-  "\u8fd0\u52a8\u5065\u5eb7": names.health,
-  "\u751f\u6d3b\u8fd0\u52a8": names.health,
-  "\u751f\u6d3b\u4e8b\u52a1": names.mealsRest,
-  "\u5174\u8da3\u7231\u597d": names.social,
-  "\u653e\u677e\u4f11\u95f2": names.mealsRest,
-  "\u4f11\u606f\u6062\u590d": names.mealsRest,
-  "life&other": names.mealsRest,
-  "\u81ea\u6211\u63d0\u5347": names.courseStudy,
-  "\u8ba1\u5212\u590d\u76d8": names.taskProgress,
-  "\u5b66\u4e60\u6210\u957f": names.courseStudy,
-  "\u5a31\u4e50\u4f11\u606f": names.social,
-  "\u5176\u4ed6": names.buffer,
-  "\u6570\u636e\u6574\u7406": names.experimentData,
-  "\u5b9e\u9a8c\u5206\u6790": names.experimentData,
-  "\u884c\u653f\u6742\u52a1": names.admin,
-  "\u5916\u51fa\u901a\u52e4": names.commute,
-  "\u60c5\u7eea\u8bb0\u5f55": names.moodReview,
-  "\u7f13\u51b2\u65f6\u95f4": names.buffer,
-  "娣卞害绉戠爺": names.deepResearch,
-  "瀹為獙鏁版嵁": names.experimentData,
-  "璁烘枃鍐欎綔": names.paperWriting,
+  睡觉: names.sleep,
+  睡觉事件: names.sleep,
+  睡眠事件: names.sleep,
+  洗漱事件: names.wash,
+  早餐事件: names.breakfast,
+  中餐事件: names.lunch,
+  午餐: names.lunch,
+  午餐事件: names.lunch,
+  晚餐事件: names.dinner,
+  休息事件: names.rest,
+  社交事件: names.social,
+  娱乐事件: names.entertainment,
+  会议事件: names.meeting,
+  文献阅读事件: names.literatureReading,
+  学习事件: names.study,
+  科研事件: names.research,
+  运动事件: names.exercise,
+  通勤事件: names.commute,
+  家务事件: names.chores,
+  个人: names.other,
+  工作: names.research,
+  工作提升: names.research,
+  深度科研: names.research,
+  科研深潜: names.research,
+  实验数据: names.research,
+  数据整理: names.research,
+  实验分析: names.research,
+  论文写作: names.research,
+  投稿准备: names.research,
+  任务推进: names.research,
+  计划复盘: names.research,
+  课程学习: names.study,
+  学习成长: names.study,
+  自我提升: names.study,
+  组会沟通: names.meeting,
+  会议沟通: names.meeting,
+  行政事务: names.other,
+  行政杂务: names.other,
+  吃饭休息: names.rest,
+  生活事务: names.chores,
+  生活整理: names.chores,
+  运动健康: names.exercise,
+  健康运动: names.exercise,
+  生活运动: names.exercise,
+  家务杂事: names.chores,
+  社交娱乐: names.social,
+  兴趣爱好: names.entertainment,
+  娱乐休息: names.entertainment,
+  放松休闲: names.rest,
+  休息恢复: names.rest,
+  外出通勤: names.commute,
+  通勤外出: names.commute,
+  情绪记录: names.rest,
+  情绪复盘: names.rest,
+  缓冲时间: names.other,
+  弹性缓冲: names.other,
+  "life&other": names.other,
+  其他: names.other,
+  "娣卞害绉戠爺": names.research,
+  "瀹為獙鏁版嵁": names.research,
+  "璁烘枃鍐欎綔": names.research,
   "鏂囩尞闃呰": names.literatureReading,
-  "璇剧▼瀛︿範": names.courseStudy,
+  "璇剧▼瀛︿範": names.study,
   "浼氳娌熼€?": names.meeting,
-  "浠诲姟鎺ㄨ繘": names.taskProgress,
-  "琛屾斂浜嬪姟": names.admin,
-  "鐢熸椿浜嬪姟": names.mealsRest,
-  "鍋ュ悍杩愬姩": names.health,
+  "浠诲姟鎺ㄨ繘": names.research,
+  "琛屾斂浜嬪姟": names.other,
+  "鐢熸椿浜嬪姟": names.chores,
+  "鍋ュ悍杩愬姩": names.exercise,
   "閫氬嫟澶栧嚭": names.commute,
-  "鎯呯华澶嶇洏": names.moodReview,
-  "浼戞伅鎭㈠": names.mealsRest,
-  "寮规€х紦鍐?": names.buffer,
-  "娴犺濮熼幒銊ㄧ箻": names.taskProgress,
+  "鎯呯华澶嶇洏": names.rest,
+  "浼戞伅鎭㈠": names.rest,
+  "寮规€х紦鍐?": names.other,
+  "娴犺濮熼幒銊ㄧ箻": names.research,
   "閺傚洨灏為梼鍛邦嚢": names.literatureReading,
-  "鐎圭偤鐛欓弫鐗堝祦": names.experimentData,
-  "濞ｅ崬瀹崇粔鎴犵埡": names.deepResearch,
+  "鐎圭偤鐛欓弫鐗堝祦": names.research,
+  "濞ｅ崬瀹崇粔鎴犵埡": names.research,
 };
 
 const fallbackVisual = visual(
-  names.uncategorized,
+  names.other,
   "bg-white border-gray-300 text-gray-900",
   "bg-zinc-400",
   "#a1a1aa",
   "neutral",
+  "other",
+  "circle",
   false,
 );
 
@@ -153,7 +235,8 @@ function normalizeCategoryDefList(value: unknown): ScheduleCategoryDef[] {
   const custom = value
     .map((item, index) => {
       const raw = item as Partial<ScheduleCategoryDef>;
-      const name = typeof raw.name === "string" ? raw.name.trim() : "";
+      const rawName = typeof raw.name === "string" ? raw.name.trim() : "";
+      const name = normalizeScheduleCategory(rawName);
       if (!name) return null;
       const visual = getCategoryVisualByClass(typeof raw.color === "string" ? raw.color : "");
       return {
@@ -206,7 +289,20 @@ export function isCategoryNameTaken(defs: ScheduleCategoryDef[], name: string, e
 }
 
 export function normalizeScheduleCategory(value: string) {
-  return CATEGORY_ALIAS_MAP[value] ?? (value || fallbackVisual.name);
+  const trimmed = value.trim();
+  if (!trimmed) return fallbackVisual.name;
+
+  const withoutEventSuffix = trimmed.endsWith("事件") ? trimmed.slice(0, -2) : trimmed;
+  const builtIn = CATEGORY_VISUALS.find((item) => item.name === trimmed);
+  const builtInWithoutSuffix = CATEGORY_VISUALS.find((item) => item.name === withoutEventSuffix);
+
+  return (
+    CATEGORY_ALIAS_MAP[trimmed] ??
+    CATEGORY_ALIAS_MAP[withoutEventSuffix] ??
+    builtIn?.name ??
+    builtInWithoutSuffix?.name ??
+    trimmed
+  );
 }
 
 export function getCategoryVisualByClass(twClass: string) {

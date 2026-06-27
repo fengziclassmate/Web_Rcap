@@ -12,11 +12,31 @@ describe("schedule categories", () => {
   it("keeps category visuals and color options aligned", () => {
     expect(CATEGORY_COLORS).toHaveLength(CATEGORY_VISUALS.length);
     expect(CATEGORY_COLORS[0]).toBe(CATEGORY_VISUALS[0].color);
+    expect(CATEGORY_VISUALS.map((item) => item.name)).toEqual([
+      "睡眠",
+      "洗漱",
+      "早餐",
+      "中餐",
+      "晚餐",
+      "休息",
+      "社交",
+      "娱乐",
+      "会议",
+      "文献阅读",
+      "学习",
+      "科研",
+      "运动",
+      "通勤",
+      "家务",
+      "其他",
+    ]);
   });
 
   it("normalizes legacy category aliases", () => {
-    expect(normalizeScheduleCategory("life&other")).toBe("\u5403\u996d\u4f11\u606f");
-    expect(normalizeScheduleCategory("浠诲姟鎺ㄨ繘")).toBe("\u4efb\u52a1\u63a8\u8fdb");
+    expect(normalizeScheduleCategory("life&other")).toBe("其他");
+    expect(normalizeScheduleCategory("浠诲姟鎺ㄨ繘")).toBe("科研");
+    expect(normalizeScheduleCategory("会议事件")).toBe("会议");
+    expect(normalizeScheduleCategory("睡觉")).toBe("睡眠");
   });
 
   it("returns visual styles for known categories", () => {

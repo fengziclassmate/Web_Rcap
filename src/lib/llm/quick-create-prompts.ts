@@ -1,5 +1,9 @@
 import { addDays, format } from "date-fns";
-import { DEFAULT_SCHEDULE_CATEGORY } from "@/lib/categories";
+import {
+  DEFAULT_SCHEDULE_CATEGORY,
+  SCHEDULE_CATEGORY_PROMPT_LIST,
+  normalizeScheduleCategory,
+} from "@/lib/categories";
 
 export type QuickCreateResult =
   | {
@@ -48,7 +52,7 @@ export function buildQuickCreatePrompt(input: string, today = new Date()) {
 规则：
 1. 只能输出一个 JSON 对象。
 2. event 的 startHour/endHour 使用 24 小时小数，例如 14.5 表示 14:30。
-3. event 的 category 从这些选一个：深度科研、实验数据、论文写作、文献阅读、课程学习、会议沟通、任务推进、行政事务、吃饭休息、健康运动、家务杂事、社交娱乐、通勤外出、情绪复盘、弹性缓冲。
+3. event 的 category 从这些选一个：${SCHEDULE_CATEGORY_PROMPT_LIST}。
 4. task 如果没有明确截止日期，dueDate 使用当前日期。
 5. annual 不需要日期。
 6. 无法判断时优先返回 task。
@@ -79,7 +83,7 @@ export function parseQuickCreateResponse(raw: string): QuickCreateResult {
       date: parsed.date,
       startHour: parsed.startHour,
       endHour: parsed.endHour,
-      category: parsed.category || DEFAULT_SCHEDULE_CATEGORY,
+      category: normalizeScheduleCategory(parsed.category || DEFAULT_SCHEDULE_CATEGORY),
       notes: parsed.notes || "",
     };
   }

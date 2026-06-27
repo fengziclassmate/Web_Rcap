@@ -9,12 +9,28 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Coffee,
+  Droplets,
+  Dumbbell,
+  FlaskConical,
+  Gamepad2,
+  GraduationCap,
+  House,
+  Moon,
   Palette,
   Pencil,
   Plus,
+  Pause,
   Repeat,
   ShieldCheck,
   Trash2,
+  Utensils,
+  Users,
+  Video,
+  BookOpen,
+  Car,
+  Circle,
+  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { EventTag, ScheduleEvent } from "@/lib/types";
@@ -25,7 +41,9 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -43,6 +61,8 @@ import {
 import {
   CATEGORY_VISUALS,
   DEFAULT_SCHEDULE_CATEGORY,
+  SCHEDULE_CATEGORY_GROUP_LABELS,
+  SCHEDULE_CATEGORY_GROUP_ORDER,
   UNCATEGORIZED_SCHEDULE_CATEGORY,
   createCategoryId,
   getCategoryVisualByClass,
@@ -55,7 +75,11 @@ import {
   normalizeScheduleCategory,
   saveCategoryDefs,
 } from "@/lib/categories";
-import type { ScheduleCategoryDef, ScheduleCategoryVisual } from "@/lib/categories";
+import type {
+  ScheduleCategoryDef,
+  ScheduleCategoryIcon,
+  ScheduleCategoryVisual,
+} from "@/lib/categories";
 import {
   expandScheduleEvents,
   parseExceptionDateList,
@@ -84,11 +108,6 @@ type EventFormState = {
   isCompleted: boolean;
   category: string;
   tag: EventTag;
-};
-
-type CategoryPalette = {
-  name: string;
-  color: string;
 };
 
 type ResizeState = {
@@ -147,52 +166,6 @@ const contextMenuWidth = 208;
 const contextMenuHeight = 360;
 const contextMenuViewportPadding = 12;
 const recurrenceEditScopeStorageKey = "recurrence-edit-scope";
-
-const defaultCategoryPalette: CategoryPalette[] = [
-  { name: "深度科研", color: "bg-sky-50 border-sky-200 text-sky-950" },
-  { name: "实验数据", color: "bg-teal-50 border-teal-200 text-teal-950" },
-  { name: "论文写作", color: "bg-indigo-50 border-indigo-200 text-indigo-950" },
-  { name: "文献阅读", color: "bg-cyan-50 border-cyan-200 text-cyan-950" },
-  { name: "课程学习", color: "bg-violet-50 border-violet-200 text-violet-950" },
-  { name: "会议沟通", color: "bg-amber-50 border-amber-200 text-amber-950" },
-  { name: "任务推进", color: "bg-emerald-50 border-emerald-200 text-emerald-950" },
-  { name: "行政事务", color: "bg-stone-50 border-stone-200 text-stone-900" },
-  { name: "生活事务", color: "bg-rose-50 border-rose-200 text-rose-950" },
-  { name: "健康运动", color: "bg-orange-50 border-orange-200 text-orange-950" },
-  { name: "通勤外出", color: "bg-lime-50 border-lime-200 text-lime-950" },
-  { name: "情绪复盘", color: "bg-fuchsia-50 border-fuchsia-200 text-fuchsia-950" },
-  { name: "休息恢复", color: "bg-slate-100 border-slate-200 text-slate-900" },
-  { name: "弹性缓冲", color: "bg-zinc-50 border-zinc-200 text-zinc-900" },
-];
-
-const selectableColors = CATEGORY_VISUALS.map((item) => item.twClass);
-
-const defaultCategories: Category[] = CATEGORY_VISUALS.map((item, index) => ({
-  id: `__default__${index}`,
-  name: item.name,
-  color: item.twClass,
-}));
-
-const categoryAliasMap: Record<string, string> = {
-  个人: "生活事务",
-  工作提升: "任务推进",
-  运动健康: "健康运动",
-  生活运动: "健康运动",
-  兴趣爱好: "休息恢复",
-  放松休闲: "休息恢复",
-  "life&other": "生活事务",
-  自我提升: "课程学习",
-  计划复盘: "任务推进",
-  学习成长: "课程学习",
-  娱乐休息: "休息恢复",
-  其他: "生活事务",
-  数据整理: "实验数据",
-  实验分析: "实验数据",
-  行政杂务: "行政事务",
-  外出通勤: "通勤外出",
-  情绪记录: "情绪复盘",
-  缓冲时间: "弹性缓冲",
-};
 
 const defaultForm: EventFormState = {
   title: "",
@@ -266,12 +239,48 @@ function getCategoryColor(categories: Category[], categoryName: string) {
   );
 }
 
-function getCategoryAccentColor(categories: Category[], categoryName: string) {
+function getCategoryAccentColor(categoryName: string) {
   return getScheduleCategoryAccentColor(normalizeCategoryName(categoryName));
 }
 
 function normalizeCategoryName(categoryName: string) {
   return normalizeScheduleCategory(categoryName);
+}
+
+const categoryIconMap: Record<ScheduleCategoryIcon, LucideIcon> = {
+  moon: Moon,
+  droplets: Droplets,
+  coffee: Coffee,
+  utensils: Utensils,
+  pause: Pause,
+  users: Users,
+  gamepad: Gamepad2,
+  video: Video,
+  book: BookOpen,
+  graduation: GraduationCap,
+  flask: FlaskConical,
+  dumbbell: Dumbbell,
+  car: Car,
+  house: House,
+  circle: Circle,
+};
+
+function groupCategoriesByScheduleGroup<T extends { name: string }>(items: T[]) {
+  return SCHEDULE_CATEGORY_GROUP_ORDER.map((group) => ({
+    group,
+    categories: items.filter((item) => getCategoryVisualByName(item.name).group === group),
+  })).filter((item) => item.categories.length > 0);
+}
+
+function CategoryIcon({
+  visual,
+  className = "",
+}: {
+  visual: ScheduleCategoryVisual;
+  className?: string;
+}) {
+  const Icon = categoryIconMap[visual.icon];
+  return <Icon className={className} aria-hidden />;
 }
 
 function ColorSwatch({
@@ -302,7 +311,12 @@ function CategorySelectLabel({ category }: { category: Category }) {
   const visual = getCategoryVisualByName(category.name);
   return (
     <span className="flex items-center gap-2">
-      <span className="h-3 w-3 rounded-full border border-black/10" style={{ backgroundColor: visual.hex }} />
+      <span
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-black/10 bg-white"
+        style={{ color: visual.hex }}
+      >
+        <CategoryIcon visual={visual} className="h-3.5 w-3.5" />
+      </span>
       <span>{category.name}</span>
     </span>
   );
@@ -376,6 +390,21 @@ export function WeeklyTimeGrid({
         .sort((a, b) => a.sortOrder - b.sortOrder)
         .map((item) => ({ id: item.id, name: item.name, color: item.color })),
     [categoryDefs],
+  );
+  const groupedCategories = useMemo(() => groupCategoriesByScheduleGroup(categories), [categories]);
+  const groupedCategoryDefs = useMemo(
+    () =>
+      groupCategoriesByScheduleGroup(
+        categoryDefs.slice().sort((a, b) => a.sortOrder - b.sortOrder),
+      ),
+    [categoryDefs],
+  );
+  const defaultCreateCategory = useMemo(
+    () =>
+      categories.some((category) => category.name === DEFAULT_SCHEDULE_CATEGORY)
+        ? DEFAULT_SCHEDULE_CATEGORY
+        : categories[0]?.name ?? defaultForm.category,
+    [categories],
   );
   const [newCategory, setNewCategory] = useState<{ name: string; color: string }>({
     name: "",
@@ -525,7 +554,7 @@ export function WeeklyTimeGrid({
       ...defaultForm,
       startHour: cell.startHour,
       endHour: Math.min(24, cell.startHour + 1),
-      category: categories[0]?.name ?? defaultForm.category,
+      category: defaultCreateCategory,
     });
     setCreateRecurrence({
       enabled: false,
@@ -724,7 +753,7 @@ export function WeeklyTimeGrid({
   }
 
   function handleAddCategory() {
-    const name = newCategory.name.trim();
+    const name = normalizeCategoryName(newCategory.name.trim());
     if (!name) {
       toast.error("请输入分类名称");
       return;
@@ -766,7 +795,7 @@ export function WeeklyTimeGrid({
   }
 
   function handleSaveEditCategory(categoryId: string) {
-    const name = editingCategoryName.trim();
+    const name = normalizeCategoryName(editingCategoryName.trim());
     if (!name) {
       toast.error("分类名称不能为空");
       return;
@@ -985,6 +1014,7 @@ export function WeeklyTimeGrid({
                           const showDetails = durationHour >= 2 && !denseCard;
                           const timeLabel = formatTimelineSegmentTimeRange(event);
                           const fullTimeLabel = formatEventTimeRange(sourceEvent);
+                          const categoryVisual = getCategoryVisualByName(event.category);
                           const segmentLabel =
                             event.segmentRole === "starts"
                               ? "跨日"
@@ -1002,7 +1032,7 @@ export function WeeklyTimeGrid({
                               onContextMenu={(mouseEvent) => handleContextMenu(mouseEvent, event.id)}
                             >
                               <div
-                                className={`pointer-events-none absolute inset-y-1 left-1 w-1 rounded-full ${getCategoryAccentColor(categories, event.category)} ${event.isCompleted ? "opacity-80" : "opacity-95"}`}
+                                className={`pointer-events-none absolute inset-y-1 left-1 w-1 rounded-full ${getCategoryAccentColor(event.category)} ${event.isCompleted ? "opacity-80" : "opacity-95"}`}
                               />
                               {event.isCompleted ? (
                                 <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.22)_0px,rgba(255,255,255,0.22)_1px,transparent_1px,transparent_8px)]" />
@@ -1020,6 +1050,12 @@ export function WeeklyTimeGrid({
                                         title={fullTimeLabel}
                                       >
                                         {timeLabel}
+                                      </span>
+                                      <span
+                                        className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded bg-white/65"
+                                        title={categoryVisual.name}
+                                      >
+                                        <CategoryIcon visual={categoryVisual} className="h-3 w-3" />
                                       </span>
                                       {segmentLabel ? (
                                         <span className="mt-0.5 shrink-0 rounded-full border border-white/60 bg-white/55 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-gray-600">
@@ -1058,6 +1094,12 @@ export function WeeklyTimeGrid({
                                           title={fullTimeLabel}
                                         >
                                           {timeLabel}
+                                        </span>
+                                        <span
+                                          className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-white/65"
+                                          title={categoryVisual.name}
+                                        >
+                                          <CategoryIcon visual={categoryVisual} className="h-3 w-3" />
                                         </span>
                                         {segmentLabel ? (
                                           <span className="shrink-0 rounded-full border border-white/60 bg-white/55 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-gray-600">
@@ -1236,11 +1278,18 @@ export function WeeklyTimeGrid({
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.name}>
-                            <CategorySelectLabel category={category} />
-                          </SelectItem>
+                      <SelectContent className="max-h-80">
+                        {groupedCategories.map(({ group, categories: groupItems }) => (
+                          <SelectGroup key={group}>
+                            <SelectLabel className="px-2 py-1.5 text-[11px] font-semibold text-stone-500">
+                              {SCHEDULE_CATEGORY_GROUP_LABELS[group]}
+                            </SelectLabel>
+                            {groupItems.map((category) => (
+                              <SelectItem key={category.id} value={category.name}>
+                                <CategorySelectLabel category={category} />
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1425,11 +1474,18 @@ export function WeeklyTimeGrid({
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.name}>
-                            <CategorySelectLabel category={category} />
-                          </SelectItem>
+                      <SelectContent className="max-h-80">
+                        {groupedCategories.map(({ group, categories: groupItems }) => (
+                          <SelectGroup key={group}>
+                            <SelectLabel className="px-2 py-1.5 text-[11px] font-semibold text-stone-500">
+                              {SCHEDULE_CATEGORY_GROUP_LABELS[group]}
+                            </SelectLabel>
+                            {groupItems.map((category) => (
+                              <SelectItem key={category.id} value={category.name}>
+                                <CategorySelectLabel category={category} />
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1617,11 +1673,13 @@ export function WeeklyTimeGrid({
                     </span>
                   </div>
 
-                  <div className="max-h-[46vh] space-y-2 overflow-y-auto px-5 pb-5 pr-3 md:max-h-[58vh]">
-                    {categoryDefs
-                      .slice()
-                      .sort((a, b) => a.sortOrder - b.sortOrder)
-                      .map((category) => {
+                  <div className="max-h-[46vh] space-y-4 overflow-y-auto px-5 pb-5 pr-3 md:max-h-[58vh]">
+                    {groupedCategoryDefs.map(({ group, categories: groupItems }) => (
+                      <div key={group} className="space-y-2">
+                        <p className="px-1 text-[11px] font-semibold text-stone-500">
+                          {SCHEDULE_CATEGORY_GROUP_LABELS[group]}
+                        </p>
+                        {groupItems.map((category) => {
                         const visual = getCategoryVisualByClass(category.color);
                         const builtIn = isBuiltInCategory(category);
                         const eventCount = getCategoryUsageCount(category.name);
@@ -1712,6 +1770,8 @@ export function WeeklyTimeGrid({
                           </div>
                         );
                       })}
+                      </div>
+                    ))}
                   </div>
                 </section>
 

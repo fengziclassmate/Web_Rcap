@@ -15,6 +15,7 @@ import { WeeklyTimeGrid, ViewMode, TimeGranularity } from "@/components/schedule
 import { ScheduleTimeAnalytics } from "@/components/schedule/schedule-time-analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DEFAULT_SCHEDULE_CATEGORY } from "@/lib/categories";
 import { createId } from "@/lib/id";
 import {
   type RecurrenceConfig,
@@ -1897,7 +1898,7 @@ export function WorkbenchApp() {
         notes: input.notes?.trim() ?? "",
         requirements: [],
         isCompleted: false,
-        category: "浠诲姟鎺ㄨ繘",
+        category: DEFAULT_SCHEDULE_CATEGORY,
         tag: null,
       },
     ]);
@@ -2586,5 +2587,4 @@ export function WorkbenchApp() {
     </main>
   );
 }
-
 

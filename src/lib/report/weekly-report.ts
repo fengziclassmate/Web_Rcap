@@ -1,6 +1,7 @@
 import { addDays, format, isWithinInterval, parseISO } from "date-fns";
 import type { Achievement } from "@/components/monitoring/achievements-panel";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
+import { normalizeScheduleCategory } from "@/lib/categories";
 
 export type WeeklyReportData = {
   rangeText: string;
@@ -42,7 +43,8 @@ export function buildWeeklyReportData(
   const categoryMap = new Map<string, number>();
   for (const event of weekEvents) {
     const hours = Math.max(0, event.endHour - event.startHour);
-    categoryMap.set(event.category, (categoryMap.get(event.category) ?? 0) + hours);
+    const category = normalizeScheduleCategory(event.category);
+    categoryMap.set(category, (categoryMap.get(category) ?? 0) + hours);
   }
 
   return {
@@ -77,7 +79,7 @@ export function buildWeeklyReportPrompt(data: WeeklyReportData) {
 周范围：${data.rangeText}
 
 本周行程：
-${data.events.map((event, index) => `${index + 1}. ${event.date} ${event.startHour}:00-${event.endHour}:00 ${event.title} [${event.category}] ${event.isCompleted ? "已完成" : "未完成"}`).join("\n") || "无"}
+${data.events.map((event, index) => `${index + 1}. ${event.date} ${event.startHour}:00-${event.endHour}:00 ${event.title} [${normalizeScheduleCategory(event.category)}] ${event.isCompleted ? "已完成" : "未完成"}`).join("\n") || "无"}
 
 已完成行程：
 ${data.completedEvents.map((event, index) => `${index + 1}. ${event.title}`).join("\n") || "无"}

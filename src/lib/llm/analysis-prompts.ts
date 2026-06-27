@@ -2,6 +2,7 @@ import { addDays, format, isWithinInterval, parseISO } from "date-fns";
 import type { Achievement } from "@/components/monitoring/achievements-panel";
 import type { LogPostRecord } from "@/lib/logs";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
+import { normalizeScheduleCategory } from "@/lib/categories";
 
 export type EfficiencyAnalysisStats = {
   rangeText: string;
@@ -38,9 +39,10 @@ export function buildEfficiencyStats(
 
   for (const event of rangeEvents) {
     const hours = Math.max(0, event.endHour - event.startHour);
-    categoryMap.set(event.category, (categoryMap.get(event.category) ?? 0) + hours);
+    const category = normalizeScheduleCategory(event.category);
+    categoryMap.set(category, (categoryMap.get(category) ?? 0) + hours);
     dailyEventCount.set(event.date, (dailyEventCount.get(event.date) ?? 0) + 1);
-    if (/科研|论文|文献|实验|写作|投稿/.test(event.category + event.title)) {
+    if (/科研|文献阅读|会议|学习|论文|文献|实验|写作|投稿/.test(category + event.title)) {
       dailyResearchMap.set(event.date, (dailyResearchMap.get(event.date) ?? 0) + hours);
     }
   }
