@@ -1275,10 +1275,15 @@ export function WeeklyTimeGrid({
                         setCreateForm((prev) => ({ ...prev, category: value }));
                       }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full justify-between rounded-md border-gray-300 sm:max-w-xs">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="max-h-80">
+                      <SelectContent
+                        align="start"
+                        alignItemWithTrigger={false}
+                        sideOffset={6}
+                        className="max-h-72 min-w-64"
+                      >
                         {groupedCategories.map(({ group, categories: groupItems }) => (
                           <SelectGroup key={group}>
                             <SelectLabel className="px-2 py-1.5 text-[11px] font-semibold text-stone-500">
@@ -1471,10 +1476,15 @@ export function WeeklyTimeGrid({
                         setEditForm((prev) => ({ ...prev, category: value }));
                       }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full justify-between rounded-md border-gray-300 sm:max-w-xs">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="max-h-80">
+                      <SelectContent
+                        align="start"
+                        alignItemWithTrigger={false}
+                        sideOffset={6}
+                        className="max-h-72 min-w-64"
+                      >
                         {groupedCategories.map(({ group, categories: groupItems }) => (
                           <SelectGroup key={group}>
                             <SelectLabel className="px-2 py-1.5 text-[11px] font-semibold text-stone-500">

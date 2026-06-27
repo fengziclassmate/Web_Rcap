@@ -49,12 +49,26 @@ export type AnnualTask = {
   done: boolean;
 };
 
+export type DailyCheckinSlot = {
+  id: string;
+  label: string;
+  time: string;
+};
+
+export type DailyCheckinCompletion = {
+  date: string;
+  slotId: string;
+  completedAt: string;
+};
+
 export type ProjectCheckin = {
   id: string;
   name: string;
   description: string;
   startDate: string;
   checkins: { date: string; note: string }[];
+  dailyCheckins: DailyCheckinSlot[];
+  dailyCompletions: DailyCheckinCompletion[];
 };
 
 export type FootprintItem = {
@@ -67,6 +81,7 @@ export type DashboardUiPreferences = {
   longTaskSectionOpen: boolean;
   completedSectionOpen: boolean;
   projectSectionOpen: boolean;
+  achievementSectionOpen: boolean;
   footprintSectionOpen: boolean;
   expandedTasks: string[];
   expandedCompletedTasks: string[];

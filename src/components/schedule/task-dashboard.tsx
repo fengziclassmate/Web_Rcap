@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { startOfWeek } from "date-fns";
 import {
   CalendarRange,
   ChevronDown,
@@ -16,6 +15,8 @@ import {
   Footprints,
   KanbanSquare,
   GripVertical,
+  Pencil,
+  Trophy,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,8 +45,7 @@ import { toast } from "sonner";
 import { TaskDecompositionDialog } from "@/components/llm/task-decomposition-dialog";
 import { ContextBadge } from "@/components/llm/context-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { PriorityBubbleChart } from "@/components/schedule/priority-bubble-chart";
-import { WeeklyTaskTrend } from "@/components/schedule/weekly-task-trend";
+import type { Achievement } from "@/components/monitoring/achievements-panel";
 
 type TaskDashboardProps = {
   tasks: LongTask[];
@@ -64,10 +64,14 @@ type TaskDashboardProps = {
   onDeleteProjectCheckin: (projectId: string) => void;
   onUpdateProjectCheckin: (
     projectId: string,
-    patch: Partial<Pick<ProjectCheckin, "name" | "description" | "startDate">>,
+    patch: Partial<Omit<ProjectCheckin, "id">>,
   ) => void;
   onUpdateProjectCheckinEntry: (projectId: string, date: string, note: string) => void;
   onDeleteProjectCheckinEntry: (projectId: string, date: string) => void;
+  achievements: Achievement[];
+  onAddAchievement: (value: Omit<Achievement, "id">) => void;
+  onUpdateAchievement: (id: string, patch: Partial<Omit<Achievement, "id">>) => void;
+  onDeleteAchievement: (id: string) => void;
   footprints: FootprintItem[];
   onAddFootprint: (name: string) => void;
   onResetFootprint: (itemId: string) => void;
@@ -78,7 +82,6 @@ type TaskDashboardProps = {
   ) => void;
   showFootprintsSection?: boolean;
   showProjectSection?: boolean;
-  currentWeekStart?: Date;
   confirmDangerousActions: boolean;
   uiPreferences: DashboardUiPreferences;
   onUiPreferencesChange: (value: DashboardUiPreferences) => void;
@@ -99,6 +102,17 @@ type TaskDraft = {
   newSubtaskName: string;
 };
 
+type DailyCheckinDraft = {
+  label: string;
+  time: string;
+};
+
+type AchievementForm = {
+  date: string;
+  title: string;
+  note: string;
+};
+
 function getTodayISODate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -108,6 +122,10 @@ function daysBetweenInclusive(startIso: string, endIso: string) {
   const end = new Date(`${endIso}T00:00:00`);
   const ms = Math.max(0, end.getTime() - start.getTime());
   return Math.floor(ms / (24 * 60 * 60 * 1000)) + 1;
+}
+
+function isValidTime(value: string) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
 export function TaskDashboard({
@@ -128,6 +146,10 @@ export function TaskDashboard({
   onUpdateProjectCheckin,
   onUpdateProjectCheckinEntry,
   onDeleteProjectCheckinEntry,
+  achievements,
+  onAddAchievement,
+  onUpdateAchievement,
+  onDeleteAchievement,
   footprints,
   onAddFootprint,
   onResetFootprint,
@@ -135,7 +157,6 @@ export function TaskDashboard({
   onUpdateFootprint,
   showFootprintsSection = true,
   showProjectSection = true,
-  currentWeekStart,
   confirmDangerousActions,
   uiPreferences,
   onUiPreferencesChange,
@@ -155,16 +176,24 @@ export function TaskDashboard({
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDesc, setNewProjectDesc] = useState("");
   const [projectNoteDraft, setProjectNoteDraft] = useState<Record<string, string>>({});
+  const [dailyCheckinDrafts, setDailyCheckinDrafts] = useState<Record<string, DailyCheckinDraft>>({});
   const [newFootprintName, setNewFootprintName] = useState("");
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
   const [showAddAnnualDialog, setShowAddAnnualDialog] = useState(false);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
+  const [showAchievementDialog, setShowAchievementDialog] = useState(false);
   const [showAddFootprintDialog, setShowAddFootprintDialog] = useState(false);
   const [historyProjectId, setHistoryProjectId] = useState<string | null>(null);
   const [checkinDrafts, setCheckinDrafts] = useState<Record<string, string>>({});
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingProjectName, setEditingProjectName] = useState("");
   const [editingProjectDesc, setEditingProjectDesc] = useState("");
+  const [editingAchievementId, setEditingAchievementId] = useState<string | null>(null);
+  const [achievementForm, setAchievementForm] = useState<AchievementForm>({
+    date: getTodayISODate(),
+    title: "",
+    note: "",
+  });
   const [editingFootprintId, setEditingFootprintId] = useState<string | null>(null);
   const [editingFootprintName, setEditingFootprintName] = useState("");
   const [editingFootprintDate, setEditingFootprintDate] = useState(getTodayISODate);
@@ -176,6 +205,9 @@ export function TaskDashboard({
     uiPreferences.completedSectionOpen ?? true,
   );
   const [projectSectionOpen, setProjectSectionOpen] = useState(uiPreferences.projectSectionOpen);
+  const [achievementSectionOpen, setAchievementSectionOpen] = useState(
+    uiPreferences.achievementSectionOpen ?? true,
+  );
   const [footprintSectionOpen, setFootprintSectionOpen] = useState(uiPreferences.footprintSectionOpen);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
     () => new Set(uiPreferences.expandedProjects),
@@ -211,6 +243,24 @@ export function TaskDashboard({
     () => footprints.find((item) => item.id === editingFootprintId) ?? null,
     [footprints, editingFootprintId],
   );
+  const editingAchievement = useMemo(
+    () => achievements.find((item) => item.id === editingAchievementId) ?? null,
+    [achievements, editingAchievementId],
+  );
+  const groupedAchievements = useMemo(() => {
+    const map = new Map<string, Achievement[]>();
+    for (const item of achievements) {
+      const items = map.get(item.date) ?? [];
+      items.push(item);
+      map.set(item.date, items);
+    }
+    return [...map.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, items]) => [
+        date,
+        [...items].sort((a, b) => a.title.localeCompare(b.title)),
+      ] as const);
+  }, [achievements]);
 
   function patchUiPreferences(patch: Partial<DashboardUiPreferences>) {
     onUiPreferencesChange({ ...uiPreferences, ...patch });
@@ -360,6 +410,74 @@ export function TaskDashboard({
     setProjectNoteDraft((prev) => ({ ...prev, [projectId]: "" }));
   }
 
+  function getDailyCheckinDraft(projectId: string): DailyCheckinDraft {
+    return dailyCheckinDrafts[projectId] ?? { label: "", time: "" };
+  }
+
+  function patchDailyCheckinDraft(projectId: string, patch: Partial<DailyCheckinDraft>) {
+    setDailyCheckinDrafts((prev) => ({
+      ...prev,
+      [projectId]: { ...(prev[projectId] ?? { label: "", time: "" }), ...patch },
+    }));
+  }
+
+  function handleAddDailyCheckin(project: ProjectCheckin) {
+    const draft = getDailyCheckinDraft(project.id);
+    const label = draft.label.trim();
+    const time = draft.time.trim();
+    if (!label || !time) return;
+    if (!isValidTime(time)) {
+      toast.error("请输入有效时间，例如 07:50");
+      return;
+    }
+
+    const nextDailyCheckins = [
+      ...(project.dailyCheckins ?? []),
+      {
+        id: `daily-${Date.now()}`,
+        label,
+        time,
+      },
+    ].sort((a, b) => a.time.localeCompare(b.time));
+
+    onUpdateProjectCheckin(project.id, { dailyCheckins: nextDailyCheckins });
+    setDailyCheckinDrafts((prev) => ({ ...prev, [project.id]: { label: "", time: "" } }));
+  }
+
+  function handleToggleDailyCheckin(project: ProjectCheckin, slotId: string, checked: boolean) {
+    const today = getTodayISODate();
+    const completions = project.dailyCompletions ?? [];
+    const alreadyDone = completions.some(
+      (completion) => completion.date === today && completion.slotId === slotId,
+    );
+
+    const nextDailyCompletions = checked
+      ? alreadyDone
+        ? completions
+        : [
+            ...completions,
+            {
+              date: today,
+              slotId,
+              completedAt: new Date().toISOString(),
+            },
+          ]
+      : completions.filter(
+          (completion) => !(completion.date === today && completion.slotId === slotId),
+        );
+
+    onUpdateProjectCheckin(project.id, { dailyCompletions: nextDailyCompletions });
+  }
+
+  function handleDeleteDailyCheckin(project: ProjectCheckin, slotId: string) {
+    onUpdateProjectCheckin(project.id, {
+      dailyCheckins: (project.dailyCheckins ?? []).filter((slot) => slot.id !== slotId),
+      dailyCompletions: (project.dailyCompletions ?? []).filter(
+        (completion) => completion.slotId !== slotId,
+      ),
+    });
+  }
+
   function handleDeleteProject(projectId: string) {
     onDeleteProjectCheckin(projectId);
   }
@@ -398,6 +516,50 @@ export function TaskDashboard({
       description: editingProjectDesc.trim(),
     });
     setEditingProjectId(null);
+  }
+
+  function openCreateAchievement() {
+    setEditingAchievementId(null);
+    setAchievementForm({
+      date: getTodayISODate(),
+      title: "",
+      note: "",
+    });
+    setShowAchievementDialog(true);
+  }
+
+  function openEditAchievement(item: Achievement) {
+    setEditingAchievementId(item.id);
+    setAchievementForm({
+      date: item.date,
+      title: item.title,
+      note: item.note ?? "",
+    });
+    setShowAchievementDialog(true);
+  }
+
+  function handleSaveAchievement() {
+    const date = achievementForm.date.trim();
+    const title = achievementForm.title.trim();
+    const note = achievementForm.note.trim();
+    if (!date || !title) return;
+
+    if (editingAchievementId) {
+      onUpdateAchievement(editingAchievementId, {
+        date,
+        title,
+        note: note.length > 0 ? note : undefined,
+      });
+    } else {
+      onAddAchievement({
+        date,
+        title,
+        note: note.length > 0 ? note : undefined,
+      });
+    }
+
+    setShowAchievementDialog(false);
+    setEditingAchievementId(null);
   }
 
   function handleAddFootprint() {
@@ -499,11 +661,6 @@ export function TaskDashboard({
               尚未添加年度任务。
             </p>
           )}
-        </div>
-
-        <div className="mb-6 grid gap-3 xl:grid-cols-2">
-          <WeeklyTaskTrend tasks={tasks} currentWeekStart={currentWeekStart ?? startOfWeek(new Date(), { weekStartsOn: 1 })} />
-          <PriorityBubbleChart tasks={tasks} />
         </div>
 
         <Collapsible
@@ -817,6 +974,18 @@ export function TaskDashboard({
             const recentCheckins = [...project.checkins]
               .sort((a, b) => b.date.localeCompare(a.date))
               .slice(0, 5);
+            const dailySlots = [...(project.dailyCheckins ?? [])].sort((a, b) =>
+              a.time.localeCompare(b.time),
+            );
+            const todayCompletions = new Set(
+              (project.dailyCompletions ?? [])
+                .filter((completion) => completion.date === today)
+                .map((completion) => completion.slotId),
+            );
+            const completedDailyCount = dailySlots.filter((slot) =>
+              todayCompletions.has(slot.id),
+            ).length;
+            const dailyDraft = getDailyCheckinDraft(project.id);
             return (
               <div key={project.id} className="rounded-lg border border-gray-200 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -877,6 +1046,91 @@ export function TaskDashboard({
                         打卡
                       </Button>
                     </div>
+
+                    <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                          日常时段打卡
+                        </p>
+                        <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-emerald-700">
+                          今日 {completedDailyCount}/{dailySlots.length}
+                        </span>
+                      </div>
+
+                      {dailySlots.length > 0 ? (
+                        <div className="mt-3 space-y-2">
+                          {dailySlots.map((slot) => {
+                            const checked = todayCompletions.has(slot.id);
+                            return (
+                              <div
+                                key={slot.id}
+                                className="flex items-center gap-2 rounded-lg border border-white/80 bg-white/70 px-2 py-2"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(value) =>
+                                    handleToggleDailyCheckin(project, slot.id, value === true)
+                                  }
+                                  aria-label={`${slot.time} ${slot.label} 打卡状态`}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-medium text-gray-900">
+                                    {slot.label}
+                                  </p>
+                                  <p className="text-xs tabular-nums text-gray-500">{slot.time}</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 shrink-0 rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600"
+                                  onClick={() =>
+                                    withOptionalConfirm("确认删除这个日常打卡时间点吗？", () =>
+                                      handleDeleteDailyCheckin(project, slot.id),
+                                    )
+                                  }
+                                  aria-label={`删除 ${slot.time} ${slot.label}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="mt-3 rounded-lg border border-dashed border-emerald-200 bg-white/60 px-3 py-2 text-xs text-emerald-700">
+                          还没有日常时段。可以添加 07:50 喝水、08:40 站立这类提醒点。
+                        </p>
+                      )}
+
+                      <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_104px_auto]">
+                        <Input
+                          value={dailyDraft.label}
+                          onChange={(event) =>
+                            patchDailyCheckinDraft(project.id, { label: event.target.value })
+                          }
+                          placeholder="喝水 / 站立"
+                          aria-label={`${project.name} 新日常打卡名称`}
+                        />
+                        <Input
+                          type="time"
+                          value={dailyDraft.time}
+                          onChange={(event) =>
+                            patchDailyCheckinDraft(project.id, { time: event.target.value })
+                          }
+                          aria-label={`${project.name} 新日常打卡时间`}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => handleAddDailyCheckin(project)}
+                          disabled={!dailyDraft.label.trim() || !dailyDraft.time.trim()}
+                        >
+                          <Plus className="mr-1 h-4 w-4" />
+                          加时段
+                        </Button>
+                      </div>
+                    </div>
                     <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2">
                       <p className="mb-1 text-xs font-medium text-gray-600">最近打卡记录</p>
                       {recentCheckins.length === 0 ? (
@@ -916,6 +1170,96 @@ export function TaskDashboard({
       </section>
         </>
       ) : null}
+
+      <Separator />
+
+      <section className="space-y-4 p-6">
+        <Collapsible
+          open={achievementSectionOpen}
+          onOpenChange={(open) => {
+            setAchievementSectionOpen(open);
+            patchUiPreferences({ achievementSectionOpen: open });
+          }}
+        >
+          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
+            <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
+              <Trophy className="h-4 w-4 text-primary" />
+              成就记录栏
+            </h3>
+            <ChevronDown
+              className={`h-4 w-4 text-gray-500 transition-transform ${
+                achievementSectionOpen ? "" : "-rotate-90"
+              }`}
+            />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3 space-y-3">
+            <div className="flex justify-end">
+              <Button type="button" size="sm" onClick={openCreateAchievement}>
+                <Plus className="mr-1 h-4 w-4" />
+                添加
+              </Button>
+            </div>
+
+            {groupedAchievements.length === 0 ? (
+              <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-500">
+                暂无成就记录。可以把今天完成的重要进展记下来。
+              </p>
+            ) : (
+              <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
+                {groupedAchievements.map(([date, items]) => (
+                  <div key={date} className="rounded-lg border border-gray-200 bg-white/70">
+                    <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700">
+                      {date}
+                    </div>
+                    <ul className="divide-y divide-gray-100">
+                      {items.map((item) => (
+                        <li key={item.id} className="flex items-start justify-between gap-2 px-3 py-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words text-sm font-medium text-gray-900">
+                              {item.title}
+                            </p>
+                            {item.note ? (
+                              <p className="mt-1 whitespace-pre-wrap break-words text-xs text-gray-600">
+                                {item.note}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 rounded-md hover:bg-gray-100"
+                              onClick={() => openEditAchievement(item)}
+                              aria-label={`编辑成就 ${item.title}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 rounded-md hover:bg-red-50 hover:text-red-600"
+                              onClick={() =>
+                                withOptionalConfirm("确认删除这条成就记录吗？", () =>
+                                  onDeleteAchievement(item.id),
+                                )
+                              }
+                              aria-label={`删除成就 ${item.title}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      </section>
 
       {showFootprintsSection ? (
         <>
@@ -1083,6 +1427,61 @@ export function TaskDashboard({
             />
             <Button type="button" className="w-full" onClick={handleAddProject}>
               添加项目
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showAchievementDialog}
+        onOpenChange={(open) => {
+          setShowAchievementDialog(open);
+          if (!open) setEditingAchievementId(null);
+        }}
+      >
+        <DialogContent className="rounded-sm border-gray-200">
+          <DialogHeader>
+            <DialogTitle className="text-sm">
+              {editingAchievement ? "编辑成就" : "新增成就"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="task-dashboard-achievement-date">日期</Label>
+              <Input
+                id="task-dashboard-achievement-date"
+                type="date"
+                value={achievementForm.date}
+                onChange={(event) =>
+                  setAchievementForm((prev) => ({ ...prev, date: event.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="task-dashboard-achievement-title">成就内容</Label>
+              <Input
+                id="task-dashboard-achievement-title"
+                value={achievementForm.title}
+                onChange={(event) =>
+                  setAchievementForm((prev) => ({ ...prev, title: event.target.value }))
+                }
+                placeholder="输入成就"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="task-dashboard-achievement-note">备注（可选）</Label>
+              <Textarea
+                id="task-dashboard-achievement-note"
+                value={achievementForm.note}
+                onChange={(event) =>
+                  setAchievementForm((prev) => ({ ...prev, note: event.target.value }))
+                }
+                placeholder="补充说明、感受、证据链接等"
+                className="min-h-24"
+              />
+            </div>
+            <Button type="button" className="w-full" onClick={handleSaveAchievement}>
+              保存
             </Button>
           </div>
         </DialogContent>

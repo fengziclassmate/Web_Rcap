@@ -115,9 +115,8 @@ import { CalendarDays, ListTodo } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { todayISO } from "@/lib/date-utils";
 import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
-import { AchievementsPanel, type Achievement } from "@/components/monitoring/achievements-panel";
+import type { Achievement } from "@/components/monitoring/achievements-panel";
 import { FootprintsPanel } from "@/components/monitoring/footprints-panel";
-import { ProjectCheckinsPanel } from "@/components/monitoring/project-checkins-panel";
 import {
   type ResearchProject,
   type PlanItem,
@@ -2100,6 +2099,8 @@ export function WorkbenchApp() {
         description: description.trim(),
         startDate: new Date().toISOString().slice(0, 10),
         checkins: [],
+        dailyCheckins: [],
+        dailyCompletions: [],
       },
     ]);
   }
@@ -2126,7 +2127,7 @@ export function WorkbenchApp() {
 
   function handleUpdateProjectCheckin(
     projectId: string,
-    patch: Partial<Pick<ProjectCheckin, "name" | "description" | "startDate">>,
+    patch: Partial<Omit<ProjectCheckin, "id">>,
   ) {
     setProjectCheckins((prev) =>
       prev.map((project) => (project.id === projectId ? { ...project, ...patch } : project)),
@@ -2410,28 +2411,23 @@ export function WorkbenchApp() {
                   onUpdateProjectCheckin={handleUpdateProjectCheckin}
                   onUpdateProjectCheckinEntry={handleUpdateProjectCheckinEntry}
                   onDeleteProjectCheckinEntry={handleDeleteProjectCheckinEntry}
+                  achievements={achievements}
+                  onAddAchievement={handleAddAchievement}
+                  onUpdateAchievement={handleUpdateAchievement}
+                  onDeleteAchievement={handleDeleteAchievement}
                   footprints={footprints}
                   onAddFootprint={handleAddFootprint}
                   onResetFootprint={handleResetFootprint}
                   onDeleteFootprint={handleDeleteFootprint}
                   onUpdateFootprint={handleUpdateFootprint}
-                  showProjectSection={false}
                   showFootprintsSection={false}
                   confirmDangerousActions={confirmDangerousActions}
                   uiPreferences={dashboardUiPreferences}
                   onUiPreferencesChange={setDashboardUiPreferences}
-                  currentWeekStart={currentWeekStart}
                 />
                 <ScheduleTimeAnalytics events={events} currentWeekStart={currentWeekStart} viewMode={viewMode} />
               </section>
             </div>
-          ) : activeModule === "achievements" ? (
-            <AchievementsPanel
-              achievements={achievements}
-              onAdd={handleAddAchievement}
-              onUpdate={handleUpdateAchievement}
-              onDelete={handleDeleteAchievement}
-            />
           ) : activeModule === "footprints" ? (
             <FootprintsPanel
               footprints={footprints}
@@ -2439,17 +2435,6 @@ export function WorkbenchApp() {
               onReset={handleResetFootprint}
               onUpdate={handleUpdateFootprint}
               onDelete={handleDeleteFootprint}
-              confirmDangerousActions={confirmDangerousActions}
-            />
-          ) : activeModule === "project-checkins" ? (
-            <ProjectCheckinsPanel
-              projectCheckins={projectCheckins}
-              onAddProjectCheckin={handleAddProjectCheckin}
-              onCheckinProject={handleCheckinProject}
-              onDeleteProjectCheckin={handleDeleteProjectCheckin}
-              onUpdateProjectCheckin={handleUpdateProjectCheckin}
-              onUpdateProjectCheckinEntry={handleUpdateProjectCheckinEntry}
-              onDeleteProjectCheckinEntry={handleDeleteProjectCheckinEntry}
               confirmDangerousActions={confirmDangerousActions}
             />
           ) : activeModule === "research" ? (
@@ -2587,4 +2572,3 @@ export function WorkbenchApp() {
     </main>
   );
 }
-

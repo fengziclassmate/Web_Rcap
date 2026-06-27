@@ -21,6 +21,7 @@ export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   longTaskSectionOpen: true,
   completedSectionOpen: true,
   projectSectionOpen: true,
+  achievementSectionOpen: true,
   footprintSectionOpen: true,
   expandedTasks: [],
   expandedCompletedTasks: [],
@@ -47,6 +48,10 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function isTimeString(value: unknown): value is string {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
 export function normalizeAnnualTasks(payload: unknown): AnnualTask[] {
   if (!Array.isArray(payload)) return [];
   return payload.map((item, index) => {
@@ -71,12 +76,39 @@ export function normalizeProjectCheckins(payload: unknown): ProjectCheckin[] {
           }))
           .filter((checkin) => checkin.date.length > 0)
       : [];
+    const dailyCheckins = Array.isArray(value.dailyCheckins)
+      ? value.dailyCheckins
+          .map((slot, slotIndex) => ({
+            id:
+              typeof slot.id === "string" && slot.id.length > 0
+                ? slot.id
+                : `daily-slot-${index}-${slotIndex}`,
+            label:
+              typeof slot.label === "string" && slot.label.trim().length > 0
+                ? slot.label.trim()
+                : "\u65e5\u5e38\u6253\u5361",
+            time: isTimeString(slot.time) ? slot.time : "09:00",
+          }))
+          .sort((a, b) => a.time.localeCompare(b.time))
+      : [];
+    const dailyCompletions = Array.isArray(value.dailyCompletions)
+      ? value.dailyCompletions
+          .map((completion) => ({
+            date: typeof completion.date === "string" ? completion.date : "",
+            slotId: typeof completion.slotId === "string" ? completion.slotId : "",
+            completedAt:
+              typeof completion.completedAt === "string" ? completion.completedAt : "",
+          }))
+          .filter((completion) => completion.date.length > 0 && completion.slotId.length > 0)
+      : [];
     return {
       id: value.id ?? `project-restored-${index}`,
       name: typeof value.name === "string" ? value.name : "\u672a\u547d\u540d\u9879\u76ee",
       description: typeof value.description === "string" ? value.description : "",
       startDate: typeof value.startDate === "string" ? value.startDate : todayIso(),
       checkins,
+      dailyCheckins,
+      dailyCompletions,
     };
   });
 }
@@ -232,6 +264,8 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
       typeof value.completedSectionOpen === "boolean" ? value.completedSectionOpen : true,
     projectSectionOpen:
       typeof value.projectSectionOpen === "boolean" ? value.projectSectionOpen : true,
+    achievementSectionOpen:
+      typeof value.achievementSectionOpen === "boolean" ? value.achievementSectionOpen : true,
     footprintSectionOpen:
       typeof value.footprintSectionOpen === "boolean" ? value.footprintSectionOpen : true,
     expandedTasks: Array.isArray(value.expandedTasks)
