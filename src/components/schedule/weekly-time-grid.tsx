@@ -166,6 +166,10 @@ const contextMenuWidth = 208;
 const contextMenuHeight = 360;
 const contextMenuViewportPadding = 12;
 const recurrenceEditScopeStorageKey = "recurrence-edit-scope";
+const hourOptions = Array.from({ length: 24 }, (_, hour) => hour);
+const endHourOptions = Array.from({ length: 25 }, (_, hour) => hour);
+const minuteOptions = Array.from({ length: 60 }, (_, minute) => minute);
+const quickMinuteOptions = [0, 15, 30, 45];
 
 const defaultForm: EventFormState = {
   title: "",
@@ -342,6 +346,11 @@ function getTimeSelectParts(value: number, allowEndBoundary = false) {
     hours: Math.floor(totalMinutes / minutesPerHour),
     minutes: totalMinutes % minutesPerHour,
   };
+}
+
+function getTimeValueFromParts(hours: number, minutes: number, allowEndBoundary = false) {
+  if (allowEndBoundary && hours === hoursPerDay) return hoursPerDay;
+  return hours + minutes / minutesPerHour;
 }
 
 function monthWeekdayHeaders() {
@@ -547,13 +556,46 @@ export function WeeklyTimeGrid({
     };
   }
 
+  function getDefaultCreateTimeRange(cell: GridCell) {
+    const cellStartHour = normalizeStartTimeValue(cell.startHour);
+    const cellEndHour = Math.min(hoursPerDay, cellStartHour + timeGranularity / minutesPerHour);
+    let startHour = cellStartHour;
+    let nextBusyStartHour: number | null = null;
+    const dayEvents = displayEventSegments
+      .filter((event) => event.displayDate === cell.date)
+      .sort((a, b) => {
+        if (a.startHour !== b.startHour) return a.startHour - b.startHour;
+        return a.endHour - b.endHour;
+      });
+
+    for (const event of dayEvents) {
+      if (event.endHour <= startHour) continue;
+      if (event.startHour > startHour) {
+        nextBusyStartHour = event.startHour;
+        break;
+      }
+      startHour = Math.max(startHour, event.endHour);
+    }
+
+    startHour = normalizeStartTimeValue(startHour);
+    const endBoundary =
+      nextBusyStartHour === null ? cellEndHour : Math.min(cellEndHour, nextBusyStartHour);
+    const endHour =
+      startHour < endBoundary
+        ? endBoundary
+        : Math.min(hoursPerDay, startHour + timeGranularity / minutesPerHour);
+
+    return resolveFormTimeRange(startHour, endHour);
+  }
+
   function resetCreateDialog(cell: GridCell) {
-    setSelectedCell(cell);
+    const { startHour, endHour } = getDefaultCreateTimeRange(cell);
+    setSelectedCell({ ...cell, startHour });
     const day = parse(cell.date, "yyyy-MM-dd", new Date());
     setCreateForm({
       ...defaultForm,
-      startHour: cell.startHour,
-      endHour: Math.min(24, cell.startHour + 1),
+      startHour,
+      endHour,
       category: defaultCreateCategory,
     });
     setCreateRecurrence({
@@ -1918,6 +1960,80 @@ export function WeeklyTimeGrid({
   );
 }
 
+function TimePartSelect({
+  value,
+  options,
+  unit,
+  ariaLabel,
+  onChange,
+}: {
+  value: number;
+  options: number[];
+  unit: string;
+  ariaLabel: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <Select value={String(value)} onValueChange={(nextValue) => onChange(Number(nextValue))}>
+      <SelectTrigger
+        aria-label={ariaLabel}
+        className="h-11 w-full justify-between rounded-lg border-stone-200 bg-white px-3 font-mono text-base shadow-sm"
+      >
+        <SelectValue placeholder={unit} />
+      </SelectTrigger>
+      <SelectContent
+        align="start"
+        alignItemWithTrigger={false}
+        sideOffset={6}
+        className="max-h-64 min-w-24"
+      >
+        {options.map((option) => (
+          <SelectItem key={option} value={String(option)} className="font-mono">
+            {option.toString().padStart(2, "0")}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function MinuteShortcutGroup({
+  value,
+  availableMinutes,
+  ariaPrefix,
+  onChange,
+}: {
+  value: number;
+  availableMinutes: number[];
+  ariaPrefix: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="grid grid-cols-4 gap-1.5">
+      {quickMinuteOptions.map((minute) => {
+        const disabled = !availableMinutes.includes(minute);
+        const selected = value === minute;
+        return (
+          <button
+            key={minute}
+            type="button"
+            disabled={disabled}
+            aria-label={`${ariaPrefix}${minute.toString().padStart(2, "0")} 分`}
+            onClick={() => onChange(minute)}
+            className={`h-8 rounded-md border px-2 font-mono text-xs font-semibold transition ${
+              selected
+                ? "border-stone-900 bg-stone-900 text-white shadow-sm"
+                : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
+            } disabled:cursor-not-allowed disabled:border-stone-100 disabled:bg-stone-50 disabled:text-stone-300`}
+          >
+            {minute.toString().padStart(2, "0")}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function TimeRangeEditor({
   startHour,
   endHour,
@@ -1931,102 +2047,95 @@ function TimeRangeEditor({
 }) {
   const startParts = getTimeSelectParts(startHour);
   const endParts = getTimeSelectParts(endHour, true);
-  const minuteOptions = Array.from({ length: 60 }, (_, minute) => minute);
   const endMinuteOptions = endParts.hours === 24 ? [0] : minuteOptions;
   const crossesMidnight = endHour < startHour;
 
   return (
-    <div className="grid grid-cols-2 gap-4">
-      <div className="space-y-3">
-        <Label>开始时间</Label>
-        <div className="flex gap-3">
-          <Select
-            value={String(startParts.hours)}
-            onValueChange={(value) => {
-              const hours = Number(value);
-              onStartHourChange(hours + startParts.minutes / minutesPerHour);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="时" />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 24 }, (_, hour) => (
-                <SelectItem key={hour} value={String(hour)}>
-                  {hour.toString().padStart(2, "0")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={String(startParts.minutes)}
-            onValueChange={(value) => {
-              onStartHourChange(startParts.hours + Number(value) / minutesPerHour);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="分" />
-            </SelectTrigger>
-            <SelectContent>
-              {minuteOptions.map((minute) => (
-                <SelectItem key={minute} value={String(minute)}>
-                  {minute.toString().padStart(2, "0")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-stone-600">
+            开始时间
+          </Label>
+          <span className="rounded-md bg-white px-2.5 py-1 font-mono text-lg font-semibold leading-none text-stone-950 shadow-sm">
+            {formatHour(startHour)}
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <TimePartSelect
+            value={startParts.hours}
+            options={hourOptions}
+            unit="时"
+            ariaLabel="开始小时"
+            onChange={(hours) =>
+              onStartHourChange(getTimeValueFromParts(hours, startParts.minutes))
+            }
+          />
+          <TimePartSelect
+            value={startParts.minutes}
+            options={minuteOptions}
+            unit="分"
+            ariaLabel="开始分钟"
+            onChange={(minutes) =>
+              onStartHourChange(getTimeValueFromParts(startParts.hours, minutes))
+            }
+          />
+        </div>
+        <div className="mt-2">
+          <MinuteShortcutGroup
+            value={startParts.minutes}
+            availableMinutes={minuteOptions}
+            ariaPrefix="设置开始时间为"
+            onChange={(minutes) =>
+              onStartHourChange(getTimeValueFromParts(startParts.hours, minutes))
+            }
+          />
         </div>
       </div>
 
-      <div className="space-y-3">
-        <Label className="flex items-center gap-2">
-          结束时间
-          {crossesMidnight ? (
-            <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
-              次日
-            </span>
-          ) : null}
-        </Label>
-        <div className="flex gap-3">
-          <Select
-            value={String(endParts.hours)}
-            onValueChange={(value) => {
-              const hours = Number(value);
-              onEndHourChange(
-                hours === 24 ? 24 : hours + endParts.minutes / minutesPerHour,
-              );
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="时" />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 25 }, (_, hour) => (
-                <SelectItem key={hour} value={String(hour)}>
-                  {hour.toString().padStart(2, "0")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={String(endParts.minutes)}
-            onValueChange={(value) => {
-              onEndHourChange(
-                endParts.hours === 24 ? 24 : endParts.hours + Number(value) / minutesPerHour,
-              );
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="分" />
-            </SelectTrigger>
-            <SelectContent>
-              {endMinuteOptions.map((minute) => (
-                <SelectItem key={minute} value={String(minute)}>
-                  {minute.toString().padStart(2, "0")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <Label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-600">
+            结束时间
+            {crossesMidnight ? (
+              <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-sky-700">
+                次日
+              </span>
+            ) : null}
+          </Label>
+          <span className="rounded-md bg-white px-2.5 py-1 font-mono text-lg font-semibold leading-none text-stone-950 shadow-sm">
+            {formatHour(endHour)}
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <TimePartSelect
+            value={endParts.hours}
+            options={endHourOptions}
+            unit="时"
+            ariaLabel="结束小时"
+            onChange={(hours) =>
+              onEndHourChange(getTimeValueFromParts(hours, endParts.minutes, true))
+            }
+          />
+          <TimePartSelect
+            value={endParts.minutes}
+            options={endMinuteOptions}
+            unit="分"
+            ariaLabel="结束分钟"
+            onChange={(minutes) =>
+              onEndHourChange(getTimeValueFromParts(endParts.hours, minutes, true))
+            }
+          />
+        </div>
+        <div className="mt-2">
+          <MinuteShortcutGroup
+            value={endParts.minutes}
+            availableMinutes={endMinuteOptions}
+            ariaPrefix="设置结束时间为"
+            onChange={(minutes) =>
+              onEndHourChange(getTimeValueFromParts(endParts.hours, minutes, true))
+            }
+          />
         </div>
       </div>
     </div>
