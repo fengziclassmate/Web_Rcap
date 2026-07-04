@@ -1172,25 +1172,33 @@ export function TaskDashboard({
                     <p className="mb-2 text-xs text-gray-600">
                       进度：{doneCount}/{totalDays}（{percent}%）
                     </p>
-                    <div className="grid gap-2 sm:grid-cols-[140px_minmax(0,1fr)_auto]">
-                      <Input
-                        type="date"
-                        value={projectDateDraft[project.id] ?? todayDate}
-                        max={todayDate}
-                        onChange={(event) =>
-                          setProjectDateDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
-                        }
-                        aria-label={`${project.name} 打卡日期`}
-                      />
-                      <Input
-                        value={projectNoteDraft[project.id] ?? ""}
-                        onChange={(event) =>
-                          setProjectNoteDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
-                        }
-                        placeholder="打卡描述（可选）"
-                      />
-                      <Button type="button" size="sm" onClick={() => handleProjectCheckin(project.id)}>
-                        打卡
+                    <div className="grid gap-2 rounded-lg border border-gray-200 bg-gray-50/70 p-2 sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-end">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-gray-600">打卡日期</Label>
+                        <Input
+                          type="date"
+                          value={projectDateDraft[project.id] ?? todayDate}
+                          max={todayDate}
+                          onChange={(event) =>
+                            setProjectDateDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
+                          }
+                          aria-label={`${project.name} 打卡日期`}
+                          className="h-9 bg-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-gray-600">打卡描述</Label>
+                        <Input
+                          value={projectNoteDraft[project.id] ?? ""}
+                          onChange={(event) =>
+                            setProjectNoteDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
+                          }
+                          placeholder="可选"
+                          className="h-9 bg-white"
+                        />
+                      </div>
+                      <Button type="button" size="sm" className="h-9" onClick={() => handleProjectCheckin(project.id)}>
+                        {(projectDateDraft[project.id] ?? todayDate) === todayDate ? "打卡" : "补打"}
                       </Button>
                     </div>
 
