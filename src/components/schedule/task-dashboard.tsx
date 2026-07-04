@@ -193,6 +193,7 @@ export function TaskDashboard({
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDesc, setNewProjectDesc] = useState("");
   const [projectNoteDraft, setProjectNoteDraft] = useState<Record<string, string>>({});
+  const [projectDateDraft, setProjectDateDraft] = useState<Record<string, string>>({});
   const [dailyCheckinDrafts, setDailyCheckinDrafts] = useState<Record<string, DailyCheckinDraft>>({});
   const [newFootprintName, setNewFootprintName] = useState("");
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
@@ -528,8 +529,19 @@ export function TaskDashboard({
   }
 
   function handleProjectCheckin(projectId: string) {
-    onCheckinProject(projectId, getTodayISODate(), projectNoteDraft[projectId] ?? "");
+    const checkinDate = projectDateDraft[projectId] ?? todayDate;
+    if (!isISODateString(checkinDate)) {
+      toast.error("请选择有效的打卡日期");
+      return;
+    }
+    if (checkinDate > todayDate) {
+      toast.error("不能补打未来日期");
+      return;
+    }
+
+    onCheckinProject(projectId, checkinDate, projectNoteDraft[projectId] ?? "");
     setProjectNoteDraft((prev) => ({ ...prev, [projectId]: "" }));
+    toast.success(checkinDate === todayDate ? "Project 已打卡" : `已补打 ${checkinDate}`);
   }
 
   function getDailyCheckinDraft(projectId: string): DailyCheckinDraft {
@@ -1103,7 +1115,11 @@ export function TaskDashboard({
                 const projectExpanded = expandedProjects.has(project.id);
             const today = getTodayISODate();
             const doneCount = project.checkins.length;
-            const totalDays = daysBetweenInclusive(project.startDate, today);
+            const trackedStartDate = project.checkins.reduce(
+              (earliestDate, entry) => (entry.date < earliestDate ? entry.date : earliestDate),
+              project.startDate,
+            );
+            const totalDays = daysBetweenInclusive(trackedStartDate, today);
             const percent = Math.min(100, Math.round((doneCount / Math.max(1, totalDays)) * 100));
             const recentCheckins = [...project.checkins]
               .sort((a, b) => b.date.localeCompare(a.date))
@@ -1156,13 +1172,22 @@ export function TaskDashboard({
                     <p className="mb-2 text-xs text-gray-600">
                       进度：{doneCount}/{totalDays}（{percent}%）
                     </p>
-                    <div className="flex gap-2">
+                    <div className="grid gap-2 sm:grid-cols-[140px_minmax(0,1fr)_auto]">
+                      <Input
+                        type="date"
+                        value={projectDateDraft[project.id] ?? todayDate}
+                        max={todayDate}
+                        onChange={(event) =>
+                          setProjectDateDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
+                        }
+                        aria-label={`${project.name} 打卡日期`}
+                      />
                       <Input
                         value={projectNoteDraft[project.id] ?? ""}
                         onChange={(event) =>
                           setProjectNoteDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
                         }
-                        placeholder="今日描述（可选）"
+                        placeholder="打卡描述（可选）"
                       />
                       <Button type="button" size="sm" onClick={() => handleProjectCheckin(project.id)}>
                         打卡
