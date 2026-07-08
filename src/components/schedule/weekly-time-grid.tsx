@@ -35,6 +35,7 @@ import {
 import { toast } from "sonner";
 import type { EventTag, ScheduleEvent } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { DailyExpensePanel } from "@/components/schedule/daily-expense-panel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +51,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { createId } from "@/lib/id";
+import { supabase } from "@/lib/supabase";
 import {
   getScheduleEventDurationHour,
   layoutOverlappingScheduleEvents,
@@ -156,6 +158,21 @@ type TimelineEventSegment = ScheduleEventSegment<ScheduleEvent>;
 export type ViewMode = "day" | "week" | "month";
 export type TimeGranularity = 5 | 15 | 30 | 60;
 
+type MonthlyExpenseSummary = {
+  totalExpense: number;
+  dailyBudget: number | null;
+};
+
+type ExpenseSummaryRow = {
+  amount: number | string;
+  expense_date: string;
+};
+
+type DailyBudgetSummaryRow = {
+  amount: number | string;
+  budget_date: string;
+};
+
 const hourCellHeight = 80;
 const minutesPerHour = 60;
 const hoursPerDay = 24;
@@ -170,6 +187,10 @@ const hourOptions = Array.from({ length: 24 }, (_, hour) => hour);
 const endHourOptions = Array.from({ length: 25 }, (_, hour) => hour);
 const minuteOptions = Array.from({ length: 60 }, (_, minute) => minute);
 const quickMinuteOptions = [0, 15, 30, 45];
+const compactMoneyFormatter = new Intl.NumberFormat("zh-CN", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
 
 const defaultForm: EventFormState = {
   title: "",
@@ -357,6 +378,23 @@ function monthWeekdayHeaders() {
   return ["日", "一", "二", "三", "四", "五", "六"];
 }
 
+function normalizeMoneyValue(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 100) / 100;
+}
+
+function formatCompactMoney(value: number) {
+  return `¥${compactMoneyFormatter.format(normalizeMoneyValue(value))}`;
+}
+
+function getMonthlyExpenseLabel(summary: MonthlyExpenseSummary) {
+  if (summary.dailyBudget === null) {
+    return formatCompactMoney(summary.totalExpense);
+  }
+
+  return `${formatCompactMoney(summary.totalExpense)} / ${formatCompactMoney(summary.dailyBudget)}`;
+}
+
 function buildRequirementLines(value: string) {
   return value
     .split("\n")
@@ -419,6 +457,9 @@ export function WeeklyTimeGrid({
     name: "",
     color: CATEGORY_VISUALS[0].twClass,
   });
+  const [monthlyExpenseSummaries, setMonthlyExpenseSummaries] = useState<
+    Record<string, MonthlyExpenseSummary>
+  >({});
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingCategoryColor, setEditingCategoryColor] = useState(CATEGORY_VISUALS[0].twClass);
@@ -461,6 +502,82 @@ export function WeeklyTimeGrid({
     }
     return Array.from({ length: 35 }, (_, index) => addDays(currentWeekStart, index));
   }, [currentWeekStart, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "month" || displayDates.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    const rangeStart = format(displayDates[0], "yyyy-MM-dd");
+    const rangeEnd = format(displayDates[displayDates.length - 1], "yyyy-MM-dd");
+
+    async function loadMonthlyExpenseSummaries() {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (cancelled) return;
+      if (sessionError || !session?.user) {
+        setMonthlyExpenseSummaries({});
+        return;
+      }
+
+      const [expensesResult, budgetsResult] = await Promise.all([
+        supabase
+          .from("expenses")
+          .select("amount,expense_date")
+          .eq("user_id", session.user.id)
+          .gte("expense_date", rangeStart)
+          .lte("expense_date", rangeEnd),
+        supabase
+          .from("daily_budgets")
+          .select("amount,budget_date")
+          .eq("user_id", session.user.id)
+          .gte("budget_date", rangeStart)
+          .lte("budget_date", rangeEnd),
+      ]);
+
+      if (cancelled) return;
+      if (expensesResult.error || budgetsResult.error) {
+        console.error("Failed to load monthly expense summaries", {
+          expensesError: expensesResult.error,
+          budgetsError: budgetsResult.error,
+        });
+        setMonthlyExpenseSummaries({});
+        return;
+      }
+
+      const nextSummaries: Record<string, MonthlyExpenseSummary> = {};
+
+      for (const row of (expensesResult.data ?? []) as ExpenseSummaryRow[]) {
+        const current = nextSummaries[row.expense_date] ?? {
+          totalExpense: 0,
+          dailyBudget: null,
+        };
+        current.totalExpense = normalizeMoneyValue(current.totalExpense + Number(row.amount));
+        nextSummaries[row.expense_date] = current;
+      }
+
+      for (const row of (budgetsResult.data ?? []) as DailyBudgetSummaryRow[]) {
+        const current = nextSummaries[row.budget_date] ?? {
+          totalExpense: 0,
+          dailyBudget: null,
+        };
+        current.dailyBudget = normalizeMoneyValue(Number(row.amount));
+        nextSummaries[row.budget_date] = current;
+      }
+
+      setMonthlyExpenseSummaries(nextSummaries);
+    }
+
+    void loadMonthlyExpenseSummaries();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [displayDates, viewMode]);
 
   const expandedEvents = useMemo(() => {
     if (displayDates.length === 0) return [] as ScheduleEvent[];
@@ -518,6 +635,7 @@ export function WeeklyTimeGrid({
     () => expandedEvents.find((event) => event.id === editingEventId) ?? null,
     [editingEventId, expandedEvents],
   );
+  const activeDayIso = viewMode === "day" ? format(currentWeekStart, "yyyy-MM-dd") : null;
 
   const cellHeight = hourCellHeight / (60 / timeGranularity);
 
@@ -1240,6 +1358,13 @@ export function WeeklyTimeGrid({
                 {displayDates.map((day) => {
                   const dayIso = format(day, "yyyy-MM-dd");
                   const dayEvents = displayEventSegments.filter((event) => event.displayDate === dayIso);
+                  const expenseSummary = monthlyExpenseSummaries[dayIso] ?? {
+                    totalExpense: 0,
+                    dailyBudget: null,
+                  };
+                  const isOverBudget =
+                    expenseSummary.dailyBudget !== null &&
+                    expenseSummary.totalExpense > expenseSummary.dailyBudget;
 
                   return (
                     <div
@@ -1258,7 +1383,7 @@ export function WeeklyTimeGrid({
                         </button>
                       </div>
 
-                      <div className="space-y-1 overflow-hidden">
+                      <div className="min-h-0 flex-1 space-y-1 overflow-hidden">
                         {dayEvents.length === 0 ? (
                           <span className="text-xs text-gray-400">无行程</span>
                         ) : (
@@ -1295,12 +1420,30 @@ export function WeeklyTimeGrid({
                           })
                         )}
                       </div>
+                      <div
+                        className={`mt-2 flex min-h-5 items-center justify-between gap-1 rounded-md border px-1.5 py-0.5 text-[11px] leading-none ${
+                          isOverBudget
+                            ? "border-rose-200 bg-rose-50 text-rose-700"
+                            : "border-stone-200 bg-stone-50 text-stone-600"
+                        }`}
+                        title={isOverBudget ? "当日花销已超支" : "当日花销摘要"}
+                      >
+                        <span className="min-w-0 truncate font-medium">
+                          {getMonthlyExpenseLabel(expenseSummary)}
+                        </span>
+                        {isOverBudget ? (
+                          <span className="shrink-0 rounded-sm bg-rose-100 px-1 py-0.5 font-semibold">
+                            超支
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   );
                 })}
               </div>
             </div>
           )}
+          {activeDayIso ? <DailyExpensePanel date={activeDayIso} /> : null}
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             {selectedCell ? (
               <DialogContent className="rounded-lg border-gray-200 shadow-lg">
