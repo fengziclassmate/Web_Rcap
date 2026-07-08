@@ -115,6 +115,12 @@ const PRIORITY_VISUAL_STYLE: Record<
   },
 };
 
+const fallbackPriority = PRIORITY_ORDER[3];
+
+function getPriorityVisualStyle(priority: Priority) {
+  return PRIORITY_VISUAL_STYLE[priority] ?? PRIORITY_VISUAL_STYLE[fallbackPriority];
+}
+
 type TaskDraft = {
   id: string;
   name: string;
@@ -1245,7 +1251,7 @@ export function TaskDashboard({
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-stone-100">
                           <div
-                            className={`h-full rounded-full ${PRIORITY_VISUAL_STYLE[stat.priority].barClassName}`}
+                            className={`h-full rounded-full ${getPriorityVisualStyle(stat.priority).barClassName}`}
                             style={{ width: `${stat.count > 0 ? Math.max(stat.percent, 6) : 0}%` }}
                           />
                         </div>
@@ -1292,7 +1298,7 @@ export function TaskDashboard({
                             </span>
                             <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
                               <Badge
-                                className={`rounded-md border ${PRIORITY_VISUAL_STYLE[task.priority].badgeClassName}`}
+                                className={`rounded-md border ${getPriorityVisualStyle(task.priority).badgeClassName}`}
                               >
                                 {task.priority}
                               </Badge>

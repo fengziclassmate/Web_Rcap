@@ -25,6 +25,13 @@ describe("normalizers", () => {
     ]);
   });
 
+  it("normalizes invalid task priority to the default priority", () => {
+    expect(normalizeTasks([{ name: "Done", done: true, priority: "old-priority" }])).toEqual([
+      expect.objectContaining({
+        priority: "\u4e0d\u7d27\u6025\u4e0d\u91cd\u8981",
+      }),
+    ]);
+  });
   it("normalizes event recurrence and defaults", () => {
     const [event] = normalizeEvents([
       {

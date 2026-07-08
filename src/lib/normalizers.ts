@@ -34,6 +34,20 @@ export const defaultTasks: LongTask[] = [];
 
 export const defaultEvents: ScheduleEvent[] = [];
 
+const defaultPriority: Priority = "不紧急不重要";
+const validPriorities = new Set<Priority>([
+  "紧急且重要",
+  "紧急不重要",
+  "不紧急重要",
+  "不紧急不重要",
+]);
+
+function normalizePriority(value: unknown): Priority {
+  return typeof value === "string" && validPriorities.has(value as Priority)
+    ? (value as Priority)
+    : defaultPriority;
+}
+
 export const defaultPaperProgress: PaperProgress = {
   title: "",
   totalChapters: 0,
@@ -312,7 +326,7 @@ export function normalizeTasks(payload: unknown): LongTask[] {
         ? value.precautions.filter((item): item is string => typeof item === "string")
         : [],
       completionLog: value.completionLog ?? "",
-      priority: (value.priority as Priority) ?? "\u4e0d\u7d27\u6025\u4e0d\u91cd\u8981",
+      priority: normalizePriority(value.priority),
       subtasks: Array.isArray(value.subtasks)
         ? value.subtasks.map((subtask, subIndex) => ({
             id: subtask.id ?? `subtask-${index}-${subIndex}`,
