@@ -37,6 +37,8 @@ export type LongTask = {
   id: string;
   name: string;
   dueDate: string;
+  createdAt?: string;
+  completedAt?: string | null;
   done: boolean;
   notes: string;
   precautions: string[];

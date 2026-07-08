@@ -93,6 +93,28 @@ type TaskDashboardProps = {
 
 const PRIORITY_ORDER: Priority[] = ["紧急且重要", "紧急不重要", "不紧急重要", "不紧急不重要"];
 
+const PRIORITY_VISUAL_STYLE: Record<
+  Priority,
+  { barClassName: string; badgeClassName: string }
+> = {
+  "\u7d27\u6025\u4e14\u91cd\u8981": {
+    barClassName: "bg-red-500",
+    badgeClassName: "border-red-200 bg-red-50 text-red-700",
+  },
+  "\u7d27\u6025\u4e0d\u91cd\u8981": {
+    barClassName: "bg-amber-500",
+    badgeClassName: "border-amber-200 bg-amber-50 text-amber-700",
+  },
+  "\u4e0d\u7d27\u6025\u91cd\u8981": {
+    barClassName: "bg-blue-500",
+    badgeClassName: "border-blue-200 bg-blue-50 text-blue-700",
+  },
+  "\u4e0d\u7d27\u6025\u4e0d\u91cd\u8981": {
+    barClassName: "bg-slate-500",
+    badgeClassName: "border-slate-200 bg-slate-50 text-slate-700",
+  },
+};
+
 type TaskDraft = {
   id: string;
   name: string;
@@ -139,6 +161,68 @@ function daysBetweenInclusive(startIso: string, endIso: string) {
   return Math.floor(ms / (24 * 60 * 60 * 1000)) + 1;
 }
 
+const HOUR_MS = 60 * 60 * 1000;
+
+function parseDateTime(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getTaskCompletionDateTime(task: LongTask) {
+  return parseDateTime(task.completedAt) ?? parseDateTime(`${task.dueDate}T23:59:59`);
+}
+
+function getTaskCreatedDateTime(task: LongTask) {
+  return parseDateTime(task.createdAt);
+}
+
+function getTaskCompletionISODate(task: LongTask) {
+  const completedAt = getTaskCompletionDateTime(task);
+  return completedAt ? formatDateToISODate(completedAt) : task.dueDate;
+}
+
+function getTaskCompletionDurationHours(task: LongTask) {
+  const startedAt = getTaskCreatedDateTime(task);
+  const completedAt = getTaskCompletionDateTime(task);
+  if (!startedAt || !completedAt) return null;
+  const duration = completedAt.getTime() - startedAt.getTime();
+  if (duration < 0) return null;
+  return Math.max(1, Math.ceil(duration / HOUR_MS));
+}
+
+function formatDateTimeLabel(date: Date | null) {
+  if (!date) return "\u672a\u8bb0\u5f55";
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${formatDateToISODate(date)} ${hours}:${minutes}`;
+}
+
+function formatDurationLabel(hours: number | null) {
+  if (hours === null) return "\u672a\u8bb0\u5f55";
+  if (hours < 24) return `${hours}\u5c0f\u65f6`;
+  const days = Math.floor(hours / 24);
+  const remainderHours = hours % 24;
+  return remainderHours === 0 ? `${days}\u5929` : `${days}\u5929${remainderHours}\u5c0f\u65f6`;
+}
+
+function addDaysToISODate(isoDate: string, amount: number) {
+  const date = new Date(`${isoDate}T00:00:00`);
+  date.setDate(date.getDate() + amount);
+  return formatDateToISODate(date);
+}
+
+function getWeekStartISODate(isoDate: string) {
+  const date = new Date(`${isoDate}T00:00:00`);
+  const day = date.getDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + offset);
+  return formatDateToISODate(date);
+}
+
+function formatWeekRangeLabel(weekStartIso: string) {
+  return `${weekStartIso} - ${addDaysToISODate(weekStartIso, 6)}`;
+}
 function isValidTime(value: string) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
@@ -243,8 +327,8 @@ export function TaskDashboard({
     description: string;
     onConfirm: () => void;
   } | null>(null);
-  const incompleteTasks = tasks.filter((task) => !task.done);
-  const completedTasks = tasks.filter((task) => task.done);
+  const incompleteTasks = useMemo(() => tasks.filter((task) => !task.done), [tasks]);
+  const completedTasks = useMemo(() => tasks.filter((task) => task.done), [tasks]);
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
 
   useEffect(() => {
@@ -358,6 +442,72 @@ export function TaskDashboard({
       })),
     [orderedIncompleteTasks],
   );
+  const orderedCompletedTasks = useMemo(
+    () =>
+      [...completedTasks].sort((a, b) => {
+        const aTime = getTaskCompletionDateTime(a)?.getTime() ?? 0;
+        const bTime = getTaskCompletionDateTime(b)?.getTime() ?? 0;
+        return bTime - aTime;
+      }),
+    [completedTasks],
+  );
+  const completedTaskInsights = useMemo(() => {
+    const weeklyMap = new Map<
+      string,
+      { weekStart: string; count: number; totalDurationHours: number; durationCount: number }
+    >();
+    let totalDurationHours = 0;
+    let durationCount = 0;
+
+    for (const task of completedTasks) {
+      const completionDate = getTaskCompletionISODate(task);
+      const weekStart = getWeekStartISODate(completionDate);
+      const current = weeklyMap.get(weekStart) ?? {
+        weekStart,
+        count: 0,
+        totalDurationHours: 0,
+        durationCount: 0,
+      };
+      const durationHours = getTaskCompletionDurationHours(task);
+      current.count += 1;
+      if (durationHours !== null) {
+        current.totalDurationHours += durationHours;
+        current.durationCount += 1;
+        totalDurationHours += durationHours;
+        durationCount += 1;
+      }
+      weeklyMap.set(weekStart, current);
+    }
+
+    const weeklyStats = [...weeklyMap.values()]
+      .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+      .slice(0, 8)
+      .map((week) => ({
+        ...week,
+        averageDurationHours:
+          week.durationCount > 0 ? Math.round(week.totalDurationHours / week.durationCount) : null,
+      }));
+    const maxWeeklyCount = Math.max(1, ...weeklyStats.map((week) => week.count));
+    const thisWeekStart = getWeekStartISODate(todayDate);
+    const priorityStats = PRIORITY_ORDER.map((priority) => {
+      const count = completedTasks.filter((task) => task.priority === priority).length;
+      return {
+        priority,
+        count,
+        percent: completedTasks.length > 0 ? Math.round((count / completedTasks.length) * 100) : 0,
+      };
+    });
+
+    return {
+      total: completedTasks.length,
+      thisWeekCount: weeklyMap.get(thisWeekStart)?.count ?? 0,
+      durationSampleCount: durationCount,
+      averageDurationHours: durationCount > 0 ? Math.round(totalDurationHours / durationCount) : null,
+      maxWeeklyCount,
+      priorityStats,
+      weeklyStats,
+    };
+  }, [completedTasks, todayDate]);
   const historyProject = useMemo(
     () => projectCheckins.find((project) => project.id === historyProjectId) ?? null,
     [projectCheckins, historyProjectId],
@@ -423,6 +573,12 @@ export function TaskDashboard({
 
   function handleSaveTask() {
     if (!taskDraft || !taskDraft.name.trim()) return;
+    const wasDone = editingTask?.done ?? false;
+    const completedAt = taskDraft.done
+      ? wasDone
+        ? editingTask?.completedAt ?? new Date().toISOString()
+        : new Date().toISOString()
+      : null;
     onUpdateTask(taskDraft.id, {
       name: taskDraft.name.trim(),
       dueDate: taskDraft.dueDate,
@@ -433,6 +589,7 @@ export function TaskDashboard({
         .filter(Boolean),
       completionLog: taskDraft.completionLog.trim(),
       done: taskDraft.done,
+      completedAt,
       priority: taskDraft.priority,
       subtasks: taskDraft.subtasks,
     });
@@ -1005,81 +1162,214 @@ export function TaskDashboard({
         </CollapsibleTrigger>
         <CollapsibleContent>
           {completedTasks.length > 0 ? (
-            <ul className="mt-4 space-y-3 rounded-2xl subtle-card p-4 text-sm text-gray-600">
-              {completedTasks.map((task) => (
-                <li key={task.id} className="rounded-xl border border-stone-200/70 bg-white/65 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                      onClick={() =>
-                        setExpandedCompletedTasks((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(task.id)) {
-                            next.delete(task.id);
-                          } else {
-                            next.add(task.id);
-                          }
-                          patchUiPreferences({ expandedCompletedTasks: [...next] });
-                          return next;
-                        })
-                      }
-                    >
-                      <ChevronDown
-                        className={`h-4 w-4 text-gray-500 transition-transform ${expandedCompletedTasks.has(task.id) ? "" : "-rotate-90"}`}
-                      />
-                      <span className="min-w-0 truncate line-through">{task.name}</span>
-                    </button>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleOpenEdit(task)}
-                      >
-                        编辑
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-8 rounded-md border-gray-300 px-3 text-xs hover:bg-gray-50 transition-colors duration-150"
-                        onClick={() => handleMoveBackToIncomplete(task.id)}
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                        移回未完成
-                      </Button>
-                    </div>
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                  <p className="text-[11px] font-medium text-emerald-700">{"\u5f52\u6863\u4efb\u52a1"}</p>
+                  <p className="mt-1 text-2xl font-semibold text-emerald-950">{completedTaskInsights.total}</p>
+                </div>
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2">
+                  <p className="text-[11px] font-medium text-blue-700">{"\u672c\u5468\u5b8c\u6210"}</p>
+                  <p className="mt-1 text-2xl font-semibold text-blue-950">{completedTaskInsights.thisWeekCount}</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                  <p className="text-[11px] font-medium text-amber-700">{"\u5e73\u5747\u5b8c\u6210\u65f6\u957f"}</p>
+                  <p className="mt-1 text-lg font-semibold text-amber-950">
+                    {formatDurationLabel(completedTaskInsights.averageDurationHours)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
+                  <p className="text-[11px] font-medium text-stone-600">{"\u65f6\u957f\u6837\u672c"}</p>
+                  <p className="mt-1 text-2xl font-semibold text-stone-950">{completedTaskInsights.durationSampleCount}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
+                <section className="rounded-2xl border border-stone-200 bg-white/80 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                      <CalendarRange className="h-4 w-4 text-emerald-600" />
+                      {"\u6bcf\u5468\u5b8c\u6210\u60c5\u51b5"}
+                    </h4>
+                    <span className="text-[11px] text-gray-500">{"\u6700\u8fd1 8 \u5468"}</span>
                   </div>
-                  {expandedCompletedTasks.has(task.id) ? (
-                    <div className="mt-2 space-y-2 rounded-md border border-gray-100 bg-gray-50 p-2">
-                      <p className="text-xs text-gray-600">
-                        完成记录：{task.completionLog || "暂无"}
-                      </p>
-                      <div className="text-xs text-gray-600">
-                        子任务完成情况：
-                        {task.subtasks.length === 0 ? (
-                          <span className="ml-1">无子任务</span>
-                        ) : (
-                          <ul className="mt-1 space-y-1">
-                            {task.subtasks.map((subtask) => (
-                              <li key={subtask.id} className="flex items-center gap-2">
-                                <Checkbox checked={subtask.done} className="h-3.5 w-3.5" />
-                                <span className={subtask.done ? "line-through text-gray-500" : "text-gray-700"}>
-                                  {subtask.name}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
+                  <div className="space-y-3">
+                    {completedTaskInsights.weeklyStats.map((week) => (
+                      <div key={week.weekStart} className="space-y-1">
+                        <div className="flex items-center gap-3">
+                          <span className="w-36 shrink-0 text-[11px] text-gray-500">
+                            {formatWeekRangeLabel(week.weekStart)}
+                          </span>
+                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
+                            <div
+                              className="h-full rounded-full bg-emerald-600"
+                              style={{
+                                width: `${Math.max(
+                                  8,
+                                  (week.count / completedTaskInsights.maxWeeklyCount) * 100,
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="w-8 shrink-0 text-right text-xs font-semibold text-gray-800">
+                            {week.count}
+                          </span>
+                        </div>
+                        <p className="pl-36 text-[11px] text-gray-500">
+                          {"\u5e73\u5747\u65f6\u957f\uff1a"}{formatDurationLabel(week.averageDurationHours)}
+                        </p>
                       </div>
-                    </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-stone-200 bg-white/80 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                      <ListTodo className="h-4 w-4 text-blue-600" />
+                      {"\u4efb\u52a1\u7c7b\u578b\u5b8c\u6210\u60c5\u51b5"}
+                    </h4>
+                    <span className="text-[11px] text-gray-500">{"\u6309\u4f18\u5148\u7ea7"}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {completedTaskInsights.priorityStats.map((stat) => (
+                      <div key={stat.priority} className="space-y-1">
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className="flex min-w-0 items-center gap-1.5 text-gray-700">
+                            {getPriorityIcon(stat.priority)}
+                            <span className="truncate">{stat.priority}</span>
+                          </span>
+                          <span className="shrink-0 font-medium text-gray-800">
+                            {stat.count} / {stat.percent}%
+                          </span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-stone-100">
+                          <div
+                            className={`h-full rounded-full ${PRIORITY_VISUAL_STYLE[stat.priority].barClassName}`}
+                            style={{ width: `${stat.count > 0 ? Math.max(stat.percent, 6) : 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+
+              <ul className="space-y-3 rounded-2xl subtle-card p-4 text-sm text-gray-600">
+                {orderedCompletedTasks.map((task) => {
+                  const completedAt = getTaskCompletionDateTime(task);
+                  const createdAt = getTaskCreatedDateTime(task);
+                  const durationHours = getTaskCompletionDurationHours(task);
+                  const completedSubtasks = task.subtasks.filter((subtask) => subtask.done).length;
+
+                  return (
+                    <li key={task.id} className="rounded-xl border border-stone-200/70 bg-white/70 px-3 py-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                          onClick={() =>
+                            setExpandedCompletedTasks((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(task.id)) {
+                                next.delete(task.id);
+                              } else {
+                                next.add(task.id);
+                              }
+                              patchUiPreferences({ expandedCompletedTasks: [...next] });
+                              return next;
+                            })
+                          }
+                        >
+                          <ChevronDown
+                            className={`mt-0.5 h-4 w-4 shrink-0 text-gray-500 transition-transform ${
+                              expandedCompletedTasks.has(task.id) ? "" : "-rotate-90"
+                            }`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <span className="block min-w-0 truncate font-medium text-gray-900 line-through">
+                              {task.name}
+                            </span>
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
+                              <Badge
+                                className={`rounded-md border ${PRIORITY_VISUAL_STYLE[task.priority].badgeClassName}`}
+                              >
+                                {task.priority}
+                              </Badge>
+                              <span className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-stone-50 px-1.5 py-0.5">
+                                <Clock className="h-3 w-3" />
+                                {"\u5b8c\u6210 "}{formatDateTimeLabel(completedAt)}
+                              </span>
+                              <span className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-stone-50 px-1.5 py-0.5">
+                                {"\u65f6\u957f "}{formatDurationLabel(durationHours)}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                        <div className="flex shrink-0 items-center gap-1 self-end sm:self-start">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleOpenEdit(task)}
+                          >
+                            {"\u7f16\u8f91"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 rounded-md border-gray-300 px-3 text-xs hover:bg-gray-50 transition-colors duration-150"
+                            onClick={() => handleMoveBackToIncomplete(task.id)}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            {"\u79fb\u56de\u672a\u5b8c\u6210"}
+                          </Button>
+                        </div>
+                      </div>
+                      {expandedCompletedTasks.has(task.id) ? (
+                        <div className="mt-3 space-y-3 rounded-md border border-gray-100 bg-gray-50 p-3">
+                          <div className="grid gap-2 text-xs text-gray-600 sm:grid-cols-3">
+                            <span>{"\u521b\u5efa\u65f6\u95f4\uff1a"}{formatDateTimeLabel(createdAt)}</span>
+                            <span>{"\u5b8c\u6210\u65f6\u95f4\uff1a"}{formatDateTimeLabel(completedAt)}</span>
+                            <span>{"\u5b8c\u6210\u65f6\u957f\uff1a"}{formatDurationLabel(durationHours)}</span>
+                          </div>
+                          <p className="text-xs text-gray-600">
+                            {"\u5b8c\u6210\u8bb0\u5f55\uff1a"}{task.completionLog || "\u6682\u65e0"}
+                          </p>
+                          <div className="text-xs text-gray-600">
+                            {"\u5b50\u4efb\u52a1\u5b8c\u6210\u60c5\u51b5\uff1a"}
+                            {task.subtasks.length === 0 ? (
+                              <span className="ml-1">{"\u65e0\u5b50\u4efb\u52a1"}</span>
+                            ) : (
+                              <div className="mt-1 space-y-2">
+                                <span className="inline-flex rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] text-gray-500">
+                                  {completedSubtasks} / {task.subtasks.length}
+                                </span>
+                                <ul className="space-y-1">
+                                  {task.subtasks.map((subtask) => (
+                                    <li key={subtask.id} className="flex items-center gap-2">
+                                      <Checkbox checked={subtask.done} className="h-3.5 w-3.5" />
+                                      <span className={subtask.done ? "line-through text-gray-500" : "text-gray-700"}>
+                                        {subtask.name}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           ) : (
-            <p className="mt-4 border border-gray-200 rounded-lg p-4 text-sm text-gray-500 text-center">暂无已归档任务</p>
+            <p className="mt-4 border border-gray-200 rounded-lg p-4 text-sm text-gray-500 text-center">
+              {"\u6682\u65e0\u5df2\u5f52\u6863\u4efb\u52a1"}
+            </p>
           )}
         </CollapsibleContent>
       </Collapsible>

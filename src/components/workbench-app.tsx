@@ -1839,7 +1839,15 @@ export function WorkbenchApp() {
 
   function handleToggleTask(taskId: string) {
     setTasks((prev) =>
-      prev.map((task) => (task.id === taskId ? { ...task, done: !task.done } : task)),
+      prev.map((task) => {
+        if (task.id !== taskId) return task;
+        const nextDone = !task.done;
+        return {
+          ...task,
+          done: nextDone,
+          completedAt: nextDone ? new Date().toISOString() : null,
+        };
+      }),
     );
   }
 
@@ -1852,6 +1860,8 @@ export function WorkbenchApp() {
         id: createId("task"),
         name: trimmedName,
         dueDate,
+        createdAt: new Date().toISOString(),
+        completedAt: null,
         done: false,
         notes: "",
         precautions: [],
@@ -1872,6 +1882,8 @@ export function WorkbenchApp() {
         id,
         name: trimmedTitle,
         dueDate: input.dueDate || todayISO(),
+        createdAt: new Date().toISOString(),
+        completedAt: null,
         done: false,
         notes: input.notes?.trim() ?? "",
         precautions: [],
@@ -2050,7 +2062,21 @@ export function WorkbenchApp() {
   }
 
   function handleUpdateTask(taskId: string, patch: Partial<LongTask>) {
-    setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, ...patch } : task)));
+    setTasks((prev) =>
+      prev.map((task) => {
+        if (task.id !== taskId) return task;
+        const nextTask = { ...task, ...patch };
+        if (typeof patch.done === "boolean") {
+          return {
+            ...nextTask,
+            completedAt: patch.done
+              ? patch.completedAt ?? task.completedAt ?? new Date().toISOString()
+              : null,
+          };
+        }
+        return nextTask;
+      }),
+    );
   }
 
   function handleDeleteTask(taskId: string) {

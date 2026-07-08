@@ -49,6 +49,10 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeDateTime(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
 function isTimeString(value: unknown): value is string {
   return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
@@ -290,10 +294,18 @@ export function normalizeTasks(payload: unknown): LongTask[] {
   if (!Array.isArray(payload)) return [];
   return payload.map((task, index) => {
     const value = task as Partial<LongTask>;
+    const dueDate =
+      typeof value.dueDate === "string" && value.dueDate.length > 0 ? value.dueDate : todayIso();
+    const createdAt = normalizeDateTime(value.createdAt);
+    const completedAt =
+      normalizeDateTime(value.completedAt) ?? (Boolean(value.done) ? `${dueDate}T23:59:59` : null);
+
     return {
       id: value.id ?? `task-restored-${index}`,
       name: value.name ?? "\u672a\u547d\u540d\u4efb\u52a1",
-      dueDate: value.dueDate ?? new Date().toISOString().slice(0, 10),
+      dueDate,
+      createdAt,
+      completedAt,
       done: Boolean(value.done),
       notes: value.notes ?? "",
       precautions: Array.isArray(value.precautions)
