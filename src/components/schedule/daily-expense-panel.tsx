@@ -1,7 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PiggyBank, Plus, ReceiptText, RefreshCw, Trash2, WalletCards } from "lucide-react";
+import {
+  Check,
+  Pencil,
+  PiggyBank,
+  Plus,
+  ReceiptText,
+  RefreshCw,
+  Trash2,
+  WalletCards,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +53,8 @@ type DaySummaryResponse = {
 
 type DailyExpensePanelProps = {
   date: string;
+  title?: string;
+  onChanged?: () => void;
 };
 
 const expenseCategories = ["餐饮", "交通", "学习", "日用品", "娱乐", "医疗", "其他"];
@@ -89,7 +101,7 @@ async function readErrorMessage(response: Response) {
   }
 }
 
-export function DailyExpensePanel({ date }: DailyExpensePanelProps) {
+export function DailyExpensePanel({ date, title = "今日花销", onChanged }: DailyExpensePanelProps) {
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [dailyBudget, setDailyBudget] = useState<DailyBudgetRecord | null>(null);
   const [totalExpense, setTotalExpense] = useState(0);
@@ -98,9 +110,14 @@ export function DailyExpensePanel({ date }: DailyExpensePanelProps) {
   const [savingExpense, setSavingExpense] = useState(false);
   const [savingBudget, setSavingBudget] = useState(false);
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [updatingExpenseId, setUpdatingExpenseId] = useState<string | null>(null);
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseCategory, setExpenseCategory] = useState(expenseCategories[0]);
   const [expenseNote, setExpenseNote] = useState("");
+  const [editExpenseAmount, setEditExpenseAmount] = useState("");
+  const [editExpenseCategory, setEditExpenseCategory] = useState(expenseCategories[0]);
+  const [editExpenseNote, setEditExpenseNote] = useState("");
   const [budgetAmount, setBudgetAmount] = useState("");
 
   const loadSummary = useCallback(async () => {
@@ -121,6 +138,7 @@ export function DailyExpensePanel({ date }: DailyExpensePanelProps) {
       setTotalExpense(summary.totalExpense ?? 0);
       setRemainingBudget(summary.remainingBudget);
       setBudgetAmount(summary.dailyBudget ? String(summary.dailyBudget.amount) : "");
+      setEditingExpenseId(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "加载花销失败。";
       toast.error(message);
@@ -164,6 +182,7 @@ export function DailyExpensePanel({ date }: DailyExpensePanelProps) {
       setExpenseAmount("");
       setExpenseNote("");
       await loadSummary();
+      onChanged?.();
       toast.success("支出已添加。");
     } catch (error) {
       const message = error instanceof Error ? error.message : "添加支出失败。";
@@ -196,12 +215,67 @@ export function DailyExpensePanel({ date }: DailyExpensePanelProps) {
       }
 
       await loadSummary();
+      onChanged?.();
       toast.success("预算已保存。");
     } catch (error) {
       const message = error instanceof Error ? error.message : "保存预算失败。";
       toast.error(message);
     } finally {
       setSavingBudget(false);
+    }
+  }
+
+  function handleStartEditExpense(expense: ExpenseRecord) {
+    setEditingExpenseId(expense.id);
+    setEditExpenseAmount(String(expense.amount));
+    setEditExpenseCategory(expense.category);
+    setEditExpenseNote(expense.note ?? "");
+  }
+
+  function handleCancelEditExpense() {
+    setEditingExpenseId(null);
+    setEditExpenseAmount("");
+    setEditExpenseCategory(expenseCategories[0]);
+    setEditExpenseNote("");
+  }
+
+  async function handleUpdateExpense(expenseId: string) {
+    if (!isPositiveAmount(editExpenseAmount)) {
+      toast.error("支出金额必须大于 0。");
+      return;
+    }
+    if (!editExpenseCategory.trim()) {
+      toast.error("请选择支出分类。");
+      return;
+    }
+
+    setUpdatingExpenseId(expenseId);
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/expenses/${expenseId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          amount: editExpenseAmount,
+          category: editExpenseCategory,
+          note: editExpenseNote,
+          expense_date: date,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      handleCancelEditExpense();
+      await loadSummary();
+      onChanged?.();
+      toast.success("支出已更新。");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "更新支出失败。";
+      toast.error(message);
+    } finally {
+      setUpdatingExpenseId(null);
     }
   }
 
@@ -219,6 +293,7 @@ export function DailyExpensePanel({ date }: DailyExpensePanelProps) {
       }
 
       await loadSummary();
+      onChanged?.();
       toast.success("支出已删除。");
     } catch (error) {
       const message = error instanceof Error ? error.message : "删除支出失败。";
@@ -242,7 +317,7 @@ export function DailyExpensePanel({ date }: DailyExpensePanelProps) {
           <div>
             <h3 className="flex items-center gap-2 text-base font-semibold text-stone-950">
               <WalletCards className="h-4 w-4 text-stone-700" aria-hidden />
-              今日花销
+              {title}
             </h3>
             <p className="mt-0.5 text-xs text-stone-500">{date}</p>
           </div>
@@ -295,33 +370,112 @@ export function DailyExpensePanel({ date }: DailyExpensePanelProps) {
               </p>
             ) : (
               <div className="divide-y divide-stone-100">
-                {expenses.map((expense) => (
-                  <div key={expense.id} className="flex items-center gap-3 py-2.5">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-700">
-                          {expense.category}
-                        </span>
-                        <span className="text-sm font-semibold text-stone-950">
-                          {formatMoney(expense.amount)}
-                        </span>
-                      </div>
-                      {expense.note ? (
-                        <p className="mt-1 truncate text-xs text-stone-500">{expense.note}</p>
-                      ) : null}
+                {expenses.map((expense) => {
+                  const isEditing = editingExpenseId === expense.id;
+                  const isDeleting = deletingExpenseId === expense.id;
+                  const isUpdating = updatingExpenseId === expense.id;
+
+                  return (
+                    <div key={expense.id} className="py-2.5">
+                      {isEditing ? (
+                        <div className="space-y-2 rounded-md border border-stone-200 bg-stone-50 p-2">
+                          <div className="grid gap-2 sm:grid-cols-[110px_140px_minmax(0,1fr)]">
+                            <Input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              inputMode="decimal"
+                              value={editExpenseAmount}
+                              onChange={(event) => setEditExpenseAmount(event.target.value)}
+                              aria-label="支出金额"
+                              placeholder="0.00"
+                            />
+                            <Select
+                              value={editExpenseCategory}
+                              onValueChange={(value) => value && setEditExpenseCategory(value)}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {expenseCategories.map((category) => (
+                                  <SelectItem key={category} value={category}>
+                                    {category}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              value={editExpenseNote}
+                              onChange={(event) => setEditExpenseNote(event.target.value)}
+                              aria-label="支出备注"
+                              placeholder="备注"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={handleCancelEditExpense}
+                              disabled={isUpdating}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              取消
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => void handleUpdateExpense(expense.id)}
+                              disabled={isUpdating}
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              {isUpdating ? "保存中..." : "保存"}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-700">
+                                {expense.category}
+                              </span>
+                              <span className="text-sm font-semibold text-stone-950">
+                                {formatMoney(expense.amount)}
+                              </span>
+                            </div>
+                            {expense.note ? (
+                              <p className="mt-1 truncate text-xs text-stone-500">{expense.note}</p>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              onClick={() => handleStartEditExpense(expense)}
+                              disabled={Boolean(editingExpenseId) || isDeleting}
+                              aria-label="编辑支出"
+                            >
+                              <Pencil className="h-3.5 w-3.5 text-stone-600" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              onClick={() => void handleDeleteExpense(expense.id)}
+                              disabled={isDeleting || Boolean(editingExpenseId)}
+                              aria-label="删除支出"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      onClick={() => void handleDeleteExpense(expense.id)}
-                      disabled={deletingExpenseId === expense.id}
-                      aria-label="删除支出"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-rose-600" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -457,9 +457,13 @@ export function WeeklyTimeGrid({
     name: "",
     color: CATEGORY_VISUALS[0].twClass,
   });
-  const [monthlyExpenseSummaries, setMonthlyExpenseSummaries] = useState<
+  const [dateExpenseSummaries, setDateExpenseSummaries] = useState<
     Record<string, MonthlyExpenseSummary>
   >({});
+  const [selectedExpenseDateIso, setSelectedExpenseDateIso] = useState(() =>
+    format(new Date(), "yyyy-MM-dd"),
+  );
+  const [expenseSummaryRefreshKey, setExpenseSummaryRefreshKey] = useState(0);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingCategoryColor, setEditingCategoryColor] = useState(CATEGORY_VISUALS[0].twClass);
@@ -504,7 +508,7 @@ export function WeeklyTimeGrid({
   }, [currentWeekStart, viewMode]);
 
   useEffect(() => {
-    if (viewMode !== "month" || displayDates.length === 0) {
+    if ((viewMode !== "month" && viewMode !== "week") || displayDates.length === 0) {
       return;
     }
 
@@ -512,7 +516,7 @@ export function WeeklyTimeGrid({
     const rangeStart = format(displayDates[0], "yyyy-MM-dd");
     const rangeEnd = format(displayDates[displayDates.length - 1], "yyyy-MM-dd");
 
-    async function loadMonthlyExpenseSummaries() {
+    async function loadVisibleExpenseSummaries() {
       const {
         data: { session },
         error: sessionError,
@@ -520,7 +524,7 @@ export function WeeklyTimeGrid({
 
       if (cancelled) return;
       if (sessionError || !session?.user) {
-        setMonthlyExpenseSummaries({});
+        setDateExpenseSummaries({});
         return;
       }
 
@@ -541,11 +545,11 @@ export function WeeklyTimeGrid({
 
       if (cancelled) return;
       if (expensesResult.error || budgetsResult.error) {
-        console.error("Failed to load monthly expense summaries", {
+        console.error("Failed to load visible expense summaries", {
           expensesError: expensesResult.error,
           budgetsError: budgetsResult.error,
         });
-        setMonthlyExpenseSummaries({});
+        setDateExpenseSummaries({});
         return;
       }
 
@@ -569,15 +573,15 @@ export function WeeklyTimeGrid({
         nextSummaries[row.budget_date] = current;
       }
 
-      setMonthlyExpenseSummaries(nextSummaries);
+      setDateExpenseSummaries(nextSummaries);
     }
 
-    void loadMonthlyExpenseSummaries();
+    void loadVisibleExpenseSummaries();
 
     return () => {
       cancelled = true;
     };
-  }, [displayDates, viewMode]);
+  }, [displayDates, expenseSummaryRefreshKey, viewMode]);
 
   const expandedEvents = useMemo(() => {
     if (displayDates.length === 0) return [] as ScheduleEvent[];
@@ -635,7 +639,24 @@ export function WeeklyTimeGrid({
     () => expandedEvents.find((event) => event.id === editingEventId) ?? null,
     [editingEventId, expandedEvents],
   );
+  const todayIso = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const weekExpenseDateOptions = useMemo(
+    () =>
+      viewMode === "week"
+        ? displayDates.map((date) => ({ date, dateIso: format(date, "yyyy-MM-dd") }))
+        : [],
+    [displayDates, viewMode],
+  );
+  const selectedWeekExpenseDateIso = useMemo(() => {
+    if (viewMode !== "week" || weekExpenseDateOptions.length === 0) return null;
+    const visibleDateKeys = new Set(weekExpenseDateOptions.map((item) => item.dateIso));
+    if (visibleDateKeys.has(selectedExpenseDateIso)) return selectedExpenseDateIso;
+    if (visibleDateKeys.has(todayIso)) return todayIso;
+    return weekExpenseDateOptions[0]?.dateIso ?? null;
+  }, [selectedExpenseDateIso, todayIso, viewMode, weekExpenseDateOptions]);
   const activeDayIso = viewMode === "day" ? format(currentWeekStart, "yyyy-MM-dd") : null;
+  const activeExpenseDateIso = activeDayIso ?? selectedWeekExpenseDateIso;
+  const activeExpenseTitle = viewMode === "week" ? "选中日期花销" : "日期花销";
 
   const cellHeight = hourCellHeight / (60 / timeGranularity);
 
@@ -646,6 +667,10 @@ export function WeeklyTimeGrid({
   function handleGranularityChange(value: string | null) {
     if (!value) return;
     onTimeGranularityChange?.(Number(value) as TimeGranularity);
+  }
+
+  function handleExpenseChanged() {
+    setExpenseSummaryRefreshKey((value) => value + 1);
   }
 
   function getEventStyle(event: PositionedScheduleEvent) {
@@ -1157,7 +1182,10 @@ export function WeeklyTimeGrid({
                                 height: `${cellHeight}px`,
                                 borderBottomStyle: isMainHour ? "solid" : "dashed",
                               }}
-                              onClick={() => resetCreateDialog({ date: dayLayout.dateIso, startHour: hour })}
+                              onClick={() => {
+                                setSelectedExpenseDateIso(dayLayout.dateIso);
+                                resetCreateDialog({ date: dayLayout.dateIso, startHour: hour });
+                              }}
                               onDragOver={(event) => event.preventDefault()}
                               onDrop={() => handleDropEvent(dayLayout.dateIso, hour)}
                             />
@@ -1332,6 +1360,7 @@ export function WeeklyTimeGrid({
                                 className="absolute right-1.5 top-1.5 z-20 rounded-full border border-white/80 bg-white/80 p-1 text-stone-700 opacity-0 shadow-sm transition hover:bg-white hover:text-black group-hover:opacity-100 focus-visible:opacity-100"
                                 onClick={(mouseEvent) => {
                                   mouseEvent.stopPropagation();
+                                  setSelectedExpenseDateIso(event.displayDate);
                                   resetCreateDialog({ date: event.displayDate, startHour: event.startHour });
                                 }}
                                 aria-label={`在 ${event.title} 同时段新建行程`}
@@ -1358,7 +1387,7 @@ export function WeeklyTimeGrid({
                 {displayDates.map((day) => {
                   const dayIso = format(day, "yyyy-MM-dd");
                   const dayEvents = displayEventSegments.filter((event) => event.displayDate === dayIso);
-                  const expenseSummary = monthlyExpenseSummaries[dayIso] ?? {
+                  const expenseSummary = dateExpenseSummaries[dayIso] ?? {
                     totalExpense: 0,
                     dailyBudget: null,
                   };
@@ -1443,7 +1472,69 @@ export function WeeklyTimeGrid({
               </div>
             </div>
           )}
-          {activeDayIso ? <DailyExpensePanel date={activeDayIso} /> : null}
+          {viewMode === "week" && selectedWeekExpenseDateIso ? (
+            <div className="border-t border-gray-200 bg-white px-4 py-4 sm:px-6">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-stone-950">本周花销</h3>
+                  <p className="mt-0.5 text-xs text-stone-500">选择日期后在下方记录支出和预算</p>
+                </div>
+                <span className="rounded-md border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600">
+                  {selectedWeekExpenseDateIso}
+                </span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
+                {weekExpenseDateOptions.map(({ date, dateIso }) => {
+                  const summary = dateExpenseSummaries[dateIso] ?? {
+                    totalExpense: 0,
+                    dailyBudget: null,
+                  };
+                  const isSelected = selectedWeekExpenseDateIso === dateIso;
+                  const isOverBudget =
+                    summary.dailyBudget !== null && summary.totalExpense > summary.dailyBudget;
+
+                  return (
+                    <button
+                      key={dateIso}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => setSelectedExpenseDateIso(dateIso)}
+                      className={`min-h-20 rounded-lg border px-3 py-2 text-left transition ${
+                        isSelected
+                          ? "border-stone-900 bg-stone-950 text-white shadow-sm"
+                          : "border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:bg-white"
+                      }`}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="truncate text-xs font-medium opacity-80">
+                          {format(date, "M/d")} {format(date, "EEE", { locale: zhCN })}
+                        </span>
+                        {isOverBudget ? (
+                          <span
+                            className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold ${
+                              isSelected ? "bg-white/15 text-white" : "bg-rose-100 text-rose-700"
+                            }`}
+                          >
+                            超支
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="mt-2 block truncate text-base font-semibold">
+                        {getMonthlyExpenseLabel(summary)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+          {activeExpenseDateIso ? (
+            <DailyExpensePanel
+              date={activeExpenseDateIso}
+              title={activeExpenseTitle}
+              onChanged={handleExpenseChanged}
+            />
+          ) : null}
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             {selectedCell ? (
               <DialogContent className="rounded-lg border-gray-200 shadow-lg">
