@@ -19,6 +19,9 @@ type ExpenseRow = {
   id: string;
   amount: number | string;
   category: string;
+  category_main: string | null;
+  category_sub: string | null;
+  category_detail: string | null;
   note: string | null;
   expense_date: string;
   created_at: string;
@@ -33,10 +36,24 @@ type DailyBudgetRow = {
   updated_at: string;
 };
 
+type PeriodBudgetRow = {
+  id: string;
+  amount: number | string;
+  budget_type: BudgetPeriodType;
+  period_start: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BudgetPeriodType = "week" | "month";
+
 export type ExpenseDto = {
   id: string;
   amount: number;
   category: string;
+  category_main: string;
+  category_sub: string;
+  category_detail: string;
   note: string;
   expense_date: string;
   created_at: string;
@@ -51,9 +68,21 @@ export type DailyBudgetDto = {
   updated_at: string;
 };
 
+export type PeriodBudgetDto = {
+  id: string;
+  amount: number;
+  budget_type: BudgetPeriodType;
+  period_start: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ExpenseInput = {
   amount: string;
   category: string;
+  category_main: string;
+  category_sub: string;
+  category_detail: string;
   note: string;
   expense_date: string;
 };
@@ -61,6 +90,12 @@ export type ExpenseInput = {
 export type DailyBudgetInput = {
   amount: string;
   budget_date: string;
+};
+
+export type PeriodBudgetInput = {
+  amount: string;
+  budget_type: BudgetPeriodType;
+  period_start: string;
 };
 
 export function jsonError(message: string, status: number) {
@@ -88,6 +123,13 @@ export function parseDateQuery(date: string | null) {
     return { error: jsonError("date must use YYYY-MM-DD format.", 400) };
   }
   return { date };
+}
+
+export function parseBudgetPeriodType(value: unknown):
+  | { budgetType: BudgetPeriodType; error?: never }
+  | { error: NextResponse; budgetType?: never } {
+  if (value === "week" || value === "month") return { budgetType: value };
+  return { error: jsonError("type must be week or month.", 400) };
 }
 
 export async function getAuthenticatedSupabase(request: Request): Promise<AuthResult> {
@@ -135,6 +177,30 @@ function parsePositiveAmount(value: unknown) {
   return raw;
 }
 
+function readString(payload: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "string") return value.trim();
+  }
+  return "";
+}
+
+function parseCategoryLabel(label: string) {
+  const parts = label
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return {
+    main: parts[0] ?? "",
+    sub: parts[1] ?? "",
+    detail: parts[2] ?? "",
+  };
+}
+
+function buildCategoryLabel(main: string, sub: string, detail: string) {
+  return [main, sub, detail].filter(Boolean).join(" / ");
+}
+
 export function parseExpenseInput(payload: unknown):
   | { value: ExpenseInput; error?: never }
   | { error: NextResponse; value?: never } {
@@ -143,8 +209,15 @@ export function parseExpenseInput(payload: unknown):
   const amount = parsePositiveAmount(payload.amount);
   if (!amount) return { error: jsonError("amount must be greater than 0.", 400) };
 
-  const category = typeof payload.category === "string" ? payload.category.trim() : "";
-  if (!category) return { error: jsonError("category is required.", 400) };
+  const categoryLabel = readString(payload, "category");
+  const parsedLabel = parseCategoryLabel(categoryLabel);
+  const categoryMain =
+    readString(payload, "category_main", "categoryMain") || parsedLabel.main || categoryLabel;
+  const categorySub = readString(payload, "category_sub", "categorySub") || parsedLabel.sub;
+  const categoryDetail =
+    readString(payload, "category_detail", "categoryDetail") || parsedLabel.detail;
+  if (!categoryMain) return { error: jsonError("category is required.", 400) };
+  const category = buildCategoryLabel(categoryMain, categorySub, categoryDetail);
 
   const expenseDate =
     typeof payload.expense_date === "string"
@@ -157,7 +230,17 @@ export function parseExpenseInput(payload: unknown):
   }
 
   const note = typeof payload.note === "string" ? payload.note.trim() : "";
-  return { value: { amount, category, note, expense_date: expenseDate } };
+  return {
+    value: {
+      amount,
+      category,
+      category_main: categoryMain,
+      category_sub: categorySub,
+      category_detail: categoryDetail,
+      note,
+      expense_date: expenseDate,
+    },
+  };
 }
 
 export function parseDailyBudgetInput(payload: unknown):
@@ -183,11 +266,53 @@ export function parseDailyBudgetInput(payload: unknown):
   return { value: { amount, budget_date: budgetDate } };
 }
 
+export function parsePeriodBudgetInput(payload: unknown):
+  | { value: PeriodBudgetInput; error?: never }
+  | { error: NextResponse; value?: never } {
+  if (!isRecord(payload)) return { error: jsonError("Invalid JSON body.", 400) };
+
+  const amount = parsePositiveAmount(payload.amount);
+  if (!amount) return { error: jsonError("amount must be greater than 0.", 400) };
+
+  const parsedType = parseBudgetPeriodType(
+    typeof payload.budget_type === "string" ? payload.budget_type : payload.type,
+  );
+  if (parsedType.error) return { error: parsedType.error };
+
+  const date =
+    typeof payload.period_start === "string"
+      ? payload.period_start
+      : typeof payload.periodStart === "string"
+        ? payload.periodStart
+        : typeof payload.date === "string"
+          ? payload.date
+          : "";
+  if (!isIsoDate(date)) {
+    return { error: jsonError("date must use YYYY-MM-DD format.", 400) };
+  }
+
+  const { periodStart } = getBudgetPeriodRange(date, parsedType.budgetType);
+  return {
+    value: {
+      amount,
+      budget_type: parsedType.budgetType,
+      period_start: periodStart,
+    },
+  };
+}
+
 export function toExpenseDto(row: ExpenseRow): ExpenseDto {
+  const parsedLabel = parseCategoryLabel(row.category);
+  const categoryMain = row.category_main ?? parsedLabel.main ?? row.category;
+  const categorySub = row.category_sub ?? parsedLabel.sub ?? "";
+  const categoryDetail = row.category_detail ?? parsedLabel.detail ?? "";
   return {
     id: row.id,
     amount: normalizeMoney(Number(row.amount)),
-    category: row.category,
+    category: row.category || buildCategoryLabel(categoryMain, categorySub, categoryDetail),
+    category_main: categoryMain,
+    category_sub: categorySub,
+    category_detail: categoryDetail,
     note: row.note ?? "",
     expense_date: row.expense_date,
     created_at: row.created_at,
@@ -205,6 +330,17 @@ export function toDailyBudgetDto(row: DailyBudgetRow): DailyBudgetDto {
   };
 }
 
+export function toPeriodBudgetDto(row: PeriodBudgetRow): PeriodBudgetDto {
+  return {
+    id: row.id,
+    amount: normalizeMoney(Number(row.amount)),
+    budget_type: row.budget_type,
+    period_start: row.period_start,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
 export function normalizeMoney(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
@@ -214,7 +350,46 @@ export function sumExpenses(expenses: ExpenseDto[]) {
   return normalizeMoney(expenses.reduce((sum, expense) => sum + expense.amount, 0));
 }
 
+function parseIsoDateParts(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return { year, month, day };
+}
+
+function formatUtcDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function addUtcDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+export function getBudgetPeriodRange(date: string, budgetType: BudgetPeriodType) {
+  const { year, month, day } = parseIsoDateParts(date);
+  const current = new Date(Date.UTC(year, month - 1, day));
+
+  if (budgetType === "month") {
+    const periodStartDate = new Date(Date.UTC(year, month - 1, 1));
+    const nextMonthStart = new Date(Date.UTC(year, month, 1));
+    return {
+      periodStart: formatUtcDate(periodStartDate),
+      periodEnd: formatUtcDate(addUtcDays(nextMonthStart, -1)),
+    };
+  }
+
+  const mondayOffset = (current.getUTCDay() + 6) % 7;
+  const periodStartDate = addUtcDays(current, -mondayOffset);
+  return {
+    periodStart: formatUtcDate(periodStartDate),
+    periodEnd: formatUtcDate(addUtcDays(periodStartDate, 6)),
+  };
+}
+
 export const EXPENSE_SELECT_COLUMNS =
-  "id,amount,category,note,expense_date,created_at,updated_at";
+  "id,amount,category,category_main,category_sub,category_detail,note,expense_date,created_at,updated_at";
 
 export const DAILY_BUDGET_SELECT_COLUMNS = "id,amount,budget_date,created_at,updated_at";
+
+export const PERIOD_BUDGET_SELECT_COLUMNS =
+  "id,amount,budget_type,period_start,created_at,updated_at";
