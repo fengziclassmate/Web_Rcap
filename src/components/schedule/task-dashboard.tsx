@@ -310,9 +310,7 @@ export function TaskDashboard({
   const [expandedCompletedTasks, setExpandedCompletedTasks] = useState<Set<string>>(
     () => new Set(uiPreferences.expandedCompletedTasks),
   );
-  const [completedSectionOpen, setCompletedSectionOpen] = useState(
-    uiPreferences.completedSectionOpen ?? true,
-  );
+  const [completedLibraryOpen, setCompletedLibraryOpen] = useState(false);
   const [projectSectionOpen, setProjectSectionOpen] = useState(uiPreferences.projectSectionOpen);
   const [routineCheckinSectionOpen, setRoutineCheckinSectionOpen] = useState(
     uiPreferences.routineCheckinSectionOpen ?? true,
@@ -917,6 +915,257 @@ export function TaskDashboard({
 
       <Separator />
 
+      <section className="p-6">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-sm font-semibold text-emerald-950">
+                <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+                {"\u5df2\u5b8c\u6210\u4efb\u52a1\u5e93"}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-emerald-800">
+                {"\u4ee5\u5b8c\u6210\u65f6\u95f4\u3001\u65f6\u957f\u548c\u6bcf\u5468\u6210\u679c\u5f52\u6863\u4efb\u52a1\u3002"}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-sm sm:flex sm:items-center sm:gap-5">
+              <div>
+                <p className="text-[11px] text-emerald-700">{"\u5f52\u6863\u4efb\u52a1"}</p>
+                <p className="font-semibold tabular-nums text-emerald-950">{completedTaskInsights.total}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-emerald-700">{"\u672c\u5468\u5b8c\u6210"}</p>
+                <p className="font-semibold tabular-nums text-emerald-950">{completedTaskInsights.thisWeekCount}</p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                className="col-span-2 mt-2 w-full bg-emerald-700 text-white hover:bg-emerald-800 sm:col-span-1 sm:mt-0 sm:w-auto"
+                onClick={() => setCompletedLibraryOpen(true)}
+              >
+                <CalendarRange className="mr-1.5 h-4 w-4" />
+                {"\u67e5\u770b\u5b8c\u6574\u5f52\u6863"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Dialog open={completedLibraryOpen} onOpenChange={setCompletedLibraryOpen}>
+        <DialogContent className="h-[calc(100dvh-1rem)] max-h-[860px] w-[calc(100%-1rem)] max-w-6xl grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:w-full">
+          <DialogHeader className="border-b border-stone-200 bg-white px-5 py-4 pr-12 sm:px-6">
+            <DialogTitle className="flex items-center gap-2 text-lg text-stone-950">
+              <CheckCircle className="h-5 w-5 text-emerald-600" aria-hidden />
+              {"\u5df2\u5b8c\u6210\u4efb\u52a1\u5e93"}
+            </DialogTitle>
+            <p className="text-xs leading-5 text-stone-500">
+              {"\u5b8c\u6210\u60c5\u51b5\u6309\u6bcf\u5468\u5f52\u6863\uff0c\u6240\u6709\u4efb\u52a1\u53ef\u5728\u6b64\u67e5\u770b\u8be6\u60c5\u3001\u7f16\u8f91\u6216\u6062\u590d\u3002"}
+            </p>
+          </DialogHeader>
+
+          <div className="min-h-0 overflow-y-auto bg-stone-50/80 p-4 sm:p-6">
+            {completedTasks.length > 0 ? (
+              <div className="grid items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+                <aside className="space-y-4 xl:sticky xl:top-0">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+                      <p className="text-[11px] font-medium text-emerald-700">{"\u5f52\u6863\u4efb\u52a1"}</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-950">{completedTaskInsights.total}</p>
+                    </div>
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
+                      <p className="text-[11px] font-medium text-blue-700">{"\u672c\u5468\u5b8c\u6210"}</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums text-blue-950">{completedTaskInsights.thisWeekCount}</p>
+                    </div>
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+                      <p className="text-[11px] font-medium text-amber-700">{"\u5e73\u5747\u5b8c\u6210\u65f6\u957f"}</p>
+                      <p className="mt-1 text-base font-semibold text-amber-950">
+                        {formatDurationLabel(completedTaskInsights.averageDurationHours)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-stone-200 bg-white px-3 py-2.5">
+                      <p className="text-[11px] font-medium text-stone-600">{"\u65f6\u957f\u6837\u672c"}</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums text-stone-950">
+                        {completedTaskInsights.durationSampleCount}
+                      </p>
+                    </div>
+                  </div>
+
+                  <section className="rounded-lg border border-stone-200 bg-white p-4">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <h4 className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+                        <CalendarRange className="h-4 w-4 text-emerald-600" />
+                        {"\u6bcf\u5468\u5b8c\u6210"}
+                      </h4>
+                      <span className="text-[11px] text-stone-500">{"\u6700\u8fd1 8 \u5468"}</span>
+                    </div>
+                    <div className="space-y-2.5">
+                      {completedTaskInsights.weeklyStats.map((week) => (
+                        <div key={week.weekStart}>
+                          <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
+                            <span className="truncate text-stone-500" title={formatWeekRangeLabel(week.weekStart)}>
+                              {formatWeekRangeLabel(week.weekStart)}
+                            </span>
+                            <span className="shrink-0 font-semibold tabular-nums text-stone-800">{week.count}</span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
+                            <div
+                              className="h-full rounded-full bg-emerald-600"
+                              style={{
+                                width: `${Math.max(8, (week.count / completedTaskInsights.maxWeeklyCount) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rounded-lg border border-stone-200 bg-white p-4">
+                    <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-stone-900">
+                      <ListTodo className="h-4 w-4 text-blue-600" />
+                      {"\u4f18\u5148\u7ea7\u5206\u5e03"}
+                    </h4>
+                    <div className="space-y-2.5">
+                      {completedTaskInsights.priorityStats.map((stat) => (
+                        <div key={stat.priority}>
+                          <div className="mb-1 flex items-center justify-between gap-2 text-[11px]">
+                            <span className="flex min-w-0 items-center gap-1.5 text-stone-700">
+                              {getPriorityIcon(stat.priority)}
+                              <span className="truncate">{stat.priority}</span>
+                            </span>
+                            <span className="shrink-0 font-medium tabular-nums text-stone-800">
+                              {stat.count} / {stat.percent}%
+                            </span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
+                            <div
+                              className={`h-full rounded-full ${getPriorityVisualStyle(stat.priority).barClassName}`}
+                              style={{ width: `${stat.count > 0 ? Math.max(stat.percent, 6) : 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </aside>
+
+                <section className="min-w-0 rounded-lg border border-stone-200 bg-white">
+                  <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3">
+                    <p className="text-sm font-semibold text-stone-900">{"\u5f52\u6863\u5217\u8868"}</p>
+                    <span className="text-xs text-stone-500">{"\u6309\u5b8c\u6210\u65f6\u95f4\u5012\u5e8f"}</span>
+                  </div>
+                  <ul className="divide-y divide-stone-100">
+                    {orderedCompletedTasks.map((task) => {
+                      const completedAt = getTaskCompletionDateTime(task);
+                      const createdAt = getTaskCreatedDateTime(task);
+                      const durationHours = getTaskCompletionDurationHours(task);
+                      const completedSubtasks = task.subtasks.filter((subtask) => subtask.done).length;
+
+                      return (
+                        <li key={task.id} className="px-4 py-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <button
+                              type="button"
+                              className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                              onClick={() =>
+                                setExpandedCompletedTasks((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(task.id)) next.delete(task.id);
+                                  else next.add(task.id);
+                                  patchUiPreferences({ expandedCompletedTasks: [...next] });
+                                  return next;
+                                })
+                              }
+                            >
+                              <ChevronDown
+                                className={`mt-0.5 h-4 w-4 shrink-0 text-stone-500 transition-transform ${
+                                  expandedCompletedTasks.has(task.id) ? "" : "-rotate-90"
+                                }`}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="break-words font-medium text-stone-900 line-through">{task.name}</p>
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-stone-500">
+                                  <Badge className={`rounded-md border ${getPriorityVisualStyle(task.priority).badgeClassName}`}>
+                                    {task.priority}
+                                  </Badge>
+                                  <span className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-stone-50 px-1.5 py-0.5">
+                                    <Clock className="h-3 w-3" />
+                                    {"\u5b8c\u6210 "}{formatDateTimeLabel(completedAt)}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-stone-50 px-1.5 py-0.5">
+                                    {"\u65f6\u957f "}{formatDurationLabel(durationHours)}
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
+                            <div className="flex shrink-0 items-center gap-1 self-end sm:self-start">
+                              <Button type="button" size="sm" variant="ghost" onClick={() => handleOpenEdit(task)}>
+                                {"\u7f16\u8f91"}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 rounded-md border-stone-300 px-3 text-xs hover:bg-stone-50"
+                                onClick={() => handleMoveBackToIncomplete(task.id)}
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                {"\u79fb\u56de\u672a\u5b8c\u6210"}
+                              </Button>
+                            </div>
+                          </div>
+                          {expandedCompletedTasks.has(task.id) ? (
+                            <div className="mt-3 space-y-3 rounded-md border border-stone-200 bg-stone-50 p-3">
+                              <div className="grid gap-2 text-xs text-stone-600 sm:grid-cols-3">
+                                <span>{"\u521b\u5efa\u65f6\u95f4\uff1a"}{formatDateTimeLabel(createdAt)}</span>
+                                <span>{"\u5b8c\u6210\u65f6\u95f4\uff1a"}{formatDateTimeLabel(completedAt)}</span>
+                                <span>{"\u5b8c\u6210\u65f6\u957f\uff1a"}{formatDurationLabel(durationHours)}</span>
+                              </div>
+                              <p className="text-xs leading-5 text-stone-600">
+                                {"\u5b8c\u6210\u8bb0\u5f55\uff1a"}{task.completionLog || "\u6682\u65e0"}
+                              </p>
+                              <div className="text-xs text-stone-600">
+                                {"\u5b50\u4efb\u52a1\u5b8c\u6210\u60c5\u51b5\uff1a"}
+                                {task.subtasks.length === 0 ? (
+                                  <span className="ml-1">{"\u65e0\u5b50\u4efb\u52a1"}</span>
+                                ) : (
+                                  <div className="mt-1 space-y-2">
+                                    <span className="inline-flex rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] text-stone-500">
+                                      {completedSubtasks} / {task.subtasks.length}
+                                    </span>
+                                    <ul className="space-y-1">
+                                      {task.subtasks.map((subtask) => (
+                                        <li key={subtask.id} className="flex items-center gap-2">
+                                          <Checkbox checked={subtask.done} className="h-3.5 w-3.5" />
+                                          <span className={subtask.done ? "line-through text-stone-500" : "text-stone-700"}>
+                                            {subtask.name}
+                                          </span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              </div>
+            ) : (
+              <div className="grid min-h-72 place-items-center rounded-lg border border-dashed border-stone-300 bg-white p-6 text-center">
+                <div>
+                  <CheckCircle className="mx-auto h-8 w-8 text-stone-300" aria-hidden />
+                  <p className="mt-3 text-sm font-medium text-stone-900">{"\u6682\u65e0\u5df2\u5f52\u6863\u4efb\u52a1"}</p>
+                  <p className="mt-1 text-xs text-stone-500">{"\u5b8c\u6210\u957f\u671f\u4efb\u52a1\u540e\uff0c\u8fd9\u91cc\u4f1a\u81ea\u52a8\u4fdd\u5b58\u5b83\u7684\u5b8c\u6210\u4fe1\u606f\u3002"}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-600">
@@ -1153,232 +1402,6 @@ export function TaskDashboard({
       </div>
 
       <Separator />
-
-      <Collapsible
-        open={completedSectionOpen}
-        onOpenChange={(open) => {
-          setCompletedSectionOpen(open);
-          patchUiPreferences({ completedSectionOpen: open });
-        }}
-        className="p-6"
-      >
-        <CollapsibleTrigger className="section-trigger flex w-full items-center justify-between rounded-2xl px-4 py-3 text-sm font-medium text-gray-900 transition-colors duration-150 hover:bg-white/70">
-          已完成任务库
-          <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${completedSectionOpen ? "" : "-rotate-90"}`} />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          {completedTasks.length > 0 ? (
-            <div className="mt-4 space-y-4">
-              <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
-                  <p className="text-[11px] font-medium text-emerald-700">{"\u5f52\u6863\u4efb\u52a1"}</p>
-                  <p className="mt-1 text-2xl font-semibold text-emerald-950">{completedTaskInsights.total}</p>
-                </div>
-                <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2">
-                  <p className="text-[11px] font-medium text-blue-700">{"\u672c\u5468\u5b8c\u6210"}</p>
-                  <p className="mt-1 text-2xl font-semibold text-blue-950">{completedTaskInsights.thisWeekCount}</p>
-                </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-                  <p className="text-[11px] font-medium text-amber-700">{"\u5e73\u5747\u5b8c\u6210\u65f6\u957f"}</p>
-                  <p className="mt-1 text-lg font-semibold text-amber-950">
-                    {formatDurationLabel(completedTaskInsights.averageDurationHours)}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
-                  <p className="text-[11px] font-medium text-stone-600">{"\u65f6\u957f\u6837\u672c"}</p>
-                  <p className="mt-1 text-2xl font-semibold text-stone-950">{completedTaskInsights.durationSampleCount}</p>
-                </div>
-              </div>
-
-              <div className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-                <section className="rounded-2xl border border-stone-200 bg-white/80 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                      <CalendarRange className="h-4 w-4 text-emerald-600" />
-                      {"\u6bcf\u5468\u5b8c\u6210\u60c5\u51b5"}
-                    </h4>
-                    <span className="text-[11px] text-gray-500">{"\u6700\u8fd1 8 \u5468"}</span>
-                  </div>
-                  <div className="space-y-3">
-                    {completedTaskInsights.weeklyStats.map((week) => (
-                      <div key={week.weekStart} className="space-y-1">
-                        <div className="flex items-center gap-3">
-                          <span className="w-36 shrink-0 text-[11px] text-gray-500">
-                            {formatWeekRangeLabel(week.weekStart)}
-                          </span>
-                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
-                            <div
-                              className="h-full rounded-full bg-emerald-600"
-                              style={{
-                                width: `${Math.max(
-                                  8,
-                                  (week.count / completedTaskInsights.maxWeeklyCount) * 100,
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                          <span className="w-8 shrink-0 text-right text-xs font-semibold text-gray-800">
-                            {week.count}
-                          </span>
-                        </div>
-                        <p className="pl-36 text-[11px] text-gray-500">
-                          {"\u5e73\u5747\u65f6\u957f\uff1a"}{formatDurationLabel(week.averageDurationHours)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="rounded-2xl border border-stone-200 bg-white/80 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                      <ListTodo className="h-4 w-4 text-blue-600" />
-                      {"\u4efb\u52a1\u7c7b\u578b\u5b8c\u6210\u60c5\u51b5"}
-                    </h4>
-                    <span className="text-[11px] text-gray-500">{"\u6309\u4f18\u5148\u7ea7"}</span>
-                  </div>
-                  <div className="space-y-3">
-                    {completedTaskInsights.priorityStats.map((stat) => (
-                      <div key={stat.priority} className="space-y-1">
-                        <div className="flex items-center justify-between gap-2 text-xs">
-                          <span className="flex min-w-0 items-center gap-1.5 text-gray-700">
-                            {getPriorityIcon(stat.priority)}
-                            <span className="truncate">{stat.priority}</span>
-                          </span>
-                          <span className="shrink-0 font-medium text-gray-800">
-                            {stat.count} / {stat.percent}%
-                          </span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-stone-100">
-                          <div
-                            className={`h-full rounded-full ${getPriorityVisualStyle(stat.priority).barClassName}`}
-                            style={{ width: `${stat.count > 0 ? Math.max(stat.percent, 6) : 0}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </div>
-
-              <ul className="space-y-3 rounded-2xl subtle-card p-4 text-sm text-gray-600">
-                {orderedCompletedTasks.map((task) => {
-                  const completedAt = getTaskCompletionDateTime(task);
-                  const createdAt = getTaskCreatedDateTime(task);
-                  const durationHours = getTaskCompletionDurationHours(task);
-                  const completedSubtasks = task.subtasks.filter((subtask) => subtask.done).length;
-
-                  return (
-                    <li key={task.id} className="rounded-xl border border-stone-200/70 bg-white/70 px-3 py-3">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <button
-                          type="button"
-                          className="flex min-w-0 flex-1 items-start gap-2 text-left"
-                          onClick={() =>
-                            setExpandedCompletedTasks((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(task.id)) {
-                                next.delete(task.id);
-                              } else {
-                                next.add(task.id);
-                              }
-                              patchUiPreferences({ expandedCompletedTasks: [...next] });
-                              return next;
-                            })
-                          }
-                        >
-                          <ChevronDown
-                            className={`mt-0.5 h-4 w-4 shrink-0 text-gray-500 transition-transform ${
-                              expandedCompletedTasks.has(task.id) ? "" : "-rotate-90"
-                            }`}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <span className="block min-w-0 truncate font-medium text-gray-900 line-through">
-                              {task.name}
-                            </span>
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
-                              <Badge
-                                className={`rounded-md border ${getPriorityVisualStyle(task.priority).badgeClassName}`}
-                              >
-                                {task.priority}
-                              </Badge>
-                              <span className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-stone-50 px-1.5 py-0.5">
-                                <Clock className="h-3 w-3" />
-                                {"\u5b8c\u6210 "}{formatDateTimeLabel(completedAt)}
-                              </span>
-                              <span className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-stone-50 px-1.5 py-0.5">
-                                {"\u65f6\u957f "}{formatDurationLabel(durationHours)}
-                              </span>
-                            </div>
-                          </div>
-                        </button>
-                        <div className="flex shrink-0 items-center gap-1 self-end sm:self-start">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleOpenEdit(task)}
-                          >
-                            {"\u7f16\u8f91"}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 rounded-md border-gray-300 px-3 text-xs hover:bg-gray-50 transition-colors duration-150"
-                            onClick={() => handleMoveBackToIncomplete(task.id)}
-                          >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                            {"\u79fb\u56de\u672a\u5b8c\u6210"}
-                          </Button>
-                        </div>
-                      </div>
-                      {expandedCompletedTasks.has(task.id) ? (
-                        <div className="mt-3 space-y-3 rounded-md border border-gray-100 bg-gray-50 p-3">
-                          <div className="grid gap-2 text-xs text-gray-600 sm:grid-cols-3">
-                            <span>{"\u521b\u5efa\u65f6\u95f4\uff1a"}{formatDateTimeLabel(createdAt)}</span>
-                            <span>{"\u5b8c\u6210\u65f6\u95f4\uff1a"}{formatDateTimeLabel(completedAt)}</span>
-                            <span>{"\u5b8c\u6210\u65f6\u957f\uff1a"}{formatDurationLabel(durationHours)}</span>
-                          </div>
-                          <p className="text-xs text-gray-600">
-                            {"\u5b8c\u6210\u8bb0\u5f55\uff1a"}{task.completionLog || "\u6682\u65e0"}
-                          </p>
-                          <div className="text-xs text-gray-600">
-                            {"\u5b50\u4efb\u52a1\u5b8c\u6210\u60c5\u51b5\uff1a"}
-                            {task.subtasks.length === 0 ? (
-                              <span className="ml-1">{"\u65e0\u5b50\u4efb\u52a1"}</span>
-                            ) : (
-                              <div className="mt-1 space-y-2">
-                                <span className="inline-flex rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] text-gray-500">
-                                  {completedSubtasks} / {task.subtasks.length}
-                                </span>
-                                <ul className="space-y-1">
-                                  {task.subtasks.map((subtask) => (
-                                    <li key={subtask.id} className="flex items-center gap-2">
-                                      <Checkbox checked={subtask.done} className="h-3.5 w-3.5" />
-                                      <span className={subtask.done ? "line-through text-gray-500" : "text-gray-700"}>
-                                        {subtask.name}
-                                      </span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : (
-            <p className="mt-4 border border-gray-200 rounded-lg p-4 text-sm text-gray-500 text-center">
-              {"\u6682\u65e0\u5df2\u5f52\u6863\u4efb\u52a1"}
-            </p>
-          )}
-        </CollapsibleContent>
-      </Collapsible>
 
       {showProjectSection ? (
         <>
