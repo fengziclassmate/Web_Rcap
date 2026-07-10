@@ -1049,7 +1049,7 @@ export function TaskDashboard({
                 </aside>
 
                 <section className="min-w-0 rounded-lg border border-stone-200 bg-white">
-                  <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3">
+                  <div className="flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3">
                     <p className="text-sm font-semibold text-stone-900">{"\u5f52\u6863\u5217\u8868"}</p>
                     <span className="text-xs text-stone-500">{"\u6309\u5b8c\u6210\u65f6\u95f4\u5012\u5e8f"}</span>
                   </div>
