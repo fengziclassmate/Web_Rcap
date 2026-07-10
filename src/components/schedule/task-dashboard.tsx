@@ -951,7 +951,7 @@ export function TaskDashboard({
       </section>
 
       <Dialog open={completedLibraryOpen} onOpenChange={setCompletedLibraryOpen}>
-        <DialogContent className="h-[calc(100dvh-1rem)] max-h-[860px] w-[calc(100%-1rem)] max-w-6xl grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:w-full">
+        <DialogContent className="h-[calc(100dvh-1rem)] max-h-[860px] w-[calc(100%-1rem)] max-w-6xl grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:w-full sm:!max-w-6xl">
           <DialogHeader className="border-b border-stone-200 bg-white px-5 py-4 pr-12 sm:px-6">
             <DialogTitle className="flex items-center gap-2 text-lg text-stone-950">
               <CheckCircle className="h-5 w-5 text-emerald-600" aria-hidden />
