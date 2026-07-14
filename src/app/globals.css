@@ -313,44 +313,61 @@
   }
 
   .utility-panel-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: auto auto;
-    gap: 0.45rem;
     border-top: 1px solid color-mix(in oklch, var(--border) 72%, white);
   }
 
-  .utility-panel,
-  .utility-panel-root {
-    display: contents;
+  .utility-panel-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
-  .utility-panel-header {
+  .utility-panel-tabs {
+    display: grid;
     min-width: 0;
+    flex: 1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+  }
+
+  .utility-panel-tab {
+    display: flex;
+    min-width: 0;
+    min-height: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
     border: 1px solid color-mix(in oklch, var(--border) 78%, white);
-    border-radius: 0.85rem;
+    border-radius: 0.7rem;
     background: color-mix(in oklch, white 64%, transparent);
-    padding: 0.45rem;
+    padding: 0.5rem 0.4rem;
+    color: color-mix(in oklch, var(--foreground) 70%, white);
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1;
+    transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
   }
 
-  .utility-panel-project .utility-panel-header {
-    grid-column: 1;
-    grid-row: 1;
+  .utility-panel-tab:hover {
+    border-color: color-mix(in oklch, var(--primary) 38%, var(--border));
+    background: color-mix(in oklch, var(--primary) 7%, white);
   }
 
-  .utility-panel-routine .utility-panel-header {
-    grid-column: 2;
-    grid-row: 1;
+  .utility-panel-tab-active {
+    border-color: color-mix(in oklch, var(--primary) 52%, var(--border));
+    background: color-mix(in oklch, var(--primary) 12%, white);
+    color: color-mix(in oklch, var(--primary) 84%, var(--foreground));
   }
 
-  .utility-panel-achievement .utility-panel-header {
-    grid-column: 3;
-    grid-row: 1;
+  .utility-panel-add {
+    display: inline-flex;
+    min-height: 2.5rem;
+    align-items: center;
+    gap: 0.35rem;
+    padding-inline: 0.7rem;
   }
 
   .utility-panel-content {
-    grid-column: 1 / -1;
-    grid-row: 2;
     min-width: 0;
     border: 1px solid color-mix(in oklch, var(--border) 72%, white);
     border-radius: 0.85rem;
@@ -359,18 +376,31 @@
     box-shadow: 0 10px 25px color-mix(in oklch, var(--foreground) 5%, transparent);
   }
 
-  .utility-panel-header:not(.utility-panel-header-active) .utility-panel-action {
-    display: none;
-  }
-
   @media (max-width: 420px) {
     .daily-task-panel {
       padding: 0.9rem;
     }
 
     .utility-panel-grid {
-      gap: 0.35rem;
       padding-inline: 0.75rem;
+    }
+
+    .utility-panel-controls {
+      gap: 0.35rem;
+    }
+
+    .utility-panel-tabs {
+      gap: 0.25rem;
+    }
+
+    .utility-panel-tab {
+      gap: 0.25rem;
+      padding-inline: 0.3rem;
+      font-size: 0.72rem;
+    }
+
+    .utility-panel-add {
+      padding-inline: 0.55rem;
     }
   }
 }

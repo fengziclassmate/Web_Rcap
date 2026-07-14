@@ -334,7 +334,7 @@ export function TaskDashboard({
     if (uiPreferences.projectSectionOpen) return "project";
     if (uiPreferences.routineCheckinSectionOpen) return "routine";
     if (uiPreferences.achievementSectionOpen) return "achievement";
-    return null;
+    return "project";
   });
   const [footprintSectionOpen, setFootprintSectionOpen] = useState(uiPreferences.footprintSectionOpen);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
@@ -954,6 +954,20 @@ export function TaskDashboard({
     });
   }
 
+  function handleAddUtilityItem() {
+    if (activeUtilityPanel === "routine") {
+      setShowRoutineCheckinForm(true);
+      return;
+    }
+
+    if (activeUtilityPanel === "achievement") {
+      openCreateAchievement();
+      return;
+    }
+
+    setShowAddProjectDialog(true);
+  }
+
   return (
     <aside className="module-shell">
       <div className="module-header px-6 py-5">
@@ -1498,6 +1512,44 @@ export function TaskDashboard({
       <Separator />
 
       <div className="utility-panel-grid p-4 sm:p-6">
+      <div className="utility-panel-controls">
+        <div className="utility-panel-tabs" role="tablist" aria-label="打卡与成就栏目">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeUtilityPanel === "project"}
+            className={`utility-panel-tab ${activeUtilityPanel === "project" ? "utility-panel-tab-active" : ""}`}
+            onClick={() => setUtilityPanel("project", true)}
+          >
+            <KanbanSquare className="h-4 w-4 shrink-0" />
+            <span className="truncate">Project</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeUtilityPanel === "routine"}
+            className={`utility-panel-tab ${activeUtilityPanel === "routine" ? "utility-panel-tab-active" : ""}`}
+            onClick={() => setUtilityPanel("routine", true)}
+          >
+            <Clock className="h-4 w-4 shrink-0" />
+            <span className="truncate">日常</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeUtilityPanel === "achievement"}
+            className={`utility-panel-tab ${activeUtilityPanel === "achievement" ? "utility-panel-tab-active" : ""}`}
+            onClick={() => setUtilityPanel("achievement", true)}
+          >
+            <Trophy className="h-4 w-4 shrink-0" />
+            <span className="truncate">成就</span>
+          </button>
+        </div>
+        <Button type="button" size="sm" className="utility-panel-add shrink-0" onClick={handleAddUtilityItem}>
+          <Plus className="h-4 w-4" />
+          <span>添加</span>
+        </Button>
+      </div>
       {showProjectSection ? (
       <section className="utility-panel utility-panel-project">
         <Collapsible
@@ -1505,19 +1557,6 @@ export function TaskDashboard({
           open={activeUtilityPanel === "project"}
           onOpenChange={(open) => setUtilityPanel("project", open)}
         >
-          <div className={`utility-panel-header flex items-center gap-2 ${activeUtilityPanel === "project" ? "utility-panel-header-active" : ""}`}>
-            <CollapsibleTrigger className="flex min-h-11 flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
-              <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
-                <KanbanSquare className="h-4 w-4 shrink-0 text-primary" />
-                <span className="truncate">Project打卡</span>
-              </h3>
-              <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${activeUtilityPanel === "project" ? "" : "-rotate-90"}`} />
-            </CollapsibleTrigger>
-            <Button type="button" size="sm" className="utility-panel-action shrink-0" onClick={() => setShowAddProjectDialog(true)}>
-              <Plus className="mr-1 h-4 w-4" />
-              添加
-            </Button>
-          </div>
           <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
             <div className="space-y-3">
               {visibleProjectCheckins.map((project) => {
@@ -1656,29 +1695,6 @@ export function TaskDashboard({
           open={activeUtilityPanel === "routine"}
           onOpenChange={(open) => setUtilityPanel("routine", open)}
         >
-          <div className={`utility-panel-header flex items-center gap-2 ${activeUtilityPanel === "routine" ? "utility-panel-header-active" : ""}`}>
-            <CollapsibleTrigger className="flex min-h-11 flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
-              <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
-                <Clock className="h-4 w-4 shrink-0 text-primary" />
-                <span className="truncate">日常打卡</span>
-              </h3>
-              <ChevronDown
-                className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${
-                  activeUtilityPanel === "routine" ? "" : "-rotate-90"
-                }`}
-              />
-            </CollapsibleTrigger>
-            <Button
-              type="button"
-              size="sm"
-              className="utility-panel-action shrink-0"
-              onClick={() => setShowRoutineCheckinForm((open) => !open)}
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              添加
-            </Button>
-          </div>
-
           <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
               <div className="flex items-center justify-between gap-2">
@@ -1839,23 +1855,6 @@ export function TaskDashboard({
           open={activeUtilityPanel === "achievement"}
           onOpenChange={(open) => setUtilityPanel("achievement", open)}
         >
-          <div className={`utility-panel-header flex items-center gap-2 ${activeUtilityPanel === "achievement" ? "utility-panel-header-active" : ""}`}>
-            <CollapsibleTrigger className="flex min-h-11 flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
-              <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
-                <Trophy className="h-4 w-4 shrink-0 text-primary" />
-                <span className="truncate">成就记录</span>
-              </h3>
-              <ChevronDown
-                className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${
-                  activeUtilityPanel === "achievement" ? "" : "-rotate-90"
-                }`}
-              />
-            </CollapsibleTrigger>
-            <Button type="button" size="sm" className="utility-panel-action shrink-0" onClick={openCreateAchievement}>
-              <Plus className="mr-1 h-4 w-4" />
-              添加
-            </Button>
-          </div>
           <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
             {groupedAchievements.length === 0 ? (
               <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-500">
