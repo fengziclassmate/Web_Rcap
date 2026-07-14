@@ -30,6 +30,7 @@ import {
   type Priority,
   type ProjectCheckin,
   type SubTask,
+  type TaskType,
 } from "@/lib/types";
 import {
   Collapsible,
@@ -47,11 +48,12 @@ import { TaskDecompositionDialog } from "@/components/llm/task-decomposition-dia
 import { ContextBadge } from "@/components/llm/context-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { Achievement } from "@/components/monitoring/achievements-panel";
+import { DailyTaskPanel } from "@/components/schedule/daily-task-panel";
 
 type TaskDashboardProps = {
   tasks: LongTask[];
   onToggleTask: (taskId: string) => void;
-  onAddTask: (name: string, dueDate: string) => void;
+  onAddTask: (name: string, dueDate: string, taskType?: TaskType) => void;
   onUpdateTask: (taskId: string, patch: Partial<LongTask>) => void;
   onDeleteTask: (taskId: string) => void;
   onReorderTask: (sourceTaskId: string, targetTaskId: string) => void;
@@ -59,6 +61,14 @@ type TaskDashboardProps = {
   onAddAnnualTask: (name: string) => void;
   onToggleAnnualTask: (taskId: string) => void;
   onDeleteAnnualTask: (taskId: string) => void;
+  onUpdateAnnualTask: (taskId: string, name: string) => void;
+  onReorderAnnualTask: (sourceTaskId: string, targetTaskId: string) => void;
+  onCreateDailyTaskTimeBlock: (
+    task: LongTask,
+    date: string,
+    startHour: number,
+    durationMinutes: number,
+  ) => void;
   projectCheckins: ProjectCheckin[];
   onAddProjectCheckin: (name: string, description: string) => void;
   onCheckinProject: (projectId: string, date: string, note: string) => void;
@@ -244,6 +254,9 @@ export function TaskDashboard({
   onAddAnnualTask,
   onToggleAnnualTask,
   onDeleteAnnualTask,
+  onUpdateAnnualTask,
+  onReorderAnnualTask,
+  onCreateDailyTaskTimeBlock,
   projectCheckins,
   onAddProjectCheckin,
   onCheckinProject,
@@ -288,6 +301,9 @@ export function TaskDashboard({
   const [newFootprintName, setNewFootprintName] = useState("");
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
   const [showAddAnnualDialog, setShowAddAnnualDialog] = useState(false);
+  const [editingAnnualTaskId, setEditingAnnualTaskId] = useState<string | null>(null);
+  const [editingAnnualTaskName, setEditingAnnualTaskName] = useState("");
+  const [draggingAnnualTaskId, setDraggingAnnualTaskId] = useState<string | null>(null);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showRoutineCheckinForm, setShowRoutineCheckinForm] = useState(false);
   const [showAchievementDialog, setShowAchievementDialog] = useState(false);
@@ -307,17 +323,19 @@ export function TaskDashboard({
   const [editingFootprintName, setEditingFootprintName] = useState("");
   const [editingFootprintDate, setEditingFootprintDate] = useState(getTodayISODate);
   const [longTaskSectionOpen, setLongTaskSectionOpen] = useState(uiPreferences.longTaskSectionOpen);
+  const [annualSectionOpen, setAnnualSectionOpen] = useState(uiPreferences.annualSectionOpen);
   const [expandedCompletedTasks, setExpandedCompletedTasks] = useState<Set<string>>(
     () => new Set(uiPreferences.expandedCompletedTasks),
   );
   const [completedLibraryOpen, setCompletedLibraryOpen] = useState(false);
-  const [projectSectionOpen, setProjectSectionOpen] = useState(uiPreferences.projectSectionOpen);
-  const [routineCheckinSectionOpen, setRoutineCheckinSectionOpen] = useState(
-    uiPreferences.routineCheckinSectionOpen ?? true,
-  );
-  const [achievementSectionOpen, setAchievementSectionOpen] = useState(
-    uiPreferences.achievementSectionOpen ?? true,
-  );
+  const [activeUtilityPanel, setActiveUtilityPanel] = useState<
+    "project" | "routine" | "achievement" | null
+  >(() => {
+    if (uiPreferences.projectSectionOpen) return "project";
+    if (uiPreferences.routineCheckinSectionOpen) return "routine";
+    if (uiPreferences.achievementSectionOpen) return "achievement";
+    return null;
+  });
   const [footprintSectionOpen, setFootprintSectionOpen] = useState(uiPreferences.footprintSectionOpen);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
     () => new Set(uiPreferences.expandedProjects),
@@ -331,8 +349,14 @@ export function TaskDashboard({
     description: string;
     onConfirm: () => void;
   } | null>(null);
-  const incompleteTasks = useMemo(() => tasks.filter((task) => !task.done), [tasks]);
-  const completedTasks = useMemo(() => tasks.filter((task) => task.done), [tasks]);
+  const incompleteTasks = useMemo(
+    () => tasks.filter((task) => task.taskType === "long" && !task.done),
+    [tasks],
+  );
+  const completedTasks = useMemo(
+    () => tasks.filter((task) => task.taskType === "long" && task.done),
+    [tasks],
+  );
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
 
   useEffect(() => {
@@ -904,6 +928,32 @@ export function TaskDashboard({
     onUpdateTask(taskId, { subtasks: nextSubtasks });
   }
 
+  function openEditAnnualTask(task: AnnualTask) {
+    setEditingAnnualTaskId(task.id);
+    setEditingAnnualTaskName(task.name);
+  }
+
+  function saveAnnualTaskName() {
+    if (!editingAnnualTaskId || !editingAnnualTaskName.trim()) return;
+    onUpdateAnnualTask(editingAnnualTaskId, editingAnnualTaskName);
+    setEditingAnnualTaskId(null);
+  }
+
+  function handleAnnualTaskDrop(targetTaskId: string) {
+    if (!draggingAnnualTaskId || draggingAnnualTaskId === targetTaskId) return;
+    onReorderAnnualTask(draggingAnnualTaskId, targetTaskId);
+    setDraggingAnnualTaskId(null);
+  }
+
+  function setUtilityPanel(panel: "project" | "routine" | "achievement", open: boolean) {
+    setActiveUtilityPanel(open ? panel : null);
+    patchUiPreferences({
+      projectSectionOpen: open && panel === "project",
+      routineCheckinSectionOpen: open && panel === "routine",
+      achievementSectionOpen: open && panel === "achievement",
+    });
+  }
+
   return (
     <aside className="module-shell">
       <div className="module-header px-6 py-5">
@@ -915,38 +965,27 @@ export function TaskDashboard({
 
       <Separator />
 
-      <section className="p-6">
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="flex items-center gap-2 text-sm font-semibold text-emerald-950">
-                <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
-                {"\u5df2\u5b8c\u6210\u4efb\u52a1\u5e93"}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-emerald-800">
-                {"\u4ee5\u5b8c\u6210\u65f6\u95f4\u3001\u65f6\u957f\u548c\u6bcf\u5468\u6210\u679c\u5f52\u6863\u4efb\u52a1\u3002"}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-sm sm:flex sm:items-center sm:gap-5">
-              <div>
-                <p className="text-[11px] text-emerald-700">{"\u5f52\u6863\u4efb\u52a1"}</p>
-                <p className="font-semibold tabular-nums text-emerald-950">{completedTaskInsights.total}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-emerald-700">{"\u672c\u5468\u5b8c\u6210"}</p>
-                <p className="font-semibold tabular-nums text-emerald-950">{completedTaskInsights.thisWeekCount}</p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                className="col-span-2 mt-2 w-full bg-emerald-700 text-white hover:bg-emerald-800 sm:col-span-1 sm:mt-0 sm:w-auto"
-                onClick={() => setCompletedLibraryOpen(true)}
-              >
-                <CalendarRange className="mr-1.5 h-4 w-4" />
-                {"\u67e5\u770b\u5b8c\u6574\u5f52\u6863"}
-              </Button>
-            </div>
+      <section className="p-4 sm:p-6">
+        <div className="completed-library-trigger">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+              <CheckCircle className="h-4 w-4" aria-hidden />
+            </span>
+            <p className="truncate text-sm font-semibold text-stone-900">{"\u5df2\u5b8c\u6210\u4efb\u52a1\u5e93"}</p>
+            <span className="text-xs tabular-nums text-stone-500">
+              {completedTaskInsights.total} {"\u9879"}
+            </span>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="shrink-0 rounded-lg px-2 text-emerald-800 hover:bg-emerald-100 hover:text-emerald-950"
+            onClick={() => setCompletedLibraryOpen(true)}
+          >
+            {"\u67e5\u770b"}
+            <ChevronDown className="h-3.5 w-3.5 -rotate-90" aria-hidden />
+          </Button>
         </div>
       </section>
 
@@ -957,9 +996,6 @@ export function TaskDashboard({
               <CheckCircle className="h-5 w-5 text-emerald-600" aria-hidden />
               {"\u5df2\u5b8c\u6210\u4efb\u52a1\u5e93"}
             </DialogTitle>
-            <p className="text-xs leading-5 text-stone-500">
-              {"\u5b8c\u6210\u60c5\u51b5\u6309\u6bcf\u5468\u5f52\u6863\uff0c\u6240\u6709\u4efb\u52a1\u53ef\u5728\u6b64\u67e5\u770b\u8be6\u60c5\u3001\u7f16\u8f91\u6216\u6062\u590d\u3002"}
-            </p>
           </DialogHeader>
 
           <div className="min-h-0 overflow-y-auto bg-stone-50/80 p-4 sm:p-6">
@@ -1166,43 +1202,92 @@ export function TaskDashboard({
         </DialogContent>
       </Dialog>
 
+      <DailyTaskPanel
+        tasks={tasks}
+        onAddTask={(name, dueDate, taskType) => onAddTask(name, dueDate, taskType)}
+        onToggleTask={onToggleTask}
+        onUpdateTask={onUpdateTask}
+        onCreateTimeBlock={onCreateDailyTaskTimeBlock}
+      />
+
+      <Separator />
+
       <div className="p-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-600">
             <CalendarRange className="h-4 w-4 text-primary" aria-hidden />
             年度任务清单
           </p>
-          <Button type="button" size="sm" onClick={() => setShowAddAnnualDialog(true)}>
-            <Plus className="mr-1 h-4 w-4" />
-            添加
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button type="button" size="sm" onClick={() => setShowAddAnnualDialog(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              添加
+            </Button>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => {
+                const nextOpen = !annualSectionOpen;
+                setAnnualSectionOpen(nextOpen);
+                patchUiPreferences({ annualSectionOpen: nextOpen });
+              }}
+              aria-label={annualSectionOpen ? "收起年度任务清单" : "展开年度任务清单"}
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${annualSectionOpen ? "" : "-rotate-90"}`} />
+            </Button>
+          </div>
         </div>
-        <div className="mb-6 space-y-3 rounded-2xl subtle-card p-4">
+        {annualSectionOpen ? <div className="mb-6 space-y-3 rounded-2xl subtle-card p-3">
           {annualTasks.length > 0 ? (
-            <ul className="max-h-56 space-y-2 overflow-y-auto pr-1 text-sm">
+            <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">
               {annualTasks.map((item) => (
                 <li
                   key={item.id}
-                  className="flex items-start gap-2 rounded-xl border border-stone-100 bg-white/55 px-3 py-2"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => handleAnnualTaskDrop(item.id)}
+                  className="annual-task-row"
                 >
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={() => setDraggingAnnualTaskId(item.id)}
+                    onDragEnd={() => setDraggingAnnualTaskId(null)}
+                    className="mt-0.5 shrink-0 rounded p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                    aria-label={`拖动排序年度任务 ${item.name}`}
+                  >
+                    <GripVertical className="h-4 w-4" />
+                  </button>
                   <Checkbox
                     checked={item.done}
                     onCheckedChange={() => onToggleAnnualTask(item.id)}
                     className="mt-0.5"
                     aria-label={`年度任务 ${item.name} 完成状态`}
                   />
-                  <span
+                  <button
+                    type="button"
+                    onClick={() => openEditAnnualTask(item)}
                     className={`min-w-0 flex-1 leading-snug [overflow-wrap:anywhere] break-words ${
-                      item.done ? "text-gray-500 line-through" : "text-gray-900"
+                      item.done ? "text-left text-gray-500 line-through" : "text-left text-gray-900"
                     }`}
                   >
                     {item.name}
-                  </span>
+                  </button>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    className="mt-0.5 shrink-0 rounded-md text-stone-500 hover:bg-stone-100"
+                    onClick={() => openEditAnnualTask(item)}
+                    aria-label={`编辑年度任务 ${item.name}`}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
                   <Button
                     type="button"
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8 shrink-0 rounded-md hover:bg-red-50 hover:text-red-500"
+                    className="mt-0.5 h-7 w-7 shrink-0 rounded-md hover:bg-red-50 hover:text-red-500"
                     onClick={() => {
                       onDeleteAnnualTask(item.id);
                       toast.success("已从年度清单移除");
@@ -1219,7 +1304,7 @@ export function TaskDashboard({
               尚未添加年度任务。
             </p>
           )}
-        </div>
+        </div> : null}
 
         <Collapsible
           open={longTaskSectionOpen}
@@ -1228,14 +1313,14 @@ export function TaskDashboard({
             patchUiPreferences({ longTaskSectionOpen: open });
           }}
         >
-          <CollapsibleTrigger className="section-trigger mb-3 flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left">
-            <span className="text-sm font-medium uppercase tracking-wide text-gray-600">
+          <CollapsibleTrigger className="section-trigger mb-3 flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left">
+            <span className="text-sm font-semibold text-gray-700">
               长期任务 / 未完成任务
             </span>
             <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${longTaskSectionOpen ? "" : "-rotate-90"}`} />
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="mb-3 flex items-center gap-2">
+            <div className="mb-3 flex items-center gap-1.5">
               <Button
                 type="button"
                 size="sm"
@@ -1253,7 +1338,7 @@ export function TaskDashboard({
                 按优先级分组
               </Button>
               <Button type="button" size="sm" onClick={() => setShowAddTaskDialog(true)}>
-                <Plus className="mr-1 h-4 w-4" />
+                <Plus className="mr-1 h-3.5 w-3.5" />
                 添加
               </Button>
             </div>
@@ -1265,15 +1350,15 @@ export function TaskDashboard({
                 key={task.id}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => handleDropTask(task.id)}
-                className="interactive-card rounded-2xl p-3"
+                className="task-row-card"
               >
-                <div className="flex items-start gap-2">
+                <div className="flex items-start gap-2.5">
                   <button
                     type="button"
                     draggable
                     onDragStart={(event) => handleTaskDragStart(task.id, event)}
                     onDragEnd={() => setDraggingTaskId(null)}
-                    className="mt-0.5 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    className="mt-0.5 rounded-md p-0.5 text-gray-400 hover:bg-stone-100 hover:text-gray-600"
                     aria-label={`拖动排序 ${task.name}`}
                   >
                     <GripVertical className="h-4 w-4" />
@@ -1285,28 +1370,32 @@ export function TaskDashboard({
                       toast.success("任务已标记为完成");
                     }}
                     aria-label={`任务 ${task.name} 的完成状态`}
-                    className="mt-1"
+                    className="mt-1.5"
                   />
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEdit(task)}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-start gap-2">
                       {getPriorityIcon(task.priority)}
-                      <p className="min-w-0 flex-1 break-words text-sm font-medium text-gray-900">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(task)}
+                        className="min-w-0 flex-1 break-words text-left text-sm font-semibold leading-5 text-gray-900 hover:text-emerald-800"
+                      >
                         {task.name}
-                      </p>
+                      </button>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                      <span>截止：{task.dueDate}</span>
-                      <Badge className="rounded-md border border-primary bg-primary text-white">未完成</Badge>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-1.5 py-1 tabular-nums">
+                        <Clock className="h-3 w-3" aria-hidden />
+                        {task.dueDate}
+                      </span>
+                      <Badge className={`rounded-md border ${getPriorityVisualStyle(task.priority).badgeClassName}`}>
+                        {task.priority}
+                      </Badge>
                       {task.subtasks.length > 0 ? (
                         <button
                           type="button"
-                          className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-600 hover:bg-gray-100"
-                          onClick={(event) => {
-                            event.stopPropagation();
+                          className="rounded-md px-1.5 py-1 text-[11px] font-medium text-stone-600 hover:bg-stone-100"
+                          onClick={() => {
                             setExpandedTasks((prev) => {
                               const next = new Set(prev);
                               if (next.has(task.id)) {
@@ -1323,7 +1412,7 @@ export function TaskDashboard({
                         </button>
                       ) : null}
                     </div>
-                  </button>
+                  </div>
                   <ContextBadge
                     source={{
                       kind: "task",
@@ -1339,7 +1428,7 @@ export function TaskDashboard({
                     type="button"
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8 rounded-md hover:bg-red-50 hover:text-red-500"
+                    className="h-7 w-7 rounded-md hover:bg-red-50 hover:text-red-500"
                     onClick={() => {
                       setPendingDeleteTaskId(task.id);
                       setConfirmDeleteOpen(true);
@@ -1350,7 +1439,7 @@ export function TaskDashboard({
                   </Button>
                 </div>
                 {task.subtasks.length > 0 && expandedTasks.has(task.id) ? (
-                  <ul className="mt-2 space-y-1 rounded-xl border border-stone-200/70 bg-white/50 p-2">
+                  <ul className="mt-2.5 space-y-1.5 rounded-lg border border-stone-200/70 bg-stone-50/70 p-2.5">
                     {task.subtasks.map((subtask) => (
                       <li key={subtask.id} className="flex items-center gap-2 text-xs">
                         <Checkbox
@@ -1371,7 +1460,7 @@ export function TaskDashboard({
             ) : (
           <div className="space-y-3">
             {groupedIncompleteTasks.map((group) => (
-              <div key={group.priority} className="rounded-2xl subtle-card p-3">
+              <div key={group.priority} className="rounded-xl border border-stone-200/80 bg-white/55 p-3">
                 <p className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
                   {getPriorityIcon(group.priority)}
                   {group.priority}
@@ -1379,13 +1468,18 @@ export function TaskDashboard({
                 {group.items.length === 0 ? (
                   <p className="text-xs text-gray-500">暂无任务</p>
                 ) : (
-                  <ul className="space-y-1">
+                  <ul className="space-y-1.5">
                     {group.items.map((task) => (
-                      <li key={task.id} className="flex items-center justify-between gap-2 rounded-xl bg-white/55 px-3 py-2">
-                        <button type="button" className="min-w-0 flex-1 truncate text-left text-sm" title={task.name} onClick={() => handleOpenEdit(task)}>
+                      <li key={task.id} className="task-group-row">
+                        <Checkbox
+                          checked={task.done}
+                          onCheckedChange={() => onToggleTask(task.id)}
+                          aria-label={`任务 ${task.name} 的完成状态`}
+                        />
+                        <button type="button" className="min-w-0 flex-1 truncate text-left text-sm font-medium text-stone-800" title={task.name} onClick={() => handleOpenEdit(task)}>
                           {task.name}
                         </button>
-                        <span className="text-xs text-gray-500">{task.dueDate}</span>
+                        <span className="shrink-0 text-xs tabular-nums text-gray-500">{task.dueDate}</span>
                       </li>
                     ))}
                   </ul>
@@ -1403,32 +1497,28 @@ export function TaskDashboard({
 
       <Separator />
 
+      <div className="utility-panel-grid p-4 sm:p-6">
       {showProjectSection ? (
-        <>
-      <Separator />
-
-      <section className="space-y-4 p-6">
+      <section className="utility-panel utility-panel-project">
         <Collapsible
-          open={projectSectionOpen}
-          onOpenChange={(open) => {
-            setProjectSectionOpen(open);
-            patchUiPreferences({ projectSectionOpen: open });
-          }}
+          className="utility-panel-root"
+          open={activeUtilityPanel === "project"}
+          onOpenChange={(open) => setUtilityPanel("project", open)}
         >
-          <div className="flex items-center gap-2">
+          <div className={`utility-panel-header flex items-center gap-2 ${activeUtilityPanel === "project" ? "utility-panel-header-active" : ""}`}>
             <CollapsibleTrigger className="flex min-h-11 flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
               <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
                 <KanbanSquare className="h-4 w-4 shrink-0 text-primary" />
-                <span className="truncate">Project 打卡记录栏</span>
+                <span className="truncate">Project打卡</span>
               </h3>
-              <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${projectSectionOpen ? "" : "-rotate-90"}`} />
+              <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${activeUtilityPanel === "project" ? "" : "-rotate-90"}`} />
             </CollapsibleTrigger>
-            <Button type="button" size="sm" className="shrink-0" onClick={() => setShowAddProjectDialog(true)}>
+            <Button type="button" size="sm" className="utility-panel-action shrink-0" onClick={() => setShowAddProjectDialog(true)}>
               <Plus className="mr-1 h-4 w-4" />
               添加
             </Button>
           </div>
-          <CollapsibleContent className="mt-3 space-y-3">
+          <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
             <div className="space-y-3">
               {visibleProjectCheckins.map((project) => {
                 const projectExpanded = expandedProjects.has(project.id);
@@ -1558,35 +1648,30 @@ export function TaskDashboard({
           </CollapsibleContent>
         </Collapsible>
       </section>
-        </>
       ) : null}
 
-      <Separator />
-
-      <section className="space-y-4 p-6">
+      <section className="utility-panel utility-panel-routine">
         <Collapsible
-          open={routineCheckinSectionOpen}
-          onOpenChange={(open) => {
-            setRoutineCheckinSectionOpen(open);
-            patchUiPreferences({ routineCheckinSectionOpen: open });
-          }}
+          className="utility-panel-root"
+          open={activeUtilityPanel === "routine"}
+          onOpenChange={(open) => setUtilityPanel("routine", open)}
         >
-          <div className="flex items-center gap-2">
+          <div className={`utility-panel-header flex items-center gap-2 ${activeUtilityPanel === "routine" ? "utility-panel-header-active" : ""}`}>
             <CollapsibleTrigger className="flex min-h-11 flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
               <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
                 <Clock className="h-4 w-4 shrink-0 text-primary" />
-                <span className="truncate">日常时段打卡任务</span>
+                <span className="truncate">日常打卡</span>
               </h3>
               <ChevronDown
                 className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${
-                  routineCheckinSectionOpen ? "" : "-rotate-90"
+                  activeUtilityPanel === "routine" ? "" : "-rotate-90"
                 }`}
               />
             </CollapsibleTrigger>
             <Button
               type="button"
               size="sm"
-              className="shrink-0"
+              className="utility-panel-action shrink-0"
               onClick={() => setShowRoutineCheckinForm((open) => !open)}
             >
               <Plus className="mr-1 h-4 w-4" />
@@ -1594,7 +1679,7 @@ export function TaskDashboard({
             </Button>
           </div>
 
-          <CollapsibleContent className="mt-3 space-y-3">
+          <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
@@ -1748,34 +1833,30 @@ export function TaskDashboard({
         </Collapsible>
       </section>
 
-      <Separator />
-
-      <section className="space-y-4 p-6">
+      <section className="utility-panel utility-panel-achievement">
         <Collapsible
-          open={achievementSectionOpen}
-          onOpenChange={(open) => {
-            setAchievementSectionOpen(open);
-            patchUiPreferences({ achievementSectionOpen: open });
-          }}
+          className="utility-panel-root"
+          open={activeUtilityPanel === "achievement"}
+          onOpenChange={(open) => setUtilityPanel("achievement", open)}
         >
-          <div className="flex items-center gap-2">
+          <div className={`utility-panel-header flex items-center gap-2 ${activeUtilityPanel === "achievement" ? "utility-panel-header-active" : ""}`}>
             <CollapsibleTrigger className="flex min-h-11 flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
               <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
                 <Trophy className="h-4 w-4 shrink-0 text-primary" />
-                <span className="truncate">成就记录栏</span>
+                <span className="truncate">成就记录</span>
               </h3>
               <ChevronDown
                 className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${
-                  achievementSectionOpen ? "" : "-rotate-90"
+                  activeUtilityPanel === "achievement" ? "" : "-rotate-90"
                 }`}
               />
             </CollapsibleTrigger>
-            <Button type="button" size="sm" className="shrink-0" onClick={openCreateAchievement}>
+            <Button type="button" size="sm" className="utility-panel-action shrink-0" onClick={openCreateAchievement}>
               <Plus className="mr-1 h-4 w-4" />
               添加
             </Button>
           </div>
-          <CollapsibleContent className="mt-3 space-y-3">
+          <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
             {groupedAchievements.length === 0 ? (
               <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-500">
                 暂无成就记录。可以把今天完成的重要进展记下来。
@@ -1836,6 +1917,7 @@ export function TaskDashboard({
           </CollapsibleContent>
         </Collapsible>
       </section>
+      </div>
 
       {showFootprintsSection ? (
         <>
@@ -1980,6 +2062,26 @@ export function TaskDashboard({
             <Button type="button" className="w-full" onClick={handleAddAnnual}>
               添加年度任务
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(editingAnnualTaskId)}
+        onOpenChange={(open) => !open && setEditingAnnualTaskId(null)}
+      >
+        <DialogContent>
+          <DialogHeader><DialogTitle>编辑年度任务</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Input
+              value={editingAnnualTaskName}
+              onChange={(event) => setEditingAnnualTaskName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") saveAnnualTaskName();
+              }}
+              aria-label="年度任务名称"
+            />
+            <Button type="button" className="w-full" onClick={saveAnnualTaskName}>保存修改</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -2280,6 +2382,8 @@ export function TaskDashboard({
                       completionLog: taskDraft.completionLog,
                       priority: taskDraft.priority,
                       subtasks: taskDraft.subtasks,
+                      taskType: editingTask.taskType,
+                      isTodayFocus: editingTask.isTodayFocus,
                     }}
                     onImport={(names) =>
                       setTaskDraft((prev) =>

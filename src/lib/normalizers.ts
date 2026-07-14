@@ -18,6 +18,7 @@ import type { GroupMeetingRecord } from "@/components/monitoring/group-meetings-
 import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/categories";
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
+  annualSectionOpen: true,
   longTaskSectionOpen: true,
   completedSectionOpen: true,
   projectSectionOpen: true,
@@ -277,6 +278,8 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
   if (!payload || typeof payload !== "object") return defaultDashboardUiPreferences;
   const value = payload as Partial<DashboardUiPreferences>;
   return {
+    annualSectionOpen:
+      typeof value.annualSectionOpen === "boolean" ? value.annualSectionOpen : true,
     longTaskSectionOpen:
       typeof value.longTaskSectionOpen === "boolean" ? value.longTaskSectionOpen : true,
     completedSectionOpen:
@@ -313,6 +316,7 @@ export function normalizeTasks(payload: unknown): LongTask[] {
     const createdAt = normalizeDateTime(value.createdAt);
     const completedAt =
       normalizeDateTime(value.completedAt) ?? (Boolean(value.done) ? `${dueDate}T23:59:59` : null);
+    const abandonedAt = normalizeDateTime(value.abandonedAt) ?? null;
 
     return {
       id: value.id ?? `task-restored-${index}`,
@@ -320,6 +324,7 @@ export function normalizeTasks(payload: unknown): LongTask[] {
       dueDate,
       createdAt,
       completedAt,
+      abandonedAt,
       done: Boolean(value.done),
       notes: value.notes ?? "",
       precautions: Array.isArray(value.precautions)
@@ -334,6 +339,8 @@ export function normalizeTasks(payload: unknown): LongTask[] {
             done: Boolean(subtask.done),
           }))
         : [],
+      taskType: value.taskType === "daily" ? "daily" : "long",
+      isTodayFocus: Boolean(value.isTodayFocus),
     };
   });
 }

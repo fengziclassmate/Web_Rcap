@@ -232,6 +232,147 @@
     border: 1px solid color-mix(in oklch, var(--border) 76%, white);
     background: color-mix(in oklch, white 58%, transparent);
   }
+
+  .completed-library-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 1px solid color-mix(in oklch, #5aa681 26%, white);
+    border-radius: 0.9rem;
+    background: linear-gradient(105deg, color-mix(in oklch, #e4f6e9 84%, white), color-mix(in oklch, white 74%, transparent));
+    padding: 0.55rem 0.65rem 0.55rem 0.75rem;
+  }
+
+  .task-row-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid color-mix(in oklch, var(--border) 80%, white);
+    border-radius: 0.9rem;
+    background: color-mix(in oklch, white 78%, transparent);
+    padding: 0.7rem;
+    box-shadow: 0 6px 16px color-mix(in oklch, var(--foreground) 3%, transparent);
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+
+  .task-row-card::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: color-mix(in oklch, var(--moss) 68%, white);
+    content: "";
+  }
+
+  .task-row-card:hover {
+    border-color: color-mix(in oklch, var(--moss) 34%, var(--border));
+    box-shadow: 0 12px 24px color-mix(in oklch, var(--foreground) 6%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .task-group-row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    border-radius: 0.65rem;
+    background: color-mix(in oklch, white 66%, transparent);
+    padding: 0.5rem 0.6rem;
+  }
+
+  .daily-task-panel {
+    padding: 1rem 1.25rem;
+    background:
+      radial-gradient(circle at 94% 7%, color-mix(in oklch, #b3dfc3 30%, transparent), transparent 32%),
+      color-mix(in oklch, white 72%, transparent);
+  }
+
+  .today-focus-strip {
+    border: 1px solid color-mix(in oklch, #5aa681 24%, white);
+    border-radius: 0.8rem;
+    background: color-mix(in oklch, #e8f7ec 76%, white);
+    padding: 0.65rem 0.75rem;
+  }
+
+  .daily-task-row,
+  .annual-task-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    border: 1px solid color-mix(in oklch, var(--border) 78%, white);
+    border-radius: 0.7rem;
+    background: color-mix(in oklch, white 74%, transparent);
+    padding: 0.55rem 0.6rem;
+  }
+
+  .daily-task-row {
+    align-items: center;
+  }
+
+  .deadline-radar {
+    border-top: 1px dashed color-mix(in oklch, #a57a1a 28%, white);
+    padding-top: 0.7rem;
+  }
+
+  .utility-panel-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: auto auto;
+    gap: 0.45rem;
+    border-top: 1px solid color-mix(in oklch, var(--border) 72%, white);
+  }
+
+  .utility-panel,
+  .utility-panel-root {
+    display: contents;
+  }
+
+  .utility-panel-header {
+    min-width: 0;
+    border: 1px solid color-mix(in oklch, var(--border) 78%, white);
+    border-radius: 0.85rem;
+    background: color-mix(in oklch, white 64%, transparent);
+    padding: 0.45rem;
+  }
+
+  .utility-panel-project .utility-panel-header {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .utility-panel-routine .utility-panel-header {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .utility-panel-achievement .utility-panel-header {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .utility-panel-content {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-width: 0;
+    border: 1px solid color-mix(in oklch, var(--border) 72%, white);
+    border-radius: 0.85rem;
+    background: color-mix(in oklch, white 70%, transparent);
+    padding: 0.7rem;
+    box-shadow: 0 10px 25px color-mix(in oklch, var(--foreground) 5%, transparent);
+  }
+
+  .utility-panel-header:not(.utility-panel-header-active) .utility-panel-action {
+    display: none;
+  }
+
+  @media (max-width: 420px) {
+    .daily-task-panel {
+      padding: 0.9rem;
+    }
+
+    .utility-panel-grid {
+      gap: 0.35rem;
+      padding-inline: 0.75rem;
+    }
+  }
 }
 
 .workbench-shell section.rounded-lg.border,

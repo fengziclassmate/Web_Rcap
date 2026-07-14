@@ -33,18 +33,23 @@ export type Priority =
   | "\u4e0d\u7d27\u6025\u91cd\u8981"
   | "\u4e0d\u7d27\u6025\u4e0d\u91cd\u8981";
 
+export type TaskType = "daily" | "long";
+
 export type LongTask = {
   id: string;
   name: string;
   dueDate: string;
   createdAt?: string;
   completedAt?: string | null;
+  abandonedAt?: string | null;
   done: boolean;
   notes: string;
   precautions: string[];
   completionLog: string;
   priority: Priority;
   subtasks: SubTask[];
+  taskType: TaskType;
+  isTodayFocus: boolean;
 };
 
 export type AnnualTask = {
@@ -82,6 +87,7 @@ export type FootprintItem = {
 };
 
 export type DashboardUiPreferences = {
+  annualSectionOpen: boolean;
   longTaskSectionOpen: boolean;
   completedSectionOpen: boolean;
   projectSectionOpen: boolean;

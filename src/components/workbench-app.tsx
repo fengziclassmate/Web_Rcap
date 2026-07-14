@@ -12,7 +12,6 @@ import { zhCN } from "date-fns/locale";
 import type { User } from "@supabase/supabase-js";
 import { TaskDashboard } from "@/components/schedule/task-dashboard";
 import { WeeklyTimeGrid, ViewMode, TimeGranularity } from "@/components/schedule/weekly-time-grid";
-import { ScheduleTimeAnalytics } from "@/components/schedule/schedule-time-analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DEFAULT_SCHEDULE_CATEGORY } from "@/lib/categories";
@@ -1851,7 +1850,7 @@ export function WorkbenchApp() {
     );
   }
 
-  function handleAddTask(name: string, dueDate: string) {
+  function handleAddTask(name: string, dueDate: string, taskType: LongTask["taskType"] = "long") {
     const trimmedName = name.trim();
     if (!trimmedName) return;
     setTasks((prev) => [
@@ -1868,6 +1867,8 @@ export function WorkbenchApp() {
         completionLog: "",
         priority: "不紧急不重要",
         subtasks: [],
+        taskType,
+        isTodayFocus: false,
       },
     ]);
   }
@@ -1890,6 +1891,8 @@ export function WorkbenchApp() {
         completionLog: "",
         priority: "不紧急重要" as Priority,
         subtasks: [],
+        taskType: "long",
+        isTodayFocus: false,
       },
     ]);
     return id;
@@ -2115,6 +2118,27 @@ export function WorkbenchApp() {
     setAnnualTasks((prev) => prev.filter((t) => t.id !== taskId));
   }
 
+  function handleUpdateAnnualTask(taskId: string, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setAnnualTasks((prev) =>
+      prev.map((task) => (task.id === taskId ? { ...task, name: trimmed } : task)),
+    );
+  }
+
+  function handleReorderAnnualTask(sourceTaskId: string, targetTaskId: string) {
+    if (!sourceTaskId || !targetTaskId || sourceTaskId === targetTaskId) return;
+    setAnnualTasks((prev) => {
+      const next = [...prev];
+      const sourceIndex = next.findIndex((task) => task.id === sourceTaskId);
+      const targetIndex = next.findIndex((task) => task.id === targetTaskId);
+      if (sourceIndex < 0 || targetIndex < 0) return prev;
+      const [moved] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+  }
+
   function handleAddProjectCheckin(name: string, description: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -2244,6 +2268,33 @@ export function WorkbenchApp() {
 
   function handleCreateEvent(event: ScheduleEvent) {
     setEvents((prev) => [...prev, event]);
+  }
+
+  function handleCreateDailyTaskTimeBlock(
+    task: LongTask,
+    date: string,
+    startHour: number,
+    durationMinutes: number,
+  ) {
+    setEvents((prev) => [
+      ...prev,
+      {
+        id: createId("event"),
+        date,
+        startHour,
+        endHour: startHour + durationMinutes / 60,
+        title: task.name,
+        notes: `来自日常任务：${task.name}`,
+        requirements: [],
+        isCompleted: false,
+        category: DEFAULT_SCHEDULE_CATEGORY,
+        tag: null,
+        recurrence: null,
+        exceptionDates: [],
+        recurrenceOverrides: {},
+        recurrenceEndExclusive: null,
+      },
+    ]);
   }
 
   function handleUpdateEvent(
@@ -2456,6 +2507,9 @@ export function WorkbenchApp() {
                   onAddAnnualTask={handleAddAnnualTask}
                   onToggleAnnualTask={handleToggleAnnualTask}
                   onDeleteAnnualTask={handleDeleteAnnualTask}
+                  onUpdateAnnualTask={handleUpdateAnnualTask}
+                  onReorderAnnualTask={handleReorderAnnualTask}
+                  onCreateDailyTaskTimeBlock={handleCreateDailyTaskTimeBlock}
                   projectCheckins={projectCheckins}
                   onAddProjectCheckin={handleAddProjectCheckin}
                   onCheckinProject={handleCheckinProject}
@@ -2478,7 +2532,6 @@ export function WorkbenchApp() {
                   uiPreferences={dashboardUiPreferences}
                   onUiPreferencesChange={setDashboardUiPreferences}
                 />
-                <ScheduleTimeAnalytics events={events} currentWeekStart={currentWeekStart} viewMode={viewMode} />
               </section>
             </div>
           ) : activeModule === "footprints" ? (

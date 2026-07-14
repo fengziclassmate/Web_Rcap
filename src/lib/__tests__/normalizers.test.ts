@@ -21,6 +21,8 @@ describe("normalizers", () => {
         notes: "",
         precautions: [],
         subtasks: [],
+        taskType: "long",
+        isTodayFocus: false,
       }),
     ]);
   });
@@ -31,6 +33,14 @@ describe("normalizers", () => {
         priority: "\u4e0d\u7d27\u6025\u4e0d\u91cd\u8981",
       }),
     ]);
+  });
+  it("keeps daily task metadata while defaulting legacy tasks to long tasks", () => {
+    const [dailyTask, legacyTask] = normalizeTasks([
+      { name: "Today", taskType: "daily", isTodayFocus: true },
+      { name: "Legacy" },
+    ]);
+    expect(dailyTask).toMatchObject({ taskType: "daily", isTodayFocus: true });
+    expect(legacyTask).toMatchObject({ taskType: "long", isTodayFocus: false });
   });
   it("normalizes event recurrence and defaults", () => {
     const [event] = normalizeEvents([
@@ -50,6 +60,7 @@ describe("normalizers", () => {
 
   it("normalizes dashboard preferences safely", () => {
     expect(normalizeDashboardUiPreferences({ expandedTasks: ["a", 1] })).toMatchObject({
+      annualSectionOpen: true,
       longTaskSectionOpen: true,
       completedSectionOpen: true,
       expandedTasks: ["a"],

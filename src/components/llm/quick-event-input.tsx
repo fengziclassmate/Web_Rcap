@@ -85,25 +85,24 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
   }
 
   return (
-    <section className="mb-3 overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
-      <div className="relative p-3 sm:p-4">
+    <section className="mb-3 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+      <div className="relative p-2 sm:p-3">
         <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-sky-50 via-emerald-50/60 to-transparent" />
-        <div className="relative flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-black text-white">
-                <Sparkles className="h-4 w-4" />
-              </span>
-              <h2 className="text-sm font-semibold text-stone-950">智能快速创建</h2>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 lg:flex-row">
+        <div className="relative flex items-center gap-2">
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-950 text-white shadow-sm"
+            role="img"
+            aria-label="智能快速创建"
+          >
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
             <Input
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="写下要创建的内容"
-              className="h-11 rounded-2xl border-stone-200 bg-white/90 px-4"
+              placeholder="输入日程、长期任务或年度计划"
+              aria-label="智能快速创建输入"
+              className="h-9 rounded-xl border-stone-200 bg-white/90 px-3"
               onKeyDown={(event) => {
                 if (event.key === "Enter") void handleAnalyze();
               }}
@@ -112,7 +111,7 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
               type="button"
               onClick={handleAnalyze}
               disabled={loading || !input.trim()}
-              className="h-11 rounded-2xl px-4 lg:w-auto"
+              className="h-9 rounded-xl px-3 sm:w-auto"
             >
               <Sparkles className="h-4 w-4" />
               {loading ? "识别中" : "智能识别"}
