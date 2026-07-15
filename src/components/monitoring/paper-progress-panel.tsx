@@ -205,15 +205,15 @@ function PaperPlanEditor({
         <Input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="输入计划…" />
         <Button
           type="button"
-          size="sm"
+          size="icon-sm"
           onClick={() => {
             onAdd(draft, date);
             setDraft("");
           }}
-          className="sm:w-24"
+          aria-label="添加计划"
+          title="添加计划"
         >
-          <Plus className="mr-1 h-4 w-4" />
-          添加
+          <Plus className="h-4 w-4" />
         </Button>
       </div>
 

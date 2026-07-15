@@ -281,9 +281,8 @@ export function LiteraturePage({
             </div>
             <div className="flex items-center gap-2">
               <ViewSwitch view={view} onChange={setView} />
-              <Button type="button" onClick={() => setCreating(true)} className="rounded-xl">
-                <Plus className="mr-2 h-4 w-4" />
-                新建文献
+              <Button type="button" size="icon" onClick={() => setCreating(true)} className="rounded-xl" aria-label="新建文献" title="新建文献">
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
           </div>

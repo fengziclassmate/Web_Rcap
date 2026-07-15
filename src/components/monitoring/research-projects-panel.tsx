@@ -134,9 +134,8 @@ export function ResearchProjectsPanel({
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">科研项目进度</h2>
         </div>
-        <Button type="button" size="sm" onClick={openCreate}>
-          <Plus className="mr-1 h-4 w-4" />
-          新增项目
+        <Button type="button" size="icon-sm" onClick={openCreate} aria-label="新增科研项目" title="新增科研项目">
+          <Plus className="h-4 w-4" />
         </Button>
       </header>
 
@@ -322,15 +321,15 @@ function PlanEditor({
         <Input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="输入计划…" />
         <Button
           type="button"
-          size="sm"
+          size="icon-sm"
           onClick={() => {
             onAdd(draft, date);
             setDraft("");
           }}
-          className="sm:w-24"
+          aria-label="添加计划"
+          title="添加计划"
         >
-          <Plus className="mr-1 h-4 w-4" />
-          添加
+          <Plus className="h-4 w-4" />
         </Button>
       </div>
 

@@ -111,9 +111,8 @@ export function SubmissionsPanel({
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">投稿记录</h2>
         </div>
-        <Button type="button" size="sm" onClick={openCreate}>
-          <Plus className="mr-1 h-4 w-4" />
-          新增
+        <Button type="button" size="icon-sm" onClick={openCreate} aria-label="新增投稿记录" title="新增投稿记录">
+          <Plus className="h-4 w-4" />
         </Button>
       </header>
 

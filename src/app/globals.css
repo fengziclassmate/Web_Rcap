@@ -365,10 +365,11 @@
 
   .utility-panel-add {
     display: inline-flex;
+    min-width: 2.5rem;
     min-height: 2.5rem;
     align-items: center;
-    gap: 0.35rem;
-    padding-inline: 0.7rem;
+    justify-content: center;
+    padding-inline: 0;
   }
 
   .utility-panel-content {
@@ -400,9 +401,6 @@
       font-size: 0.72rem;
     }
 
-    .utility-panel-add {
-      padding-inline: 0.55rem;
-    }
   }
 }
 

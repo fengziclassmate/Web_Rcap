@@ -112,9 +112,8 @@ export function ProjectCheckinsPanel({
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">Project 打卡记录</h2>
         </div>
-        <Button type="button" size="sm" onClick={() => setShowAddProjectDialog(true)}>
-          <Plus className="mr-1 h-4 w-4" />
-          新增
+        <Button type="button" size="icon-sm" onClick={() => setShowAddProjectDialog(true)} aria-label="新增 Project 打卡项" title="新增 Project 打卡项">
+          <Plus className="h-4 w-4" />
         </Button>
       </header>
 

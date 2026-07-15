@@ -1247,9 +1247,8 @@ export function TaskDashboard({
             年度任务清单
           </p>
           <div className="flex items-center gap-1">
-            <Button type="button" size="sm" onClick={() => setShowAddAnnualDialog(true)}>
-              <Plus className="mr-1 h-4 w-4" />
-              添加
+            <Button type="button" size="icon-sm" onClick={() => setShowAddAnnualDialog(true)} aria-label="添加年度任务" title="添加年度任务">
+              <Plus className="h-4 w-4" />
             </Button>
             <Button
               type="button"
@@ -1365,9 +1364,8 @@ export function TaskDashboard({
               >
                 按优先级分组
               </Button>
-              <Button type="button" size="sm" onClick={() => setShowAddTaskDialog(true)}>
-                <Plus className="mr-1 h-3.5 w-3.5" />
-                添加
+              <Button type="button" size="icon-sm" onClick={() => setShowAddTaskDialog(true)} aria-label="添加长期任务" title="添加长期任务">
+                <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
 
@@ -1559,9 +1557,8 @@ export function TaskDashboard({
           </button>
         </div>
         {activeUtilityPanel ? (
-          <Button type="button" size="sm" className="utility-panel-add shrink-0" onClick={handleAddUtilityItem}>
+          <Button type="button" size="icon" className="utility-panel-add shrink-0" onClick={handleAddUtilityItem} aria-label="添加当前栏目项目" title="添加当前栏目项目">
             <Plus className="h-4 w-4" />
-            <span>添加</span>
           </Button>
         ) : null}
       </div>
@@ -2021,9 +2018,8 @@ export function TaskDashboard({
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3 space-y-3">
                 <div className="flex justify-end">
-                  <Button type="button" size="sm" onClick={() => setShowAddFootprintDialog(true)}>
-                    <Plus className="mr-1 h-4 w-4" />
-                    添加
+                  <Button type="button" size="icon-sm" onClick={() => setShowAddFootprintDialog(true)} aria-label="添加足迹项" title="添加足迹项">
+                    <Plus className="h-4 w-4" />
                   </Button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">

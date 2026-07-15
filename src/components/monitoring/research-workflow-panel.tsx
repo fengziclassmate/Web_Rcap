@@ -877,12 +877,13 @@ export function ResearchWorkflowPanel({
             </div>
             <Button
               type="button"
-              size="sm"
+              size="icon"
               onClick={openCreateDialog}
-              className={cn(module === "research" && "h-9 rounded-lg bg-stone-950 px-3 text-white hover:bg-stone-800")}
+              className={cn(module === "research" && "h-9 rounded-lg bg-stone-950 text-white hover:bg-stone-800")}
+              aria-label="新建"
+              title="新建"
             >
-              <Plus className="mr-1 h-4 w-4" />
-              新建
+              <Plus className="h-4 w-4" />
             </Button>
           </div>
           {module === "research" ? (

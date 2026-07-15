@@ -166,9 +166,8 @@ export function DailyTaskPanel({
           }}
         />
         <Input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
-        <Button type="button" size="sm" onClick={addDailyTask} disabled={!name.trim()}>
+        <Button type="button" size="icon-sm" onClick={addDailyTask} disabled={!name.trim()} aria-label="添加日常任务" title="添加日常任务">
           <Plus className="h-3.5 w-3.5" />
-          添加
         </Button>
       </div>
 

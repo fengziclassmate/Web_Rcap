@@ -89,9 +89,8 @@ export function AchievementsPanel({
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">成就记录栏</h2>
         </div>
-        <Button type="button" size="sm" onClick={openCreate}>
-          <Plus className="mr-1 h-4 w-4" />
-          新增
+        <Button type="button" size="icon-sm" onClick={openCreate} aria-label="新增成就" title="新增成就">
+          <Plus className="h-4 w-4" />
         </Button>
       </header>
 
