@@ -191,7 +191,7 @@ type DailyBudgetSummaryRow = {
   budget_date: string;
 };
 
-const hourCellHeight = 80;
+const hourCellHeight = 72;
 const minutesPerHour = 60;
 const hoursPerDay = 24;
 const minutesPerDay = hoursPerDay * minutesPerHour;
@@ -1309,13 +1309,13 @@ export function WeeklyTimeGrid({
 
   return (
     <section className="rounded-lg border border-gray-200 bg-white shadow-md">
-      <header className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
+      <header className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2.5">
         <div className="shrink-0">
-          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-900">
-            <Clock3 className="h-5 w-5 text-primary" />
+          <h2 className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-gray-900">
+            <Clock3 className="h-4 w-4 text-primary" />
             {viewMode === "day" ? "日视图" : viewMode === "week" ? "周视图" : "月视图"}
           </h2>
-          <p className="mt-1 text-sm text-gray-600">{weekRange}</p>
+          <p className="mt-0.5 text-xs text-gray-600">{weekRange}</p>
         </div>
 
         {toolbarContent ? (
@@ -1324,24 +1324,24 @@ export function WeeklyTimeGrid({
           </div>
         ) : null}
 
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          <div className="flex items-center gap-2">
-            <Button type="button" size="sm" variant={viewMode === "day" ? "default" : "outline"} onClick={() => handleViewModeChange("day")}>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <Button type="button" size="sm" className="h-8 px-2.5 text-xs" variant={viewMode === "day" ? "default" : "outline"} onClick={() => handleViewModeChange("day")}>
               日
             </Button>
-            <Button type="button" size="sm" variant={viewMode === "week" ? "default" : "outline"} onClick={() => handleViewModeChange("week")}>
+            <Button type="button" size="sm" className="h-8 px-2.5 text-xs" variant={viewMode === "week" ? "default" : "outline"} onClick={() => handleViewModeChange("week")}>
               周
             </Button>
-            <Button type="button" size="sm" variant={viewMode === "month" ? "default" : "outline"} onClick={() => handleViewModeChange("month")}>
+            <Button type="button" size="sm" className="h-8 px-2.5 text-xs" variant={viewMode === "month" ? "default" : "outline"} onClick={() => handleViewModeChange("month")}>
               月
             </Button>
           </div>
 
           {viewMode !== "month" ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">粒度</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-600">粒度</span>
               <Select value={String(timeGranularity)} onValueChange={handleGranularityChange}>
-                <SelectTrigger className="w-24 rounded-md border-gray-300">
+                <SelectTrigger className="h-8 w-24 rounded-md border-gray-300 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1356,21 +1356,21 @@ export function WeeklyTimeGrid({
             </div>
           ) : null}
 
-          <Button type="button" variant="outline" size="sm" onClick={onPrevWeek}>
-            <ChevronLeft className="h-4 w-4" />
+          <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={onPrevWeek}>
+            <ChevronLeft className="h-3.5 w-3.5" />
             {viewMode === "day" ? "前一天" : viewMode === "week" ? "前一周" : "前一段"}
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={onNextWeek}>
+          <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={onNextWeek}>
             {viewMode === "day" ? "后一天" : viewMode === "week" ? "后一周" : "后一段"}
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-3.5 w-3.5" />
           </Button>
           {viewMode !== "month" ? (
-            <Button type="button" variant="outline" size="sm" onClick={handleOpenTemplateDialog}>
-              <Stamp className="h-4 w-4" />
+            <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={handleOpenTemplateDialog}>
+              <Stamp className="h-3.5 w-3.5" />
               模板
             </Button>
           ) : null}
-          <Button type="button" size="sm" onClick={() => setShowCategoryManager(true)}>
+          <Button type="button" size="sm" className="h-8 px-2.5 text-xs" onClick={() => setShowCategoryManager(true)}>
             分类管理
           </Button>
         </div>
@@ -1384,15 +1384,15 @@ export function WeeklyTimeGrid({
                 className="grid border-b border-gray-200 bg-white"
                 style={{ gridTemplateColumns: timelineGridTemplateColumns }}
               >
-                <div className="border-r border-gray-200 bg-gray-50 px-1.5 py-3 text-xs font-medium text-gray-700">时间</div>
+                <div className="border-r border-gray-200 bg-gray-50 px-1.5 py-2 text-[11px] font-medium text-gray-700">时间</div>
                 {timelineDayLayouts.map((day) => (
                   <div
                     key={day.dateIso}
-                    className="border-r border-gray-200 bg-gray-50 px-4 py-3 text-center text-sm font-medium text-gray-700 last:border-r-0"
+                    className="border-r border-gray-200 bg-gray-50 px-3 py-2 text-center text-xs font-medium text-gray-700 last:border-r-0"
                   >
                     <div>{dayTitle(day.date)}</div>
                     {day.laneCount > 1 ? (
-                      <div className="mt-1 text-[11px] font-medium text-gray-500">
+                      <div className="mt-0.5 text-[10px] font-medium text-gray-500">
                         {day.laneCount} 个并行
                       </div>
                     ) : null}
@@ -1413,7 +1413,7 @@ export function WeeklyTimeGrid({
                     return (
                       <div
                         key={`hour-label-${slot.startHour}`}
-                        className={`border-r border-b px-1.5 py-1 text-xs ${endsAtMainHour ? "border-gray-200" : "border-gray-100"} ${startsAtMainHour ? "bg-gray-50 text-gray-500" : "text-gray-400"}`}
+                        className={`border-r border-b px-1.5 py-1 text-[10px] ${endsAtMainHour ? "border-gray-200" : "border-gray-100"} ${startsAtMainHour ? "bg-gray-50 text-gray-500" : "text-gray-400"}`}
                         style={{
                           height: `${(slot.durationMinutes / minutesPerHour) * hourCellHeight}px`,
                           borderBottomStyle: endsAtMainHour ? "solid" : "dashed",
@@ -1529,32 +1529,32 @@ export function WeeklyTimeGrid({
                                   ) : compactCard ? (
                                     <div className="flex min-w-0 items-start gap-1.5">
                                       <span
-                                        className="shrink-0 whitespace-nowrap rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
+                                        className="shrink-0 whitespace-nowrap rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
                                         title={fullTimeLabel}
                                       >
                                         {timeLabel}
                                       </span>
                                       <span
-                                        className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded bg-white/65"
+                                        className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded bg-white/65"
                                         title={categoryVisual.name}
                                       >
-                                        <CategoryIcon visual={categoryVisual} className="h-3 w-3" />
+                                        <CategoryIcon visual={categoryVisual} className="h-2.5 w-2.5" />
                                       </span>
                                       {segmentLabel ? (
-                                        <span className="mt-0.5 shrink-0 rounded-full border border-white/60 bg-white/55 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-gray-600">
+                                        <span className="mt-0.5 shrink-0 rounded-full border border-white/60 bg-white/55 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-gray-600">
                                           {segmentLabel}
                                         </span>
                                       ) : null}
                                       {event.tag ? (
-                                        <span className={`mt-0.5 shrink-0 text-sm font-bold leading-none ${getTagInfo(event.tag).color}`}>
+                                        <span className={`mt-0.5 shrink-0 text-xs font-bold leading-none ${getTagInfo(event.tag).color}`}>
                                           {getTagInfo(event.tag).icon}
                                         </span>
                                       ) : null}
                                       {parseSyntheticEventId(event.id) ? (
-                                        <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600" aria-hidden />
+                                        <Repeat className="mt-0.5 h-3 w-3 shrink-0 text-gray-600" aria-hidden />
                                       ) : null}
                                       <p
-                                        className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-snug ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
+                                        className={`min-w-0 flex-1 truncate text-xs font-semibold leading-snug ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
                                         title={`${event.title} (${fullTimeLabel})`}
                                       >
                                         {event.title}
@@ -1565,7 +1565,7 @@ export function WeeklyTimeGrid({
                                           title="已完成"
                                           aria-label="已完成"
                                         >
-                                          <Check className="h-3 w-3" aria-hidden />
+                                          <Check className="h-2.5 w-2.5" aria-hidden />
                                         </span>
                                       ) : null}
                                     </div>
@@ -1573,33 +1573,33 @@ export function WeeklyTimeGrid({
                                     <>
                                       <div className="flex min-w-0 items-center gap-1.5">
                                         <span
-                                          className="shrink-0 whitespace-nowrap rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
+                                          className="shrink-0 whitespace-nowrap rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
                                           title={fullTimeLabel}
                                         >
                                           {timeLabel}
                                         </span>
                                         <span
-                                          className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-white/65"
+                                          className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded bg-white/65"
                                           title={categoryVisual.name}
                                         >
-                                          <CategoryIcon visual={categoryVisual} className="h-3 w-3" />
+                                          <CategoryIcon visual={categoryVisual} className="h-2.5 w-2.5" />
                                         </span>
                                         {segmentLabel ? (
-                                          <span className="shrink-0 rounded-full border border-white/60 bg-white/55 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-gray-600">
+                                          <span className="shrink-0 rounded-full border border-white/60 bg-white/55 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-gray-600">
                                             {segmentLabel}
                                           </span>
                                         ) : null}
                                         {event.tag ? (
-                                          <span className={`shrink-0 text-sm font-bold leading-none ${getTagInfo(event.tag).color}`}>
+                                          <span className={`shrink-0 text-xs font-bold leading-none ${getTagInfo(event.tag).color}`}>
                                             {getTagInfo(event.tag).icon}
                                           </span>
                                         ) : null}
                                         {parseSyntheticEventId(event.id) ? (
-                                          <Repeat className="h-3.5 w-3.5 shrink-0 text-gray-600" aria-hidden />
+                                          <Repeat className="h-3 w-3 shrink-0 text-gray-600" aria-hidden />
                                         ) : null}
                                         <span className="min-w-0 flex-1" />
                                         {denseCard ? (
-                                          <span className="shrink-0 rounded-md border border-white/50 bg-white/45 px-1.5 py-0.5 text-[10px] font-medium leading-none text-gray-700">
+                                          <span className="shrink-0 rounded-md border border-white/50 bg-white/45 px-1.5 py-0.5 text-[9px] font-medium leading-none text-gray-700">
                                             {event.lane + 1}/{event.laneCount}
                                           </span>
                                         ) : null}
@@ -1609,13 +1609,13 @@ export function WeeklyTimeGrid({
                                             title="已完成"
                                             aria-label="已完成"
                                           >
-                                            <Check className="h-3 w-3" aria-hidden />
+                                            <Check className="h-2.5 w-2.5" aria-hidden />
                                           </span>
                                         ) : null}
                                       </div>
 
                                       <p
-                                        className={`min-w-0 flex-1 overflow-hidden break-words text-sm font-semibold leading-snug ${
+                                        className={`min-w-0 flex-1 overflow-hidden break-words text-[13px] font-semibold leading-snug ${
                                           mediumCard || denseCard
                                             ? "[display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
                                             : ""
@@ -1626,13 +1626,13 @@ export function WeeklyTimeGrid({
                                       </p>
 
                                       {showDetails && event.notes ? (
-                                        <p className="min-h-0 overflow-hidden text-[11px] leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
+                                        <p className="min-h-0 overflow-hidden text-[10px] leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
                                           {event.notes}
                                         </p>
                                       ) : null}
 
                                       {durationHour >= 1.5 && event.requirements.length > 0 ? (
-                                        <div className="flex shrink-0 justify-end text-[11px] leading-tight text-gray-700">
+                                        <div className="flex shrink-0 justify-end text-[10px] leading-tight text-gray-700">
                                           <span className="truncate rounded-md border border-white/50 bg-white/45 px-1.5 py-0.5">
                                             {event.requirements.length} 项准备
                                           </span>
@@ -1646,7 +1646,7 @@ export function WeeklyTimeGrid({
                               {microCard ? null : (
                                 <button
                                   type="button"
-                                  className="absolute right-1.5 top-1.5 z-20 rounded-full border border-white/80 bg-white/80 p-1 text-stone-700 opacity-0 shadow-sm transition hover:bg-white hover:text-black group-hover:opacity-100 focus-visible:opacity-100"
+                                  className="absolute right-1.5 top-1.5 z-20 rounded-full border border-white/80 bg-white/80 p-0.5 text-stone-700 opacity-0 shadow-sm transition hover:bg-white hover:text-black group-hover:opacity-100 focus-visible:opacity-100"
                                   onClick={(mouseEvent) => {
                                     mouseEvent.stopPropagation();
                                     setSelectedExpenseDateIso(event.displayDate);
@@ -1654,7 +1654,7 @@ export function WeeklyTimeGrid({
                                   }}
                                   aria-label={`在 ${event.title} 同时段新建行程`}
                                 >
-                                  <Plus className="h-3 w-3" />
+                                  <Plus className="h-2.5 w-2.5" />
                                 </button>
                               )}
                             </div>

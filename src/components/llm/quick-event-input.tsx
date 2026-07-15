@@ -109,7 +109,7 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
           size="sm"
           onClick={handleAnalyze}
           disabled={loading || !input.trim()}
-          className="h-8 shrink-0 rounded-lg px-2.5"
+          className="h-8 shrink-0 rounded-lg px-2.5 text-xs"
         >
           <Sparkles className="h-3.5 w-3.5" />
           {loading ? "识别中" : "智能识别"}
