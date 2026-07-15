@@ -116,7 +116,6 @@ import { cn } from "@/lib/utils";
 import { todayISO } from "@/lib/date-utils";
 import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
 import type { Achievement } from "@/components/monitoring/achievements-panel";
-import { FootprintsPanel } from "@/components/monitoring/footprints-panel";
 import {
   type ResearchProject,
   type PlanItem,
@@ -2615,15 +2614,6 @@ export function WorkbenchApp() {
               events={events}
               initialOutcomeTaskId={continuityOutcomeTaskId}
               onInitialOutcomeHandled={() => setContinuityOutcomeTaskId(null)}
-            />
-          ) : activeModule === "footprints" ? (
-            <FootprintsPanel
-              footprints={footprints}
-              onAdd={handleAddFootprint}
-              onReset={handleResetFootprint}
-              onUpdate={handleUpdateFootprint}
-              onDelete={handleDeleteFootprint}
-              confirmDangerousActions={confirmDangerousActions}
             />
           ) : activeModule === "research" ? (
             <ResearchWorkflowPanel

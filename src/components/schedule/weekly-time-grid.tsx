@@ -1597,7 +1597,7 @@ export function WeeklyTimeGrid({
           ) : null}
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             {selectedCell ? (
-              <DialogContent className="rounded-lg border-gray-200 shadow-lg">
+              <DialogContent className="rounded-lg border-gray-200 shadow-lg sm:max-w-lg">
                 <DialogHeader>
                   <DialogTitle className="text-lg font-semibold text-gray-900">
                     新建行程 - {selectedCell.date} {formatHour(selectedCell.startHour)}
@@ -1803,7 +1803,7 @@ export function WeeklyTimeGrid({
           <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => !open && setEditingEventId(null)}>
             {selectedEvent ? (
               <DialogContent
-                className="rounded-lg border-gray-200 shadow-lg"
+                className="rounded-lg border-gray-200 shadow-lg sm:max-w-lg"
                 onKeyDown={(event) => {
                   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                     event.preventDefault();

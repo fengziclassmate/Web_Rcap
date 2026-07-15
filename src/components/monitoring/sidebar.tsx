@@ -6,7 +6,6 @@ import {
   CalendarDays,
   FileText,
   FlaskConical,
-  Footprints,
   LayoutDashboard,
   NotebookPen,
   Orbit,
@@ -18,7 +17,6 @@ import { cn } from "@/lib/utils";
 export type MonitoringModuleId =
   | "schedule"
   | "continuity"
-  | "footprints"
   | "research"
   | "paper"
   | "submissions"
@@ -34,7 +32,6 @@ const items: Array<{
 }> = [
   { id: "schedule", label: "个人日程", group: "Today", icon: <CalendarDays className="h-4 w-4" aria-hidden /> },
   { id: "continuity", label: "执行连续性", group: "Continuity", icon: <Orbit className="h-4 w-4" aria-hidden /> },
-  { id: "footprints", label: "足迹跟踪", group: "Life", icon: <Footprints className="h-4 w-4" aria-hidden /> },
   { id: "research", label: "科研项目", group: "Research", icon: <FlaskConical className="h-4 w-4" aria-hidden /> },
   { id: "paper", label: "论文进度", group: "Writing", icon: <FileText className="h-4 w-4" aria-hidden /> },
   { id: "literature", label: "文献阅读", group: "Reading", icon: <BookOpen className="h-4 w-4" aria-hidden /> },

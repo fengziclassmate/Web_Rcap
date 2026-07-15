@@ -1998,34 +1998,26 @@ export function TaskDashboard({
       <Separator />
 
       <div className="task-dashboard-section">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-600">
-            <CalendarRange className="h-4 w-4 text-primary" aria-hidden />
-            年度任务清单
-          </p>
-          <div className="flex items-center gap-1">
-            <Button type="button" size="icon-sm" onClick={() => setShowAddAnnualDialog(true)} aria-label="添加年度任务" title="添加年度任务">
-              <Plus className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              onClick={() => {
-                const nextOpen = !annualSectionOpen;
-                setAnnualSectionOpen(nextOpen);
-                patchUiPreferences({ annualSectionOpen: nextOpen });
-              }}
-              aria-label={annualSectionOpen ? "收起年度任务清单" : "展开年度任务清单"}
-            >
-              <ChevronDown className={`h-4 w-4 transition-transform ${annualSectionOpen ? "" : "-rotate-90"}`} />
-            </Button>
-          </div>
-        </div>
-        {annualSectionOpen ? (
-          <div className="space-y-3 rounded-2xl subtle-card p-3">
-            {annualTasks.length > 0 ? (
-              <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">
+        <Collapsible
+          open={annualSectionOpen}
+          onOpenChange={(open) => {
+            setAnnualSectionOpen(open);
+            patchUiPreferences({ annualSectionOpen: open });
+          }}
+        >
+          <CollapsibleTrigger className="section-trigger mb-3 flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left">
+            <span className="text-sm font-semibold text-gray-700">年度任务清单</span>
+            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${annualSectionOpen ? "" : "-rotate-90"}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="mb-3 flex items-center gap-1.5">
+              <Button type="button" size="icon-sm" onClick={() => setShowAddAnnualDialog(true)} aria-label="添加年度任务" title="添加年度任务">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-3 rounded-2xl subtle-card p-3">
+              {annualTasks.length > 0 ? (
+                <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">
                 {annualTasks.map((item) => (
                   <li
                     key={item.id}
@@ -2083,12 +2075,13 @@ export function TaskDashboard({
                     </Button>
                   </li>
                 ))}
-              </ul>
-            ) : (
-              <p className="text-center text-sm text-gray-500">尚未添加年度任务。</p>
-            )}
-          </div>
-        ) : null}
+                </ul>
+              ) : (
+                <p className="text-center text-sm text-gray-500">尚未添加年度任务。</p>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       {showFootprintsSection ? (
