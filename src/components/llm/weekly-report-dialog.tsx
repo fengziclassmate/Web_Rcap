@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Clipboard, FileText, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { Achievement } from "@/components/monitoring/achievements-panel";
+import type { Achievement } from "@/lib/legacy-research";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -65,15 +65,6 @@ export function WeeklyReportDialog({
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
   const reportData = useWeekReportData(currentWeekStart, events, tasks, achievements);
   const { loading, sendMessage } = useLLMChat();
-
-  useEffect(() => {
-    if (!open) return;
-    setSavedReports(readSavedReports());
-  }, [open]);
-
-  useEffect(() => {
-    if (!title) setTitle(`${reportData.rangeText} 周报`);
-  }, [reportData.rangeText, title]);
 
   const activeReport = useMemo(
     () => savedReports.find((report) => report.id === activeReportId) ?? null,
@@ -141,9 +132,15 @@ export function WeeklyReportDialog({
     toast.success("已删除周报");
   }
 
+  function handleOpen() {
+    setSavedReports(readSavedReports());
+    if (!activeReportId) setTitle(`${reportData.rangeText} 周报`);
+    setOpen(true);
+  }
+
   return (
     <>
-      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+      <Button type="button" variant="outline" size="sm" onClick={handleOpen}>
         <FileText className="h-4 w-4" />
         生成周报
       </Button>

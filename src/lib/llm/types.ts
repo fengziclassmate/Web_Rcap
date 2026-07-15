@@ -20,12 +20,8 @@ export type LLMRequestOptions = {
   stream?: boolean;
 };
 
-export type LLMResponse = {
-  content: string;
-  model: string;
-};
 
-export type ProviderEndpoint = {
+type ProviderEndpoint = {
   baseUrl: string;
   chatPath: string;
 };

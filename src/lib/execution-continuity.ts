@@ -87,7 +87,7 @@ export type ExecutionOutcome = ContinuityEntityLink & {
   createdAt: string;
 };
 
-export type DeviationInsight = {
+type DeviationInsight = {
   workType: KnowledgeWorkType;
   sampleSize: number;
   averagePlannedMinutes: number;

@@ -365,19 +365,3 @@ export function emptyLinkState(): WorkflowLinkState {
     linkedActivityLogIds: [],
   };
 }
-
-export function ensureStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-}
-
-export function normalizeChecklistItems(payload: unknown): SubmissionChecklistItem[] {
-  if (!Array.isArray(payload)) return [];
-  return payload.map((item, index) => {
-    const value = item as Partial<SubmissionChecklistItem>;
-    return {
-      id: typeof value.id === "string" ? value.id : `check-${index}`,
-      label: typeof value.label === "string" ? value.label : "",
-      done: Boolean(value.done),
-    };
-  });
-}

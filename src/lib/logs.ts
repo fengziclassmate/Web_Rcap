@@ -117,7 +117,7 @@ export type LogPostEditorInput = {
   links: LinkedEntity[];
 };
 
-export type LogStats = {
+type LogStats = {
   weekCount: number;
   monthCount: number;
   categoryCounts: Array<{ category: LogCategory; count: number }>;

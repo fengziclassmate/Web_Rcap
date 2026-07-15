@@ -1,9 +1,11 @@
-import type { Achievement } from "@/components/monitoring/achievements-panel";
 import type { FootprintItem, AnnualTask, DashboardUiPreferences, LongTask, ProjectCheckin, ScheduleEvent } from "@/lib/types";
-import type { GroupMeetingRecord } from "@/components/monitoring/group-meetings-panel";
-import type { PaperProgress } from "@/components/monitoring/paper-progress-panel";
-import type { ResearchProject } from "@/components/monitoring/research-projects-panel";
-import type { SubmissionRecord } from "@/components/monitoring/submissions-panel";
+import type {
+  Achievement,
+  GroupMeetingRecord,
+  PaperProgress,
+  ResearchProject,
+  SubmissionRecord,
+} from "@/lib/legacy-research";
 import {
   defaultExecutionContinuityState,
   normalizeExecutionContinuityState,
@@ -46,7 +48,7 @@ export function getScheduleBackupStorageKey(userId: string) {
   return `${SCHEDULE_DATA_BACKUP_STORAGE_PREFIX}:${userId}`;
 }
 
-export function normalizePersistedSchedulePayload(
+function normalizePersistedSchedulePayload(
   payload: unknown,
 ): PersistedSchedulePayload | null {
   if (!payload || typeof payload !== "object") return null;

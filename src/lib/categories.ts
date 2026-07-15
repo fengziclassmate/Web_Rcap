@@ -122,15 +122,11 @@ export const CATEGORY_VISUALS: ScheduleCategoryVisual[] = [
 ];
 
 export const CATEGORY_COLORS = CATEGORY_VISUALS.map((item) => item.twClass);
-export const SCHEDULE_CATEGORY_NAMES = CATEGORY_VISUALS.map((item) => item.name);
+const SCHEDULE_CATEGORY_NAMES = CATEGORY_VISUALS.map((item) => item.name);
 export const SCHEDULE_CATEGORY_PROMPT_LIST = SCHEDULE_CATEGORY_NAMES.join("、");
 
-export const DEFAULT_CATEGORY_PALETTE = CATEGORY_VISUALS.map((item) => ({
-  name: item.name,
-  color: item.twClass,
-}));
 
-export const CATEGORY_ALIAS_MAP: Record<string, string> = {
+const CATEGORY_ALIAS_MAP: Record<string, string> = {
   睡觉: names.sleep,
   睡觉事件: names.sleep,
   睡眠事件: names.sleep,
@@ -220,7 +216,7 @@ const fallbackVisual = visual(
   false,
 );
 
-export function createDefaultCategoryDefs(): ScheduleCategoryDef[] {
+function createDefaultCategoryDefs(): ScheduleCategoryDef[] {
   return CATEGORY_VISUALS.map((item, index) => ({
     id: `${DEFAULT_CATEGORY_ID_PREFIX}${index}`,
     name: item.name,
@@ -316,10 +312,6 @@ export function getCategoryVisualByName(name: string) {
   return CATEGORY_VISUALS.find((item) => item.name === normalized) ?? { ...fallbackVisual, name: normalized };
 }
 
-export function findCategoryDef(defs: ScheduleCategoryDef[], name: string) {
-  const normalized = normalizeScheduleCategory(name);
-  return defs.find((item) => item.name === normalized);
-}
 
 export function getScheduleCategoryVisual(category: string) {
   return getCategoryVisualByName(category);
@@ -331,8 +323,4 @@ export function getScheduleCategoryColor(category: string) {
 
 export function getScheduleCategoryAccentColor(category: string) {
   return getScheduleCategoryVisual(category).twAccent;
-}
-
-export function getScheduleCategoryHex(category: string) {
-  return getScheduleCategoryVisual(category).hex;
 }

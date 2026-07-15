@@ -13,11 +13,15 @@ import type {
   TaskUncertaintyLevel,
   TaskUncertaintyProfile,
 } from "@/lib/types";
-import type { Achievement } from "@/components/monitoring/achievements-panel";
-import type { PlanItem, ResearchProject } from "@/components/monitoring/research-projects-panel";
-import type { PaperPlanItem, PaperProgress } from "@/components/monitoring/paper-progress-panel";
-import type { SubmissionRecord } from "@/components/monitoring/submissions-panel";
-import type { GroupMeetingRecord } from "@/components/monitoring/group-meetings-panel";
+import type {
+  Achievement,
+  GroupMeetingRecord,
+  PaperPlanItem,
+  PaperProgress,
+  PlanItem,
+  ResearchProject,
+  SubmissionRecord,
+} from "@/lib/legacy-research";
 import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/categories";
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
@@ -225,7 +229,7 @@ export function normalizeAchievements(payload: unknown): Achievement[] {
     .filter((x): x is Achievement => x !== null);
 }
 
-export function normalizePlanItems(payload: unknown): PlanItem[] {
+function normalizePlanItems(payload: unknown): PlanItem[] {
   if (!Array.isArray(payload)) return [];
   return payload
     .map((item, index) => {
@@ -242,7 +246,7 @@ export function normalizePlanItems(payload: unknown): PlanItem[] {
     .filter((x): x is PlanItem => Boolean(x));
 }
 
-export function normalizePaperPlanItems(payload: unknown): PaperPlanItem[] {
+function normalizePaperPlanItems(payload: unknown): PaperPlanItem[] {
   if (!Array.isArray(payload)) return [];
   return payload
     .map((item, index) => {
@@ -412,7 +416,7 @@ export function normalizeTasks(payload: unknown): LongTask[] {
   });
 }
 
-export function normalizeRecurrence(value: unknown): RecurrenceConfig | undefined {
+function normalizeRecurrence(value: unknown): RecurrenceConfig | undefined {
   if (!value || typeof value !== "object") return undefined;
   const r = value as { kind?: string; weekdays?: unknown };
   if (r.kind === "daily") return { kind: "daily" };

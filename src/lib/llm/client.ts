@@ -4,13 +4,13 @@ import type { LLMRequestOptions, LLMUserConfig } from "@/lib/llm/types";
 const DEFAULT_SYSTEM_PROMPT =
   "You are a helpful research and productivity assistant. Reply in Chinese unless the user writes in another language. Be concise, concrete, and practical.";
 
-export function buildRequestUrl(config: LLMUserConfig): string {
+function buildRequestUrl(config: LLMUserConfig): string {
   const endpoint = PROVIDER_ENDPOINTS[config.provider];
   const base = (config.baseUrl?.trim() || endpoint.baseUrl).replace(/\/$/, "");
   return `${base}${endpoint.chatPath}`;
 }
 
-export function buildHeaders(config: LLMUserConfig): Record<string, string> {
+function buildHeaders(config: LLMUserConfig): Record<string, string> {
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${config.apiKey}`,

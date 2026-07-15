@@ -135,7 +135,7 @@ export function expandScheduleEvents(
   return out;
 }
 
-export const RECURRENCE_INSTANCE_OVERRIDE_KEYS = [
+const RECURRENCE_INSTANCE_OVERRIDE_KEYS = [
   "title",
   "startHour",
   "endHour",
@@ -147,7 +147,6 @@ export const RECURRENCE_INSTANCE_OVERRIDE_KEYS = [
   "linkedDailyTaskId",
 ] as const;
 
-export type RecurrenceInstanceOverrideKey = (typeof RECURRENCE_INSTANCE_OVERRIDE_KEYS)[number];
 
 export function pickRecurrenceOverridePatch(
   patch: Partial<ExpandableScheduleEvent>,

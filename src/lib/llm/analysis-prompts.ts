@@ -1,10 +1,10 @@
 import { addDays, format, isWithinInterval, parseISO } from "date-fns";
-import type { Achievement } from "@/components/monitoring/achievements-panel";
+import type { Achievement } from "@/lib/legacy-research";
 import type { LogPostRecord } from "@/lib/logs";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
 import { normalizeScheduleCategory } from "@/lib/categories";
 
-export type EfficiencyAnalysisStats = {
+type EfficiencyAnalysisStats = {
   rangeText: string;
   categoryHours: Array<{ category: string; hours: number }>;
   dailyResearchHours: Array<{ date: string; hours: number }>;

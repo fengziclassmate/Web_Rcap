@@ -23,7 +23,7 @@ export type ChatSession = {
   contextSources: ContextSource[];
 };
 
-export type LLMContextInjector = (sources: ContextSource | ContextSource[]) => void;
+type LLMContextInjector = (sources: ContextSource | ContextSource[]) => void;
 
 declare global {
   interface Window {

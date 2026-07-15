@@ -55,7 +55,7 @@ import { toast } from "sonner";
 import { TaskDecompositionDialog } from "@/components/llm/task-decomposition-dialog";
 import { ContextBadge } from "@/components/llm/context-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { Achievement } from "@/components/monitoring/achievements-panel";
+import type { Achievement } from "@/lib/legacy-research";
 import { DailyTaskPanel } from "@/components/schedule/daily-task-panel";
 import { cn } from "@/lib/utils";
 

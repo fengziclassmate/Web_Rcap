@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { BarChart3 } from "lucide-react";
-import type { Achievement } from "@/components/monitoring/achievements-panel";
+import type { Achievement } from "@/lib/legacy-research";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLLMChat } from "@/hooks/useLLMChat";

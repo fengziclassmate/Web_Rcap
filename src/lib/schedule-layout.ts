@@ -45,7 +45,7 @@ export function doScheduleEventsOverlap(a: ScheduleEvent, b: ScheduleEvent) {
   return a.startHour < b.endHour && b.startHour < a.endHour;
 }
 
-export function isCrossDayScheduleEvent(event: Pick<ScheduleEvent, "startHour" | "endHour">) {
+function isCrossDayScheduleEvent(event: Pick<ScheduleEvent, "startHour" | "endHour">) {
   return event.endHour < event.startHour;
 }
 

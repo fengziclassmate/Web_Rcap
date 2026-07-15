@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Achievement } from "@/components/monitoring/achievements-panel";
+import type { Achievement } from "@/lib/legacy-research";
 import { buildWeeklyReportData } from "@/lib/report/weekly-report";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
 

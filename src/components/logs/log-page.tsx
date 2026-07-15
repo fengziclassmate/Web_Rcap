@@ -131,7 +131,7 @@ export function LogPage({
   );
 }
 
-export function LogComposer({
+function LogComposer({
   uploading,
   onSubmit,
 }: {
@@ -288,7 +288,7 @@ export function LogComposer({
   );
 }
 
-export function LogTimeline({
+function LogTimeline({
   groups,
   onEdit,
   onDelete,
@@ -341,7 +341,7 @@ export function LogTimeline({
   );
 }
 
-export function LogPostCard({
+function LogPostCard({
   post,
   onEdit,
   onDelete,
@@ -420,7 +420,7 @@ export function LogPostCard({
   );
 }
 
-export function LogImageGrid({
+function LogImageGrid({
   images,
   onPreviewImages,
 }: {
@@ -444,7 +444,7 @@ export function LogImageGrid({
   );
 }
 
-export function LogFilterPanel({
+function LogFilterPanel({
   filters,
   tags,
   onChange,
@@ -511,7 +511,7 @@ export function LogFilterPanel({
   );
 }
 
-export function LogStatsPanel({ stats }: { stats: ReturnType<typeof buildLogStats> }) {
+function LogStatsPanel({ stats }: { stats: ReturnType<typeof buildLogStats> }) {
   return (
     <section className="rounded-lg border border-gray-200 bg-white shadow-md">
       <div className="border-b border-gray-200 px-4 py-4">
@@ -558,7 +558,7 @@ export function LogStatsPanel({ stats }: { stats: ReturnType<typeof buildLogStat
   );
 }
 
-export function LogPostEditorModal({
+function LogPostEditorModal({
   post,
   uploading,
   onClose,
@@ -588,7 +588,7 @@ export function LogPostEditorModal({
   );
 }
 
-export function LogImagePreviewModal({
+function LogImagePreviewModal({
   images,
   currentIndex,
   onOpenChange,

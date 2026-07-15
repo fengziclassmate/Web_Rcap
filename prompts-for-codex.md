@@ -1,7 +1,7 @@
 # 日程安排 App — Codex 优化 Prompt 集
 
 > 项目根目录：`C:\Users\25371\Desktop\日程安排_app`
-> 技术栈：Next.js 16 + React 19 + TypeScript + Supabase + shadcn/ui + Tailwind CSS 4 + Capacitor 8 (Android)
+> 技术栈：Next.js 16 + React 19 + TypeScript + Supabase + shadcn/ui + Tailwind CSS 4（仅桌面 Web）
 > 当前状态：功能完整可运行，但代码结构混乱，page.tsx 4000+ 行，缺乏测试和规范的状态管理。
 
 ---

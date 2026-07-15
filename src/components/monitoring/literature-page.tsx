@@ -1,6 +1,6 @@
 "use client";
 
-import { type ClipboardEvent, type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from "react";
+import { type ClipboardEvent, type Dispatch, type ReactNode, type SetStateAction, useMemo, useState } from "react";
 import {
   ArrowRight,
   BookOpenCheck,
@@ -19,6 +19,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
+import Image, { type ImageLoaderProps } from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -175,6 +176,10 @@ type LiteratureCompleteness = {
   strengths: string[];
 };
 
+function attachmentImageLoader({ src }: ImageLoaderProps) {
+  return src;
+}
+
 function buildLiteratureCompleteness(item: LiteratureItem | null): LiteratureCompleteness {
   if (!item) return { score: 0, done: 0, total: 0, missing: [], strengths: [] };
 
@@ -325,6 +330,7 @@ export function LiteraturePage({
             <div className="min-h-[720px]">
               {activeItem ? (
                 <LiteratureDetail
+                  key={`${activeItem.id}:${activeItem.updatedAt}`}
                   item={activeItem}
                   projects={projects}
                   papers={papers}
@@ -866,12 +872,6 @@ function LiteratureDetail({
   const [tagInput, setTagInput] = useState(item.tags.map((tag) => tag.name).join(", "));
   const completeness = useMemo(() => buildLiteratureCompleteness(item), [item]);
 
-  useEffect(() => {
-    setEditing(false);
-    setDraft(literatureFormFromItem(item));
-    setTagInput(item.tags.map((tag) => tag.name).join(", "));
-  }, [item.id, item.tags]);
-
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-gray-200 px-5 py-4">
@@ -922,7 +922,6 @@ function LiteratureDetail({
 
       <div className="flex-1 overflow-y-auto p-5">
         <LiteratureReadinessStrip
-          item={item}
           completeness={completeness}
           onEdit={() => setEditing(true)}
           onJump={setActiveTab}
@@ -1123,12 +1122,10 @@ function InlineLiteratureEditor({
 }
 
 function LiteratureReadinessStrip({
-  item,
   completeness,
   onEdit,
   onJump,
 }: {
-  item: LiteratureItem;
   completeness: LiteratureCompleteness;
   onEdit: () => void;
   onJump: (tab: DetailTab) => void;
@@ -1285,6 +1282,7 @@ function InsightCard({ title, content, tone }: { title: string; content: string;
     <section
       className={cn(
         "rounded-2xl border border-stone-200 bg-white p-5 shadow-sm",
+        tone === "emerald" ? "border-l-4 border-l-emerald-500" : "border-l-4 border-l-amber-500",
       )}
     >
       <h4 className="text-sm font-semibold text-stone-950">{title}</h4>
@@ -1312,50 +1310,6 @@ function RelationBox({ title, items, emptyText }: { title: string; items: string
   );
 }
 
-function OverviewTab({
-  item,
-  projects,
-  papers,
-}: {
-  item: LiteratureItem;
-  projects: LiteratureReferenceOption[];
-  papers: LiteratureReferenceOption[];
-}) {
-  const linkedProjects = item.projectLinks
-    .map((link) => projects.find((project) => project.id === link.projectId)?.title)
-    .filter((value): value is string => Boolean(value));
-  const linkedPapers = item.paperUsages
-    .map((usage) => papers.find((paper) => paper.id === usage.paperId)?.title)
-    .filter((value): value is string => Boolean(value));
-
-  return (
-    <div className="space-y-6">
-      <DetailGrid
-        items={[
-          { label: "DOI", value: item.doi || "未填写" },
-          { label: "URL", value: item.url || "未填写" },
-          { label: "PDF", value: item.pdfUrl || "未填写" },
-          { label: "关键词", value: item.keywords.length > 0 ? item.keywords.join("、") : "未填写" },
-        ]}
-      />
-      <SectionCard title="一句话总结" content={item.summary || "未填写"} />
-      <SectionCard title="主要贡献" content={item.contributions || "未填写"} />
-      <SectionCard title="局限性" content={item.limitations || "未填写"} />
-      <SectionCard title="摘要" content={item.abstract || "未填写"} />
-      <SectionCard title="关联项目" content={linkedProjects.length > 0 ? linkedProjects.join("、") : "未关联"} />
-      <SectionCard title="关联论文" content={linkedPapers.length > 0 ? linkedPapers.join("、") : "未关联"} />
-      {item.tags.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {item.tags.map((tag) => (
-            <Badge key={tag.id} variant="secondary">
-              #{tag.name}
-            </Badge>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 function NoteTab({
   item,
@@ -1593,12 +1547,18 @@ function AttachmentsTabV2({
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
             {imageAttachments.map((attachment) => (
               <figure key={attachment.id} className="overflow-hidden rounded-xl border border-stone-200 bg-stone-50">
-                <button type="button" className="block w-full bg-white" onClick={() => setPreview(attachment)}>
-                  <img
+                <button
+                  type="button"
+                  className="relative block h-48 w-full bg-white"
+                  onClick={() => setPreview(attachment)}
+                >
+                  <Image
+                    loader={attachmentImageLoader}
                     src={attachment.fileUrl}
                     alt={attachment.fileName}
-                    className="h-48 w-full object-contain"
-                    loading="lazy"
+                    fill
+                    sizes="30vw"
+                    className="object-contain"
                   />
                 </button>
                 <figcaption className="flex items-start justify-between gap-2 border-t border-stone-200 px-3 py-2">
@@ -1663,7 +1623,14 @@ function AttachmentsTabV2({
             <DialogTitle>{preview?.fileName ?? "图片预览"}</DialogTitle>
           </DialogHeader>
           {preview ? (
-            <img src={preview.fileUrl} alt={preview.fileName} className="max-h-[76vh] w-full object-contain" />
+            <Image
+              loader={attachmentImageLoader}
+              src={preview.fileUrl}
+              alt={preview.fileName}
+              width={1600}
+              height={1200}
+              className="max-h-[76vh] w-full object-contain"
+            />
           ) : null}
         </DialogContent>
       </Dialog>
@@ -1671,73 +1638,6 @@ function AttachmentsTabV2({
   );
 }
 
-function AttachmentsTab({
-  item,
-  onUploadAttachments,
-  onDeleteAttachment,
-}: {
-  item: LiteratureItem;
-  onUploadAttachments: (literatureId: string, files: File[]) => Promise<void>;
-  onDeleteAttachment: (attachmentId: string) => Promise<void>;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <div className="flex items-start gap-3">
-          <Paperclip className="mt-0.5 h-4 w-4 text-gray-500" />
-          <div>
-            <p className="text-sm font-medium text-gray-900">附件记录</p>
-          </div>
-        </div>
-        <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50">
-          上传附件
-          <input
-            type="file"
-            className="hidden"
-            multiple
-            accept=".doc,.docx,.ppt,.pptx,.xls,.xlsx,.pdf,.txt,.md,.csv"
-            onChange={(event) => {
-              const files = Array.from(event.target.files ?? []);
-              if (files.length > 0) {
-                void onUploadAttachments(item.id, files);
-              }
-              event.target.value = "";
-            }}
-          />
-        </label>
-      </div>
-
-      {item.attachments.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
-          当前还没有附件。
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {item.attachments.map((attachment) => (
-            <div key={attachment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-4">
-              <div className="min-w-0">
-                <a
-                  href={attachment.fileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block truncate text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
-                >
-                  {attachment.fileName}
-                </a>
-                <p className="mt-1 text-xs text-gray-500">
-                  {attachment.fileType || "未知类型"} · {formatFileSize(attachment.fileSize)} · 上传于 {attachment.createdAt.slice(0, 10)}
-                </p>
-              </div>
-              <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteAttachment(attachment.id)}>
-                删除附件
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function emptyMethodInput(): LiteratureMethodNoteInput {
   return {
@@ -1787,10 +1687,6 @@ function MethodsTabEditable({
   const [editing, setEditing] = useState<LiteratureMethodNote | null>(null);
   const [draft, setDraft] = useState<LiteratureMethodNoteInput>(emptyMethodInput());
 
-  useEffect(() => {
-    setDraft(methodInputFromValue(editing ?? undefined));
-  }, [editing]);
-
   return (
     <div className="space-y-4">
       <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -1825,7 +1721,14 @@ function MethodsTabEditable({
         </div>
         <div className="mt-3 flex justify-end gap-2">
           {editing ? (
-            <Button type="button" variant="outline" onClick={() => setEditing(null)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setEditing(null);
+                setDraft(emptyMethodInput());
+              }}
+            >
               取消
             </Button>
           ) : null}
@@ -1867,7 +1770,17 @@ function MethodsTabEditable({
                 <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700">{method.description || "未填写描述"}</p>
               </div>
               <div className="flex gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={() => setEditing(method)}>编辑</Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setEditing(method);
+                    setDraft(methodInputFromValue(method));
+                  }}
+                >
+                  编辑
+                </Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteMethodNote(method.id)}>删除</Button>
               </div>
             </div>
@@ -1886,46 +1799,6 @@ function MethodsTabEditable({
   );
 }
 
-function MethodsTab({
-  item,
-  projects,
-  papers,
-}: {
-  item: LiteratureItem;
-  projects: LiteratureReferenceOption[];
-  papers: LiteratureReferenceOption[];
-}) {
-  return (
-    <div className="space-y-3">
-      {item.methodNotes.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
-          第一版暂未开放编辑，数据结构已预留。
-        </div>
-      ) : (
-        item.methodNotes.map((method) => (
-          <div key={method.id} className="rounded-lg border border-gray-200 p-4">
-            <p className="text-sm font-semibold text-gray-900">{method.name || "未命名方法"}</p>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700">{method.description || "未填写描述"}</p>
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <MiniField label="所需数据" value={method.requiredData || "未填写"} />
-              <MiniField label="适用性" value={method.applicability || "未填写"} />
-              <MiniField label="优点" value={method.strengths || "未填写"} />
-              <MiniField label="缺点" value={method.weaknesses || "未填写"} />
-              <MiniField
-                label="关联项目"
-                value={projects.find((item) => item.id === method.projectId)?.title || "未关联"}
-              />
-              <MiniField
-                label="关联论文"
-                value={papers.find((item) => item.id === method.paperId)?.title || "未关联"}
-              />
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
 
 function emptyPaperUsageInput(papers: LiteratureReferenceOption[]): LiteraturePaperUsageInput {
   return {
@@ -1965,10 +1838,6 @@ function UsageTabEditable({
   const [editing, setEditing] = useState<LiteraturePaperUsage | null>(null);
   const [draft, setDraft] = useState<LiteraturePaperUsageInput>(() => emptyPaperUsageInput(papers));
 
-  useEffect(() => {
-    setDraft(paperUsageInputFromValue(editing ?? undefined, papers));
-  }, [editing, papers]);
-
   return (
     <div className="space-y-4">
       <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -1997,7 +1866,18 @@ function UsageTabEditable({
           <FieldTextarea label="备注" value={draft.note} onChange={(value) => setDraft((prev) => ({ ...prev, note: value }))} />
         </div>
         <div className="mt-3 flex justify-end gap-2">
-          {editing ? <Button type="button" variant="outline" onClick={() => setEditing(null)}>取消</Button> : null}
+          {editing ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setEditing(null);
+                setDraft(emptyPaperUsageInput(papers));
+              }}
+            >
+              取消
+            </Button>
+          ) : null}
           <Button
             type="button"
             disabled={!draft.paperId}
@@ -2029,7 +1909,17 @@ function UsageTabEditable({
                 <Badge variant="outline">{citationStatusLabel(usage.citationStatus)}</Badge>
               </div>
               <div className="flex gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={() => setEditing(usage)}>编辑</Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setEditing(usage);
+                    setDraft(paperUsageInputFromValue(usage, papers));
+                  }}
+                >
+                  编辑
+                </Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => void onDeletePaperUsage(usage.id)}>删除</Button>
               </div>
             </div>
@@ -2042,37 +1932,6 @@ function UsageTabEditable({
   );
 }
 
-function UsageTab({
-  item,
-  papers,
-}: {
-  item: LiteratureItem;
-  papers: LiteratureReferenceOption[];
-}) {
-  return (
-    <div className="space-y-3">
-      {item.paperUsages.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
-          当前没有论文使用记录。
-        </div>
-      ) : (
-        item.paperUsages.map((usage) => (
-          <div key={usage.id} className="rounded-lg border border-gray-200 p-4">
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">
-                {papers.find((paper) => paper.id === usage.paperId)?.title || "未命名论文"}
-              </Badge>
-              <Badge variant="secondary">{usageTypeLabel(usage.usageType)}</Badge>
-              <Badge variant="outline">{citationStatusLabel(usage.citationStatus)}</Badge>
-            </div>
-            <p className="mt-3 text-sm text-gray-700">章节：{usage.chapter || "未填写"}</p>
-            {usage.note ? <p className="mt-2 whitespace-pre-wrap text-sm text-gray-600">{usage.note}</p> : null}
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
 
 function LinksTab({
   item,
@@ -2142,10 +2001,6 @@ function ReadingLogsTabEditable({
   const [editing, setEditing] = useState<LiteratureReadingLog | null>(null);
   const [draft, setDraft] = useState<LiteratureReadingLogInput>(() => emptyReadingLogInput(item.status));
 
-  useEffect(() => {
-    setDraft(readingLogInputFromValue(editing ?? undefined, item.status));
-  }, [editing, item.status]);
-
   return (
     <div className="space-y-4">
       <section className="rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -2172,7 +2027,18 @@ function ReadingLogsTabEditable({
           <FieldTextarea label="阅读进展" value={draft.progressText} onChange={(value) => setDraft((prev) => ({ ...prev, progressText: value }))} />
         </div>
         <div className="mt-3 flex justify-end gap-2">
-          {editing ? <Button type="button" variant="outline" onClick={() => setEditing(null)}>取消</Button> : null}
+          {editing ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setEditing(null);
+                setDraft(emptyReadingLogInput(item.status));
+              }}
+            >
+              取消
+            </Button>
+          ) : null}
           <Button
             type="button"
             disabled={!draft.progressText.trim()}
@@ -2217,7 +2083,17 @@ function ReadingLogsTabEditable({
                       <Badge variant="outline">{log.durationMinutes} 分钟</Badge>
                     </div>
                     <div className="flex gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={() => setEditing(log)}>编辑</Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditing(log);
+                          setDraft(readingLogInputFromValue(log, item.status));
+                        }}
+                      >
+                        编辑
+                      </Button>
                       <Button type="button" size="sm" variant="outline" onClick={() => void onDeleteReadingLog(log.id)}>删除</Button>
                     </div>
                   </div>
@@ -2233,40 +2109,6 @@ function ReadingLogsTabEditable({
   );
 }
 
-function ReadingLogsTab({ item }: { item: LiteratureItem }) {
-  const groups = groupReadingLogs(item.readingLogs);
-
-  return (
-    <div className="space-y-4">
-      {groups.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
-          第一版暂未开放阅读记录创建，后续可从任务、日程、动态日志联动生成。
-        </div>
-      ) : (
-        groups.map((group) => (
-          <div key={group.label}>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-900">{group.label}</span>
-              <span className="h-px flex-1 bg-gray-200" />
-            </div>
-            <div className="space-y-3">
-              {group.logs.map((log) => (
-                <div key={log.id} className="rounded-lg border border-gray-200 p-4">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary">{statusLabel(log.statusAfter)}</Badge>
-                    <Badge variant="outline">{log.durationMinutes} 分钟</Badge>
-                  </div>
-                  <p className="mt-3 text-sm text-gray-800">{log.progressText || "未填写阅读进展"}</p>
-                  <p className="mt-2 text-xs text-gray-500">{format(new Date(log.loggedAt), "yyyy-MM-dd HH:mm")}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
 
 function LiteratureEditorModal({
   open,
@@ -2571,19 +2413,6 @@ function StatCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
       <p className="text-xs text-gray-500">{label}</p>
       <p className="mt-1 text-lg font-semibold text-gray-900">{value}</p>
-    </div>
-  );
-}
-
-function DetailGrid({ items }: { items: Array<{ label: string; value: string }> }) {
-  return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-      {items.map((item) => (
-        <div key={item.label} className="rounded-lg border border-gray-200 p-3">
-          <p className="text-xs text-gray-500">{item.label}</p>
-          <p className="mt-1 break-all text-sm text-gray-800">{item.value}</p>
-        </div>
-      ))}
     </div>
   );
 }

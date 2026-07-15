@@ -15,7 +15,7 @@ const ACTION_LABEL: Record<LiteratureQuickAction, string> = {
   paper_usage: "可用于论文的位置",
 };
 
-export function buildLiteratureContext(item: LiteratureItem) {
+function buildLiteratureContext(item: LiteratureItem) {
   return `标题：${item.title}
 作者：${item.authors || "未填写"}
 年份：${item.year ?? "未填写"}

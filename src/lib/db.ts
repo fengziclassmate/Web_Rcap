@@ -12,7 +12,7 @@ type UserPayloadRecord = {
   updatedAt: string;
 };
 
-export type ChatSessionRecord = {
+type ChatSessionRecord = {
   id: string;
   title: string;
   messages: unknown[];
@@ -21,7 +21,7 @@ export type ChatSessionRecord = {
   updatedAt: string;
 };
 
-export type SyncMetaRecord = {
+type SyncMetaRecord = {
   userId: string;
   lastSyncTimestamp: string;
   pendingChanges: number;
@@ -54,12 +54,12 @@ interface AppDBSchema extends DBSchema {
   };
 }
 
-export type AppStoreName = StoreNames<AppDBSchema>;
-export type AppDatabase = IDBPDatabase<AppDBSchema>;
+type AppStoreName = StoreNames<AppDBSchema>;
+type AppDatabase = IDBPDatabase<AppDBSchema>;
 
 let dbInstance: AppDatabase | null = null;
 
-export async function getDB(): Promise<AppDatabase> {
+async function getDB(): Promise<AppDatabase> {
   if (typeof indexedDB === "undefined") {
     throw new Error("IndexedDB is not available in this environment.");
   }
@@ -91,10 +91,6 @@ export async function getDB(): Promise<AppDatabase> {
   return dbInstance;
 }
 
-export async function dbGet<T>(storeName: AppStoreName, key: string): Promise<T | undefined> {
-  const db = await getDB();
-  return db.get(storeName, key) as Promise<T | undefined>;
-}
 
 export async function dbGetAll<T>(storeName: AppStoreName): Promise<T[]> {
   const db = await getDB();
@@ -109,9 +105,4 @@ export async function dbPut<T>(storeName: AppStoreName, value: T): Promise<void>
 export async function dbDelete(storeName: AppStoreName, key: string): Promise<void> {
   const db = await getDB();
   await db.delete(storeName, key);
-}
-
-export async function dbClear(storeName: AppStoreName): Promise<void> {
-  const db = await getDB();
-  await db.clear(storeName);
 }

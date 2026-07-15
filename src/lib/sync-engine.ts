@@ -1,6 +1,6 @@
 export type SyncStatus = "idle" | "syncing" | "error" | "offline";
 
-export type SyncListener = (status: SyncStatus, message?: string) => void;
+type SyncListener = (status: SyncStatus, message?: string) => void;
 
 class SyncEngine {
   private listeners = new Set<SyncListener>();

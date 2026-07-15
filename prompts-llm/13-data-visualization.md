@@ -549,6 +549,6 @@ function HourlyDistributionBar({ events }: { events: ScheduleEvent[] }) {
 - [ ] 点击图例可切换显示/隐藏分类
 - [ ] 趋势折线图显示每日已完成 vs 总数对比
 - [ ] 气泡图展示四象限任务分布，悬浮显示任务列表
-- [ ] 响应式适配（手机端缩小尺寸，p-0 内边距自动适配）
+- [ ] 桌面窗口缩放时保持图表标签与交互区域完整
 - [ ] 无数据时显示占位提示
 - [ ] `npm run build` 无 TypeScript 错误

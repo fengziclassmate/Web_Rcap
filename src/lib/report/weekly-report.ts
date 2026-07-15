@@ -1,9 +1,9 @@
 import { addDays, format, isWithinInterval, parseISO } from "date-fns";
-import type { Achievement } from "@/components/monitoring/achievements-panel";
+import type { Achievement } from "@/lib/legacy-research";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
 import { normalizeScheduleCategory } from "@/lib/categories";
 
-export type WeeklyReportData = {
+type WeeklyReportData = {
   rangeText: string;
   events: ScheduleEvent[];
   completedEvents: ScheduleEvent[];

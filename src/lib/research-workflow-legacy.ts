@@ -1,7 +1,9 @@
-import type { GroupMeetingRecord } from "@/components/monitoring/group-meetings-panel";
-import type { PaperProgress } from "@/components/monitoring/paper-progress-panel";
-import type { ResearchProject } from "@/components/monitoring/research-projects-panel";
-import type { SubmissionRecord } from "@/components/monitoring/submissions-panel";
+import type {
+  GroupMeetingRecord,
+  PaperProgress,
+  ResearchProject,
+  SubmissionRecord,
+} from "@/lib/legacy-research";
 import { todayISO } from "@/lib/date-utils";
 import {
   defaultResearchWorkflowState,

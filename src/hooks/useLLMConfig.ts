@@ -6,7 +6,7 @@ import type { LLMUserConfig } from "@/lib/llm/types";
 
 type SafeLLMConfig = Omit<LLMUserConfig, "apiKey">;
 
-export type LLMConfigState = {
+type LLMConfigState = {
   configured: boolean;
   loading: boolean;
   error: string | null;

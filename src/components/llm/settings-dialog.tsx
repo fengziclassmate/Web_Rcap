@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Brain, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -23,18 +23,14 @@ const providerOptions: Array<{ value: LLMProvider; label: string }> = [
 
 export function LLMSettingsDialog({ open, onOpenChange }: LLMSettingsDialogProps) {
   const { saveConfig, clearConfig, loading, error, presetModels, config } = useLLMConfig();
-  const [provider, setProvider] = useState<LLMProvider>("deepseek");
-  const [model, setModel] = useState("deepseek-chat");
+  const [providerOverride, setProvider] = useState<LLMProvider | null>(null);
+  const [modelOverride, setModel] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
+  const [baseUrlOverride, setBaseUrl] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
-
-  useEffect(() => {
-    if (!config) return;
-    setProvider(config.provider);
-    setModel(config.model);
-    setBaseUrl(config.baseUrl ?? "");
-  }, [config]);
+  const provider = providerOverride ?? config?.provider ?? "deepseek";
+  const model = modelOverride ?? (config?.provider === provider ? config.model : presetModels[provider][0] ?? "");
+  const baseUrl = baseUrlOverride ?? config?.baseUrl ?? "";
 
   function handleProviderChange(nextProvider: LLMProvider) {
     setProvider(nextProvider);
@@ -60,6 +56,9 @@ export function LLMSettingsDialog({ open, onOpenChange }: LLMSettingsDialogProps
 
   async function handleClear() {
     await clearConfig();
+    setProvider(null);
+    setModel(null);
+    setBaseUrl(null);
     setApiKey("");
     toast.success("已清除 LLM 配置");
   }

@@ -44,7 +44,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      <div className="fixed bottom-20 right-4 z-40 hidden sm:block">
+      <div className="fixed bottom-4 right-4 z-40">
         <SyncIndicator />
       </div>
       <NetworkBanner />

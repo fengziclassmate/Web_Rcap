@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import dynamic from "next/dynamic";
 
 /**
  * 日程管理应用的工作台主组件
@@ -17,8 +17,6 @@ import { Input } from "@/components/ui/input";
 import { DEFAULT_SCHEDULE_CATEGORY } from "@/lib/categories";
 import { createId } from "@/lib/id";
 import {
-  type RecurrenceConfig,
-  type RecurrenceInstanceOverride,
   parseSyntheticEventId,
   pickRecurrenceOverridePatch,
 } from "@/lib/recurrence";
@@ -26,7 +24,6 @@ import {
   ROUTINE_CHECKIN_PROJECT_ID,
   type AnnualTask,
   type DashboardUiPreferences,
-  type EventTag,
   type FootprintItem,
   type LongTask,
   type Priority,
@@ -46,7 +43,6 @@ import {
   normalizeGroupMeetings,
   normalizePaperProgress,
   normalizeProjectCheckins,
-  normalizeRecurrence,
   normalizeResearchProjects,
   normalizeSubmissions,
   normalizeTasks,
@@ -111,27 +107,15 @@ import {
 } from "@/lib/research-workflow-mappers";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { CalendarDays, ListTodo } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { todayISO } from "@/lib/date-utils";
 import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
-import type { Achievement } from "@/components/monitoring/achievements-panel";
-import {
-  type ResearchProject,
-  type PlanItem,
-} from "@/components/monitoring/research-projects-panel";
-import {
-  type PaperProgress,
-  type PaperPlanItem,
-} from "@/components/monitoring/paper-progress-panel";
-import { type SubmissionRecord } from "@/components/monitoring/submissions-panel";
-import {
-  type GroupMeetingRecord,
-} from "@/components/monitoring/group-meetings-panel";
-import { LogPage } from "@/components/logs/log-page";
-import { LiteraturePage } from "@/components/monitoring/literature-page";
-import { ResearchWorkflowPanel } from "@/components/monitoring/research-workflow-panel";
-import { ExecutionContinuityPanel } from "@/components/continuity/execution-continuity-panel";
+import type {
+  Achievement,
+  GroupMeetingRecord,
+  PaperProgress,
+  ResearchProject,
+  SubmissionRecord,
+} from "@/lib/legacy-research";
 import { EfficiencyAnalysisDialog } from "@/components/llm/analysis-dialog";
 import { LLMChatSidebar } from "@/components/llm/chat-sidebar";
 import { QuickEventInput } from "@/components/llm/quick-event-input";
@@ -142,43 +126,24 @@ import { buildResearchWorkflowFromLegacy } from "@/lib/research-workflow-legacy"
 import {
   defaultResearchWorkflowState,
   type MeetingAttachment,
-  type MeetingActionItem,
-  type PaperFeedback,
-  type PaperProjectLink,
-  type PaperSection,
-  type ProjectLog,
   type ProjectAttachment,
   type ResearchWorkflowState,
-  type ReviewComment,
-  type SubmissionStatusHistoryEntry,
 } from "@/lib/research-workflow";
 import {
   type LogComposerInput,
-  type LogPost,
   type LogPostEditorInput,
-  type LogPostImage,
-  type LogPostLink,
   type LogPostRecord,
   type LogTag,
 } from "@/lib/logs";
 import {
-  type LiteratureAttachment,
-  type LiteratureExcerpt,
   type LiteratureExcerptInput,
   type LiteratureFormInput,
   type LiteratureItem,
-  type LiteratureMethodNote,
   type LiteratureMethodNoteInput,
-  type LiteratureNote,
   type LiteratureNoteInput,
-  type LiteraturePaperUsage,
   type LiteraturePaperUsageInput,
-  type LiteratureProjectLink,
-  type LiteratureReadingLog,
   type LiteratureReadingLogInput,
-  type LiteratureRecord,
   type LiteratureTag,
-  type LiteratureTagLink,
 } from "@/lib/literature";
 import {
   defaultExecutionContinuityState,
@@ -186,8 +151,41 @@ import {
   type ExecutionContinuityState,
 } from "@/lib/execution-continuity";
 
+const LogPage = dynamic(() => import("@/components/logs/log-page").then((module) => module.LogPage), {
+  ssr: false,
+  loading: ModuleLoadingState,
+});
+const LiteraturePage = dynamic(
+  () => import("@/components/monitoring/literature-page").then((module) => module.LiteraturePage),
+  { ssr: false, loading: ModuleLoadingState },
+);
+const ResearchWorkflowPanel = dynamic(
+  () => import("@/components/monitoring/research-workflow-panel").then((module) => module.ResearchWorkflowPanel),
+  { ssr: false, loading: ModuleLoadingState },
+);
+const ExecutionContinuityPanel = dynamic(
+  () => import("@/components/continuity/execution-continuity-panel").then((module) => module.ExecutionContinuityPanel),
+  { ssr: false, loading: ModuleLoadingState },
+);
+
+function ModuleLoadingState() {
+  return (
+    <section className="min-h-[520px] animate-pulse rounded-2xl border border-stone-200 bg-white/70 p-6">
+      <div className="h-5 w-44 rounded bg-stone-200" />
+      <div className="mt-6 h-28 rounded-xl bg-stone-100" />
+      <div className="mt-4 h-64 rounded-xl bg-stone-100" />
+    </section>
+  );
+}
+
 function getCurrentWeekStart() {
   return startOfWeek(new Date(), { weekStartsOn: 1 });
+}
+
+type ResearchWorkflowModule = "research" | "paper" | "submissions" | "meetings";
+
+function isResearchWorkflowModule(module: MonitoringModuleId): module is ResearchWorkflowModule {
+  return module === "research" || module === "paper" || module === "submissions" || module === "meetings";
 }
 
 export function WorkbenchApp() {
@@ -233,7 +231,6 @@ export function WorkbenchApp() {
   const [dataReady, setDataReady] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [confirmDangerousActions, setConfirmDangerousActions] = useState(true);
-  const [mobileTab, setMobileTab] = useState<"schedule" | "tasks">("schedule");
   const weekRange = useMemo(() => {
     const start = format(currentWeekStart, "yyyy/MM/dd", { locale: zhCN });
     const end = format(addDays(currentWeekStart, 6), "yyyy/MM/dd", { locale: zhCN });
@@ -2432,13 +2429,12 @@ export function WorkbenchApp() {
     setEvents((prev) => prev.filter((event) => event.id !== eventId));
   }
 
-  const shellClass =
-    "workbench-shell min-h-screen text-stone-950 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]";
+  const shellClass = "workbench-shell min-h-screen min-w-[1180px] text-stone-950";
 
   if (!isBooted) {
     return (
       <main className={shellClass}>
-        <div className="mx-auto grid max-w-[1880px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[1fr_460px]">
+        <div className="mx-auto grid max-w-[1880px] grid-cols-[1fr_460px] gap-4 px-4 py-4">
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
         </div>
@@ -2478,7 +2474,7 @@ export function WorkbenchApp() {
   if (!dataReady) {
     return (
       <main className={shellClass}>
-        <div className="mx-auto grid max-w-[1880px] grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[1fr_460px]">
+        <div className="mx-auto grid max-w-[1880px] grid-cols-[1fr_460px] gap-4 px-4 py-4">
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
           <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
         </div>
@@ -2487,12 +2483,7 @@ export function WorkbenchApp() {
   }
 
   return (
-    <main
-      className={cn(
-        shellClass,
-        "pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-4",
-      )}
-    >
+    <main className={`${shellClass} pb-4`}>
       <div className="relative z-10 mx-auto flex max-w-[1880px] items-center justify-between gap-3 px-4 pt-4">
         <div className="workbench-hero min-w-0 rounded-2xl px-4 py-2">
           <p className="truncate text-xs uppercase tracking-[0.22em] text-stone-500">Current account</p>
@@ -2538,8 +2529,8 @@ export function WorkbenchApp() {
 
         <div className="min-h-0 w-full">
           {activeModule === "schedule" ? (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] 2xl:grid-cols-[minmax(1180px,1fr)_minmax(340px,380px)]">
-              <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(340px,380px)] gap-4">
+              <section className="min-h-0">
                 <WeeklyTimeGrid
                   currentWeekStart={currentWeekStart}
                   weekRange={displayRangeLabel}
@@ -2563,7 +2554,7 @@ export function WorkbenchApp() {
                   timeGranularity={timeGranularity}
                 />
               </section>
-              <section className={cn(mobileTab === "tasks" ? "block" : "hidden", "min-h-0 space-y-4 lg:block")}>
+              <section className="min-h-0 space-y-4">
                 <TaskDashboard
                   tasks={tasks}
                   events={events}
@@ -2618,45 +2609,9 @@ export function WorkbenchApp() {
               initialOutcomeTaskId={continuityOutcomeTaskId}
               onInitialOutcomeHandled={() => setContinuityOutcomeTaskId(null)}
             />
-          ) : activeModule === "research" ? (
+          ) : isResearchWorkflowModule(activeModule) ? (
             <ResearchWorkflowPanel
-              module="research"
-              workflow={researchWorkflow}
-              onChange={setResearchWorkflow}
-              onCreateTask={handleCreateWorkflowTask}
-              onCreateEvent={handleCreateWorkflowEvent}
-              onUploadProjectAttachments={handleUploadProjectAttachments}
-              onDeleteProjectAttachment={handleDeleteProjectAttachment}
-              onUploadMeetingAttachments={handleUploadMeetingAttachments}
-              onDeleteMeetingAttachment={handleDeleteMeetingAttachment}
-            />
-          ) : activeModule === "paper" ? (
-            <ResearchWorkflowPanel
-              module="paper"
-              workflow={researchWorkflow}
-              onChange={setResearchWorkflow}
-              onCreateTask={handleCreateWorkflowTask}
-              onCreateEvent={handleCreateWorkflowEvent}
-              onUploadProjectAttachments={handleUploadProjectAttachments}
-              onDeleteProjectAttachment={handleDeleteProjectAttachment}
-              onUploadMeetingAttachments={handleUploadMeetingAttachments}
-              onDeleteMeetingAttachment={handleDeleteMeetingAttachment}
-            />
-          ) : activeModule === "submissions" ? (
-            <ResearchWorkflowPanel
-              module="submissions"
-              workflow={researchWorkflow}
-              onChange={setResearchWorkflow}
-              onCreateTask={handleCreateWorkflowTask}
-              onCreateEvent={handleCreateWorkflowEvent}
-              onUploadProjectAttachments={handleUploadProjectAttachments}
-              onDeleteProjectAttachment={handleDeleteProjectAttachment}
-              onUploadMeetingAttachments={handleUploadMeetingAttachments}
-              onDeleteMeetingAttachment={handleDeleteMeetingAttachment}
-            />
-          ) : activeModule === "meetings" ? (
-            <ResearchWorkflowPanel
-              module="meetings"
+              module={activeModule}
               workflow={researchWorkflow}
               onChange={setResearchWorkflow}
               onCreateTask={handleCreateWorkflowTask}
@@ -2721,33 +2676,6 @@ export function WorkbenchApp() {
           )}
         </div>
       </div>
-      <nav
-        className="fixed inset-x-0 bottom-0 z-50 flex border-t border-gray-200 bg-white/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur-md supports-[backdrop-filter]:bg-white/80 lg:hidden"
-        aria-label="主功能"
-      >
-        <button
-          type="button"
-          onClick={() => setMobileTab("schedule")}
-          className={cn(
-            "flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] text-gray-500 transition-colors",
-            mobileTab === "schedule" && "font-medium text-black",
-          )}
-        >
-          <CalendarDays className="size-6 shrink-0" aria-hidden />
-          <span>鏃ョ▼</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileTab("tasks")}
-          className={cn(
-            "flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] text-gray-500 transition-colors",
-            mobileTab === "tasks" && "font-medium text-black",
-          )}
-        >
-          <ListTodo className="size-6 shrink-0" aria-hidden />
-          <span>浠诲姟</span>
-        </button>
-      </nav>
       <LLMChatSidebar />
       <QuickNoteFab />
     </main>

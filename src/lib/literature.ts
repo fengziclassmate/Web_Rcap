@@ -272,7 +272,7 @@ export type LiteratureReadingLogInput = {
   linkedLogPostId: string;
 };
 
-export type LiteratureStats = {
+type LiteratureStats = {
   total: number;
   active: number;
   cited: number;

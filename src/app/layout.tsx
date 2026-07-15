@@ -23,12 +23,6 @@ export const metadata: Metadata = {
   title: "研究手札与日常切片",
   description: "一个面向科研人员的个人研究空间，记录研究项目、文献阅读、日程节律与日常观察。",
   applicationName: "研究手札与日常切片",
-  manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    title: "研究手札与日常切片",
-    statusBarStyle: "default",
-  },
   formatDetection: {
     telephone: false,
   },
@@ -37,7 +31,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  viewportFit: "cover",
   themeColor: "#ffffff",
 };
 

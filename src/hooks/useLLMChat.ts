@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import type { LLMMessage } from "@/lib/llm/types";
 
-export type ChatMessage = LLMMessage & {
+type ChatMessage = LLMMessage & {
   id: string;
   createdAt: string;
 };
