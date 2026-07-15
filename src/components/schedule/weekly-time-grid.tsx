@@ -53,6 +53,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { createId } from "@/lib/id";
 import { supabase } from "@/lib/supabase";
 import {
+  getCenteredScrollTop,
   getScheduleEventDurationHour,
   layoutOverlappingScheduleEvents,
   type PositionedScheduleEvent,
@@ -137,6 +138,7 @@ type WeeklyTimeGridProps = {
   onNextWeek: () => void;
   onViewModeChange?: (mode: ViewMode) => void;
   onTimeGranularityChange?: (granularity: TimeGranularity) => void;
+  toolbarContent?: React.ReactNode;
   viewMode?: ViewMode;
   timeGranularity?: TimeGranularity;
 };
@@ -448,6 +450,7 @@ export function WeeklyTimeGrid({
   onNextWeek,
   onViewModeChange,
   onTimeGranularityChange,
+  toolbarContent,
   viewMode = "week",
   timeGranularity = 60,
 }: WeeklyTimeGridProps) {
@@ -1118,8 +1121,8 @@ export function WeeklyTimeGrid({
 
   return (
     <section className="rounded-lg border border-gray-200 bg-white shadow-md">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4">
-        <div>
+      <header className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
+        <div className="shrink-0">
           <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-900">
             <Clock3 className="h-5 w-5 text-primary" />
             {viewMode === "day" ? "日视图" : viewMode === "week" ? "周视图" : "月视图"}
@@ -1127,7 +1130,13 @@ export function WeeklyTimeGrid({
           <p className="mt-1 text-sm text-gray-600">{weekRange}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        {toolbarContent ? (
+          <div className="min-w-[min(100%,18rem)] flex-[1_1_20rem]">
+            {toolbarContent}
+          </div>
+        ) : null}
+
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           <div className="flex items-center gap-2">
             <Button type="button" size="sm" variant={viewMode === "day" ? "default" : "outline"} onClick={() => handleViewModeChange("day")}>
               日
@@ -1613,60 +1622,62 @@ export function WeeklyTimeGrid({
                       placeholder="输入行程标题"
                     />
                   </div>
-                  <div className="space-y-3">
-                    <Label>分类</Label>
-                    <Select
-                      value={createForm.category}
-                      onValueChange={(value) => {
-                        if (!value) return;
-                        setCreateForm((prev) => ({ ...prev, category: value }));
-                      }}
-                    >
-                      <SelectTrigger className="w-full justify-between rounded-md border-gray-300 sm:max-w-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent
-                        align="start"
-                        alignItemWithTrigger={false}
-                        sideOffset={6}
-                        className="max-h-72 min-w-64"
+                  <div className="grid grid-cols-[minmax(0,3fr)_minmax(7rem,2fr)] gap-3">
+                    <div className="min-w-0 space-y-2">
+                      <Label>分类</Label>
+                      <Select
+                        value={createForm.category}
+                        onValueChange={(value) => {
+                          if (!value) return;
+                          setCreateForm((prev) => ({ ...prev, category: value }));
+                        }}
                       >
-                        {groupedCategories.map(({ group, categories: groupItems }) => (
-                          <SelectGroup key={group}>
-                            <SelectLabel className="px-2 py-1.5 text-[11px] font-semibold text-stone-500">
-                              {SCHEDULE_CATEGORY_GROUP_LABELS[group]}
-                            </SelectLabel>
-                            {groupItems.map((category) => (
-                              <SelectItem key={category.id} value={category.name}>
-                                <CategorySelectLabel category={category} />
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-3">
-                    <Label>标记</Label>
-                    <Select
-                      value={createForm.tag ?? "none"}
-                      onValueChange={(value) =>
-                        setCreateForm((prev) => ({
-                          ...prev,
-                          tag: value === "none" ? null : (value as EventTag),
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">无标记</SelectItem>
-                        <SelectItem value="待定">待定</SelectItem>
-                        <SelectItem value="不着急">不着急</SelectItem>
-                        <SelectItem value="不可后退">不可后退</SelectItem>
-                      </SelectContent>
-                    </Select>
+                        <SelectTrigger className="w-full justify-between rounded-md border-gray-300">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent
+                          align="start"
+                          alignItemWithTrigger={false}
+                          sideOffset={6}
+                          className="max-h-72 min-w-64"
+                        >
+                          {groupedCategories.map(({ group, categories: groupItems }) => (
+                            <SelectGroup key={group}>
+                              <SelectLabel className="px-2 py-1.5 text-[11px] font-semibold text-stone-500">
+                                {SCHEDULE_CATEGORY_GROUP_LABELS[group]}
+                              </SelectLabel>
+                              {groupItems.map((category) => (
+                                <SelectItem key={category.id} value={category.name}>
+                                  <CategorySelectLabel category={category} />
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="min-w-0 space-y-2">
+                      <Label>标记</Label>
+                      <Select
+                        value={createForm.tag ?? "none"}
+                        onValueChange={(value) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            tag: value === "none" ? null : (value as EventTag),
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-full justify-between">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                          <SelectItem value="none">无标记</SelectItem>
+                          <SelectItem value="待定">待定</SelectItem>
+                          <SelectItem value="不着急">不着急</SelectItem>
+                          <SelectItem value="不可后退">不可后退</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-4">
                     <div className="flex items-center gap-3">
@@ -1824,60 +1835,62 @@ export function WeeklyTimeGrid({
                       placeholder="输入行程标题"
                     />
                   </div>
-                  <div className="space-y-3">
-                    <Label>分类</Label>
-                    <Select
-                      value={editForm.category}
-                      onValueChange={(value) => {
-                        if (!value) return;
-                        setEditForm((prev) => ({ ...prev, category: value }));
-                      }}
-                    >
-                      <SelectTrigger className="w-full justify-between rounded-md border-gray-300 sm:max-w-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent
-                        align="start"
-                        alignItemWithTrigger={false}
-                        sideOffset={6}
-                        className="max-h-72 min-w-64"
+                  <div className="grid grid-cols-[minmax(0,3fr)_minmax(7rem,2fr)] gap-3">
+                    <div className="min-w-0 space-y-2">
+                      <Label>分类</Label>
+                      <Select
+                        value={editForm.category}
+                        onValueChange={(value) => {
+                          if (!value) return;
+                          setEditForm((prev) => ({ ...prev, category: value }));
+                        }}
                       >
-                        {groupedCategories.map(({ group, categories: groupItems }) => (
-                          <SelectGroup key={group}>
-                            <SelectLabel className="px-2 py-1.5 text-[11px] font-semibold text-stone-500">
-                              {SCHEDULE_CATEGORY_GROUP_LABELS[group]}
-                            </SelectLabel>
-                            {groupItems.map((category) => (
-                              <SelectItem key={category.id} value={category.name}>
-                                <CategorySelectLabel category={category} />
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-3">
-                    <Label>标记</Label>
-                    <Select
-                      value={editForm.tag ?? "none"}
-                      onValueChange={(value) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          tag: value === "none" ? null : (value as EventTag),
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">无标记</SelectItem>
-                        <SelectItem value="待定">待定</SelectItem>
-                        <SelectItem value="不着急">不着急</SelectItem>
-                        <SelectItem value="不可后退">不可后退</SelectItem>
-                      </SelectContent>
-                    </Select>
+                        <SelectTrigger className="w-full justify-between rounded-md border-gray-300">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent
+                          align="start"
+                          alignItemWithTrigger={false}
+                          sideOffset={6}
+                          className="max-h-72 min-w-64"
+                        >
+                          {groupedCategories.map(({ group, categories: groupItems }) => (
+                            <SelectGroup key={group}>
+                              <SelectLabel className="px-2 py-1.5 text-[11px] font-semibold text-stone-500">
+                                {SCHEDULE_CATEGORY_GROUP_LABELS[group]}
+                              </SelectLabel>
+                              {groupItems.map((category) => (
+                                <SelectItem key={category.id} value={category.name}>
+                                  <CategorySelectLabel category={category} />
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="min-w-0 space-y-2">
+                      <Label>标记</Label>
+                      <Select
+                        value={editForm.tag ?? "none"}
+                        onValueChange={(value) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            tag: value === "none" ? null : (value as EventTag),
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-full justify-between">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                          <SelectItem value="none">无标记</SelectItem>
+                          <SelectItem value="待定">待定</SelectItem>
+                          <SelectItem value="不着急">不着急</SelectItem>
+                          <SelectItem value="不可后退">不可后退</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <TimeRangeEditor
                     startHour={editForm.startHour}
@@ -2302,7 +2315,21 @@ function CenteredTimePartSelect({
           if (nextValue !== null) onChange(Number(nextValue));
         }}
         onOpenChangeComplete={(open) => {
-          if (open) selectedOptionRef.current?.scrollIntoView({ block: "center" });
+          if (!open || !selectedOptionRef.current) return;
+
+          const selectedOption = selectedOptionRef.current;
+          const scrollContainer = selectedOption.closest('[data-slot="select-content"]') as HTMLElement | null;
+          if (!scrollContainer) return;
+
+          const containerRect = scrollContainer.getBoundingClientRect();
+          const selectedRect = selectedOption.getBoundingClientRect();
+          scrollContainer.scrollTop = getCenteredScrollTop({
+            currentScrollTop: scrollContainer.scrollTop,
+            containerTop: containerRect.top,
+            containerHeight: containerRect.height,
+            itemTop: selectedRect.top,
+            itemHeight: selectedRect.height,
+          });
         }}
       >
         <SelectTrigger

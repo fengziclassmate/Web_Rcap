@@ -22,6 +22,25 @@ export type PositionedScheduleEvent<TEvent extends ScheduleEvent = ScheduleEvent
 
 const dayHourCount = 24;
 
+export function getCenteredScrollTop({
+  currentScrollTop,
+  containerTop,
+  containerHeight,
+  itemTop,
+  itemHeight,
+}: {
+  currentScrollTop: number;
+  containerTop: number;
+  containerHeight: number;
+  itemTop: number;
+  itemHeight: number;
+}) {
+  return Math.max(
+    0,
+    currentScrollTop + itemTop - containerTop - (containerHeight - itemHeight) / 2,
+  );
+}
+
 export function doScheduleEventsOverlap(a: ScheduleEvent, b: ScheduleEvent) {
   return a.startHour < b.endHour && b.startHour < a.endHour;
 }

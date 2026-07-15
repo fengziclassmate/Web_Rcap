@@ -194,6 +194,13 @@ type AchievementForm = {
   note: string;
 };
 
+function toggleStoredId(items: string[], id: string) {
+  const next = new Set(items);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return [...next];
+}
+
 function formatDateToISODate(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -330,9 +337,7 @@ export function TaskDashboard({
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(
-    () => new Set(uiPreferences.expandedTasks),
-  );
+  const expandedTasks = useMemo(() => new Set(uiPreferences.expandedTasks), [uiPreferences.expandedTasks]);
   const [taskViewMode, setTaskViewMode] = useState<"order" | "priority">("order");
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [newProjectName, setNewProjectName] = useState("");
@@ -364,27 +369,31 @@ export function TaskDashboard({
   const [editingFootprintId, setEditingFootprintId] = useState<string | null>(null);
   const [editingFootprintName, setEditingFootprintName] = useState("");
   const [editingFootprintDate, setEditingFootprintDate] = useState(getTodayISODate);
-  const [longTaskSectionOpen, setLongTaskSectionOpen] = useState(uiPreferences.longTaskSectionOpen);
-  const [annualSectionOpen, setAnnualSectionOpen] = useState(uiPreferences.annualSectionOpen);
-  const [expandedCompletedTasks, setExpandedCompletedTasks] = useState<Set<string>>(
+  const longTaskSectionOpen = uiPreferences.longTaskSectionOpen;
+  const annualSectionOpen = uiPreferences.annualSectionOpen;
+  const expandedCompletedTasks = useMemo(
     () => new Set(uiPreferences.expandedCompletedTasks),
+    [uiPreferences.expandedCompletedTasks],
   );
   const [completedLibraryOpen, setCompletedLibraryOpen] = useState(false);
-  const [activeUtilityPanel, setActiveUtilityPanel] = useState<
-    "project" | "routine" | "achievement" | "footprint" | null
-  >(() => {
-    if (uiPreferences.projectSectionOpen) return "project";
-    if (uiPreferences.routineCheckinSectionOpen) return "routine";
-    if (uiPreferences.achievementSectionOpen) return "achievement";
-    if (uiPreferences.footprintSectionOpen) return "footprint";
-    return null;
-  });
-  const [footprintSectionOpen, setFootprintSectionOpen] = useState(uiPreferences.footprintSectionOpen);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
+  const activeUtilityPanel: "project" | "routine" | "achievement" | "footprint" | null =
+    uiPreferences.projectSectionOpen
+      ? "project"
+      : uiPreferences.routineCheckinSectionOpen
+        ? "routine"
+        : uiPreferences.achievementSectionOpen
+          ? "achievement"
+          : uiPreferences.footprintSectionOpen
+            ? "footprint"
+            : null;
+  const footprintSectionOpen = uiPreferences.footprintSectionOpen;
+  const expandedProjects = useMemo(
     () => new Set(uiPreferences.expandedProjects),
+    [uiPreferences.expandedProjects],
   );
-  const [expandedFootprints, setExpandedFootprints] = useState<Set<string>>(
+  const expandedFootprints = useMemo(
     () => new Set(uiPreferences.expandedFootprints),
+    [uiPreferences.expandedFootprints],
   );
   const [confirmState, setConfirmState] = useState<{
     open: boolean;
@@ -1032,7 +1041,6 @@ export function TaskDashboard({
     panel: "project" | "routine" | "achievement" | "footprint",
     open: boolean,
   ) {
-    setActiveUtilityPanel(open ? panel : null);
     patchUiPreferences({
       projectSectionOpen: open && panel === "project",
       routineCheckinSectionOpen: open && panel === "routine",
@@ -1208,15 +1216,12 @@ export function TaskDashboard({
                             <button
                               type="button"
                               className="flex min-w-0 flex-1 items-start gap-2 text-left"
-                              onClick={() =>
-                                setExpandedCompletedTasks((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(task.id)) next.delete(task.id);
-                                  else next.add(task.id);
-                                  patchUiPreferences({ expandedCompletedTasks: [...next] });
-                                  return next;
-                                })
-                              }
+                              onClick={() => patchUiPreferences({
+                                expandedCompletedTasks: toggleStoredId(
+                                  uiPreferences.expandedCompletedTasks,
+                                  task.id,
+                                ),
+                              })}
                             >
                               <ChevronDown
                                 className={`mt-0.5 h-4 w-4 shrink-0 text-stone-500 transition-transform ${
@@ -1315,6 +1320,8 @@ export function TaskDashboard({
         onToggleTask={onToggleTask}
         onUpdateTask={onUpdateTask}
         onCreateTimeBlock={onCreateDailyTaskTimeBlock}
+        archivedSectionOpen={uiPreferences.dailyArchiveSectionOpen}
+        onArchivedSectionOpenChange={(open) => patchUiPreferences({ dailyArchiveSectionOpen: open })}
       />
 
       <Separator />
@@ -1322,10 +1329,7 @@ export function TaskDashboard({
       <div className="task-dashboard-section">
         <Collapsible
           open={longTaskSectionOpen}
-          onOpenChange={(open) => {
-            setLongTaskSectionOpen(open);
-            patchUiPreferences({ longTaskSectionOpen: open });
-          }}
+          onOpenChange={(open) => patchUiPreferences({ longTaskSectionOpen: open })}
         >
           <CollapsibleTrigger className="section-trigger mb-3 flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left">
             <span className="text-sm font-semibold text-gray-700">
@@ -1418,18 +1422,9 @@ export function TaskDashboard({
                         <button
                           type="button"
                           className="rounded-md px-1.5 py-1 text-[11px] font-medium text-stone-600 hover:bg-stone-100"
-                          onClick={() => {
-                            setExpandedTasks((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(task.id)) {
-                                next.delete(task.id);
-                              } else {
-                                next.add(task.id);
-                              }
-                              patchUiPreferences({ expandedTasks: [...next] });
-                              return next;
-                            });
-                          }}
+                          onClick={() => patchUiPreferences({
+                            expandedTasks: toggleStoredId(uiPreferences.expandedTasks, task.id),
+                          })}
                         >
                           {expandedTasks.has(task.id) ? "收起子任务" : `子任务 ${task.subtasks.length}`}
                         </button>
@@ -1592,15 +1587,9 @@ export function TaskDashboard({
                   <button
                     type="button"
                     className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                    onClick={() =>
-                      setExpandedProjects((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(project.id)) next.delete(project.id);
-                        else next.add(project.id);
-                        patchUiPreferences({ expandedProjects: [...next] });
-                        return next;
-                      })
-                    }
+                    onClick={() => patchUiPreferences({
+                      expandedProjects: toggleStoredId(uiPreferences.expandedProjects, project.id),
+                    })}
                   >
                     <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${projectExpanded ? "" : "-rotate-90"}`} />
                     <p className="truncate text-sm font-medium" title={project.name}>
@@ -1953,15 +1942,9 @@ export function TaskDashboard({
                       <button
                         type="button"
                         className="flex w-full items-center justify-between gap-2 text-left"
-                        onClick={() =>
-                          setExpandedFootprints((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(item.id)) next.delete(item.id);
-                            else next.add(item.id);
-                            patchUiPreferences({ expandedFootprints: [...next] });
-                            return next;
-                          })
-                        }
+                        onClick={() => patchUiPreferences({
+                          expandedFootprints: toggleStoredId(uiPreferences.expandedFootprints, item.id),
+                        })}
                       >
                         <p className="truncate text-sm font-medium" title={item.name}>{item.name}</p>
                         <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${itemExpanded ? "" : "-rotate-90"}`} />
@@ -2000,10 +1983,7 @@ export function TaskDashboard({
       <div className="task-dashboard-section">
         <Collapsible
           open={annualSectionOpen}
-          onOpenChange={(open) => {
-            setAnnualSectionOpen(open);
-            patchUiPreferences({ annualSectionOpen: open });
-          }}
+          onOpenChange={(open) => patchUiPreferences({ annualSectionOpen: open })}
         >
           <CollapsibleTrigger className="section-trigger mb-3 flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left">
             <span className="text-sm font-semibold text-gray-700">年度任务清单</span>
@@ -2091,10 +2071,7 @@ export function TaskDashboard({
           <section className="task-dashboard-section space-y-4">
             <Collapsible
               open={footprintSectionOpen}
-              onOpenChange={(open) => {
-                setFootprintSectionOpen(open);
-                patchUiPreferences({ footprintSectionOpen: open });
-              }}
+              onOpenChange={(open) => patchUiPreferences({ footprintSectionOpen: open })}
             >
               <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
                 <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
@@ -2123,15 +2100,9 @@ export function TaskDashboard({
                         <button
                           type="button"
                           className="flex w-full items-center justify-between gap-2 text-left"
-                          onClick={() =>
-                            setExpandedFootprints((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(item.id)) next.delete(item.id);
-                              else next.add(item.id);
-                              patchUiPreferences({ expandedFootprints: [...next] });
-                              return next;
-                            })
-                          }
+                          onClick={() => patchUiPreferences({
+                            expandedFootprints: toggleStoredId(uiPreferences.expandedFootprints, item.id),
+                          })}
                         >
                           <p className="truncate text-sm font-medium" title={item.name}>
                             {item.name}

@@ -16,6 +16,8 @@ type DailyTaskPanelProps = {
   onToggleTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<LongTask>) => void;
   onCreateTimeBlock: (task: LongTask, date: string, startHour: number, durationMinutes: number) => void;
+  archivedSectionOpen: boolean;
+  onArchivedSectionOpenChange: (open: boolean) => void;
 };
 
 function getLocalISODate(date = new Date()) {
@@ -49,6 +51,8 @@ export function DailyTaskPanel({
   onToggleTask,
   onUpdateTask,
   onCreateTimeBlock,
+  archivedSectionOpen,
+  onArchivedSectionOpenChange,
 }: DailyTaskPanelProps) {
   const today = getLocalISODate();
   const tomorrow = addDays(today, 1);
@@ -59,7 +63,6 @@ export function DailyTaskPanel({
   const [scheduleTime, setScheduleTime] = useState("09:00");
   const [duration, setDuration] = useState("30");
   const [dailyCloseOpen, setDailyCloseOpen] = useState(false);
-  const [showArchivedTasks, setShowArchivedTasks] = useState(false);
 
   const dailyTasks = tasks.filter(
     (task) => task.taskType === "daily" && !task.done && !task.abandonedAt,
@@ -239,12 +242,13 @@ export function DailyTaskPanel({
           <button
             type="button"
             className="flex w-full items-center justify-between text-xs font-medium text-stone-600"
-            onClick={() => setShowArchivedTasks((open) => !open)}
+            onClick={() => onArchivedSectionOpenChange(!archivedSectionOpen)}
+            aria-expanded={archivedSectionOpen}
           >
             已处理的日常任务
             <span>{archivedDailyTasks.length} 项</span>
           </button>
-          {showArchivedTasks ? (
+          {archivedSectionOpen ? (
             <div className="mt-2 space-y-1.5">
               {archivedDailyTasks.map((task) => (
                 <div key={task.id} className="flex items-center gap-2 rounded-md bg-stone-50 px-2 py-1.5 text-xs">

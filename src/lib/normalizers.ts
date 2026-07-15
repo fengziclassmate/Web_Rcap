@@ -21,9 +21,11 @@ import type { GroupMeetingRecord } from "@/components/monitoring/group-meetings-
 import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/categories";
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
+  timeGranularity: 60,
   annualSectionOpen: true,
   longTaskSectionOpen: true,
   completedSectionOpen: true,
+  dailyArchiveSectionOpen: false,
   projectSectionOpen: true,
   routineCheckinSectionOpen: true,
   achievementSectionOpen: true,
@@ -33,6 +35,15 @@ export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   expandedProjects: [],
   expandedFootprints: [],
 };
+
+const validTimeGranularities = new Set<DashboardUiPreferences["timeGranularity"]>([
+  5,
+  15,
+  30,
+  60,
+  "45-15",
+  "50-10",
+]);
 
 export const defaultTasks: LongTask[] = [];
 
@@ -328,12 +339,17 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
   if (!payload || typeof payload !== "object") return defaultDashboardUiPreferences;
   const value = payload as Partial<DashboardUiPreferences>;
   return {
+    timeGranularity: validTimeGranularities.has(value.timeGranularity as DashboardUiPreferences["timeGranularity"])
+      ? value.timeGranularity as DashboardUiPreferences["timeGranularity"]
+      : 60,
     annualSectionOpen:
       typeof value.annualSectionOpen === "boolean" ? value.annualSectionOpen : true,
     longTaskSectionOpen:
       typeof value.longTaskSectionOpen === "boolean" ? value.longTaskSectionOpen : true,
     completedSectionOpen:
       typeof value.completedSectionOpen === "boolean" ? value.completedSectionOpen : true,
+    dailyArchiveSectionOpen:
+      typeof value.dailyArchiveSectionOpen === "boolean" ? value.dailyArchiveSectionOpen : false,
     projectSectionOpen:
       typeof value.projectSectionOpen === "boolean" ? value.projectSectionOpen : true,
     routineCheckinSectionOpen:

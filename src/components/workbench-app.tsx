@@ -226,12 +226,12 @@ export function WorkbenchApp() {
   const [dashboardUiPreferences, setDashboardUiPreferences] = useState<DashboardUiPreferences>(
     defaultDashboardUiPreferences,
   );
+  const timeGranularity = dashboardUiPreferences.timeGranularity;
   const [user, setUser] = useState<User | null>(null);
   const [authEmail, setAuthEmail] = useState("");
   const [sendingLink, setSendingLink] = useState(false);
   const [dataReady, setDataReady] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(60);
   const [confirmDangerousActions, setConfirmDangerousActions] = useState(true);
   const [mobileTab, setMobileTab] = useState<"schedule" | "tasks">("schedule");
   const weekRange = useMemo(() => {
@@ -1815,8 +1815,9 @@ export function WorkbenchApp() {
   }
 
   useEffect(() => {
+    if (!dataReady) return;
     writeDashboardUiPreferencesToLocal(dashboardUiPreferences);
-  }, [dashboardUiPreferences]);
+  }, [dashboardUiPreferences, dataReady]);
 
   async function handleSendMagicLink() {
     if (!authEmail.trim()) return;
@@ -1890,7 +1891,7 @@ export function WorkbenchApp() {
   }
 
   function handleTimeGranularityChange(granularity: TimeGranularity) {
-    setTimeGranularity(granularity);
+    setDashboardUiPreferences((previous) => ({ ...previous, timeGranularity: granularity }));
   }
 
   function handleToggleTask(taskId: string) {
@@ -2539,11 +2540,6 @@ export function WorkbenchApp() {
           {activeModule === "schedule" ? (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] 2xl:grid-cols-[minmax(1180px,1fr)_minmax(340px,380px)]">
               <section className={cn(mobileTab === "schedule" ? "block" : "hidden", "min-h-0 lg:block")}>
-                <QuickEventInput
-                  onCreateEvent={handleCreateEvent}
-                  onAddTask={handleAddTask}
-                  onAddAnnualTask={handleAddAnnualTask}
-                />
                 <WeeklyTimeGrid
                   currentWeekStart={currentWeekStart}
                   weekRange={displayRangeLabel}
@@ -2556,6 +2552,13 @@ export function WorkbenchApp() {
                   onNextWeek={handleGoNextWeek}
                   onViewModeChange={handleViewModeChange}
                   onTimeGranularityChange={handleTimeGranularityChange}
+                  toolbarContent={(
+                    <QuickEventInput
+                      onCreateEvent={handleCreateEvent}
+                      onAddTask={handleAddTask}
+                      onAddAnnualTask={handleAddAnnualTask}
+                    />
+                  )}
                   viewMode={viewMode}
                   timeGranularity={timeGranularity}
                 />

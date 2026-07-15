@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   doScheduleEventsOverlap,
+  getCenteredScrollTop,
   getScheduleEventDurationHour,
   layoutOverlappingScheduleEvents,
   splitScheduleEventByDay,
@@ -25,6 +26,18 @@ function event(patch: Partial<ScheduleEvent> = {}): ScheduleEvent {
 }
 
 describe("schedule event layout", () => {
+  it("calculates the selected time position within its own dropdown", () => {
+    expect(
+      getCenteredScrollTop({
+        currentScrollTop: 120,
+        containerTop: 200,
+        containerHeight: 240,
+        itemTop: 310,
+        itemHeight: 40,
+      }),
+    ).toBe(130);
+  });
+
   it("treats touching events as non-overlapping", () => {
     expect(
       doScheduleEventsOverlap(

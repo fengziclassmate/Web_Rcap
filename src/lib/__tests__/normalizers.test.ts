@@ -84,11 +84,21 @@ describe("normalizers", () => {
   });
 
   it("normalizes dashboard preferences safely", () => {
-    expect(normalizeDashboardUiPreferences({ expandedTasks: ["a", 1] })).toMatchObject({
+    expect(normalizeDashboardUiPreferences({
+      timeGranularity: "45-15",
+      dailyArchiveSectionOpen: true,
+      expandedTasks: ["a", 1],
+    })).toMatchObject({
+      timeGranularity: "45-15",
       annualSectionOpen: true,
       longTaskSectionOpen: true,
       completedSectionOpen: true,
+      dailyArchiveSectionOpen: true,
       expandedTasks: ["a"],
+    });
+    expect(normalizeDashboardUiPreferences({ timeGranularity: "invalid" })).toMatchObject({
+      timeGranularity: 60,
+      dailyArchiveSectionOpen: false,
     });
   });
 });

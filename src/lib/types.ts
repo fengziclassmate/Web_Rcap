@@ -113,9 +113,11 @@ export type FootprintItem = {
 };
 
 export type DashboardUiPreferences = {
+  timeGranularity: 5 | 15 | 30 | 60 | "45-15" | "50-10";
   annualSectionOpen: boolean;
   longTaskSectionOpen: boolean;
   completedSectionOpen: boolean;
+  dailyArchiveSectionOpen: boolean;
   projectSectionOpen: boolean;
   routineCheckinSectionOpen: boolean;
   achievementSectionOpen: boolean;

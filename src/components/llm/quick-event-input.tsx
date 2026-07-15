@@ -85,39 +85,35 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
   }
 
   return (
-    <section className="mb-3 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-      <div className="relative p-2 sm:p-3">
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-sky-50 via-emerald-50/60 to-transparent" />
-        <div className="relative flex items-center gap-2">
-          <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-950 text-white shadow-sm"
-            role="img"
-            aria-label="智能快速创建"
-          >
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
-            <Input
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="输入日程、长期任务或年度计划"
-              aria-label="智能快速创建输入"
-              className="h-9 rounded-xl border-stone-200 bg-white/90 px-3"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void handleAnalyze();
-              }}
-            />
-            <Button
-              type="button"
-              onClick={handleAnalyze}
-              disabled={loading || !input.trim()}
-              className="h-9 rounded-xl px-3 sm:w-auto"
-            >
-              <Sparkles className="h-4 w-4" />
-              {loading ? "识别中" : "智能识别"}
-            </Button>
-          </div>
-        </div>
+    <>
+      <div className="flex min-w-0 items-center gap-2" aria-label="智能快速创建">
+        <span
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-stone-950 text-white shadow-sm"
+          role="img"
+          aria-label="智能快速创建"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+        </span>
+        <Input
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder="输入日程、长期任务或年度计划"
+          aria-label="智能快速创建输入"
+          className="h-8 min-w-0 flex-1 rounded-lg border-stone-200 bg-white px-3 text-xs shadow-none"
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void handleAnalyze();
+          }}
+        />
+        <Button
+          type="button"
+          size="sm"
+          onClick={handleAnalyze}
+          disabled={loading || !input.trim()}
+          className="h-8 shrink-0 rounded-lg px-2.5"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          {loading ? "识别中" : "智能识别"}
+        </Button>
       </div>
 
       <Dialog open={Boolean(parsed)} onOpenChange={(open) => !open && setParsed(null)}>
@@ -158,6 +154,6 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
           ) : null}
         </DialogContent>
       </Dialog>
-    </section>
+    </>
   );
 }
