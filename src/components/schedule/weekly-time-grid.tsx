@@ -23,6 +23,7 @@ import {
   Pause,
   Repeat,
   ShieldCheck,
+  Stamp,
   Trash2,
   Utensils,
   Users,
@@ -90,6 +91,13 @@ import {
   WEEKDAY_SHORT_LABEL,
   WEEKDAY_UI_ORDER,
 } from "@/lib/recurrence";
+import {
+  buildSplitTailPlacements,
+  loadScheduleTemplates,
+  saveScheduleTemplates,
+  type ScheduleTemplate,
+  type SplitScheduleGranularity,
+} from "@/lib/schedule-templates";
 
 type Category = {
   id: string;
@@ -127,6 +135,7 @@ type WeeklyTimeGridProps = {
   weekRange: string;
   events: ScheduleEvent[];
   onCreateEvent: (event: ScheduleEvent) => void;
+  onCreateEvents?: (events: ScheduleEvent[]) => void;
   onCreateDailyTask: (name: string, dueDate: string) => string | null;
   onUpdateEvent: (
     eventId: string,
@@ -443,6 +452,7 @@ export function WeeklyTimeGrid({
   weekRange,
   events,
   onCreateEvent,
+  onCreateEvents,
   onCreateDailyTask,
   onUpdateEvent,
   onDeleteEvent,
@@ -467,6 +477,20 @@ export function WeeklyTimeGrid({
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [scheduleTemplates, setScheduleTemplates] = useState<ScheduleTemplate[]>(() =>
+    loadScheduleTemplates(),
+  );
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateForm, setTemplateForm] = useState({
+    title: "",
+    category: DEFAULT_SCHEDULE_CATEGORY,
+    tag: null as EventTag,
+    notes: "",
+  });
+  const [templateWeekdays, setTemplateWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [templateStartHour, setTemplateStartHour] = useState(9);
+  const [templateEndHour, setTemplateEndHour] = useState(18);
   const [categoryDefs, setCategoryDefs] = useState<ScheduleCategoryDef[]>(() => loadCategoryDefs());
   const categories = useMemo<Category[]>(
     () =>
@@ -524,6 +548,10 @@ export function WeeklyTimeGrid({
   useEffect(() => {
     saveCategoryDefs(categoryDefs);
   }, [categoryDefs]);
+
+  useEffect(() => {
+    saveScheduleTemplates(scheduleTemplates);
+  }, [scheduleTemplates]);
 
   const displayDates = useMemo(() => {
     if (viewMode === "day") return [currentWeekStart];
@@ -628,6 +656,38 @@ export function WeeklyTimeGrid({
         .filter((segment) => displayDateKeys.has(segment.displayDate)),
     [displayDateKeys, expandedEvents],
   );
+
+  const splitTemplateGranularity: SplitScheduleGranularity | null =
+    timeGranularity === "45-15" || timeGranularity === "50-10" ? timeGranularity : null;
+  const templatePlacementPreview = useMemo(() => {
+    if (!splitTemplateGranularity || viewMode === "month") {
+      return { placements: [], skipped: 0 };
+    }
+
+    return buildSplitTailPlacements({
+      dates: displayDates.map((date) => ({
+        date: format(date, "yyyy-MM-dd"),
+        weekday: date.getDay(),
+      })),
+      weekdays: templateWeekdays,
+      startHour: templateStartHour,
+      endHour: templateEndHour,
+      granularity: splitTemplateGranularity,
+      busyIntervals: displayEventSegments.map((event) => ({
+        date: event.displayDate,
+        startHour: event.startHour,
+        endHour: event.endHour,
+      })),
+    });
+  }, [
+    displayDates,
+    displayEventSegments,
+    splitTemplateGranularity,
+    templateEndHour,
+    templateStartHour,
+    templateWeekdays,
+    viewMode,
+  ]);
 
   const timelineDayLayouts = useMemo<TimelineDayLayout[]>(() => {
     if (viewMode === "month") return [];
@@ -781,6 +841,135 @@ export function WeeklyTimeGrid({
       exceptionText: "",
     });
     setCreateDialogOpen(true);
+  }
+
+  function loadTemplateIntoEditor(template: ScheduleTemplate) {
+    const category = categories.some((item) => item.name === template.category)
+      ? template.category
+      : defaultCreateCategory;
+    setEditingTemplateId(template.id);
+    setTemplateForm({
+      title: template.title,
+      category,
+      tag: template.tag,
+      notes: template.notes,
+    });
+  }
+
+  function handleOpenTemplateDialog() {
+    const selected =
+      scheduleTemplates.find((template) => template.id === editingTemplateId) ??
+      scheduleTemplates[0];
+    if (selected) {
+      loadTemplateIntoEditor(selected);
+    } else {
+      setEditingTemplateId(null);
+      setTemplateForm({
+        title: "",
+        category: defaultCreateCategory,
+        tag: null,
+        notes: "",
+      });
+    }
+    setTemplateDialogOpen(true);
+  }
+
+  function handleNewTemplate() {
+    setEditingTemplateId(null);
+    setTemplateForm({
+      title: "",
+      category: defaultCreateCategory,
+      tag: null,
+      notes: "",
+    });
+  }
+
+  function upsertTemplateFromForm() {
+    const title = templateForm.title.trim();
+    if (!title) {
+      toast.error("请输入模板标题");
+      return null;
+    }
+
+    const existing = scheduleTemplates.find((template) => template.id === editingTemplateId);
+    const template: ScheduleTemplate = {
+      id: existing?.id ?? createId("schedule-template"),
+      title,
+      category: templateForm.category,
+      tag: templateForm.tag,
+      notes: templateForm.notes.trim(),
+      requirements: existing?.requirements ?? [],
+    };
+
+    setScheduleTemplates((previous) =>
+      previous.some((item) => item.id === template.id)
+        ? previous.map((item) => (item.id === template.id ? template : item))
+        : [...previous, template],
+    );
+    setEditingTemplateId(template.id);
+    return template;
+  }
+
+  function handleDeleteTemplate(templateId: string) {
+    if (scheduleTemplates.length <= 1) {
+      toast.info("至少保留一个行程模板");
+      return;
+    }
+
+    const nextTemplates = scheduleTemplates.filter((template) => template.id !== templateId);
+    setScheduleTemplates(nextTemplates);
+    loadTemplateIntoEditor(nextTemplates[0]);
+  }
+
+  function handleApplyTemplateToView() {
+    if (!splitTemplateGranularity) {
+      toast.error("请先选择 45+15 或 50+10 网格粒度");
+      return;
+    }
+    if (templateWeekdays.length === 0) {
+      toast.error("请至少选择一天");
+      return;
+    }
+    if (templateStartHour >= templateEndHour) {
+      toast.error("结束时间需要晚于开始时间");
+      return;
+    }
+
+    const template = upsertTemplateFromForm();
+    if (!template) return;
+    if (templatePlacementPreview.placements.length === 0) {
+      toast.info(
+        templatePlacementPreview.skipped > 0
+          ? "所选休息格都已有行程，未重复写入"
+          : "当前范围内没有可写入的休息格",
+      );
+      return;
+    }
+
+    const nextEvents = templatePlacementPreview.placements.map<ScheduleEvent>((placement) => ({
+      id: createId("event"),
+      date: placement.date,
+      startHour: placement.startHour,
+      endHour: placement.endHour,
+      title: template.title,
+      notes: template.notes,
+      requirements: template.requirements,
+      isCompleted: false,
+      category: normalizeCategoryName(template.category),
+      tag: template.tag,
+    }));
+
+    if (onCreateEvents) {
+      onCreateEvents(nextEvents);
+    } else {
+      nextEvents.forEach(onCreateEvent);
+    }
+
+    const skippedText = templatePlacementPreview.skipped
+      ? `，跳过 ${templatePlacementPreview.skipped} 个已占用格`
+      : "";
+    toast.success(`已铺入 ${nextEvents.length} 个「${template.title}」行程${skippedText}`);
+    setTemplateDialogOpen(false);
   }
 
   function handleOpenEdit(event: ScheduleEvent) {
@@ -1176,6 +1365,12 @@ export function WeeklyTimeGrid({
             {viewMode === "day" ? "后一天" : viewMode === "week" ? "后一周" : "后一段"}
             <ChevronRight className="h-4 w-4" />
           </Button>
+          {viewMode !== "month" ? (
+            <Button type="button" variant="outline" size="sm" onClick={handleOpenTemplateDialog}>
+              <Stamp className="h-4 w-4" />
+              模板
+            </Button>
+          ) : null}
           <Button type="button" size="sm" onClick={() => setShowCategoryManager(true)}>
             分类管理
           </Button>
@@ -2036,6 +2231,273 @@ export function WeeklyTimeGrid({
             ) : null}
           </Dialog>
 
+          <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+            <DialogContent className="max-h-[84vh] overflow-hidden rounded-3xl border-stone-200 bg-stone-50 p-0 shadow-[0_28px_80px_rgba(28,25,23,0.24)] sm:max-w-4xl">
+              <DialogHeader className="border-b border-stone-200 bg-white px-5 py-4">
+                <DialogTitle className="flex items-center gap-2 text-base font-semibold text-stone-950">
+                  <Stamp className="h-4 w-4" />
+                  行程模板
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[11px] font-medium text-emerald-700">
+                    {splitTemplateGranularity ?? "普通粒度"}
+                  </span>
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="grid min-h-0 grid-cols-[230px_minmax(0,1fr)]">
+                <aside className="min-h-0 border-r border-stone-200 bg-white p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-stone-500">模板库</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="新建行程模板"
+                      onClick={handleNewTemplate}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="mt-3 max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+                    {scheduleTemplates.map((template) => {
+                      const active = template.id === editingTemplateId;
+                      return (
+                        <div
+                          key={template.id}
+                          className={`group flex items-center gap-1 rounded-xl border p-1 transition ${
+                            active
+                              ? "border-emerald-300 bg-emerald-50/80"
+                              : "border-stone-200 bg-white hover:border-stone-300"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                            onClick={() => loadTemplateIntoEditor(template)}
+                          >
+                            <span className="block truncate text-sm font-semibold text-stone-900">
+                              {template.title}
+                            </span>
+                            <span className="mt-0.5 block truncate text-[11px] text-stone-500">
+                              {template.category}
+                            </span>
+                          </button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="shrink-0 text-stone-400 opacity-0 hover:text-rose-600 group-hover:opacity-100 focus-visible:opacity-100"
+                            aria-label={`删除模板 ${template.title}`}
+                            onClick={() => handleDeleteTemplate(template.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </aside>
+
+                <section className="min-h-0 overflow-y-auto p-5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_190px] gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="template-title">标题</Label>
+                      <Input
+                        id="template-title"
+                        value={templateForm.title}
+                        placeholder="例如：休息"
+                        onChange={(event) =>
+                          setTemplateForm((previous) => ({
+                            ...previous,
+                            title: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>标记</Label>
+                      <Select
+                        value={templateForm.tag ?? "none"}
+                        onValueChange={(value) =>
+                          setTemplateForm((previous) => ({
+                            ...previous,
+                            tag: value === "none" ? null : (value as EventTag),
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-full justify-between">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                          <SelectItem value="none">无标记</SelectItem>
+                          <SelectItem value="待定">待定</SelectItem>
+                          <SelectItem value="不着急">不着急</SelectItem>
+                          <SelectItem value="不可后退">不可后退</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    <Label>分类</Label>
+                    <Select
+                      value={templateForm.category}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        setTemplateForm((previous) => ({ ...previous, category: value }));
+                      }}
+                    >
+                      <SelectTrigger className="w-full justify-between">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent
+                        align="start"
+                        alignItemWithTrigger={false}
+                        className="max-h-72 min-w-64"
+                      >
+                        {groupedCategories.map(({ group, categories: groupItems }) => (
+                          <SelectGroup key={group}>
+                            <SelectLabel className="px-2 py-1.5 text-[11px] font-semibold text-stone-500">
+                              {SCHEDULE_CATEGORY_GROUP_LABELS[group]}
+                            </SelectLabel>
+                            {groupItems.map((category) => (
+                              <SelectItem key={category.id} value={category.name}>
+                                <CategorySelectLabel category={category} />
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    <Label htmlFor="template-notes">备注</Label>
+                    <Textarea
+                      id="template-notes"
+                      className="min-h-20"
+                      value={templateForm.notes}
+                      onChange={(event) =>
+                        setTemplateForm((previous) => ({
+                          ...previous,
+                          notes: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-semibold text-stone-900">
+                        {viewMode === "day" ? "铺入当天" : "铺入本周"}
+                      </span>
+                      <span className="rounded-full bg-stone-100 px-2.5 py-1 font-mono text-xs text-stone-600">
+                        {templatePlacementPreview.placements.length} 个
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {WEEKDAY_UI_ORDER.map((day) => (
+                        <Button
+                          key={day}
+                          type="button"
+                          size="sm"
+                          variant={templateWeekdays.includes(day) ? "default" : "outline"}
+                          className="h-8 min-w-10 rounded-full px-2.5"
+                          onClick={() =>
+                            setTemplateWeekdays((previous) =>
+                              previous.includes(day)
+                                ? previous.filter((item) => item !== day)
+                                : [...previous, day],
+                            )
+                          }
+                        >
+                          {WEEKDAY_SHORT_LABEL[day]}
+                        </Button>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-stone-500">开始</Label>
+                        <Select
+                          value={String(templateStartHour)}
+                          onValueChange={(value) => {
+                            if (value !== null) setTemplateStartHour(Number(value));
+                          }}
+                        >
+                          <SelectTrigger className="w-full font-mono">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent align="start" alignItemWithTrigger={false}>
+                            {hourOptions.map((hour) => (
+                              <SelectItem key={hour} value={String(hour)}>
+                                {hour.toString().padStart(2, "0")}:00
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <span className="pb-2.5 text-xs text-stone-400">至</span>
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-stone-500">结束</Label>
+                        <Select
+                          value={String(templateEndHour)}
+                          onValueChange={(value) => {
+                            if (value !== null) setTemplateEndHour(Number(value));
+                          }}
+                        >
+                          <SelectTrigger className="w-full font-mono">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent align="end" alignItemWithTrigger={false}>
+                            {endHourOptions.slice(1).map((hour) => (
+                              <SelectItem key={hour} value={String(hour)}>
+                                {hour.toString().padStart(2, "0")}:00
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {templatePlacementPreview.skipped > 0 ? (
+                      <p className="mt-2 text-xs text-amber-700">
+                        已占用 {templatePlacementPreview.skipped} 格将自动跳过
+                      </p>
+                    ) : null}
+                    {!splitTemplateGranularity ? (
+                      <p className="mt-2 text-xs font-medium text-amber-700">
+                        需切换至 45+15 或 50+10
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-[160px_minmax(0,1fr)] gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const saved = upsertTemplateFromForm();
+                        if (saved) toast.success("模板已保存");
+                      }}
+                    >
+                      保存模板
+                    </Button>
+                    <Button
+                      type="button"
+                      className="bg-emerald-800 text-white hover:bg-emerald-900"
+                      disabled={!splitTemplateGranularity || !templateForm.title.trim()}
+                      onClick={handleApplyTemplateToView}
+                    >
+                      <Stamp className="h-4 w-4" />
+                      {viewMode === "day" ? "铺入当天" : "铺入本周"}
+                    </Button>
+                  </div>
+                </section>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog
             open={showCategoryManager}
             onOpenChange={(open) => {
@@ -2289,7 +2751,7 @@ export function WeeklyTimeGrid({
   );
 }
 
-function CenteredTimePartSelect({
+export function CenteredTimePartSelect({
   value,
   options,
   label,
@@ -2343,7 +2805,6 @@ function CenteredTimePartSelect({
           alignItemWithTrigger={false}
           className="max-h-56 min-w-24 p-1"
         >
-          <div aria-hidden className="h-24" />
           {options.map((option) => {
             const optionValue = option.toString().padStart(2, "0");
             return (
@@ -2357,7 +2818,6 @@ function CenteredTimePartSelect({
               </SelectItem>
             );
           })}
-          <div aria-hidden className="h-24" />
         </SelectContent>
       </Select>
     </div>

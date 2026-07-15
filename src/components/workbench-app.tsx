@@ -2331,6 +2331,11 @@ export function WorkbenchApp() {
     setEvents((prev) => [...prev, event]);
   }
 
+  function handleCreateEvents(nextEvents: ScheduleEvent[]) {
+    if (nextEvents.length === 0) return;
+    setEvents((prev) => [...prev, ...nextEvents]);
+  }
+
   function handleCreateDailyTaskTimeBlock(
     task: LongTask,
     date: string,
@@ -2536,6 +2541,7 @@ export function WorkbenchApp() {
                   weekRange={displayRangeLabel}
                   events={events}
                   onCreateEvent={handleCreateEvent}
+                  onCreateEvents={handleCreateEvents}
                   onCreateDailyTask={(name, date) => handleAddTask(name, date, "daily")}
                   onUpdateEvent={handleUpdateEvent}
                   onDeleteEvent={handleDeleteEvent}
