@@ -192,7 +192,6 @@ const recurrenceEditScopeStorageKey = "recurrence-edit-scope";
 const hourOptions = Array.from({ length: 24 }, (_, hour) => hour);
 const endHourOptions = Array.from({ length: 25 }, (_, hour) => hour);
 const minuteOptions = Array.from({ length: 60 }, (_, minute) => minute);
-const quickMinuteOptions = [0, 15, 30, 45];
 const compactMoneyFormatter = new Intl.NumberFormat("zh-CN", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
@@ -221,6 +220,10 @@ function getTimeGridSlots(granularity: TimeGranularity): TimeGridSlot[] {
       return slot;
     });
   }).flat();
+}
+
+function isWholeHour(value: number) {
+  return Math.abs(value - Math.round(value)) < 0.0001;
 }
 
 const defaultForm: EventFormState = {
@@ -1200,17 +1203,20 @@ export function WeeklyTimeGrid({
               >
                 <div>
                   {timeGridSlots.map((slot) => {
-                    const isMainHour = Number.isInteger(slot.startHour);
+                    const startsAtMainHour = isWholeHour(slot.startHour);
+                    const endsAtMainHour = isWholeHour(
+                      slot.startHour + slot.durationMinutes / minutesPerHour,
+                    );
                     return (
                       <div
                         key={`hour-label-${slot.startHour}`}
-                        className={`border-r border-b px-1.5 py-1 text-xs ${isMainHour ? "border-gray-200 bg-gray-50 text-gray-500" : "border-gray-100 text-gray-400"}`}
+                        className={`border-r border-b px-1.5 py-1 text-xs ${endsAtMainHour ? "border-gray-200" : "border-gray-100"} ${startsAtMainHour ? "bg-gray-50 text-gray-500" : "text-gray-400"}`}
                         style={{
                           height: `${(slot.durationMinutes / minutesPerHour) * hourCellHeight}px`,
-                          borderBottomStyle: isMainHour ? "solid" : "dashed",
+                          borderBottomStyle: endsAtMainHour ? "solid" : "dashed",
                         }}
                       >
-                        {isMainHour ? formatHour(slot.startHour) : ""}
+                        {startsAtMainHour ? formatHour(slot.startHour) : ""}
                       </div>
                     );
                   })}
@@ -1224,15 +1230,17 @@ export function WeeklyTimeGrid({
                         style={{ gridTemplateRows }}
                       >
                         {timeGridSlots.map((slot) => {
-                          const isMainHour = Number.isInteger(slot.startHour);
+                          const endsAtMainHour = isWholeHour(
+                            slot.startHour + slot.durationMinutes / minutesPerHour,
+                          );
                           return (
                             <button
                               key={`${dayLayout.dateIso}-${slot.startHour}`}
                               type="button"
-                              className={`border-b transition-colors hover:bg-gray-50 ${isMainHour ? "border-gray-200" : "border-gray-100"}`}
+                              className={`border-b transition-colors hover:bg-gray-50 ${endsAtMainHour ? "border-gray-200" : "border-gray-100"}`}
                               style={{
                                 height: `${(slot.durationMinutes / minutesPerHour) * hourCellHeight}px`,
-                                borderBottomStyle: isMainHour ? "solid" : "dashed",
+                                borderBottomStyle: endsAtMainHour ? "solid" : "dashed",
                               }}
                               onClick={() => {
                                 setSelectedExpenseDateIso(dayLayout.dateIso);
@@ -2268,75 +2276,63 @@ export function WeeklyTimeGrid({
   );
 }
 
-function HourChoiceGrid({
+function CenteredTimePartSelect({
   value,
   options,
-  ariaLabel,
+  label,
+  disabled = false,
   onChange,
 }: {
   value: number;
   options: number[];
-  ariaLabel: string;
+  label: string;
+  disabled?: boolean;
   onChange: (value: number) => void;
 }) {
-  return (
-    <div className="grid grid-cols-6 gap-1" role="group" aria-label={ariaLabel}>
-      {options.map((option) => {
-        const selected = value === option;
-        return (
-          <button
-            key={option}
-            type="button"
-            aria-pressed={selected}
-            aria-label={`${ariaLabel} ${option.toString().padStart(2, "0")}`}
-            onClick={() => onChange(option)}
-            className={`h-8 rounded-md border font-mono text-xs font-semibold transition ${
-              selected
-                ? "border-stone-900 bg-stone-900 text-white shadow-sm"
-                : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
-            }`}
-          >
-            {option.toString().padStart(2, "0")}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+  const selectedOptionRef = React.useRef<HTMLDivElement | null>(null);
+  const selectedValue = value.toString().padStart(2, "0");
 
-function MinuteShortcutGroup({
-  value,
-  availableMinutes,
-  ariaPrefix,
-  onChange,
-}: {
-  value: number;
-  availableMinutes: number[];
-  ariaPrefix: string;
-  onChange: (value: number) => void;
-}) {
   return (
-    <div className="grid grid-cols-4 gap-1.5">
-      {quickMinuteOptions.map((minute) => {
-        const disabled = !availableMinutes.includes(minute);
-        const selected = value === minute;
-        return (
-          <button
-            key={minute}
-            type="button"
-            disabled={disabled}
-            aria-label={`${ariaPrefix}${minute.toString().padStart(2, "0")} 分`}
-            onClick={() => onChange(minute)}
-            className={`h-8 rounded-md border px-2 font-mono text-xs font-semibold transition ${
-              selected
-                ? "border-stone-900 bg-stone-900 text-white shadow-sm"
-                : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
-            } disabled:cursor-not-allowed disabled:border-stone-100 disabled:bg-stone-50 disabled:text-stone-300`}
-          >
-            {minute.toString().padStart(2, "0")}
-          </button>
-        );
-      })}
+    <div className="min-w-0 space-y-1.5">
+      <Label className="text-[11px] font-medium text-stone-500">{label}</Label>
+      <Select
+        value={selectedValue}
+        disabled={disabled}
+        onValueChange={(nextValue) => {
+          if (nextValue !== null) onChange(Number(nextValue));
+        }}
+        onOpenChangeComplete={(open) => {
+          if (open) selectedOptionRef.current?.scrollIntoView({ block: "center" });
+        }}
+      >
+        <SelectTrigger
+          className="h-10 w-full rounded-lg border-stone-200 bg-white px-3 font-mono text-sm font-semibold text-stone-900 shadow-sm"
+          aria-label={label}
+        >
+          <SelectValue>{selectedValue}</SelectValue>
+        </SelectTrigger>
+        <SelectContent
+          align="start"
+          alignItemWithTrigger={false}
+          className="max-h-56 min-w-24 p-1"
+        >
+          <div aria-hidden className="h-24" />
+          {options.map((option) => {
+            const optionValue = option.toString().padStart(2, "0");
+            return (
+              <SelectItem
+                key={option}
+                ref={option === value ? selectedOptionRef : undefined}
+                value={optionValue}
+                className="justify-center py-2 font-mono font-semibold"
+              >
+                {optionValue}
+              </SelectItem>
+            );
+          })}
+          <div aria-hidden className="h-24" />
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -2368,40 +2364,24 @@ function TimeRangeEditor({
             {formatHour(startHour)}
           </span>
         </div>
-        <div className="mt-3 space-y-2">
-          <HourChoiceGrid
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
+          <CenteredTimePartSelect
             value={startParts.hours}
             options={hourOptions}
-            ariaLabel="开始时间小时"
+            label="小时"
             onChange={(hours) =>
               onStartHourChange(getTimeValueFromParts(hours, startParts.minutes))
             }
           />
-          <MinuteShortcutGroup
+          <span className="pb-2.5 font-mono text-sm font-semibold text-stone-400">:</span>
+          <CenteredTimePartSelect
             value={startParts.minutes}
-            availableMinutes={minuteOptions}
-            ariaPrefix="设置开始时间为"
+            options={minuteOptions}
+            label="分钟"
             onChange={(minutes) =>
               onStartHourChange(getTimeValueFromParts(startParts.hours, minutes))
             }
           />
-          <div className="flex items-center gap-2">
-            <Label htmlFor="start-minute-input" className="shrink-0 text-xs text-stone-600">分钟</Label>
-            <Input
-              id="start-minute-input"
-              type="number"
-              min="0"
-              max="59"
-              value={startParts.minutes}
-              onChange={(event) => {
-                const minutes = Number(event.target.value);
-                if (Number.isFinite(minutes)) {
-                  onStartHourChange(getTimeValueFromParts(startParts.hours, Math.max(0, Math.min(59, minutes))));
-                }
-              }}
-              className="h-8 font-mono text-xs"
-            />
-          </div>
         </div>
       </div>
 
@@ -2419,41 +2399,25 @@ function TimeRangeEditor({
             {formatHour(endHour)}
           </span>
         </div>
-        <div className="mt-3 space-y-2">
-          <HourChoiceGrid
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
+          <CenteredTimePartSelect
             value={endParts.hours}
             options={endHourOptions}
-            ariaLabel="结束时间小时"
+            label="小时"
             onChange={(hours) =>
               onEndHourChange(getTimeValueFromParts(hours, endParts.minutes, true))
             }
           />
-          <MinuteShortcutGroup
+          <span className="pb-2.5 font-mono text-sm font-semibold text-stone-400">:</span>
+          <CenteredTimePartSelect
             value={endParts.minutes}
-            availableMinutes={endMinuteOptions}
-            ariaPrefix="设置结束时间为"
+            options={endMinuteOptions}
+            label="分钟"
+            disabled={endParts.hours === 24}
             onChange={(minutes) =>
               onEndHourChange(getTimeValueFromParts(endParts.hours, minutes, true))
             }
           />
-          <div className="flex items-center gap-2">
-            <Label htmlFor="end-minute-input" className="shrink-0 text-xs text-stone-600">分钟</Label>
-            <Input
-              id="end-minute-input"
-              type="number"
-              min="0"
-              max="59"
-              value={endParts.minutes}
-              disabled={endParts.hours === 24}
-              onChange={(event) => {
-                const minutes = Number(event.target.value);
-                if (Number.isFinite(minutes)) {
-                  onEndHourChange(getTimeValueFromParts(endParts.hours, Math.max(0, Math.min(59, minutes)), true));
-                }
-              }}
-              className="h-8 font-mono text-xs"
-            />
-          </div>
         </div>
       </div>
     </div>

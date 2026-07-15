@@ -730,7 +730,7 @@ export function TaskDashboard({
 
     onCheckinProject(projectId, checkinDate, projectNoteDraft[projectId] ?? "");
     setProjectNoteDraft((prev) => ({ ...prev, [projectId]: "" }));
-    toast.success(checkinDate === todayDate ? "Project 已打卡" : `已补打 ${checkinDate}`);
+    toast.success(checkinDate === todayDate ? "项目已打卡" : `已补打 ${checkinDate}`);
   }
 
   function getDailyCheckinDraft(projectId: string): DailyCheckinDraft {
@@ -1241,98 +1241,6 @@ export function TaskDashboard({
       <Separator />
 
       <div className="task-dashboard-section">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-600">
-            <CalendarRange className="h-4 w-4 text-primary" aria-hidden />
-            年度任务清单
-          </p>
-          <div className="flex items-center gap-1">
-            <Button type="button" size="icon-sm" onClick={() => setShowAddAnnualDialog(true)} aria-label="添加年度任务" title="添加年度任务">
-              <Plus className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              onClick={() => {
-                const nextOpen = !annualSectionOpen;
-                setAnnualSectionOpen(nextOpen);
-                patchUiPreferences({ annualSectionOpen: nextOpen });
-              }}
-              aria-label={annualSectionOpen ? "收起年度任务清单" : "展开年度任务清单"}
-            >
-              <ChevronDown className={`h-4 w-4 transition-transform ${annualSectionOpen ? "" : "-rotate-90"}`} />
-            </Button>
-          </div>
-        </div>
-        {annualSectionOpen ? <div className="mb-6 space-y-3 rounded-2xl subtle-card p-3">
-          {annualTasks.length > 0 ? (
-            <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">
-              {annualTasks.map((item) => (
-                <li
-                  key={item.id}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => handleAnnualTaskDrop(item.id)}
-                  className="annual-task-row"
-                >
-                  <button
-                    type="button"
-                    draggable
-                    onDragStart={() => setDraggingAnnualTaskId(item.id)}
-                    onDragEnd={() => setDraggingAnnualTaskId(null)}
-                    className="mt-0.5 shrink-0 rounded p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
-                    aria-label={`拖动排序年度任务 ${item.name}`}
-                  >
-                    <GripVertical className="h-4 w-4" />
-                  </button>
-                  <Checkbox
-                    checked={item.done}
-                    onCheckedChange={() => onToggleAnnualTask(item.id)}
-                    className="mt-0.5"
-                    aria-label={`年度任务 ${item.name} 完成状态`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => openEditAnnualTask(item)}
-                    className={`min-w-0 flex-1 leading-snug [overflow-wrap:anywhere] break-words ${
-                      item.done ? "text-left text-gray-500 line-through" : "text-left text-gray-900"
-                    }`}
-                  >
-                    {item.name}
-                  </button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    className="mt-0.5 shrink-0 rounded-md text-stone-500 hover:bg-stone-100"
-                    onClick={() => openEditAnnualTask(item)}
-                    aria-label={`编辑年度任务 ${item.name}`}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="mt-0.5 h-7 w-7 shrink-0 rounded-md hover:bg-red-50 hover:text-red-500"
-                    onClick={() => {
-                      onDeleteAnnualTask(item.id);
-                      toast.success("已从年度清单移除");
-                    }}
-                    aria-label={`删除年度任务 ${item.name}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-center text-sm text-gray-500">
-              尚未添加年度任务。
-            </p>
-          )}
-        </div> : null}
-
         <Collapsible
           open={longTaskSectionOpen}
           onOpenChange={(open) => {
@@ -1523,7 +1431,7 @@ export function TaskDashboard({
             onClick={() => setUtilityPanel("project", activeUtilityPanel !== "project")}
           >
             <KanbanSquare className="h-4 w-4 shrink-0" />
-            <span className="truncate">Project</span>
+            <span className="truncate">项目</span>
           </button>
           <button
             type="button"
@@ -1614,7 +1522,7 @@ export function TaskDashboard({
                       size="icon"
                       variant="ghost"
                       onClick={() =>
-                        withOptionalConfirm("确认删除这个 Project 以及其全部打卡记录吗？", () =>
+                        withOptionalConfirm("确认删除这个项目以及其全部打卡记录吗？", () =>
                           handleDeleteProject(project.id),
                         )
                       }
@@ -1694,7 +1602,7 @@ export function TaskDashboard({
               </div>
             );
               })}
-              {visibleProjectCheckins.length === 0 ? <p className="text-xs text-gray-500">暂无 Project 打卡项</p> : null}
+              {visibleProjectCheckins.length === 0 ? <p className="text-xs text-gray-500">暂无项目打卡项</p> : null}
             </div>
           </CollapsibleContent>
         </Collapsible>
@@ -1993,6 +1901,102 @@ export function TaskDashboard({
       </section>
       </div>
 
+      <Separator />
+
+      <div className="task-dashboard-section">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-600">
+            <CalendarRange className="h-4 w-4 text-primary" aria-hidden />
+            年度任务清单
+          </p>
+          <div className="flex items-center gap-1">
+            <Button type="button" size="icon-sm" onClick={() => setShowAddAnnualDialog(true)} aria-label="添加年度任务" title="添加年度任务">
+              <Plus className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => {
+                const nextOpen = !annualSectionOpen;
+                setAnnualSectionOpen(nextOpen);
+                patchUiPreferences({ annualSectionOpen: nextOpen });
+              }}
+              aria-label={annualSectionOpen ? "收起年度任务清单" : "展开年度任务清单"}
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${annualSectionOpen ? "" : "-rotate-90"}`} />
+            </Button>
+          </div>
+        </div>
+        {annualSectionOpen ? (
+          <div className="space-y-3 rounded-2xl subtle-card p-3">
+            {annualTasks.length > 0 ? (
+              <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">
+                {annualTasks.map((item) => (
+                  <li
+                    key={item.id}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => handleAnnualTaskDrop(item.id)}
+                    className="annual-task-row"
+                  >
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={() => setDraggingAnnualTaskId(item.id)}
+                      onDragEnd={() => setDraggingAnnualTaskId(null)}
+                      className="mt-0.5 shrink-0 rounded p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                      aria-label={`拖动排序年度任务 ${item.name}`}
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </button>
+                    <Checkbox
+                      checked={item.done}
+                      onCheckedChange={() => onToggleAnnualTask(item.id)}
+                      className="mt-0.5"
+                      aria-label={`年度任务 ${item.name} 完成状态`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openEditAnnualTask(item)}
+                      className={`min-w-0 flex-1 leading-snug [overflow-wrap:anywhere] break-words ${
+                        item.done ? "text-left text-gray-500 line-through" : "text-left text-gray-900"
+                      }`}
+                    >
+                      {item.name}
+                    </button>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      className="mt-0.5 shrink-0 rounded-md text-stone-500 hover:bg-stone-100"
+                      onClick={() => openEditAnnualTask(item)}
+                      aria-label={`编辑年度任务 ${item.name}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="mt-0.5 h-7 w-7 shrink-0 rounded-md hover:bg-red-50 hover:text-red-500"
+                      onClick={() => {
+                        onDeleteAnnualTask(item.id);
+                        toast.success("已从年度清单移除");
+                      }}
+                      aria-label={`删除年度任务 ${item.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-center text-sm text-gray-500">尚未添加年度任务。</p>
+            )}
+          </div>
+        ) : null}
+      </div>
+
       {showFootprintsSection ? (
         <>
           <Separator />
@@ -2162,7 +2166,7 @@ export function TaskDashboard({
       <Dialog open={showAddProjectDialog} onOpenChange={setShowAddProjectDialog}>
         <DialogContent className="rounded-sm border-gray-200">
           <DialogHeader>
-            <DialogTitle className="text-sm">新增 Project 打卡项</DialogTitle>
+            <DialogTitle className="text-sm">新增项目打卡项</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <Input
@@ -2327,7 +2331,7 @@ export function TaskDashboard({
       <Dialog open={Boolean(editingProjectId)} onOpenChange={(open) => !open && setEditingProjectId(null)}>
         <DialogContent className="rounded-sm border-gray-200">
           <DialogHeader>
-            <DialogTitle className="text-sm">编辑 Project</DialogTitle>
+            <DialogTitle className="text-sm">编辑项目</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <Input

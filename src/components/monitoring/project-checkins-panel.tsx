@@ -110,9 +110,9 @@ export function ProjectCheckinsPanel({
     <section className="rounded-lg border border-gray-200 bg-white shadow-md">
       <header className="flex items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight text-gray-900">Project 打卡记录</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-gray-900">项目打卡记录</h2>
         </div>
-        <Button type="button" size="icon-sm" onClick={() => setShowAddProjectDialog(true)} aria-label="新增 Project 打卡项" title="新增 Project 打卡项">
+        <Button type="button" size="icon-sm" onClick={() => setShowAddProjectDialog(true)} aria-label="新增项目打卡项" title="新增项目打卡项">
           <Plus className="h-4 w-4" />
         </Button>
       </header>
@@ -166,7 +166,7 @@ export function ProjectCheckinsPanel({
                         size="icon"
                         variant="ghost"
                         onClick={() =>
-                          withOptionalConfirm("确认删除这个 Project 以及其全部打卡记录吗？", () =>
+                          withOptionalConfirm("确认删除这个项目以及其全部打卡记录吗？", () =>
                             onDeleteProjectCheckin(project.id),
                           )
                         }
@@ -246,7 +246,7 @@ export function ProjectCheckinsPanel({
             })}
 
             {projectCheckins.length === 0 ? (
-              <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-500">暂无 Project 打卡项。</p>
+              <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-500">暂无项目打卡项。</p>
             ) : null}
           </CollapsibleContent>
         </Collapsible>
@@ -255,7 +255,7 @@ export function ProjectCheckinsPanel({
       <Dialog open={showAddProjectDialog} onOpenChange={setShowAddProjectDialog}>
         <DialogContent className="rounded-sm border-gray-200">
           <DialogHeader>
-            <DialogTitle className="text-sm">新增 Project 打卡项</DialogTitle>
+            <DialogTitle className="text-sm">新增项目打卡项</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <Input
@@ -343,7 +343,7 @@ export function ProjectCheckinsPanel({
       <Dialog open={Boolean(editingProjectId)} onOpenChange={(open) => !open && setEditingProjectId(null)}>
         <DialogContent className="rounded-sm border-gray-200">
           <DialogHeader>
-            <DialogTitle className="text-sm">编辑 Project</DialogTitle>
+            <DialogTitle className="text-sm">编辑项目</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <Input
