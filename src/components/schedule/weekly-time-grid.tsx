@@ -1573,7 +1573,7 @@ export function WeeklyTimeGrid({
                                     <>
                                       <div className="flex min-w-0 items-center gap-1.5">
                                         <span
-                                          className="shrink-0 whitespace-nowrap rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
+                                          className="shrink-0 whitespace-nowrap font-mono text-[9px] font-semibold tracking-[-0.03em] text-gray-700 [font-variant-numeric:tabular-nums]"
                                           title={fullTimeLabel}
                                         >
                                           {timeLabel}
@@ -1615,7 +1615,7 @@ export function WeeklyTimeGrid({
                                       </div>
 
                                       <p
-                                        className={`min-w-0 flex-1 overflow-hidden break-words text-[13px] font-semibold leading-snug ${
+                                        className={`min-w-0 flex-1 overflow-hidden break-words text-xs font-semibold leading-snug ${
                                           mediumCard || denseCard
                                             ? "[display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
                                             : ""
