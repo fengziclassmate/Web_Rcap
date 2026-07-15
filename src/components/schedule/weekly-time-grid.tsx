@@ -126,6 +126,7 @@ type WeeklyTimeGridProps = {
   weekRange: string;
   events: ScheduleEvent[];
   onCreateEvent: (event: ScheduleEvent) => void;
+  onCreateDailyTask: (name: string, dueDate: string) => string | null;
   onUpdateEvent: (
     eventId: string,
     patch: Partial<ScheduleEvent>,
@@ -407,6 +408,7 @@ export function WeeklyTimeGrid({
   weekRange,
   events,
   onCreateEvent,
+  onCreateDailyTask,
   onUpdateEvent,
   onDeleteEvent,
   onPrevWeek,
@@ -767,10 +769,19 @@ export function WeeklyTimeGrid({
     });
   }
 
-  function handleCreateEvent() {
+  function handleCreateEvent(alsoCreateDailyTask = false) {
     if (!selectedCell || !createForm.title.trim()) return;
 
     const { startHour, endHour } = resolveFormTimeRange(createForm.startHour, createForm.endHour);
+
+    if (createRecurrence.enabled && createRecurrence.kind === "weekly" && createRecurrence.weekdays.length === 0) {
+      toast.error("每周重复至少要选择一个星期。");
+      return;
+    }
+
+    const linkedDailyTaskId = alsoCreateDailyTask
+      ? onCreateDailyTask(createForm.title.trim(), selectedCell.date)
+      : null;
 
     const baseEvent: ScheduleEvent = {
       id: createId("event"),
@@ -783,14 +794,10 @@ export function WeeklyTimeGrid({
       isCompleted: createForm.isCompleted,
       category: createForm.category,
       tag: createForm.tag,
+      ...(linkedDailyTaskId ? { linkedDailyTaskId } : {}),
     };
 
     if (createRecurrence.enabled) {
-      if (createRecurrence.kind === "weekly" && createRecurrence.weekdays.length === 0) {
-        toast.error("每周重复至少要选择一个星期。");
-        return;
-      }
-
       const weekdays =
         createRecurrence.kind === "weekly"
           ? [...createRecurrence.weekdays].sort((a, b) => a - b)
@@ -808,6 +815,10 @@ export function WeeklyTimeGrid({
       });
     } else {
       onCreateEvent(baseEvent);
+    }
+
+    if (linkedDailyTaskId) {
+      toast.success("已创建行程并加入当日日常任务");
     }
 
     setCreateDialogOpen(false);
@@ -1722,9 +1733,19 @@ export function WeeklyTimeGrid({
                     />
                     <Label htmlFor="create-completed">标记为已完成</Label>
                   </div>
-                  <Button type="button" className="w-full" onClick={handleCreateEvent}>
-                    创建行程
-                  </Button>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleCreateEvent(true)}
+                      disabled={!createForm.title.trim()}
+                    >
+                      创建并加入当日任务
+                    </Button>
+                    <Button type="button" onClick={() => handleCreateEvent()} disabled={!createForm.title.trim()}>
+                      创建行程
+                    </Button>
+                  </div>
                 </div>
               </DialogContent>
             ) : null}

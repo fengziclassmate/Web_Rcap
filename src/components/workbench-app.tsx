@@ -1850,13 +1850,18 @@ export function WorkbenchApp() {
     );
   }
 
-  function handleAddTask(name: string, dueDate: string, taskType: LongTask["taskType"] = "long") {
+  function handleAddTask(
+    name: string,
+    dueDate: string,
+    taskType: LongTask["taskType"] = "long",
+  ): string | null {
     const trimmedName = name.trim();
-    if (!trimmedName) return;
+    if (!trimmedName) return null;
+    const id = createId("task");
     setTasks((prev) => [
       ...prev,
       {
-        id: createId("task"),
+        id,
         name: trimmedName,
         dueDate,
         createdAt: new Date().toISOString(),
@@ -1871,6 +1876,7 @@ export function WorkbenchApp() {
         isTodayFocus: false,
       },
     ]);
+    return id;
   }
 
   function handleCreateWorkflowTask(input: { title: string; dueDate?: string; notes?: string }) {
@@ -2289,6 +2295,7 @@ export function WorkbenchApp() {
         isCompleted: false,
         category: DEFAULT_SCHEDULE_CATEGORY,
         tag: null,
+        linkedDailyTaskId: task.id,
         recurrence: null,
         exceptionDates: [],
         recurrenceOverrides: {},
@@ -2485,6 +2492,7 @@ export function WorkbenchApp() {
                   weekRange={displayRangeLabel}
                   events={events}
                   onCreateEvent={handleCreateEvent}
+                  onCreateDailyTask={(name, date) => handleAddTask(name, date, "daily")}
                   onUpdateEvent={handleUpdateEvent}
                   onDeleteEvent={handleDeleteEvent}
                   onPrevWeek={handleGoPrevWeek}
@@ -2498,6 +2506,7 @@ export function WorkbenchApp() {
               <section className={cn(mobileTab === "tasks" ? "block" : "hidden", "min-h-0 space-y-4 lg:block")}>
                 <TaskDashboard
                   tasks={tasks}
+                  events={events}
                   onToggleTask={handleToggleTask}
                   onAddTask={handleAddTask}
                   onUpdateTask={handleUpdateTask}

@@ -381,6 +381,10 @@ export function normalizeEvents(payload: unknown): ScheduleEvent[] {
       isCompleted: Boolean(value.isCompleted),
       category: normalizeScheduleCategory(value.category ?? DEFAULT_SCHEDULE_CATEGORY),
       tag: (value.tag as EventTag) ?? null,
+      linkedDailyTaskId:
+        typeof value.linkedDailyTaskId === "string" && value.linkedDailyTaskId.length > 0
+          ? value.linkedDailyTaskId
+          : undefined,
       recurrence: recurrence ?? undefined,
       exceptionDates: Array.isArray(value.exceptionDates)
         ? value.exceptionDates.filter((item): item is string => typeof item === "string")

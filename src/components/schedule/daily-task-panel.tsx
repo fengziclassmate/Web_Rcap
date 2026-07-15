@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { LongTask, TaskType } from "@/lib/types";
+import type { LongTask, ScheduleEvent, TaskType } from "@/lib/types";
 
 type DailyTaskPanelProps = {
   tasks: LongTask[];
+  events: ScheduleEvent[];
   onAddTask: (name: string, dueDate: string, taskType: TaskType) => void;
   onToggleTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<LongTask>) => void;
@@ -43,6 +44,7 @@ function parseTimeToHour(value: string) {
 
 export function DailyTaskPanel({
   tasks,
+  events,
   onAddTask,
   onToggleTask,
   onUpdateTask,
@@ -72,6 +74,14 @@ export function DailyTaskPanel({
     .map((task) => ({ task, days: dayDistance(today, task.dueDate) }))
     .filter(({ days }) => days <= 7)
     .sort((a, b) => a.days - b.days);
+  const scheduledDailyTaskIds = new Set(
+    events.flatMap((event) => (event.linkedDailyTaskId ? [event.linkedDailyTaskId] : [])),
+  );
+  const legacyScheduledDailyTaskNames = new Set(
+    events
+      .map((event) => event.notes.match(/^来自日常任务：(.+)$/)?.[1])
+      .filter((name): name is string => Boolean(name)),
+  );
 
   function addDailyTask() {
     const trimmed = name.trim();
@@ -101,7 +111,12 @@ export function DailyTaskPanel({
     if (!taskForSchedule) return;
     const durationMinutes = Number(duration);
     const startHour = parseTimeToHour(scheduleTime);
-    if (!Number.isFinite(startHour) || startHour + durationMinutes / 60 > 24) {
+    if (
+      !Number.isFinite(startHour) ||
+      !Number.isFinite(durationMinutes) ||
+      durationMinutes <= 0 ||
+      startHour + durationMinutes / 60 > 24
+    ) {
       toast.error("请选择当天可用的时间段");
       return;
     }
@@ -134,7 +149,6 @@ export function DailyTaskPanel({
             <ListTodo className="h-4 w-4 text-emerald-700" aria-hidden />
             日常任务
           </p>
-          <p className="mt-0.5 text-xs text-stone-500">当天安排，直接转为时间块</p>
         </div>
         <Button type="button" size="sm" variant="outline" onClick={() => setDailyCloseOpen(true)}>
           <RotateCcw className="h-3.5 w-3.5" />
@@ -174,9 +188,7 @@ export function DailyTaskPanel({
               </li>
             ))}
           </ol>
-        ) : (
-          <p className="mt-2 text-xs text-emerald-700">从下方日常任务中选择今天最重要的三项。</p>
-        )}
+        ) : null}
       </div>
 
       <div className="mt-3 space-y-2">
@@ -203,10 +215,17 @@ export function DailyTaskPanel({
                   {task.isTodayFocus ? "今日重点" : "设为重点"}
                 </Button>
               ) : null}
-              <Button type="button" size="xs" variant="outline" onClick={() => openSchedule(task)}>
-                <Clock className="h-3 w-3" />
-                排入日程
-              </Button>
+              {scheduledDailyTaskIds.has(task.id) || legacyScheduledDailyTaskNames.has(task.name) ? (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+                  <CheckCircle className="h-3 w-3" aria-hidden />
+                  已排入日程
+                </span>
+              ) : (
+                <Button type="button" size="xs" variant="outline" onClick={() => openSchedule(task)}>
+                  <Clock className="h-3 w-3" />
+                  排入日程
+                </Button>
+              )}
             </article>
           ))
         ) : (
@@ -278,7 +297,16 @@ export function DailyTaskPanel({
               <div className="space-y-1"><label className="text-xs text-stone-600">开始时间</label><Input type="time" value={scheduleTime} onChange={(event) => setScheduleTime(event.target.value)} /></div>
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-stone-600">时长</label>
+              <label className="text-xs text-stone-600" htmlFor="daily-task-duration">时长（分钟）</label>
+              <Input
+                id="daily-task-duration"
+                type="number"
+                min="1"
+                max="1440"
+                step="5"
+                value={duration}
+                onChange={(event) => setDuration(event.target.value)}
+              />
               <div className="grid grid-cols-3 gap-2">
                 {[30, 60, 90].map((minutes) => (
                   <Button key={minutes} type="button" size="sm" variant={duration === String(minutes) ? "default" : "outline"} onClick={() => setDuration(String(minutes))}>

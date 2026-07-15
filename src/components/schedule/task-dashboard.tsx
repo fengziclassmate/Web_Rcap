@@ -29,6 +29,7 @@ import {
   type LongTask,
   type Priority,
   type ProjectCheckin,
+  type ScheduleEvent,
   type SubTask,
   type TaskType,
 } from "@/lib/types";
@@ -52,6 +53,7 @@ import { DailyTaskPanel } from "@/components/schedule/daily-task-panel";
 
 type TaskDashboardProps = {
   tasks: LongTask[];
+  events: ScheduleEvent[];
   onToggleTask: (taskId: string) => void;
   onAddTask: (name: string, dueDate: string, taskType?: TaskType) => void;
   onUpdateTask: (taskId: string, patch: Partial<LongTask>) => void;
@@ -245,6 +247,7 @@ function isValidTime(value: string) {
 
 export function TaskDashboard({
   tasks,
+  events,
   onToggleTask,
   onAddTask,
   onUpdateTask,
@@ -334,7 +337,7 @@ export function TaskDashboard({
     if (uiPreferences.projectSectionOpen) return "project";
     if (uiPreferences.routineCheckinSectionOpen) return "routine";
     if (uiPreferences.achievementSectionOpen) return "achievement";
-    return "project";
+    return null;
   });
   const [footprintSectionOpen, setFootprintSectionOpen] = useState(uiPreferences.footprintSectionOpen);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
@@ -979,7 +982,7 @@ export function TaskDashboard({
 
       <Separator />
 
-      <section className="p-4 sm:p-6">
+      <section className="task-dashboard-section">
         <div className="completed-library-trigger">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -1218,6 +1221,7 @@ export function TaskDashboard({
 
       <DailyTaskPanel
         tasks={tasks}
+        events={events}
         onAddTask={(name, dueDate, taskType) => onAddTask(name, dueDate, taskType)}
         onToggleTask={onToggleTask}
         onUpdateTask={onUpdateTask}
@@ -1226,7 +1230,7 @@ export function TaskDashboard({
 
       <Separator />
 
-      <div className="p-6">
+      <div className="task-dashboard-section">
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-gray-600">
             <CalendarRange className="h-4 w-4 text-primary" aria-hidden />
@@ -1511,7 +1515,7 @@ export function TaskDashboard({
 
       <Separator />
 
-      <div className="utility-panel-grid p-4 sm:p-6">
+      <div className="task-dashboard-section utility-panel-grid">
       <div className="utility-panel-controls">
         <div className="utility-panel-tabs" role="tablist" aria-label="打卡与成就栏目">
           <button
@@ -1519,7 +1523,7 @@ export function TaskDashboard({
             role="tab"
             aria-selected={activeUtilityPanel === "project"}
             className={`utility-panel-tab ${activeUtilityPanel === "project" ? "utility-panel-tab-active" : ""}`}
-            onClick={() => setUtilityPanel("project", true)}
+            onClick={() => setUtilityPanel("project", activeUtilityPanel !== "project")}
           >
             <KanbanSquare className="h-4 w-4 shrink-0" />
             <span className="truncate">Project</span>
@@ -1529,7 +1533,7 @@ export function TaskDashboard({
             role="tab"
             aria-selected={activeUtilityPanel === "routine"}
             className={`utility-panel-tab ${activeUtilityPanel === "routine" ? "utility-panel-tab-active" : ""}`}
-            onClick={() => setUtilityPanel("routine", true)}
+            onClick={() => setUtilityPanel("routine", activeUtilityPanel !== "routine")}
           >
             <Clock className="h-4 w-4 shrink-0" />
             <span className="truncate">日常</span>
@@ -1539,16 +1543,18 @@ export function TaskDashboard({
             role="tab"
             aria-selected={activeUtilityPanel === "achievement"}
             className={`utility-panel-tab ${activeUtilityPanel === "achievement" ? "utility-panel-tab-active" : ""}`}
-            onClick={() => setUtilityPanel("achievement", true)}
+            onClick={() => setUtilityPanel("achievement", activeUtilityPanel !== "achievement")}
           >
             <Trophy className="h-4 w-4 shrink-0" />
             <span className="truncate">成就</span>
           </button>
         </div>
-        <Button type="button" size="sm" className="utility-panel-add shrink-0" onClick={handleAddUtilityItem}>
-          <Plus className="h-4 w-4" />
-          <span>添加</span>
-        </Button>
+        {activeUtilityPanel ? (
+          <Button type="button" size="sm" className="utility-panel-add shrink-0" onClick={handleAddUtilityItem}>
+            <Plus className="h-4 w-4" />
+            <span>添加</span>
+          </Button>
+        ) : null}
       </div>
       {showProjectSection ? (
       <section className="utility-panel utility-panel-project">
@@ -1922,7 +1928,7 @@ export function TaskDashboard({
         <>
           <Separator />
 
-          <section className="space-y-4 p-6">
+          <section className="task-dashboard-section space-y-4">
             <Collapsible
               open={footprintSectionOpen}
               onOpenChange={(open) => {
@@ -2310,11 +2316,11 @@ export function TaskDashboard({
         }}
       >
         {editingTask && taskDraft && (
-          <DialogContent className="rounded-sm border-gray-200">
-            <DialogHeader>
+          <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-sm border-gray-200 p-0 sm:max-w-xl">
+            <DialogHeader className="shrink-0 border-b border-gray-200 bg-white px-5 py-4 pr-12">
               <DialogTitle className="text-sm">编辑长期任务详情</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3">
+            <div className="min-h-0 space-y-3 overflow-y-auto px-5 py-4">
               <div className="space-y-1">
                 <Label htmlFor="task-edit-name">任务名称</Label>
                 <Input

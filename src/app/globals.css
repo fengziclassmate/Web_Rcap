@@ -244,6 +244,11 @@
     padding: 0.55rem 0.65rem 0.55rem 0.75rem;
   }
 
+  .task-dashboard-section,
+  .daily-task-panel {
+    padding: 1.25rem 1.5rem;
+  }
+
   .task-row-card {
     position: relative;
     overflow: hidden;
@@ -279,7 +284,6 @@
   }
 
   .daily-task-panel {
-    padding: 1rem 1.25rem;
     background:
       radial-gradient(circle at 94% 7%, color-mix(in oklch, #b3dfc3 30%, transparent), transparent 32%),
       color-mix(in oklch, white 72%, transparent);
@@ -313,7 +317,7 @@
   }
 
   .utility-panel-grid {
-    border-top: 1px solid color-mix(in oklch, var(--border) 72%, white);
+    background: color-mix(in oklch, white 28%, transparent);
   }
 
   .utility-panel-controls {
@@ -377,12 +381,9 @@
   }
 
   @media (max-width: 420px) {
+    .task-dashboard-section,
     .daily-task-panel {
       padding: 0.9rem;
-    }
-
-    .utility-panel-grid {
-      padding-inline: 0.75rem;
     }
 
     .utility-panel-controls {

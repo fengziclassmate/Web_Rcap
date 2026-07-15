@@ -15,6 +15,7 @@ export type ScheduleEvent = {
   isCompleted: boolean;
   category: string;
   tag: EventTag;
+  linkedDailyTaskId?: string;
   recurrence?: RecurrenceConfig | null;
   exceptionDates?: string[];
   recurrenceOverrides?: Record<string, RecurrenceInstanceOverride>;
