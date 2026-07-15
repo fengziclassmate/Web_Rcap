@@ -17,6 +17,7 @@ export type RecurrenceInstanceOverride = Partial<{
   isCompleted: boolean;
   category: string;
   tag: string | null;
+  linkedDailyTaskId: string;
 }>;
 
 /** 与 page 中 ScheduleEvent 对齐，供展开逻辑使用（避免引用 app） */
@@ -31,6 +32,7 @@ export type ExpandableScheduleEvent = {
   isCompleted: boolean;
   category: string;
   tag: string | null;
+  linkedDailyTaskId?: string;
   recurrence?: RecurrenceConfig | null;
   exceptionDates?: string[];
   recurrenceOverrides?: Record<string, RecurrenceInstanceOverride>;
@@ -142,6 +144,7 @@ export const RECURRENCE_INSTANCE_OVERRIDE_KEYS = [
   "isCompleted",
   "category",
   "tag",
+  "linkedDailyTaskId",
 ] as const;
 
 export type RecurrenceInstanceOverrideKey = (typeof RECURRENCE_INSTANCE_OVERRIDE_KEYS)[number];

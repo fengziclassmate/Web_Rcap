@@ -332,11 +332,12 @@ export function TaskDashboard({
   );
   const [completedLibraryOpen, setCompletedLibraryOpen] = useState(false);
   const [activeUtilityPanel, setActiveUtilityPanel] = useState<
-    "project" | "routine" | "achievement" | null
+    "project" | "routine" | "achievement" | "footprint" | null
   >(() => {
     if (uiPreferences.projectSectionOpen) return "project";
     if (uiPreferences.routineCheckinSectionOpen) return "routine";
     if (uiPreferences.achievementSectionOpen) return "achievement";
+    if (uiPreferences.footprintSectionOpen) return "footprint";
     return null;
   });
   const [footprintSectionOpen, setFootprintSectionOpen] = useState(uiPreferences.footprintSectionOpen);
@@ -948,12 +949,16 @@ export function TaskDashboard({
     setDraggingAnnualTaskId(null);
   }
 
-  function setUtilityPanel(panel: "project" | "routine" | "achievement", open: boolean) {
+  function setUtilityPanel(
+    panel: "project" | "routine" | "achievement" | "footprint",
+    open: boolean,
+  ) {
     setActiveUtilityPanel(open ? panel : null);
     patchUiPreferences({
       projectSectionOpen: open && panel === "project",
       routineCheckinSectionOpen: open && panel === "routine",
       achievementSectionOpen: open && panel === "achievement",
+      footprintSectionOpen: open && panel === "footprint",
     });
   }
 
@@ -965,6 +970,11 @@ export function TaskDashboard({
 
     if (activeUtilityPanel === "achievement") {
       openCreateAchievement();
+      return;
+    }
+
+    if (activeUtilityPanel === "footprint") {
+      setShowAddFootprintDialog(true);
       return;
     }
 
@@ -1431,17 +1441,6 @@ export function TaskDashboard({
                       ) : null}
                     </div>
                   </div>
-                  <ContextBadge
-                    source={{
-                      kind: "task",
-                      id: task.id,
-                      title: task.name,
-                      priority: task.priority,
-                      dueDate: task.dueDate,
-                      done: task.done,
-                    }}
-                    className="mt-0.5 shrink-0"
-                  />
                   <Button
                     type="button"
                     size="icon"
@@ -1517,7 +1516,7 @@ export function TaskDashboard({
 
       <div className="task-dashboard-section utility-panel-grid">
       <div className="utility-panel-controls">
-        <div className="utility-panel-tabs" role="tablist" aria-label="打卡与成就栏目">
+        <div className="utility-panel-tabs" role="tablist" aria-label="打卡、成就与足迹栏目">
           <button
             type="button"
             role="tab"
@@ -1547,6 +1546,16 @@ export function TaskDashboard({
           >
             <Trophy className="h-4 w-4 shrink-0" />
             <span className="truncate">成就</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeUtilityPanel === "footprint"}
+            className={`utility-panel-tab ${activeUtilityPanel === "footprint" ? "utility-panel-tab-active" : ""}`}
+            onClick={() => setUtilityPanel("footprint", activeUtilityPanel !== "footprint")}
+          >
+            <Footprints className="h-4 w-4 shrink-0" />
+            <span className="truncate">足迹</span>
           </button>
         </div>
         {activeUtilityPanel ? (
@@ -1917,6 +1926,69 @@ export function TaskDashboard({
                     </ul>
                   </div>
                 ))}
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      </section>
+
+      <section className="utility-panel utility-panel-footprint">
+        <Collapsible
+          className="utility-panel-root"
+          open={activeUtilityPanel === "footprint"}
+          onOpenChange={(open) => setUtilityPanel("footprint", open)}
+        >
+          <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
+            {footprints.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-gray-200 bg-white/70 px-3 py-4 text-sm text-gray-500">
+                暂无足迹项目，点击添加开始跟踪。
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {footprints.map((item) => {
+                  const itemExpanded = expandedFootprints.has(item.id);
+                  const days = daysSince(item.lastDate);
+                  const dayLabel = days === 0 ? "今天" : `${days} 天`;
+                  return (
+                    <div key={item.id} className="rounded-xl border border-gray-200 bg-white/80 p-3 text-center">
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-2 text-left"
+                        onClick={() =>
+                          setExpandedFootprints((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(item.id)) next.delete(item.id);
+                            else next.add(item.id);
+                            patchUiPreferences({ expandedFootprints: [...next] });
+                            return next;
+                          })
+                        }
+                      >
+                        <p className="truncate text-sm font-medium" title={item.name}>{item.name}</p>
+                        <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${itemExpanded ? "" : "-rotate-90"}`} />
+                      </button>
+                      {itemExpanded ? (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-lg font-semibold">{dayLabel}</p>
+                          <p className="text-xs text-gray-500">距上次记录</p>
+                          <div className="flex flex-wrap justify-center gap-1">
+                            <Button type="button" size="sm" variant="outline" onClick={() => handleResetFootprint(item.id)}>今天重置</Button>
+                            <Button type="button" size="sm" variant="ghost" onClick={() => openEditFootprint(item)}>编辑</Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-500 hover:text-red-600"
+                              onClick={() => withOptionalConfirm("确认删除这个足迹项吗？", () => onDeleteFootprint(item.id))}
+                            >
+                              删除
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CollapsibleContent>
@@ -2321,6 +2393,18 @@ export function TaskDashboard({
               <DialogTitle className="text-sm">编辑长期任务详情</DialogTitle>
             </DialogHeader>
             <div className="min-h-0 space-y-3 overflow-y-auto px-5 py-4">
+              <div className="flex justify-end">
+                <ContextBadge
+                  source={{
+                    kind: "task",
+                    id: taskDraft.id,
+                    title: taskDraft.name,
+                    priority: taskDraft.priority,
+                    dueDate: taskDraft.dueDate,
+                    done: taskDraft.done,
+                  }}
+                />
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="task-edit-name">任务名称</Label>
                 <Input

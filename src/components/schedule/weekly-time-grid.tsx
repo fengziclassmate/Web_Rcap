@@ -157,7 +157,12 @@ type TimelineDayLayout = {
 type TimelineEventSegment = ScheduleEventSegment<ScheduleEvent>;
 
 export type ViewMode = "day" | "week" | "month";
-export type TimeGranularity = 5 | 15 | 30 | 60;
+export type TimeGranularity = 5 | 15 | 30 | 60 | "45-15" | "50-10";
+
+type TimeGridSlot = {
+  startHour: number;
+  durationMinutes: number;
+};
 
 type MonthlyExpenseSummary = {
   totalExpense: number;
@@ -192,6 +197,31 @@ const compactMoneyFormatter = new Intl.NumberFormat("zh-CN", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
 });
+
+function getTimeGridSlots(granularity: TimeGranularity): TimeGridSlot[] {
+  const splitMinutes =
+    granularity === "45-15" ? [45, 15] : granularity === "50-10" ? [50, 10] : null;
+  const numericGranularity = typeof granularity === "number" ? granularity : null;
+
+  return Array.from({ length: hoursPerDay }, (_, hour) => {
+    const durations =
+      splitMinutes ??
+      Array.from(
+        { length: minutesPerHour / (numericGranularity ?? minutesPerHour) },
+        () => numericGranularity ?? minutesPerHour,
+      );
+    let elapsedMinutes = 0;
+
+    return durations.map((durationMinutes) => {
+      const slot = {
+        startHour: hour + elapsedMinutes / minutesPerHour,
+        durationMinutes,
+      };
+      elapsedMinutes += durationMinutes;
+      return slot;
+    });
+  }).flat();
+}
 
 const defaultForm: EventFormState = {
   title: "",
@@ -483,19 +513,7 @@ export function WeeklyTimeGrid({
     exceptionText: "",
   });
 
-  const hours = useMemo(() => {
-    const values: number[] = [];
-    for (let hour = 0; hour < 24; hour += 1) {
-      values.push(hour);
-      if (timeGranularity < 60) {
-        const intervalCount = 60 / timeGranularity;
-        for (let index = 1; index < intervalCount; index += 1) {
-          values.push(hour + (index * timeGranularity) / 60);
-        }
-      }
-    }
-    return values;
-  }, [timeGranularity]);
+  const timeGridSlots = useMemo(() => getTimeGridSlots(timeGranularity), [timeGranularity]);
 
   useEffect(() => {
     saveCategoryDefs(categoryDefs);
@@ -660,7 +678,9 @@ export function WeeklyTimeGrid({
   const activeExpenseDateIso = activeDayIso ?? selectedWeekExpenseDateIso;
   const activeExpenseTitle = viewMode === "week" ? "选中日期花销" : "日期花销";
 
-  const cellHeight = hourCellHeight / (60 / timeGranularity);
+  const gridTemplateRows = timeGridSlots
+    .map((slot) => `${(slot.durationMinutes / minutesPerHour) * hourCellHeight}px`)
+    .join(" ");
 
   function handleViewModeChange(mode: ViewMode) {
     onViewModeChange?.(mode);
@@ -668,7 +688,8 @@ export function WeeklyTimeGrid({
 
   function handleGranularityChange(value: string | null) {
     if (!value) return;
-    onTimeGranularityChange?.(Number(value) as TimeGranularity);
+    const granularity = value === "45-15" || value === "50-10" ? value : Number(value);
+    onTimeGranularityChange?.(granularity as TimeGranularity);
   }
 
   function handleExpenseChanged() {
@@ -703,7 +724,11 @@ export function WeeklyTimeGrid({
 
   function getDefaultCreateTimeRange(cell: GridCell) {
     const cellStartHour = normalizeStartTimeValue(cell.startHour);
-    const cellEndHour = Math.min(hoursPerDay, cellStartHour + timeGranularity / minutesPerHour);
+    const selectedSlot = timeGridSlots.find(
+      (slot) => Math.abs(slot.startHour - cellStartHour) < 0.0001,
+    );
+    const defaultDurationHour = (selectedSlot?.durationMinutes ?? 60) / minutesPerHour;
+    const cellEndHour = Math.min(hoursPerDay, cellStartHour + defaultDurationHour);
     let startHour = cellStartHour;
     let nextBusyStartHour: number | null = null;
     const dayEvents = displayEventSegments
@@ -728,7 +753,7 @@ export function WeeklyTimeGrid({
     const endHour =
       startHour < endBoundary
         ? endBoundary
-        : Math.min(hoursPerDay, startHour + timeGranularity / minutesPerHour);
+        : Math.min(hoursPerDay, startHour + defaultDurationHour);
 
     return resolveFormTimeRange(startHour, endHour);
   }
@@ -853,6 +878,20 @@ export function WeeklyTimeGrid({
     }
 
     setEditingEventId(null);
+  }
+
+  function handleAddSelectedEventToDailyTask() {
+    if (!selectedEvent || selectedEvent.linkedDailyTaskId) return;
+    const linkedDailyTaskId = onCreateDailyTask(selectedEvent.title, selectedEvent.date);
+    if (!linkedDailyTaskId) return;
+
+    const parsed = parseSyntheticEventId(selectedEvent.id);
+    onUpdateEvent(
+      selectedEvent.id,
+      { linkedDailyTaskId },
+      parsed ? { scope: "occurrence" } : undefined,
+    );
+    toast.success("已加入当日日常任务");
   }
 
   function handleAskAiForEvent(eventId: string) {
@@ -1110,6 +1149,8 @@ export function WeeklyTimeGrid({
                   <SelectItem value="15">15 分钟</SelectItem>
                   <SelectItem value="30">30 分钟</SelectItem>
                   <SelectItem value="60">60 分钟</SelectItem>
+                  <SelectItem value="45-15">45 + 15 分钟</SelectItem>
+                  <SelectItem value="50-10">50 + 10 分钟</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1158,18 +1199,18 @@ export function WeeklyTimeGrid({
                 style={{ gridTemplateColumns: timelineGridTemplateColumns }}
               >
                 <div>
-                  {hours.map((hour) => {
-                    const isMainHour = Number.isInteger(hour);
+                  {timeGridSlots.map((slot) => {
+                    const isMainHour = Number.isInteger(slot.startHour);
                     return (
                       <div
-                        key={`hour-label-${hour}`}
+                        key={`hour-label-${slot.startHour}`}
                         className={`border-r border-b px-1.5 py-1 text-xs ${isMainHour ? "border-gray-200 bg-gray-50 text-gray-500" : "border-gray-100 text-gray-400"}`}
                         style={{
-                          height: `${cellHeight}px`,
+                          height: `${(slot.durationMinutes / minutesPerHour) * hourCellHeight}px`,
                           borderBottomStyle: isMainHour ? "solid" : "dashed",
                         }}
                       >
-                        {isMainHour ? formatHour(hour) : ""}
+                        {isMainHour ? formatHour(slot.startHour) : ""}
                       </div>
                     );
                   })}
@@ -1180,25 +1221,25 @@ export function WeeklyTimeGrid({
                     <div key={dayLayout.dateIso} className="relative border-r border-gray-200 last:border-r-0">
                       <div
                         className="grid"
-                        style={{ gridTemplateRows: `repeat(${hours.length}, ${cellHeight}px)` }}
+                        style={{ gridTemplateRows }}
                       >
-                        {hours.map((hour) => {
-                          const isMainHour = Number.isInteger(hour);
+                        {timeGridSlots.map((slot) => {
+                          const isMainHour = Number.isInteger(slot.startHour);
                           return (
                             <button
-                              key={`${dayLayout.dateIso}-${hour}`}
+                              key={`${dayLayout.dateIso}-${slot.startHour}`}
                               type="button"
                               className={`border-b transition-colors hover:bg-gray-50 ${isMainHour ? "border-gray-200" : "border-gray-100"}`}
                               style={{
-                                height: `${cellHeight}px`,
+                                height: `${(slot.durationMinutes / minutesPerHour) * hourCellHeight}px`,
                                 borderBottomStyle: isMainHour ? "solid" : "dashed",
                               }}
                               onClick={() => {
                                 setSelectedExpenseDateIso(dayLayout.dateIso);
-                                resetCreateDialog({ date: dayLayout.dateIso, startHour: hour });
+                                resetCreateDialog({ date: dayLayout.dateIso, startHour: slot.startHour });
                               }}
                               onDragOver={(event) => event.preventDefault()}
-                              onDrop={() => handleDropEvent(dayLayout.dateIso, hour)}
+                              onDrop={() => handleDropEvent(dayLayout.dateIso, slot.startHour)}
                             />
                           );
                         })}
@@ -1863,6 +1904,18 @@ export function WeeklyTimeGrid({
                     <Label htmlFor="edit-completed">标记为已完成</Label>
                   </div>
 
+                  {selectedEvent.linkedDailyTaskId ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+                      <Check className="h-4 w-4" aria-hidden />
+                      已加入当日日常任务
+                    </div>
+                  ) : (
+                    <Button type="button" variant="outline" className="w-full" onClick={handleAddSelectedEventToDailyTask}>
+                      <Plus className="h-4 w-4" />
+                      加入当日任务
+                    </Button>
+                  )}
+
                   {parseSyntheticEventId(selectedEvent.id) ? (
                     <div className="space-y-4 rounded-lg border border-amber-100 bg-amber-50/60 p-4">
                       <p className="text-sm text-gray-800">
@@ -2215,40 +2268,39 @@ export function WeeklyTimeGrid({
   );
 }
 
-function TimePartSelect({
+function HourChoiceGrid({
   value,
   options,
-  unit,
   ariaLabel,
   onChange,
 }: {
   value: number;
   options: number[];
-  unit: string;
   ariaLabel: string;
   onChange: (value: number) => void;
 }) {
   return (
-    <Select value={String(value)} onValueChange={(nextValue) => onChange(Number(nextValue))}>
-      <SelectTrigger
-        aria-label={ariaLabel}
-        className="h-11 w-full justify-between rounded-lg border-stone-200 bg-white px-3 font-mono text-base shadow-sm"
-      >
-        <SelectValue placeholder={unit} />
-      </SelectTrigger>
-      <SelectContent
-        align="start"
-        alignItemWithTrigger={false}
-        sideOffset={6}
-        className="max-h-64 min-w-24"
-      >
-        {options.map((option) => (
-          <SelectItem key={option} value={String(option)} className="font-mono">
+    <div className="grid grid-cols-6 gap-1" role="group" aria-label={ariaLabel}>
+      {options.map((option) => {
+        const selected = value === option;
+        return (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={selected}
+            aria-label={`${ariaLabel} ${option.toString().padStart(2, "0")}`}
+            onClick={() => onChange(option)}
+            className={`h-8 rounded-md border font-mono text-xs font-semibold transition ${
+              selected
+                ? "border-stone-900 bg-stone-900 text-white shadow-sm"
+                : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
+            }`}
+          >
             {option.toString().padStart(2, "0")}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -2316,27 +2368,15 @@ function TimeRangeEditor({
             {formatHour(startHour)}
           </span>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <TimePartSelect
+        <div className="mt-3 space-y-2">
+          <HourChoiceGrid
             value={startParts.hours}
             options={hourOptions}
-            unit="时"
-            ariaLabel="开始小时"
+            ariaLabel="开始时间小时"
             onChange={(hours) =>
               onStartHourChange(getTimeValueFromParts(hours, startParts.minutes))
             }
           />
-          <TimePartSelect
-            value={startParts.minutes}
-            options={minuteOptions}
-            unit="分"
-            ariaLabel="开始分钟"
-            onChange={(minutes) =>
-              onStartHourChange(getTimeValueFromParts(startParts.hours, minutes))
-            }
-          />
-        </div>
-        <div className="mt-2">
           <MinuteShortcutGroup
             value={startParts.minutes}
             availableMinutes={minuteOptions}
@@ -2345,6 +2385,23 @@ function TimeRangeEditor({
               onStartHourChange(getTimeValueFromParts(startParts.hours, minutes))
             }
           />
+          <div className="flex items-center gap-2">
+            <Label htmlFor="start-minute-input" className="shrink-0 text-xs text-stone-600">分钟</Label>
+            <Input
+              id="start-minute-input"
+              type="number"
+              min="0"
+              max="59"
+              value={startParts.minutes}
+              onChange={(event) => {
+                const minutes = Number(event.target.value);
+                if (Number.isFinite(minutes)) {
+                  onStartHourChange(getTimeValueFromParts(startParts.hours, Math.max(0, Math.min(59, minutes))));
+                }
+              }}
+              className="h-8 font-mono text-xs"
+            />
+          </div>
         </div>
       </div>
 
@@ -2362,27 +2419,15 @@ function TimeRangeEditor({
             {formatHour(endHour)}
           </span>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <TimePartSelect
+        <div className="mt-3 space-y-2">
+          <HourChoiceGrid
             value={endParts.hours}
             options={endHourOptions}
-            unit="时"
-            ariaLabel="结束小时"
+            ariaLabel="结束时间小时"
             onChange={(hours) =>
               onEndHourChange(getTimeValueFromParts(hours, endParts.minutes, true))
             }
           />
-          <TimePartSelect
-            value={endParts.minutes}
-            options={endMinuteOptions}
-            unit="分"
-            ariaLabel="结束分钟"
-            onChange={(minutes) =>
-              onEndHourChange(getTimeValueFromParts(endParts.hours, minutes, true))
-            }
-          />
-        </div>
-        <div className="mt-2">
           <MinuteShortcutGroup
             value={endParts.minutes}
             availableMinutes={endMinuteOptions}
@@ -2391,6 +2436,24 @@ function TimeRangeEditor({
               onEndHourChange(getTimeValueFromParts(endParts.hours, minutes, true))
             }
           />
+          <div className="flex items-center gap-2">
+            <Label htmlFor="end-minute-input" className="shrink-0 text-xs text-stone-600">分钟</Label>
+            <Input
+              id="end-minute-input"
+              type="number"
+              min="0"
+              max="59"
+              value={endParts.minutes}
+              disabled={endParts.hours === 24}
+              onChange={(event) => {
+                const minutes = Number(event.target.value);
+                if (Number.isFinite(minutes)) {
+                  onEndHourChange(getTimeValueFromParts(endParts.hours, Math.max(0, Math.min(59, minutes)), true));
+                }
+              }}
+              className="h-8 font-mono text-xs"
+            />
+          </div>
         </div>
       </div>
     </div>
