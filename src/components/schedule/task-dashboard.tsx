@@ -13,6 +13,7 @@ import {
   Trash2,
   AlertTriangle,
   Footprints,
+  FileCheck2,
   KanbanSquare,
   GripVertical,
   Pencil,
@@ -26,13 +27,19 @@ import {
   type AnnualTask,
   type DashboardUiPreferences,
   type FootprintItem,
+  type KnowledgeWorkType,
   type LongTask,
   type Priority,
   type ProjectCheckin,
   type ScheduleEvent,
   type SubTask,
   type TaskType,
+  type TaskUncertaintyLevel,
 } from "@/lib/types";
+import {
+  buildDeviationInsights,
+  type ExecutionOutcome,
+} from "@/lib/execution-continuity";
 import {
   Collapsible,
   CollapsibleContent,
@@ -50,6 +57,7 @@ import { ContextBadge } from "@/components/llm/context-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { Achievement } from "@/components/monitoring/achievements-panel";
 import { DailyTaskPanel } from "@/components/schedule/daily-task-panel";
+import { cn } from "@/lib/utils";
 
 type TaskDashboardProps = {
   tasks: LongTask[];
@@ -101,6 +109,8 @@ type TaskDashboardProps = {
   confirmDangerousActions: boolean;
   uiPreferences: DashboardUiPreferences;
   onUiPreferencesChange: (value: DashboardUiPreferences) => void;
+  onRecordTaskOutcome?: (taskId: string) => void;
+  executionOutcomes?: ExecutionOutcome[];
 };
 
 const PRIORITY_ORDER: Priority[] = ["紧急且重要", "紧急不重要", "不紧急重要", "不紧急不重要"];
@@ -144,6 +154,33 @@ type TaskDraft = {
   priority: Priority;
   subtasks: SubTask[];
   newSubtaskName: string;
+  uncertaintyEnabled: boolean;
+  uncertaintyLevel: TaskUncertaintyLevel;
+  workType: KnowledgeWorkType;
+  estimateMinMinutes: string;
+  estimateMaxMinutes: string;
+  unknownsText: string;
+  successCriteria: string;
+  minimumValidationStep: string;
+  branchOptionsText: string;
+  stopCondition: string;
+};
+
+const workTypeLabels: Record<KnowledgeWorkType, string> = {
+  reading: "文献阅读",
+  writing: "论文写作",
+  coding: "编程实现",
+  data: "数据处理",
+  experiment: "实验验证",
+  meeting: "会议沟通",
+  admin: "行政整理",
+  other: "其他",
+};
+
+const uncertaintyLabels: Record<TaskUncertaintyLevel, string> = {
+  low: "低：路径清晰",
+  medium: "中：存在未知项",
+  high: "高：结果与路径都不确定",
 };
 
 type DailyCheckinDraft = {
@@ -282,6 +319,8 @@ export function TaskDashboard({
   confirmDangerousActions,
   uiPreferences,
   onUiPreferencesChange,
+  onRecordTaskOutcome,
+  executionOutcomes = [],
 }: TaskDashboardProps) {
   const [taskName, setTaskName] = useState("");
   const [annualTaskName, setAnnualTaskName] = useState("");
@@ -361,7 +400,14 @@ export function TaskDashboard({
     () => tasks.filter((task) => task.taskType === "long" && task.done),
     [tasks],
   );
+  const deviationInsights = useMemo(
+    () => buildDeviationInsights(executionOutcomes),
+    [executionOutcomes],
+  );
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
+  const editingTaskDeviationInsight = taskDraft
+    ? deviationInsights.find((item) => item.workType === taskDraft.workType) ?? null
+    : null;
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -600,11 +646,31 @@ export function TaskDashboard({
       priority: task.priority ?? "不紧急不重要",
       subtasks: task.subtasks ?? [],
       newSubtaskName: "",
+      uncertaintyEnabled: Boolean(task.uncertainty),
+      uncertaintyLevel: task.uncertainty?.level ?? "medium",
+      workType: task.uncertainty?.workType ?? "other",
+      estimateMinMinutes: task.uncertainty?.estimateMinMinutes?.toString() ?? "",
+      estimateMaxMinutes: task.uncertainty?.estimateMaxMinutes?.toString() ?? "",
+      unknownsText: task.uncertainty?.unknowns.join("\n") ?? "",
+      successCriteria: task.uncertainty?.successCriteria ?? "",
+      minimumValidationStep: task.uncertainty?.minimumValidationStep ?? "",
+      branchOptionsText: task.uncertainty?.branchOptions.join("\n") ?? "",
+      stopCondition: task.uncertainty?.stopCondition ?? "",
     });
   }
 
   function handleSaveTask() {
     if (!taskDraft || !taskDraft.name.trim()) return;
+    const parseDraftMinutes = (input: string) => {
+      if (!input.trim()) return null;
+      const parsed = Number(input);
+      return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : null;
+    };
+    const estimateMinMinutes = parseDraftMinutes(taskDraft.estimateMinMinutes);
+    const estimateMaxDraft = parseDraftMinutes(taskDraft.estimateMaxMinutes);
+    const estimateMaxMinutes = estimateMinMinutes !== null && estimateMaxDraft !== null
+      ? Math.max(estimateMinMinutes, estimateMaxDraft)
+      : estimateMaxDraft;
     const wasDone = editingTask?.done ?? false;
     const completedAt = taskDraft.done
       ? wasDone
@@ -624,6 +690,19 @@ export function TaskDashboard({
       completedAt,
       priority: taskDraft.priority,
       subtasks: taskDraft.subtasks,
+      uncertainty: taskDraft.uncertaintyEnabled
+        ? {
+            level: taskDraft.uncertaintyLevel,
+            workType: taskDraft.workType,
+            estimateMinMinutes,
+            estimateMaxMinutes,
+            unknowns: taskDraft.unknownsText.split("\n").map((item) => item.trim()).filter(Boolean),
+            successCriteria: taskDraft.successCriteria.trim(),
+            minimumValidationStep: taskDraft.minimumValidationStep.trim(),
+            branchOptions: taskDraft.branchOptionsText.split("\n").map((item) => item.trim()).filter(Boolean),
+            stopCondition: taskDraft.stopCondition.trim(),
+          }
+        : null,
     });
     setEditingTaskId(null);
     setTaskDraft(null);
@@ -1325,6 +1404,16 @@ export function TaskDashboard({
                       <Badge className={`rounded-md border ${getPriorityVisualStyle(task.priority).badgeClassName}`}>
                         {task.priority}
                       </Badge>
+                      {task.uncertainty ? (
+                        <span className={cn(
+                          "rounded-md border px-1.5 py-1 text-[11px] font-medium",
+                          task.uncertainty.level === "high"
+                            ? "border-amber-200 bg-amber-50 text-amber-800"
+                            : "border-teal-200 bg-teal-50 text-teal-800",
+                        )}>
+                          {workTypeLabels[task.uncertainty.workType]} · 不确定性{task.uncertainty.level === "high" ? "高" : task.uncertainty.level === "medium" ? "中" : "低"}
+                        </span>
+                      ) : null}
                       {task.subtasks.length > 0 ? (
                         <button
                           type="button"
@@ -1402,6 +1491,11 @@ export function TaskDashboard({
                         <button type="button" className="min-w-0 flex-1 truncate text-left text-sm font-medium text-stone-800" title={task.name} onClick={() => handleOpenEdit(task)}>
                           {task.name}
                         </button>
+                        {task.uncertainty ? (
+                          <span className="shrink-0 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] text-teal-800">
+                            {workTypeLabels[task.uncertainty.workType]}
+                          </span>
+                        ) : null}
                         <span className="shrink-0 text-xs tabular-nums text-gray-500">{task.dueDate}</span>
                       </li>
                     ))}
@@ -2454,6 +2548,68 @@ export function TaskDashboard({
                   ))}
                 </div>
               </div>
+              <div className="rounded-xl border border-teal-900/15 bg-teal-50/45 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <Label>不确定性任务模型</Label>
+                    <p className="mt-0.5 text-xs text-stone-500">用于研究、分析和写作等无法精确估时的任务</p>
+                  </div>
+                  <Switch
+                    checked={taskDraft.uncertaintyEnabled}
+                    onCheckedChange={(checked) =>
+                      setTaskDraft((prev) => prev ? { ...prev, uncertaintyEnabled: checked } : prev)
+                    }
+                  />
+                </div>
+                {taskDraft.uncertaintyEnabled ? (
+                  <div className="mt-3 space-y-3 border-t border-teal-900/10 pt-3">
+                    {editingTaskDeviationInsight ? (
+                      <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+                        历史 {editingTaskDeviationInsight.sampleSize} 次“{workTypeLabels[taskDraft.workType]}”记录平均为计划的
+                        <span className="mx-1 font-semibold">{editingTaskDeviationInsight.averageMultiplier} 倍</span>
+                        ，平均偏差 {editingTaskDeviationInsight.averageDeltaMinutes > 0 ? "+" : ""}{editingTaskDeviationInsight.averageDeltaMinutes} 分钟。
+                      </div>
+                    ) : (
+                      <p className="rounded-lg bg-white/70 px-3 py-2 text-xs text-stone-500">尚无同类型执行样本，完成任务后记录计划与实际时长即可开始学习。</p>
+                    )}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="task-uncertainty-level">不确定性等级</Label>
+                        <select
+                          id="task-uncertainty-level"
+                          className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+                          value={taskDraft.uncertaintyLevel}
+                          onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, uncertaintyLevel: event.target.value as TaskUncertaintyLevel } : prev)}
+                        >
+                          {Object.entries(uncertaintyLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="task-work-type">工作类型</Label>
+                        <select
+                          id="task-work-type"
+                          className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm"
+                          value={taskDraft.workType}
+                          onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, workType: event.target.value as KnowledgeWorkType } : prev)}
+                        >
+                          {Object.entries(workTypeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1"><Label htmlFor="task-estimate-min">最少时间（分钟）</Label><Input id="task-estimate-min" type="number" min="0" value={taskDraft.estimateMinMinutes} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, estimateMinMinutes: event.target.value } : prev)} /></div>
+                      <div className="space-y-1"><Label htmlFor="task-estimate-max">最多时间（分钟）</Label><Input id="task-estimate-max" type="number" min="0" value={taskDraft.estimateMaxMinutes} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, estimateMaxMinutes: event.target.value } : prev)} /></div>
+                    </div>
+                    <div className="space-y-1"><Label htmlFor="task-min-validation">最小验证步骤</Label><Input id="task-min-validation" value={taskDraft.minimumValidationStep} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, minimumValidationStep: event.target.value } : prev)} placeholder="先用最小样本验证最关键的未知项" /></div>
+                    <div className="space-y-1"><Label htmlFor="task-success-criteria">成功判定标准</Label><Textarea id="task-success-criteria" className="min-h-16 bg-white" value={taskDraft.successCriteria} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, successCriteria: event.target.value } : prev)} /></div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1"><Label htmlFor="task-unknowns">当前未知项（每行一项）</Label><Textarea id="task-unknowns" className="min-h-20 bg-white" value={taskDraft.unknownsText} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, unknownsText: event.target.value } : prev)} /></div>
+                      <div className="space-y-1"><Label htmlFor="task-branches">可能分支（每行一项）</Label><Textarea id="task-branches" className="min-h-20 bg-white" value={taskDraft.branchOptionsText} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, branchOptionsText: event.target.value } : prev)} /></div>
+                    </div>
+                    <div className="space-y-1"><Label htmlFor="task-stop-condition">停止或转向条件</Label><Input id="task-stop-condition" value={taskDraft.stopCondition} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, stopCondition: event.target.value } : prev)} /></div>
+                  </div>
+                ) : null}
+              </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <Label>子任务</Label>
@@ -2473,6 +2629,7 @@ export function TaskDashboard({
                       subtasks: taskDraft.subtasks,
                       taskType: editingTask.taskType,
                       isTodayFocus: editingTask.isTodayFocus,
+                      uncertainty: editingTask.uncertainty,
                     }}
                     onImport={(names) =>
                       setTaskDraft((prev) =>
@@ -2583,6 +2740,21 @@ export function TaskDashboard({
               >
                 保存任务
               </Button>
+              {onRecordTaskOutcome ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full rounded-sm border-emerald-200 bg-emerald-50/60 text-emerald-900 hover:bg-emerald-100"
+                  onClick={() => {
+                    onRecordTaskOutcome(editingTask.id);
+                    setEditingTaskId(null);
+                    setTaskDraft(null);
+                  }}
+                >
+                  <FileCheck2 className="size-4" />
+                  记录执行结果与证据
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"

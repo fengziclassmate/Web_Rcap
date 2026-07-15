@@ -5,6 +5,11 @@ import type { PaperProgress } from "@/components/monitoring/paper-progress-panel
 import type { ResearchProject } from "@/components/monitoring/research-projects-panel";
 import type { SubmissionRecord } from "@/components/monitoring/submissions-panel";
 import {
+  defaultExecutionContinuityState,
+  normalizeExecutionContinuityState,
+  type ExecutionContinuityState,
+} from "@/lib/execution-continuity";
+import {
   defaultDashboardUiPreferences,
   normalizeAchievements,
   normalizeAnnualTasks,
@@ -33,6 +38,7 @@ export type PersistedSchedulePayload = {
   paper_progress: PaperProgress;
   submissions: SubmissionRecord[];
   group_meetings: GroupMeetingRecord[];
+  continuity_state: ExecutionContinuityState;
   ui_preferences: DashboardUiPreferences;
 };
 
@@ -56,6 +62,9 @@ export function normalizePersistedSchedulePayload(
     paper_progress: normalizePaperProgress(value.paper_progress),
     submissions: normalizeSubmissions(value.submissions),
     group_meetings: normalizeGroupMeetings(value.group_meetings),
+    continuity_state: value.continuity_state
+      ? normalizeExecutionContinuityState(value.continuity_state)
+      : defaultExecutionContinuityState,
     ui_preferences: normalizeDashboardUiPreferences(value.ui_preferences),
   };
 }

@@ -6,9 +6,12 @@ import type {
   EventTag,
   FootprintItem,
   LongTask,
+  KnowledgeWorkType,
   Priority,
   ProjectCheckin,
   ScheduleEvent,
+  TaskUncertaintyLevel,
+  TaskUncertaintyProfile,
 } from "@/lib/types";
 import type { Achievement } from "@/components/monitoring/achievements-panel";
 import type { PlanItem, ResearchProject } from "@/components/monitoring/research-projects-panel";
@@ -66,6 +69,53 @@ function todayIso() {
 
 function normalizeDateTime(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+const knowledgeWorkTypes = new Set<KnowledgeWorkType>([
+  "reading",
+  "writing",
+  "coding",
+  "data",
+  "experiment",
+  "meeting",
+  "admin",
+  "other",
+]);
+
+const uncertaintyLevels = new Set<TaskUncertaintyLevel>(["low", "medium", "high"]);
+
+function normalizeNullableMinutes(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.round(value)
+    : null;
+}
+
+function normalizeTaskUncertainty(value: unknown): TaskUncertaintyProfile | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Partial<TaskUncertaintyProfile>;
+  const minimum = normalizeNullableMinutes(input.estimateMinMinutes);
+  const maximum = normalizeNullableMinutes(input.estimateMaxMinutes);
+  return {
+    level: uncertaintyLevels.has(input.level as TaskUncertaintyLevel)
+      ? input.level as TaskUncertaintyLevel
+      : "medium",
+    workType: knowledgeWorkTypes.has(input.workType as KnowledgeWorkType)
+      ? input.workType as KnowledgeWorkType
+      : "other",
+    estimateMinMinutes: minimum,
+    estimateMaxMinutes: maximum !== null && minimum !== null
+      ? Math.max(minimum, maximum)
+      : maximum,
+    unknowns: Array.isArray(input.unknowns)
+      ? input.unknowns.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [],
+    successCriteria: typeof input.successCriteria === "string" ? input.successCriteria : "",
+    minimumValidationStep: typeof input.minimumValidationStep === "string" ? input.minimumValidationStep : "",
+    branchOptions: Array.isArray(input.branchOptions)
+      ? input.branchOptions.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [],
+    stopCondition: typeof input.stopCondition === "string" ? input.stopCondition : "",
+  };
 }
 
 function isTimeString(value: unknown): value is string {
@@ -341,6 +391,7 @@ export function normalizeTasks(payload: unknown): LongTask[] {
         : [],
       taskType: value.taskType === "daily" ? "daily" : "long",
       isTodayFocus: Boolean(value.isTodayFocus),
+      uncertainty: normalizeTaskUncertainty(value.uncertainty),
     };
   });
 }

@@ -132,6 +132,7 @@ import {
 import { LogPage } from "@/components/logs/log-page";
 import { LiteraturePage } from "@/components/monitoring/literature-page";
 import { ResearchWorkflowPanel } from "@/components/monitoring/research-workflow-panel";
+import { ExecutionContinuityPanel } from "@/components/continuity/execution-continuity-panel";
 import { EfficiencyAnalysisDialog } from "@/components/llm/analysis-dialog";
 import { LLMChatSidebar } from "@/components/llm/chat-sidebar";
 import { QuickEventInput } from "@/components/llm/quick-event-input";
@@ -180,6 +181,11 @@ import {
   type LiteratureTag,
   type LiteratureTagLink,
 } from "@/lib/literature";
+import {
+  defaultExecutionContinuityState,
+  normalizeExecutionContinuityState,
+  type ExecutionContinuityState,
+} from "@/lib/execution-continuity";
 
 function getCurrentWeekStart() {
   return startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -203,6 +209,10 @@ export function WorkbenchApp() {
   const [paperProgress, setPaperProgress] = useState<PaperProgress>(defaultPaperProgress);
   const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
   const [groupMeetings, setGroupMeetings] = useState<GroupMeetingRecord[]>([]);
+  const [continuityState, setContinuityState] = useState<ExecutionContinuityState>(
+    defaultExecutionContinuityState,
+  );
+  const [continuityOutcomeTaskId, setContinuityOutcomeTaskId] = useState<string | null>(null);
   const [researchWorkflow, setResearchWorkflow] = useState<ResearchWorkflowState>(
     defaultResearchWorkflowState,
   );
@@ -246,11 +256,13 @@ export function WorkbenchApp() {
       paper_progress: paperProgress,
       submissions,
       group_meetings: groupMeetings,
+      continuity_state: continuityState,
       ui_preferences: dashboardUiPreferences,
     }),
     [
       achievements,
       annualTasks,
+      continuityState,
       dashboardUiPreferences,
       events,
       footprints,
@@ -272,6 +284,26 @@ export function WorkbenchApp() {
     () => researchWorkflow.papers.map((item) => ({ id: item.id, title: item.title })),
     [researchWorkflow.papers],
   );
+  const continuityProjectOptions = useMemo(() => {
+    const latestActivityByProject = new Map<string, string>();
+    for (const log of researchWorkflow.projectLogs) {
+      const current = latestActivityByProject.get(log.projectId);
+      if (!current || log.date > current) latestActivityByProject.set(log.projectId, log.date);
+    }
+    return researchWorkflow.projects.map((item) => ({
+      id: item.id,
+      title: item.title,
+      progress: item.progress,
+      status: item.status,
+      currentIssues: item.currentIssues,
+      nextActions: item.nextActions,
+      targetEndDate: item.targetEndDate,
+      startDate: item.startDate,
+      linkedTaskIds: item.linkedTaskIds,
+      plannedTaskIds: item.plannedTaskIds,
+      lastActivityDate: latestActivityByProject.get(item.id) ?? null,
+    }));
+  }, [researchWorkflow.projectLogs, researchWorkflow.projects]);
 
   async function refreshLiteratures(currentUser: User) {
     const results = await Promise.all([
@@ -392,6 +424,8 @@ export function WorkbenchApp() {
       setPaperProgress(defaultPaperProgress);
       setSubmissions([]);
       setGroupMeetings([]);
+      setContinuityState(defaultExecutionContinuityState);
+      setContinuityOutcomeTaskId(null);
       setResearchWorkflow(defaultResearchWorkflowState);
       setResearchWorkflowReady(false);
       setLogPosts([]);
@@ -434,12 +468,13 @@ export function WorkbenchApp() {
           paper_progress?: unknown;
           submissions?: unknown;
           group_meetings?: unknown;
+          continuity_state?: unknown;
         };
 
         const primary = await supabase
           .from("schedule_data")
           .select(
-            "events,tasks,annual_tasks,project_checkins,footprints,ui_preferences,achievements,research_projects,paper_progress,submissions,group_meetings",
+            "events,tasks,annual_tasks,project_checkins,footprints,ui_preferences,achievements,research_projects,paper_progress,submissions,group_meetings,continuity_state",
           )
           .eq("user_id", user.id)
           .maybeSingle();
@@ -453,11 +488,23 @@ export function WorkbenchApp() {
             isColumnMissing(error.message, "research_projects") ||
             isColumnMissing(error.message, "paper_progress") ||
             isColumnMissing(error.message, "submissions") ||
-            isColumnMissing(error.message, "group_meetings"))
+            isColumnMissing(error.message, "group_meetings") ||
+            isColumnMissing(error.message, "continuity_state"))
         ) {
+          const onlyContinuityMissing = isColumnMissing(error.message, "continuity_state") &&
+            !isUiPreferencesColumnMissing(error.message) &&
+            !isColumnMissing(error.message, "achievements") &&
+            !isColumnMissing(error.message, "research_projects") &&
+            !isColumnMissing(error.message, "paper_progress") &&
+            !isColumnMissing(error.message, "submissions") &&
+            !isColumnMissing(error.message, "group_meetings");
           const fallback = await supabase
             .from("schedule_data")
-            .select("events,tasks,annual_tasks,project_checkins,footprints")
+            .select(
+              onlyContinuityMissing
+                ? "events,tasks,annual_tasks,project_checkins,footprints,ui_preferences,achievements,research_projects,paper_progress,submissions,group_meetings"
+                : "events,tasks,annual_tasks,project_checkins,footprints",
+            )
             .eq("user_id", user.id)
             .maybeSingle();
           data = fallback.data as ScheduleDataRow | null;
@@ -481,6 +528,7 @@ export function WorkbenchApp() {
             setPaperProgress(localBackup.paper_progress);
             setSubmissions(localBackup.submissions);
             setGroupMeetings(localBackup.group_meetings);
+            setContinuityState(localBackup.continuity_state);
             setDashboardUiPreferences(localBackup.ui_preferences);
             toast.warning("Remote read failed. Restored from local backup.");
             setDataReady(true);
@@ -524,6 +572,9 @@ export function WorkbenchApp() {
             group_meetings: normalizeGroupMeetings(
               (data as { group_meetings?: unknown }).group_meetings,
             ),
+            continuity_state: normalizeExecutionContinuityState(
+              (data as { continuity_state?: unknown }).continuity_state,
+            ),
             ui_preferences: (data as { ui_preferences?: unknown }).ui_preferences
               ? normalizeDashboardUiPreferences((data as { ui_preferences?: unknown }).ui_preferences)
               : readDashboardUiPreferencesFromLocal(),
@@ -540,6 +591,7 @@ export function WorkbenchApp() {
           setPaperProgress(normalized.paper_progress);
           setSubmissions(normalized.submissions);
           setGroupMeetings(normalized.group_meetings);
+          setContinuityState(normalized.continuity_state);
           setDashboardUiPreferences(normalized.ui_preferences);
         } else {
           const localBackup = readScheduleBackupFromLocal(user.id);
@@ -556,6 +608,7 @@ export function WorkbenchApp() {
             setPaperProgress(localBackup.paper_progress);
             setSubmissions(localBackup.submissions);
             setGroupMeetings(localBackup.group_meetings);
+            setContinuityState(localBackup.continuity_state);
             setDashboardUiPreferences(localBackup.ui_preferences);
             toast.warning("Remote data was empty. Restored from local backup.");
           } else {
@@ -570,6 +623,7 @@ export function WorkbenchApp() {
               paper_progress: defaultPaperProgress,
               submissions: [],
               group_meetings: [],
+              continuity_state: defaultExecutionContinuityState,
               ui_preferences: readDashboardUiPreferencesFromLocal(),
             };
             canSaveRemoteRef.current = false;
@@ -584,6 +638,7 @@ export function WorkbenchApp() {
             setPaperProgress(emptyState.paper_progress);
             setSubmissions(emptyState.submissions);
             setGroupMeetings(emptyState.group_meetings);
+            setContinuityState(emptyState.continuity_state);
             setDashboardUiPreferences(emptyState.ui_preferences);
           }
         }
@@ -631,13 +686,15 @@ export function WorkbenchApp() {
         const missingPaper = isColumnMissing(withPreferences.error.message, "paper_progress");
         const missingSubmissions = isColumnMissing(withPreferences.error.message, "submissions");
         const missingMeetings = isColumnMissing(withPreferences.error.message, "group_meetings");
+        const missingContinuity = isColumnMissing(withPreferences.error.message, "continuity_state");
         if (
           missingUi ||
           missingAchievements ||
           missingResearch ||
           missingPaper ||
           missingSubmissions ||
-          missingMeetings
+          missingMeetings ||
+          missingContinuity
         ) {
           const fallbackPayload = {
             user_id: payload.user_id,
@@ -651,6 +708,7 @@ export function WorkbenchApp() {
             ...(missingPaper ? {} : { paper_progress: payload.paper_progress }),
             ...(missingSubmissions ? {} : { submissions: payload.submissions }),
             ...(missingMeetings ? {} : { group_meetings: payload.group_meetings }),
+            ...(missingContinuity ? {} : { continuity_state: payload.continuity_state }),
             ...(missingUi ? {} : { ui_preferences: payload.ui_preferences }),
           };
 
@@ -2540,9 +2598,24 @@ export function WorkbenchApp() {
                   confirmDangerousActions={confirmDangerousActions}
                   uiPreferences={dashboardUiPreferences}
                   onUiPreferencesChange={setDashboardUiPreferences}
+                  onRecordTaskOutcome={(taskId) => {
+                    setContinuityOutcomeTaskId(taskId);
+                    setActiveModule("continuity");
+                  }}
+                  executionOutcomes={continuityState.outcomes}
                 />
               </section>
             </div>
+          ) : activeModule === "continuity" ? (
+            <ExecutionContinuityPanel
+              value={continuityState}
+              onChange={setContinuityState}
+              projects={continuityProjectOptions}
+              tasks={tasks}
+              events={events}
+              initialOutcomeTaskId={continuityOutcomeTaskId}
+              onInitialOutcomeHandled={() => setContinuityOutcomeTaskId(null)}
+            />
           ) : activeModule === "footprints" ? (
             <FootprintsPanel
               footprints={footprints}

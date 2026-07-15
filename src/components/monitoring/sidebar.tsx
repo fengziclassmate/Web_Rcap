@@ -9,6 +9,7 @@ import {
   Footprints,
   LayoutDashboard,
   NotebookPen,
+  Orbit,
   Send,
   Users,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 
 export type MonitoringModuleId =
   | "schedule"
+  | "continuity"
   | "footprints"
   | "research"
   | "paper"
@@ -31,6 +33,7 @@ const items: Array<{
   icon: ReactNode;
 }> = [
   { id: "schedule", label: "个人日程", group: "Today", icon: <CalendarDays className="h-4 w-4" aria-hidden /> },
+  { id: "continuity", label: "执行连续性", group: "Continuity", icon: <Orbit className="h-4 w-4" aria-hidden /> },
   { id: "footprints", label: "足迹跟踪", group: "Life", icon: <Footprints className="h-4 w-4" aria-hidden /> },
   { id: "research", label: "科研项目", group: "Research", icon: <FlaskConical className="h-4 w-4" aria-hidden /> },
   { id: "paper", label: "论文进度", group: "Writing", icon: <FileText className="h-4 w-4" aria-hidden /> },

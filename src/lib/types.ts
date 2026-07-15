@@ -36,6 +36,30 @@ export type Priority =
 
 export type TaskType = "daily" | "long";
 
+export type KnowledgeWorkType =
+  | "reading"
+  | "writing"
+  | "coding"
+  | "data"
+  | "experiment"
+  | "meeting"
+  | "admin"
+  | "other";
+
+export type TaskUncertaintyLevel = "low" | "medium" | "high";
+
+export type TaskUncertaintyProfile = {
+  level: TaskUncertaintyLevel;
+  workType: KnowledgeWorkType;
+  estimateMinMinutes: number | null;
+  estimateMaxMinutes: number | null;
+  unknowns: string[];
+  successCriteria: string;
+  minimumValidationStep: string;
+  branchOptions: string[];
+  stopCondition: string;
+};
+
 export type LongTask = {
   id: string;
   name: string;
@@ -51,6 +75,7 @@ export type LongTask = {
   subtasks: SubTask[];
   taskType: TaskType;
   isTodayFocus: boolean;
+  uncertainty?: TaskUncertaintyProfile | null;
 };
 
 export type AnnualTask = {

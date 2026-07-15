@@ -42,6 +42,31 @@ describe("normalizers", () => {
     expect(dailyTask).toMatchObject({ taskType: "daily", isTodayFocus: true });
     expect(legacyTask).toMatchObject({ taskType: "long", isTodayFocus: false });
   });
+  it("normalizes uncertainty ranges and research task fields", () => {
+    const [task] = normalizeTasks([{
+      name: "验证模型",
+      uncertainty: {
+        level: "high",
+        workType: "data",
+        estimateMinMinutes: 120,
+        estimateMaxMinutes: 60,
+        unknowns: ["字段是否完整", ""],
+        successCriteria: "得到可解释结果",
+        minimumValidationStep: "先跑200条样本",
+        branchOptions: ["继续", "更换模型"],
+        stopCondition: "数据缺失超过30%",
+      },
+    }]);
+
+    expect(task.uncertainty).toMatchObject({
+      level: "high",
+      workType: "data",
+      estimateMinMinutes: 120,
+      estimateMaxMinutes: 120,
+      unknowns: ["字段是否完整"],
+      minimumValidationStep: "先跑200条样本",
+    });
+  });
   it("normalizes event recurrence and defaults", () => {
     const [event] = normalizeEvents([
       {
