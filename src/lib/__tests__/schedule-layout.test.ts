@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   doScheduleEventsOverlap,
   getCenteredScrollTop,
+  getScheduleEventVisualMetrics,
   getScheduleEventDurationHour,
   layoutOverlappingScheduleEvents,
   splitScheduleEventByDay,
@@ -45,6 +46,20 @@ describe("schedule event layout", () => {
         event({ id: "b", startHour: 10, endHour: 11 }),
       ),
     ).toBe(false);
+  });
+
+  it("keeps adjacent short event cards inside their real time ranges", () => {
+    const shortEvent = getScheduleEventVisualMetrics(
+      event({ startHour: 0.75, endHour: 1 }),
+      80,
+    );
+    const nextEvent = getScheduleEventVisualMetrics(
+      event({ startHour: 1, endHour: 1.75 }),
+      80,
+    );
+
+    expect(shortEvent.top + shortEvent.height).toBeLessThanOrEqual(nextEvent.top);
+    expect(shortEvent.height).toBeLessThan(20);
   });
 
   it("keeps a chained conflict group on one consistent lane count", () => {

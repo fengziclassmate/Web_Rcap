@@ -57,6 +57,19 @@ export function getScheduleEventDurationHour(
   return 0;
 }
 
+export function getScheduleEventVisualMetrics(
+  event: Pick<ScheduleEvent, "startHour" | "endHour">,
+  hourCellHeight: number,
+) {
+  const rawHeight = Math.max(0, event.endHour - event.startHour) * hourCellHeight;
+  const verticalInset = rawHeight >= 32 ? 4 : rawHeight >= 16 ? 1 : 0.5;
+
+  return {
+    top: event.startHour * hourCellHeight + verticalInset,
+    height: Math.max(1, rawHeight - verticalInset * 2),
+  };
+}
+
 function addDaysToIsoDate(dateIso: string, amount: number) {
   const [year, month, day] = dateIso.split("-").map(Number);
   const date = new Date(year, month - 1, day + amount);

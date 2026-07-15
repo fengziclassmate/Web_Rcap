@@ -56,6 +56,7 @@ import { supabase } from "@/lib/supabase";
 import {
   getCenteredScrollTop,
   getScheduleEventDurationHour,
+  getScheduleEventVisualMetrics,
   layoutOverlappingScheduleEvents,
   type PositionedScheduleEvent,
   type ScheduleEventSegment,
@@ -763,13 +764,11 @@ export function WeeklyTimeGrid({
   }
 
   function getEventStyle(event: PositionedScheduleEvent) {
-    const top = event.startHour * hourCellHeight + 4;
-    const height = (event.endHour - event.startHour) * hourCellHeight - 8;
-    const minHeight = event.laneCount === 1 ? 30 : 34;
+    const { top, height } = getScheduleEventVisualMetrics(event, hourCellHeight);
     if (event.laneCount === 1) {
       return {
         top: `${top}px`,
-        height: `${Math.max(height, minHeight)}px`,
+        height: `${height}px`,
         left: "4px",
         width: "calc(100% - 8px)",
       };
@@ -781,7 +780,7 @@ export function WeeklyTimeGrid({
 
     return {
       top: `${top}px`,
-      height: `${Math.max(height, minHeight)}px`,
+      height: `${height}px`,
       left: `calc(${event.lane * laneWidthPercent}% + ${leadingInset}px)`,
       width: `calc(${laneWidthPercent}% - ${leadingInset + trailingInset}px)`,
       zIndex: event.lane + 1,
@@ -1462,6 +1461,7 @@ export function WeeklyTimeGrid({
                           const sourceEvent = toSourceScheduleEvent(event);
                           const durationHour = getScheduleEventDurationHour(event);
                           const denseCard = event.laneCount > 1;
+                          const microCard = durationHour <= 0.25 + Number.EPSILON;
                           const compactCard = durationHour < 0.55;
                           const mediumCard = durationHour < 1;
                           const showDetails = durationHour >= 2 && !denseCard;
@@ -1477,15 +1477,16 @@ export function WeeklyTimeGrid({
                           return (
                             <div
                               key={event.segmentId}
-                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden rounded-lg border text-left text-sm shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""}`}
+                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden border text-left text-sm shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${microCard ? "rounded-[5px]" : "rounded-lg"} ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""}`}
                               style={getEventStyle(event)}
+                              data-density={microCard ? "micro" : compactCard ? "compact" : "regular"}
                               draggable={!parseSyntheticEventId(event.id)}
                               onDragStart={() => setDraggingEventId(event.id)}
                               onDragEnd={() => setDraggingEventId(null)}
                               onContextMenu={(mouseEvent) => handleContextMenu(mouseEvent, event.id)}
                             >
                               <div
-                                className={`pointer-events-none absolute inset-y-1 left-1 w-1 rounded-full ${getCategoryAccentColor(event.category)} ${event.isCompleted ? "opacity-80" : "opacity-95"}`}
+                                className={`pointer-events-none absolute rounded-full ${microCard ? "inset-y-0.5 left-0.5 w-0.5" : "inset-y-1 left-1 w-1"} ${getCategoryAccentColor(event.category)} ${event.isCompleted ? "opacity-80" : "opacity-95"}`}
                               />
                               {event.isCompleted ? (
                                 <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.22)_0px,rgba(255,255,255,0.22)_1px,transparent_1px,transparent_8px)]" />
@@ -1493,16 +1494,39 @@ export function WeeklyTimeGrid({
                               <button
                                 type="button"
                                 className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-[inherit] text-left outline-none focus-visible:ring-2 focus-visible:ring-stone-900/20 ${
-                                  compactCard
-                                    ? "justify-start pb-1.5 pl-4 pr-6 pt-1.5"
-                                    : mediumCard
-                                      ? "justify-start py-1.5 pl-5 pr-7"
-                                      : "justify-start py-2 pl-5 pr-8"
+                                  microCard
+                                    ? "justify-center py-0 pl-3 pr-1.5"
+                                    : compactCard
+                                      ? "justify-start pb-1.5 pl-4 pr-6 pt-1.5"
+                                      : mediumCard
+                                        ? "justify-start py-1.5 pl-5 pr-7"
+                                        : "justify-start py-2 pl-5 pr-8"
                                 }`}
                                 onClick={() => handleOpenEdit(sourceEvent)}
                               >
-                                <div className={`flex min-h-0 min-w-0 flex-col ${compactCard ? "gap-0.5" : mediumCard ? "flex-1 gap-1" : "flex-1 gap-1.5"}`}>
-                                  {compactCard ? (
+                                <div className={`flex min-h-0 min-w-0 flex-col ${microCard ? "h-full justify-center" : compactCard ? "gap-0.5" : mediumCard ? "flex-1 gap-1" : "flex-1 gap-1.5"}`}>
+                                  {microCard ? (
+                                    <div className="flex h-full min-w-0 items-center gap-1 overflow-hidden leading-none">
+                                      <span
+                                        className="shrink-0 whitespace-nowrap font-mono text-[9px] font-semibold tracking-[-0.03em] text-gray-700 [font-variant-numeric:tabular-nums]"
+                                        title={fullTimeLabel}
+                                      >
+                                        {timeLabel}
+                                      </span>
+                                      <span className="h-2.5 w-px shrink-0 bg-current/20" aria-hidden />
+                                      <p
+                                        className={`min-w-0 flex-1 truncate text-[10px] font-semibold leading-none ${event.isCompleted ? "line-through decoration-1 decoration-current/55" : ""}`}
+                                        title={`${event.title} (${fullTimeLabel})`}
+                                      >
+                                        {event.title}
+                                      </p>
+                                      {event.tag ? (
+                                        <span className={`shrink-0 text-[10px] font-bold leading-none ${getTagInfo(event.tag).color}`}>
+                                          {getTagInfo(event.tag).icon}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  ) : compactCard ? (
                                     <div className="flex min-w-0 items-start gap-1.5">
                                       <span
                                         className="shrink-0 whitespace-nowrap rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
@@ -1619,18 +1643,20 @@ export function WeeklyTimeGrid({
                                 </div>
                               </button>
 
-                              <button
-                                type="button"
-                                className="absolute right-1.5 top-1.5 z-20 rounded-full border border-white/80 bg-white/80 p-1 text-stone-700 opacity-0 shadow-sm transition hover:bg-white hover:text-black group-hover:opacity-100 focus-visible:opacity-100"
-                                onClick={(mouseEvent) => {
-                                  mouseEvent.stopPropagation();
-                                  setSelectedExpenseDateIso(event.displayDate);
-                                  resetCreateDialog({ date: event.displayDate, startHour: event.startHour });
-                                }}
-                                aria-label={`在 ${event.title} 同时段新建行程`}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
+                              {microCard ? null : (
+                                <button
+                                  type="button"
+                                  className="absolute right-1.5 top-1.5 z-20 rounded-full border border-white/80 bg-white/80 p-1 text-stone-700 opacity-0 shadow-sm transition hover:bg-white hover:text-black group-hover:opacity-100 focus-visible:opacity-100"
+                                  onClick={(mouseEvent) => {
+                                    mouseEvent.stopPropagation();
+                                    setSelectedExpenseDateIso(event.displayDate);
+                                    resetCreateDialog({ date: event.displayDate, startHour: event.startHour });
+                                  }}
+                                  aria-label={`在 ${event.title} 同时段新建行程`}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              )}
                             </div>
                           );
                         })}
