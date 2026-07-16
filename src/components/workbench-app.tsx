@@ -163,6 +163,10 @@ const ResearchWorkflowPanel = dynamic(
   () => import("@/components/monitoring/research-workflow-panel").then((module) => module.ResearchWorkflowPanel),
   { ssr: false, loading: ModuleLoadingState },
 );
+const RelationshipExchangePanel = dynamic(
+  () => import("@/components/relationships/relationship-exchange-panel").then((module) => module.RelationshipExchangePanel),
+  { ssr: false, loading: ModuleLoadingState },
+);
 const ExecutionContinuityPanel = dynamic(
   () => import("@/components/continuity/execution-continuity-panel").then((module) => module.ExecutionContinuityPanel),
   { ssr: false, loading: ModuleLoadingState },
@@ -2626,6 +2630,15 @@ export function WorkbenchApp() {
               onDeleteProjectAttachment={handleDeleteProjectAttachment}
               onUploadMeetingAttachments={handleUploadMeetingAttachments}
               onDeleteMeetingAttachment={handleDeleteMeetingAttachment}
+            />
+          ) : activeModule === "relationships" ? (
+            <RelationshipExchangePanel
+              userId={user.id}
+              tasks={tasks}
+              events={events}
+              workflow={researchWorkflow}
+              onCreateTask={handleCreateWorkflowTask}
+              onCreateEvent={handleCreateWorkflowEvent}
             />
           ) : activeModule === "literature" ? (
             literatureReady ? (

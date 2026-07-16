@@ -6,6 +6,7 @@ import {
   CalendarDays,
   FileText,
   FlaskConical,
+  Handshake,
   LayoutDashboard,
   NotebookPen,
   Orbit,
@@ -22,6 +23,7 @@ export type MonitoringModuleId =
   | "submissions"
   | "meetings"
   | "literature"
+  | "relationships"
   | "logs";
 
 const items: Array<{
@@ -37,6 +39,7 @@ const items: Array<{
   { id: "literature", label: "文献阅读", group: "Reading", icon: <BookOpen className="h-4 w-4" aria-hidden /> },
   { id: "submissions", label: "投稿记录", group: "Publish", icon: <Send className="h-4 w-4" aria-hidden /> },
   { id: "meetings", label: "组会记录", group: "Meeting", icon: <Users className="h-4 w-4" aria-hidden /> },
+  { id: "relationships", label: "人情往来", group: "Relations", icon: <Handshake className="h-4 w-4" aria-hidden /> },
   { id: "logs", label: "动态日志", group: "Journal", icon: <NotebookPen className="h-4 w-4" aria-hidden /> },
 ];
 
