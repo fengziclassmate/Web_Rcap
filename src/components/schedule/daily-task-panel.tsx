@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, CheckCircle, Clock, ListTodo, Plus, RotateCcw } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle, Clock, ListTodo, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +19,8 @@ type DailyTaskPanelProps = {
   archivedSectionOpen: boolean;
   onArchivedSectionOpenChange: (open: boolean) => void;
 };
+
+const unknownProcessedDateKey = "unknown-processed-date";
 
 function getLocalISODate(date = new Date()) {
   const year = date.getFullYear();
@@ -44,6 +46,37 @@ function parseTimeToHour(value: string) {
   return hour + minute / 60;
 }
 
+function getTaskProcessedAt(task: LongTask) {
+  const value = task.completedAt ?? task.abandonedAt;
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getTaskProcessedDate(task: LongTask) {
+  const processedAt = getTaskProcessedAt(task);
+  return processedAt ? getLocalISODate(processedAt) : null;
+}
+
+function formatHistoryDate(isoDate: string) {
+  const date = new Date(`${isoDate}T00:00:00`);
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  }).format(date);
+}
+
+function formatProcessedTime(task: LongTask) {
+  const processedAt = getTaskProcessedAt(task);
+  if (!processedAt) return "时间未记录";
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(processedAt);
+}
+
 export function DailyTaskPanel({
   tasks,
   events,
@@ -63,12 +96,44 @@ export function DailyTaskPanel({
   const [scheduleTime, setScheduleTime] = useState("09:00");
   const [duration, setDuration] = useState("30");
   const [dailyCloseOpen, setDailyCloseOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const dailyTasks = tasks.filter(
     (task) => task.taskType === "daily" && !task.done && !task.abandonedAt,
   );
   const archivedDailyTasks = tasks.filter(
     (task) => task.taskType === "daily" && (task.done || task.abandonedAt),
+  );
+  const completedTodayTasks = archivedDailyTasks.filter(
+    (task) => task.done && !task.abandonedAt && getTaskProcessedDate(task) === today,
+  );
+  const historicalDailyTaskGroups = Array.from(
+    archivedDailyTasks
+      .filter((task) => !completedTodayTasks.some((completed) => completed.id === task.id))
+      .reduce((groups, task) => {
+        const date = getTaskProcessedDate(task) ?? unknownProcessedDateKey;
+        const existing = groups.get(date) ?? [];
+        existing.push(task);
+        groups.set(date, existing);
+        return groups;
+      }, new Map<string, LongTask[]>()),
+  )
+    .sort(([left], [right]) => {
+      if (left === unknownProcessedDateKey) return 1;
+      if (right === unknownProcessedDateKey) return -1;
+      return right.localeCompare(left);
+    })
+    .map(([date, dayTasks]) => ({
+      date,
+      tasks: dayTasks.sort(
+        (left, right) =>
+          (getTaskProcessedAt(right)?.getTime() ?? 0) -
+          (getTaskProcessedAt(left)?.getTime() ?? 0),
+      ),
+    }));
+  const historicalTaskCount = historicalDailyTaskGroups.reduce(
+    (total, group) => total + group.tasks.length,
+    0,
   );
   const todayTasks = dailyTasks.filter((task) => task.dueDate === today);
   const focusTasks = todayTasks.filter((task) => task.isTodayFocus);
@@ -237,32 +302,41 @@ export function DailyTaskPanel({
         )}
       </div>
 
-      {archivedDailyTasks.length > 0 ? (
-        <div className="mt-2 rounded-lg border border-stone-200/80 bg-white/55 px-2.5 py-2">
+      <div className="mt-2 rounded-lg border border-stone-200/80 bg-white/55 px-2.5 py-2">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            className="flex w-full items-center justify-between text-xs font-medium text-stone-600"
+            className="flex min-w-0 flex-1 items-center justify-between text-xs font-medium text-stone-600"
             onClick={() => onArchivedSectionOpenChange(!archivedSectionOpen)}
             aria-expanded={archivedSectionOpen}
           >
-            已处理的日常任务
-            <span>{archivedDailyTasks.length} 项</span>
+            <span>今日已完成</span>
+            <span>{completedTodayTasks.length} 项</span>
           </button>
-          {archivedSectionOpen ? (
-            <div className="mt-2 space-y-1.5">
-              {archivedDailyTasks.map((task) => (
+          <Button type="button" size="xs" variant="ghost" onClick={() => setHistoryOpen(true)}>
+            <CalendarDays className="h-3 w-3" />
+            历史记录
+          </Button>
+        </div>
+        {archivedSectionOpen ? (
+          <div className="mt-2 space-y-1.5">
+            {completedTodayTasks.length > 0 ? (
+              completedTodayTasks.map((task) => (
                 <div key={task.id} className="flex items-center gap-2 rounded-md bg-stone-50 px-2 py-1.5 text-xs">
                   <span className="min-w-0 flex-1 truncate text-stone-500 line-through">{task.name}</span>
-                  <span className={task.abandonedAt ? "text-amber-700" : "text-emerald-700"}>
-                    {task.abandonedAt ? "已放弃" : "已完成"}
-                  </span>
+                  <span className="shrink-0 tabular-nums text-stone-400">{formatProcessedTime(task)}</span>
+                  <span className="text-emerald-700">已完成</span>
                   <Button type="button" size="xs" variant="ghost" onClick={() => restoreDailyTask(task)}>恢复</Button>
                 </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+              ))
+            ) : (
+              <p className="rounded-md border border-dashed border-stone-200 px-2 py-2 text-center text-xs text-stone-400">
+                今天还没有完成的日常任务
+              </p>
+            )}
+          </div>
+        ) : null}
+      </div>
 
       <div className="deadline-radar mt-3">
         <div className="flex items-center justify-between gap-2">
@@ -319,6 +393,54 @@ export function DailyTaskPanel({
               </div>
             </div>
             <Button type="button" className="w-full" onClick={createTimeBlock}>创建时间块</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>日常任务历史</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-between rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-600">
+            <span>按实际完成或放弃日期归档</span>
+            <span>{historicalTaskCount} 条记录</span>
+          </div>
+          <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+            {historicalDailyTaskGroups.length > 0 ? (
+              historicalDailyTaskGroups.map((group) => (
+                <section key={group.date}>
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-200 bg-white/95 py-2 backdrop-blur">
+                    <h3 className="text-sm font-semibold text-stone-800">
+                      {group.date === unknownProcessedDateKey
+                        ? "处理时间未记录"
+                        : formatHistoryDate(group.date)}
+                    </h3>
+                    {group.date === unknownProcessedDateKey ? null : (
+                      <span className="text-xs tabular-nums text-stone-400">{group.date}</span>
+                    )}
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {group.tasks.map((task) => (
+                      <div key={task.id} className="flex items-center gap-2 rounded-lg border border-stone-100 bg-stone-50/70 px-3 py-2 text-xs">
+                        <span className="min-w-0 flex-1 truncate font-medium text-stone-700">{task.name}</span>
+                        <span className="shrink-0 tabular-nums text-stone-400">{formatProcessedTime(task)}</span>
+                        <span className={task.abandonedAt ? "shrink-0 text-amber-700" : "shrink-0 text-emerald-700"}>
+                          {task.abandonedAt ? "已放弃" : "已完成"}
+                        </span>
+                        <Button type="button" size="xs" variant="ghost" onClick={() => restoreDailyTask(task)}>
+                          恢复
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))
+            ) : (
+              <p className="rounded-lg border border-dashed border-stone-200 px-3 py-10 text-center text-sm text-stone-500">
+                暂无往日日常任务记录
+              </p>
+            )}
           </div>
         </DialogContent>
       </Dialog>

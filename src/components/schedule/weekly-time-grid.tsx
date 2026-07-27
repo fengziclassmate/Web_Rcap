@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { addDays, format, parse } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -36,6 +37,8 @@ import {
 import { toast } from "sonner";
 import type { EventTag, ScheduleEvent } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DailyExpensePanel } from "@/components/schedule/daily-expense-panel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -128,7 +131,29 @@ type ResizeState = {
   initialHour: number;
   startHour: number;
   endHour: number;
+  crossesMidnight: boolean;
   direction: "start" | "end";
+};
+
+type ResizePreview = {
+  eventId: string;
+  startHour: number;
+  endHour: number;
+};
+
+type SelectionRect = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+type SelectionDrag = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  initialIds: Set<string>;
+  moved: boolean;
 };
 
 type WeeklyTimeGridProps = {
@@ -204,6 +229,8 @@ const recurrenceEditScopeStorageKey = "recurrence-edit-scope";
 const hourOptions = Array.from({ length: 24 }, (_, hour) => hour);
 const endHourOptions = Array.from({ length: 25 }, (_, hour) => hour);
 const minuteOptions = Array.from({ length: 60 }, (_, minute) => minute);
+const quickMinuteOptions = [0, 10, 15, 30, 45, 50];
+const emptySelectedEventIds = new Set<string>();
 const compactMoneyFormatter = new Intl.NumberFormat("zh-CN", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
@@ -477,6 +504,17 @@ export function WeeklyTimeGrid({
   });
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
+  const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
+  const resizePreviewRef = useRef<ResizePreview | null>(null);
+  const timelineBodyRef = useRef<HTMLDivElement | null>(null);
+  const selectionDragRef = useRef<SelectionDrag | null>(null);
+  const suppressSlotClickRef = useRef(false);
+  const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
+  const [eventSelection, setEventSelection] = useState<{
+    rangeKey: string | null;
+    ids: Set<string>;
+  }>(() => ({ rangeKey: null, ids: new Set() }));
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [scheduleTemplates, setScheduleTemplates] = useState<ScheduleTemplate[]>(() =>
@@ -543,6 +581,8 @@ export function WeeklyTimeGrid({
     weekdays: [],
     exceptionText: "",
   });
+  const [createRecurrenceOpen, setCreateRecurrenceOpen] = useState(false);
+  const [editRecurrenceOpen, setEditRecurrenceOpen] = useState(false);
 
   const timeGridSlots = useMemo(() => getTimeGridSlots(timeGranularity), [timeGranularity]);
 
@@ -561,6 +601,25 @@ export function WeeklyTimeGrid({
     }
     return Array.from({ length: 35 }, (_, index) => addDays(currentWeekStart, index));
   }, [currentWeekStart, viewMode]);
+  const visibleDateRangeKey = useMemo(
+    () => displayDates.map((date) => format(date, "yyyy-MM-dd")).join("|"),
+    [displayDates],
+  );
+  const selectedEventIds =
+    eventSelection.rangeKey === visibleDateRangeKey
+      ? eventSelection.ids
+      : emptySelectedEventIds;
+
+  function setSelectedEventIds(action: React.SetStateAction<Set<string>>) {
+    setEventSelection((previous) => {
+      const current =
+        previous.rangeKey === visibleDateRangeKey
+          ? previous.ids
+          : emptySelectedEventIds;
+      const next = typeof action === "function" ? action(current) : action;
+      return { rangeKey: visibleDateRangeKey, ids: next };
+    });
+  }
 
   useEffect(() => {
     if ((viewMode !== "month" && viewMode !== "week") || displayDates.length === 0) {
@@ -750,6 +809,8 @@ export function WeeklyTimeGrid({
     .join(" ");
 
   function handleViewModeChange(mode: ViewMode) {
+    setSelectedEventIds(new Set());
+    setSelectionRect(null);
     onViewModeChange?.(mode);
   }
 
@@ -839,6 +900,7 @@ export function WeeklyTimeGrid({
       weekdays: [day.getDay()],
       exceptionText: "",
     });
+    setCreateRecurrenceOpen(false);
     setCreateDialogOpen(true);
   }
 
@@ -973,6 +1035,7 @@ export function WeeklyTimeGrid({
 
   function handleOpenEdit(event: ScheduleEvent) {
     setEditingEventId(event.id);
+    setEditRecurrenceOpen(false);
     const savedScope =
       typeof window === "undefined" ? null : window.localStorage.getItem(recurrenceEditScopeStorageKey);
     setEditScope((parseSyntheticEventId(event.id) || event.recurrence) && savedScope === "series" ? "series" : "occurrence");
@@ -1252,30 +1315,189 @@ export function WeeklyTimeGrid({
     return events.filter((event) => normalizeCategoryName(event.category) === categoryName).length;
   }
 
+  function startEventResize(
+    mouseEvent: React.MouseEvent<HTMLButtonElement>,
+    event: ScheduleEvent,
+    direction: ResizeState["direction"],
+  ) {
+    mouseEvent.preventDefault();
+    mouseEvent.stopPropagation();
+    const initialHour = direction === "start" ? event.startHour : event.endHour;
+    const preview = {
+      eventId: event.id,
+      startHour: event.startHour,
+      endHour: event.endHour,
+    };
+    resizePreviewRef.current = preview;
+    setResizePreview(preview);
+    setResizeState({
+      eventId: event.id,
+      startY: mouseEvent.clientY,
+      initialHour,
+      startHour: event.startHour,
+      endHour: event.endHour,
+      crossesMidnight: event.endHour < event.startHour,
+      direction,
+    });
+  }
+
+  function handleSelectionPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 || resizeState || draggingEventId) return;
+    const target = event.target as Element;
+    if (target.closest("[data-schedule-card], [data-resize-handle]")) return;
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    selectionDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX - bounds.left,
+      startY: event.clientY - bounds.top,
+      initialIds: event.ctrlKey || event.metaKey ? new Set(selectedEventIds) : new Set(),
+      moved: false,
+    };
+    if (!event.ctrlKey && !event.metaKey) {
+      setSelectedEventIds(new Set());
+    }
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleSelectionPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = selectionDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const currentX = Math.max(0, Math.min(bounds.width, event.clientX - bounds.left));
+    const currentY = Math.max(0, Math.min(bounds.height, event.clientY - bounds.top));
+    if (!drag.moved && Math.hypot(currentX - drag.startX, currentY - drag.startY) < 5) return;
+
+    drag.moved = true;
+    suppressSlotClickRef.current = true;
+    event.preventDefault();
+    const left = Math.min(drag.startX, currentX);
+    const top = Math.min(drag.startY, currentY);
+    const rect = {
+      left,
+      top,
+      width: Math.abs(currentX - drag.startX),
+      height: Math.abs(currentY - drag.startY),
+    };
+    setSelectionRect(rect);
+
+    const selectionViewportRect = {
+      left: bounds.left + rect.left,
+      right: bounds.left + rect.left + rect.width,
+      top: bounds.top + rect.top,
+      bottom: bounds.top + rect.top + rect.height,
+    };
+    const nextIds = new Set(drag.initialIds);
+    event.currentTarget
+      .querySelectorAll<HTMLElement>("[data-schedule-event-id]")
+      .forEach((card) => {
+        const cardRect = card.getBoundingClientRect();
+        const intersects =
+          cardRect.right >= selectionViewportRect.left &&
+          cardRect.left <= selectionViewportRect.right &&
+          cardRect.bottom >= selectionViewportRect.top &&
+          cardRect.top <= selectionViewportRect.bottom;
+        const eventId = card.dataset.scheduleEventId;
+        if (intersects && eventId) nextIds.add(eventId);
+      });
+    setSelectedEventIds(nextIds);
+  }
+
+  function finishSelection(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = selectionDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    selectionDragRef.current = null;
+    setSelectionRect(null);
+    if (drag.moved) {
+      window.setTimeout(() => {
+        suppressSlotClickRef.current = false;
+      }, 0);
+    }
+  }
+
+  function handleBatchDelete() {
+    const ids = [...selectedEventIds];
+    ids.forEach((eventId) => {
+      onDeleteEvent(eventId, { mode: parseSyntheticEventId(eventId) ? "single" : "all" });
+    });
+    setSelectedEventIds(new Set());
+    toast.success(`已删除 ${ids.length} 个行程`);
+  }
+
   useEffect(() => {
     if (!resizeState) return;
     const activeResize = resizeState;
+    const resizeStepHour = 5 / 60;
 
     function handleMouseMove(event: MouseEvent) {
       const deltaHour = (event.clientY - activeResize.startY) / hourCellHeight;
+      const snap = (value: number) => Math.round(value / resizeStepHour) * resizeStepHour;
       if (activeResize.direction === "end") {
-        const nextEndHour = Math.min(
-          24,
-          Math.max(activeResize.startHour + 1 / 60, activeResize.initialHour + deltaHour),
-        );
-        onUpdateEvent(activeResize.eventId, { endHour: nextEndHour });
+        const nextEndHour = activeResize.crossesMidnight
+          ? Math.max(
+              0,
+              Math.min(
+                activeResize.startHour - resizeStepHour,
+                snap(activeResize.initialHour + deltaHour),
+              ),
+            )
+          : Math.min(
+              24,
+              Math.max(
+                activeResize.startHour + resizeStepHour,
+                snap(activeResize.initialHour + deltaHour),
+              ),
+            );
+        const preview = {
+          eventId: activeResize.eventId,
+          startHour: activeResize.startHour,
+          endHour: nextEndHour,
+        };
+        resizePreviewRef.current = preview;
+        setResizePreview(preview);
         return;
       }
 
-      const nextStartHour = Math.max(
-        0,
-        Math.min(activeResize.endHour - 1 / 60, activeResize.initialHour + deltaHour),
-      );
-      onUpdateEvent(activeResize.eventId, { startHour: nextStartHour });
+      const nextStartHour = activeResize.crossesMidnight
+        ? Math.min(
+            24,
+            Math.max(
+              activeResize.endHour + resizeStepHour,
+              snap(activeResize.initialHour + deltaHour),
+            ),
+          )
+        : Math.max(
+            0,
+            Math.min(
+              activeResize.endHour - resizeStepHour,
+              snap(activeResize.initialHour + deltaHour),
+            ),
+          );
+      const preview = {
+        eventId: activeResize.eventId,
+        startHour: nextStartHour,
+        endHour: activeResize.endHour,
+      };
+      resizePreviewRef.current = preview;
+      setResizePreview(preview);
     }
 
     function handleMouseUp() {
+      const preview = resizePreviewRef.current;
+      if (preview) {
+        onUpdateEvent(
+          preview.eventId,
+          { startHour: preview.startHour, endHour: preview.endHour },
+          parseSyntheticEventId(preview.eventId) ? { scope: "occurrence" } : undefined,
+        );
+      }
       setResizeState(null);
+      setResizePreview(null);
+      resizePreviewRef.current = null;
     }
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -1317,6 +1539,29 @@ export function WeeklyTimeGrid({
           </h2>
           <p className="mt-0.5 text-xs text-gray-600">{weekRange}</p>
         </div>
+
+        {selectedEventIds.size > 0 ? (
+          <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1">
+            <span className="text-xs font-semibold text-sky-800">已选 {selectedEventIds.size} 项</span>
+            <Button
+              type="button"
+              size="xs"
+              variant="destructive"
+              onClick={() => setBatchDeleteOpen(true)}
+            >
+              <Trash2 className="h-3 w-3" />
+              删除所选
+            </Button>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              onClick={() => setSelectedEventIds(new Set())}
+            >
+              清除
+            </Button>
+          </div>
+        ) : null}
 
         {toolbarContent ? (
           <div className="min-w-[min(100%,18rem)] flex-[1_1_20rem]">
@@ -1401,8 +1646,13 @@ export function WeeklyTimeGrid({
               </div>
 
               <div
-                className="grid"
+                ref={timelineBodyRef}
+                className="relative grid"
                 style={{ gridTemplateColumns: timelineGridTemplateColumns }}
+                onPointerDown={handleSelectionPointerDown}
+                onPointerMove={handleSelectionPointerMove}
+                onPointerUp={finishSelection}
+                onPointerCancel={finishSelection}
               >
                 <div>
                   {timeGridSlots.map((slot) => {
@@ -1446,6 +1696,10 @@ export function WeeklyTimeGrid({
                                 borderBottomStyle: endsAtMainHour ? "solid" : "dashed",
                               }}
                               onClick={() => {
+                                if (suppressSlotClickRef.current) {
+                                  suppressSlotClickRef.current = false;
+                                  return;
+                                }
                                 setSelectedExpenseDateIso(dayLayout.dateIso);
                                 resetCreateDialog({ date: dayLayout.dateIso, startHour: slot.startHour });
                               }}
@@ -1459,14 +1713,35 @@ export function WeeklyTimeGrid({
                       <div className="pointer-events-none absolute inset-0 p-1">
                         {dayLayout.events.map((event) => {
                           const sourceEvent = toSourceScheduleEvent(event);
-                          const durationHour = getScheduleEventDurationHour(event);
+                          const activePreview =
+                            resizePreview?.eventId === event.id ? resizePreview : null;
+                          const visualEvent =
+                            activePreview
+                              ? event.segmentRole === "starts"
+                                ? { ...event, startHour: activePreview.startHour }
+                                : event.segmentRole === "continues"
+                                  ? { ...event, endHour: activePreview.endHour }
+                                  : {
+                                      ...event,
+                                      startHour: activePreview.startHour,
+                                      endHour: activePreview.endHour,
+                                    }
+                              : event;
+                          const visualSourceEvent = activePreview
+                            ? {
+                                ...sourceEvent,
+                                startHour: activePreview.startHour,
+                                endHour: activePreview.endHour,
+                              }
+                            : sourceEvent;
+                          const durationHour = getScheduleEventDurationHour(visualEvent);
                           const denseCard = event.laneCount > 1;
                           const microCard = durationHour <= 0.25 + Number.EPSILON;
                           const compactCard = durationHour < 0.55;
                           const mediumCard = durationHour < 1;
                           const showDetails = durationHour >= 2 && !denseCard;
-                          const timeLabel = formatTimelineSegmentTimeRange(event);
-                          const fullTimeLabel = formatEventTimeRange(sourceEvent);
+                          const timeLabel = formatTimelineSegmentTimeRange(visualEvent);
+                          const fullTimeLabel = formatEventTimeRange(visualSourceEvent);
                           const categoryVisual = getCategoryVisualByName(event.category);
                           const segmentLabel =
                             event.segmentRole === "starts"
@@ -1477,10 +1752,12 @@ export function WeeklyTimeGrid({
                           return (
                             <div
                               key={event.segmentId}
-                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden border text-left text-sm shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${microCard ? "rounded-[5px]" : "rounded-lg"} ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""}`}
-                              style={getEventStyle(event)}
+                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden border text-left text-sm shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${microCard ? "rounded-[5px]" : "rounded-lg"} ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""} ${selectedEventIds.has(event.id) ? "z-50 ring-2 ring-sky-500 shadow-[0_8px_20px_rgba(14,165,233,0.2)]" : ""}`}
+                              style={getEventStyle(visualEvent)}
                               data-density={microCard ? "micro" : compactCard ? "compact" : "regular"}
-                              draggable={!parseSyntheticEventId(event.id)}
+                              data-schedule-card
+                              data-schedule-event-id={event.id}
+                              draggable={!parseSyntheticEventId(event.id) && resizeState?.eventId !== event.id}
                               onDragStart={() => setDraggingEventId(event.id)}
                               onDragEnd={() => setDraggingEventId(null)}
                               onContextMenu={(mouseEvent) => handleContextMenu(mouseEvent, event.id)}
@@ -1489,7 +1766,7 @@ export function WeeklyTimeGrid({
                                 className={`pointer-events-none absolute rounded-full ${microCard ? "inset-y-0.5 left-0.5 w-0.5" : "inset-y-1 left-1 w-1"} ${getCategoryAccentColor(event.category)} ${event.isCompleted ? "opacity-80" : "opacity-95"}`}
                               />
                               {event.isCompleted ? (
-                                <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.22)_0px,rgba(255,255,255,0.22)_1px,transparent_1px,transparent_8px)]" />
+                                <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[repeating-linear-gradient(45deg,transparent_0px,transparent_7px,rgba(68,64,60,0.18)_7px,rgba(68,64,60,0.18)_8px)]" />
                               ) : null}
                               <button
                                 type="button"
@@ -1502,7 +1779,19 @@ export function WeeklyTimeGrid({
                                         ? "justify-start py-1.5 pl-5 pr-7"
                                         : "justify-start py-2 pl-5 pr-8"
                                 }`}
-                                onClick={() => handleOpenEdit(sourceEvent)}
+                                onClick={(mouseEvent) => {
+                                  if (mouseEvent.ctrlKey || mouseEvent.metaKey) {
+                                    mouseEvent.stopPropagation();
+                                    setSelectedEventIds((previous) => {
+                                      const next = new Set(previous);
+                                      if (next.has(event.id)) next.delete(event.id);
+                                      else next.add(event.id);
+                                      return next;
+                                    });
+                                    return;
+                                  }
+                                  handleOpenEdit(sourceEvent);
+                                }}
                               >
                                 <div className={`flex min-h-0 min-w-0 flex-col ${microCard ? "h-full justify-center" : compactCard ? "gap-0.5" : mediumCard ? "flex-1 gap-1" : "flex-1 gap-1.5"}`}>
                                   {microCard ? (
@@ -1515,7 +1804,7 @@ export function WeeklyTimeGrid({
                                       </span>
                                       <span className="h-2.5 w-px shrink-0 bg-current/20" aria-hidden />
                                       <p
-                                        className={`min-w-0 flex-1 truncate text-[10px] font-semibold leading-none ${event.isCompleted ? "line-through decoration-1 decoration-current/55" : ""}`}
+                                        className="min-w-0 flex-1 truncate text-[10px] font-semibold leading-none"
                                         title={`${event.title} (${fullTimeLabel})`}
                                       >
                                         {event.title}
@@ -1554,7 +1843,7 @@ export function WeeklyTimeGrid({
                                         <Repeat className="mt-0.5 h-3 w-3 shrink-0 text-gray-600" aria-hidden />
                                       ) : null}
                                       <p
-                                        className={`min-w-0 flex-1 truncate text-xs font-semibold leading-snug ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
+                                        className="min-w-0 flex-1 truncate text-xs font-semibold leading-snug"
                                         title={`${event.title} (${fullTimeLabel})`}
                                       >
                                         {event.title}
@@ -1619,7 +1908,7 @@ export function WeeklyTimeGrid({
                                           mediumCard || denseCard
                                             ? "[display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
                                             : ""
-                                        } ${event.isCompleted ? "line-through decoration-2 decoration-current/55" : ""}`}
+                                        }`}
                                         title={`${event.title} (${fullTimeLabel})`}
                                       >
                                         {event.title}
@@ -1643,6 +1932,31 @@ export function WeeklyTimeGrid({
                                 </div>
                               </button>
 
+                              {event.segmentRole === "continues" ? null : (
+                                  <button
+                                    type="button"
+                                    data-resize-handle
+                                    className={`absolute top-0 z-30 h-2 cursor-ns-resize rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${microCard ? "inset-x-1" : "inset-x-4"}`}
+                                    onMouseDown={(mouseEvent) => startEventResize(mouseEvent, sourceEvent, "start")}
+                                    aria-label={`调整 ${event.title} 的开始时间`}
+                                    title="拖动调整开始时间"
+                                  >
+                                    <span className={`absolute left-1/2 top-0.5 h-0.5 -translate-x-1/2 rounded-full bg-stone-700/45 ${microCard ? "w-4" : "w-8"}`} />
+                                  </button>
+                              )}
+                              {event.segmentRole === "starts" ? null : (
+                                  <button
+                                    type="button"
+                                    data-resize-handle
+                                    className={`absolute bottom-0 z-30 h-2 cursor-ns-resize rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${microCard ? "inset-x-1" : "inset-x-4"}`}
+                                    onMouseDown={(mouseEvent) => startEventResize(mouseEvent, sourceEvent, "end")}
+                                    aria-label={`调整 ${event.title} 的结束时间`}
+                                    title="拖动调整结束时间"
+                                  >
+                                    <span className={`absolute bottom-0.5 left-1/2 h-0.5 -translate-x-1/2 rounded-full bg-stone-700/45 ${microCard ? "w-4" : "w-8"}`} />
+                                  </button>
+                              )}
+
                               {microCard ? null : (
                                 <button
                                   type="button"
@@ -1664,6 +1978,13 @@ export function WeeklyTimeGrid({
                     </div>
                   );
                 })}
+                {selectionRect ? (
+                  <div
+                    className="pointer-events-none absolute z-[70] rounded-md border border-sky-500 bg-sky-400/15 shadow-[0_0_0_1px_rgba(255,255,255,0.75)_inset]"
+                    style={selectionRect}
+                    aria-hidden
+                  />
+                ) : null}
               </div>
             </>
           ) : (
@@ -1720,11 +2041,14 @@ export function WeeklyTimeGrid({
                             return (
                               <div
                                 key={event.segmentId}
-                                className={`cursor-pointer rounded border px-2 py-1 text-xs ${getCategoryColor(categories, event.category)}`}
+                                className={`relative cursor-pointer overflow-hidden rounded border px-2 py-1 text-xs ${getCategoryColor(categories, event.category)}`}
                                 title={`${event.title} (${fullTimeLabel})`}
                                 onClick={() => handleOpenEdit(sourceEvent)}
                               >
-                                <div className="flex min-w-0 items-center gap-1">
+                                {event.isCompleted ? (
+                                  <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent_0px,transparent_6px,rgba(68,64,60,0.18)_6px,rgba(68,64,60,0.18)_7px)]" />
+                                ) : null}
+                                <div className="relative z-10 flex min-w-0 items-center gap-1">
                                   {event.isCompleted ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> : null}
                                   <span className="shrink-0 text-[10px] font-semibold text-gray-600">{timeLabel}</span>
                                   {segmentLabel ? (
@@ -1732,7 +2056,7 @@ export function WeeklyTimeGrid({
                                       {segmentLabel}
                                     </span>
                                   ) : null}
-                                  <span className={`min-w-0 truncate ${event.isCompleted ? "line-through decoration-2" : ""}`}>{event.title}</span>
+                                  <span className="min-w-0 truncate">{event.title}</span>
                                 </div>
                               </div>
                             );
@@ -1860,7 +2184,7 @@ export function WeeklyTimeGrid({
                           align="start"
                           alignItemWithTrigger={false}
                           sideOffset={6}
-                          className="max-h-72 min-w-64"
+                          className="max-h-[min(28rem,var(--available-height))] min-w-72"
                         >
                           {groupedCategories.map(({ group, categories: groupItems }) => (
                             <SelectGroup key={group}>
@@ -1900,8 +2224,33 @@ export function WeeklyTimeGrid({
                       </Select>
                     </div>
                   </div>
-                  <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-4">
-                    <div className="flex items-center gap-3">
+                  <Collapsible
+                    open={createRecurrenceOpen}
+                    onOpenChange={setCreateRecurrenceOpen}
+                    className="rounded-lg border border-gray-100 bg-gray-50/80"
+                  >
+                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Repeat className="h-4 w-4 shrink-0 text-stone-500" aria-hidden />
+                        <span>
+                          <span className="block text-sm font-semibold text-stone-800">循环设置</span>
+                          <span className="block text-xs text-stone-500">
+                            {createRecurrence.enabled
+                              ? createRecurrence.kind === "daily"
+                                ? "已开启 · 每天"
+                                : "已开启 · 每周"
+                              : "默认关闭，需要时展开"}
+                          </span>
+                        </span>
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${createRecurrenceOpen ? "rotate-180" : ""}`}
+                        aria-hidden
+                      />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="border-t border-gray-100 px-4 py-4">
+                        <div className="flex items-center gap-3">
                       <Switch
                         id="create-recurring"
                         checked={createRecurrence.enabled}
@@ -1917,9 +2266,9 @@ export function WeeklyTimeGrid({
                         }
                       />
                       <Label htmlFor="create-recurring">循环行程</Label>
-                    </div>
-                    {createRecurrence.enabled ? (
-                      <div className="mt-4 space-y-4">
+                        </div>
+                        {createRecurrence.enabled ? (
+                          <div className="mt-4 space-y-4">
                         <div className="space-y-2">
                           <Label>重复方式</Label>
                           <Select
@@ -1977,9 +2326,11 @@ export function WeeklyTimeGrid({
                             className="min-h-[72px]"
                           />
                         </div>
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
-                  </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                   <TimeRangeEditor
                     startHour={createForm.startHour}
                     endHour={createForm.endHour}
@@ -2073,7 +2424,7 @@ export function WeeklyTimeGrid({
                           align="start"
                           alignItemWithTrigger={false}
                           sideOffset={6}
-                          className="max-h-72 min-w-64"
+                          className="max-h-[min(28rem,var(--available-height))] min-w-72"
                         >
                           {groupedCategories.map(({ group, categories: groupItems }) => (
                             <SelectGroup key={group}>
@@ -2159,11 +2510,29 @@ export function WeeklyTimeGrid({
                   )}
 
                   {parseSyntheticEventId(selectedEvent.id) ? (
-                    <div className="space-y-4 rounded-lg border border-amber-100 bg-amber-50/60 p-4">
-                      <p className="text-sm text-gray-800">
-                        循环行程 · 当前日期 <span className="font-medium">{selectedEvent.date}</span>
-                      </p>
-                      <div className="space-y-2">
+                    <Collapsible
+                      open={editRecurrenceOpen}
+                      onOpenChange={setEditRecurrenceOpen}
+                      className="rounded-lg border border-amber-100 bg-amber-50/60"
+                    >
+                      <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Repeat className="h-4 w-4 shrink-0 text-amber-700" aria-hidden />
+                          <span>
+                            <span className="block text-sm font-semibold text-gray-800">循环行程设置</span>
+                            <span className="block text-xs text-gray-600">
+                              当前日期 {selectedEvent.date} · {editScope === "series" ? "保存整个系列" : "仅保存此日"}
+                            </span>
+                          </span>
+                        </span>
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-amber-700 transition-transform ${editRecurrenceOpen ? "rotate-180" : ""}`}
+                          aria-hidden
+                        />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="space-y-4 border-t border-amber-100 px-4 py-4">
+                          <div className="space-y-2">
                         <Label className="text-xs font-medium uppercase tracking-wide text-gray-600">保存范围</Label>
                         <div className="flex flex-wrap gap-2">
                           <Button
@@ -2196,8 +2565,8 @@ export function WeeklyTimeGrid({
                         <p className="text-xs text-gray-600">
                           修改时间、标题等时：选“仅此日”只影响当天；选“整个系列”会更新该循环规则下所有日期。
                         </p>
-                      </div>
-                      <div className="space-y-2 border-t border-amber-200/80 pt-3">
+                          </div>
+                          <div className="space-y-2 border-t border-amber-200/80 pt-3">
                         <Label className="text-xs font-medium uppercase tracking-wide text-gray-600">删除</Label>
                         <div className="flex flex-col gap-2">
                           <Button
@@ -2231,8 +2600,10 @@ export function WeeklyTimeGrid({
                             删除整个系列
                           </Button>
                         </div>
-                      </div>
-                    </div>
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   ) : null}
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
@@ -2731,6 +3102,15 @@ export function WeeklyTimeGrid({
           </Dialog>
         </div>
 
+        <ConfirmDialog
+          open={batchDeleteOpen}
+          onOpenChange={setBatchDeleteOpen}
+          title={`删除选中的 ${selectedEventIds.size} 个行程？`}
+          description="普通行程会直接删除；框选到的循环行程只删除当前日期，不会影响整个循环系列。"
+          confirmLabel="删除所选"
+          onConfirm={handleBatchDelete}
+        />
+
         {contextMenu && typeof document !== "undefined" ? createPortal(
           <div
             className="fixed z-[1000] w-52 max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl border border-stone-200 bg-white/95 p-1.5 shadow-[0_24px_60px_rgba(68,64,60,0.28)] backdrop-blur-md"
@@ -2850,6 +3230,39 @@ export function CenteredTimePartSelect({
   );
 }
 
+function MinuteQuickPick({
+  value,
+  disabled = false,
+  label,
+  onChange,
+}: {
+  value: number;
+  disabled?: boolean;
+  label: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="mt-2 grid grid-cols-6 gap-1" aria-label={label}>
+      {quickMinuteOptions.map((minute) => (
+        <button
+          key={minute}
+          type="button"
+          disabled={disabled}
+          aria-pressed={value === minute}
+          className={`h-6 rounded-md border px-1 font-mono text-[10px] font-semibold transition ${
+            value === minute
+              ? "border-stone-800 bg-stone-800 text-white"
+              : "border-stone-200 bg-white text-stone-600 hover:border-stone-400 hover:text-stone-900"
+          } disabled:cursor-not-allowed disabled:opacity-40`}
+          onClick={() => onChange(minute)}
+        >
+          {String(minute).padStart(2, "0")}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function TimeRangeEditor({
   startHour,
   endHour,
@@ -2896,6 +3309,13 @@ function TimeRangeEditor({
             }
           />
         </div>
+        <MinuteQuickPick
+          value={startParts.minutes}
+          label="开始时间分钟快捷选择"
+          onChange={(minutes) =>
+            onStartHourChange(getTimeValueFromParts(startParts.hours, minutes))
+          }
+        />
       </div>
 
       <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3">
@@ -2932,6 +3352,14 @@ function TimeRangeEditor({
             }
           />
         </div>
+        <MinuteQuickPick
+          value={endParts.minutes}
+          label="结束时间分钟快捷选择"
+          disabled={endParts.hours === 24}
+          onChange={(minutes) =>
+            onEndHourChange(getTimeValueFromParts(endParts.hours, minutes, true))
+          }
+        />
       </div>
     </div>
   );
