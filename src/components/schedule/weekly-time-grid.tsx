@@ -581,7 +581,6 @@ export function WeeklyTimeGrid({
     weekdays: [],
     exceptionText: "",
   });
-  const [createRecurrenceOpen, setCreateRecurrenceOpen] = useState(false);
   const [editRecurrenceOpen, setEditRecurrenceOpen] = useState(false);
 
   const timeGridSlots = useMemo(() => getTimeGridSlots(timeGranularity), [timeGranularity]);
@@ -900,7 +899,6 @@ export function WeeklyTimeGrid({
       weekdays: [day.getDay()],
       exceptionText: "",
     });
-    setCreateRecurrenceOpen(false);
     setCreateDialogOpen(true);
   }
 
@@ -1357,19 +1355,26 @@ export function WeeklyTimeGrid({
     if (!event.ctrlKey && !event.metaKey) {
       setSelectedEventIds(new Set());
     }
-    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function handleSelectionPointerMove(event: React.PointerEvent<HTMLDivElement>) {
     const drag = selectionDragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if ((event.buttons & 1) === 0) {
+      selectionDragRef.current = null;
+      setSelectionRect(null);
+      return;
+    }
 
     const bounds = event.currentTarget.getBoundingClientRect();
     const currentX = Math.max(0, Math.min(bounds.width, event.clientX - bounds.left));
     const currentY = Math.max(0, Math.min(bounds.height, event.clientY - bounds.top));
-    if (!drag.moved && Math.hypot(currentX - drag.startX, currentY - drag.startY) < 5) return;
+    if (!drag.moved && Math.hypot(currentX - drag.startX, currentY - drag.startY) <= 5) return;
 
-    drag.moved = true;
+    if (!drag.moved) {
+      drag.moved = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
     suppressSlotClickRef.current = true;
     event.preventDefault();
     const left = Math.min(drag.startX, currentX);
@@ -1402,6 +1407,14 @@ export function WeeklyTimeGrid({
         if (intersects && eventId) nextIds.add(eventId);
       });
     setSelectedEventIds(nextIds);
+  }
+
+  function handleSelectionPointerLeave(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = selectionDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || drag.moved) return;
+
+    selectionDragRef.current = null;
+    setSelectionRect(null);
   }
 
   function finishSelection(event: React.PointerEvent<HTMLDivElement>) {
@@ -1651,6 +1664,7 @@ export function WeeklyTimeGrid({
                 style={{ gridTemplateColumns: timelineGridTemplateColumns }}
                 onPointerDown={handleSelectionPointerDown}
                 onPointerMove={handleSelectionPointerMove}
+                onPointerLeave={handleSelectionPointerLeave}
                 onPointerUp={finishSelection}
                 onPointerCancel={finishSelection}
               >
@@ -2224,33 +2238,8 @@ export function WeeklyTimeGrid({
                       </Select>
                     </div>
                   </div>
-                  <Collapsible
-                    open={createRecurrenceOpen}
-                    onOpenChange={setCreateRecurrenceOpen}
-                    className="rounded-lg border border-gray-100 bg-gray-50/80"
-                  >
-                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <Repeat className="h-4 w-4 shrink-0 text-stone-500" aria-hidden />
-                        <span>
-                          <span className="block text-sm font-semibold text-stone-800">循环设置</span>
-                          <span className="block text-xs text-stone-500">
-                            {createRecurrence.enabled
-                              ? createRecurrence.kind === "daily"
-                                ? "已开启 · 每天"
-                                : "已开启 · 每周"
-                              : "默认关闭，需要时展开"}
-                          </span>
-                        </span>
-                      </span>
-                      <ChevronDown
-                        className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${createRecurrenceOpen ? "rotate-180" : ""}`}
-                        aria-hidden
-                      />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="border-t border-gray-100 px-4 py-4">
-                        <div className="flex items-center gap-3">
+                  <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-4">
+                    <div className="flex items-center gap-3">
                       <Switch
                         id="create-recurring"
                         checked={createRecurrence.enabled}
@@ -2266,9 +2255,9 @@ export function WeeklyTimeGrid({
                         }
                       />
                       <Label htmlFor="create-recurring">循环行程</Label>
-                        </div>
-                        {createRecurrence.enabled ? (
-                          <div className="mt-4 space-y-4">
+                    </div>
+                    {createRecurrence.enabled ? (
+                      <div className="mt-4 space-y-4">
                         <div className="space-y-2">
                           <Label>重复方式</Label>
                           <Select
@@ -2326,11 +2315,9 @@ export function WeeklyTimeGrid({
                             className="min-h-[72px]"
                           />
                         </div>
-                          </div>
-                        ) : null}
                       </div>
-                    </CollapsibleContent>
-                  </Collapsible>
+                    ) : null}
+                  </div>
                   <TimeRangeEditor
                     startHour={createForm.startHour}
                     endHour={createForm.endHour}

@@ -125,13 +125,20 @@ function marqueeSelectAll(container: HTMLElement) {
   const cards = Array.from(container.querySelectorAll<HTMLElement>("[data-schedule-card]"));
   const timeline = cards[0].closest<HTMLDivElement>(".relative.grid");
   expect(timeline).toBeTruthy();
+  let hasPointerCapture = false;
+  const setPointerCapture = vi.fn(() => {
+    hasPointerCapture = true;
+  });
+  const releasePointerCapture = vi.fn(() => {
+    hasPointerCapture = false;
+  });
   Object.defineProperties(timeline!, {
     getBoundingClientRect: {
       value: () => ({ left: 0, top: 0, right: 1000, bottom: 2000, width: 1000, height: 2000 }),
     },
-    setPointerCapture: { value: vi.fn() },
-    hasPointerCapture: { value: vi.fn(() => true) },
-    releasePointerCapture: { value: vi.fn() },
+    setPointerCapture: { value: setPointerCapture },
+    hasPointerCapture: { value: vi.fn(() => hasPointerCapture) },
+    releasePointerCapture: { value: releasePointerCapture },
   });
   cards.forEach((card, index) => {
     Object.defineProperty(card, "getBoundingClientRect", {
@@ -147,11 +154,63 @@ function marqueeSelectAll(container: HTMLElement) {
   });
 
   fireEvent.pointerDown(timeline!, { pointerId: 1, button: 0, clientX: 50, clientY: 50 });
-  fireEvent.pointerMove(timeline!, { pointerId: 1, clientX: 260, clientY: 300 });
+  fireEvent.pointerMove(timeline!, { pointerId: 1, buttons: 1, clientX: 260, clientY: 300 });
   fireEvent.pointerUp(timeline!, { pointerId: 1, clientX: 260, clientY: 300 });
+  expect(setPointerCapture).toHaveBeenCalledTimes(1);
+  expect(releasePointerCapture).toHaveBeenCalledTimes(1);
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("keeps a simple blank-cell press available for creating an event", () => {
+    const { container } = renderGrid();
+    const emptySlot = Array.from(container.querySelectorAll("button")).find(
+      (button) => !button.textContent?.trim() && !button.getAttribute("aria-label"),
+    );
+    const timeline = emptySlot?.closest<HTMLDivElement>(".relative.grid");
+    expect(emptySlot).toBeTruthy();
+    expect(timeline).toBeTruthy();
+    const setPointerCapture = vi.fn();
+    Object.defineProperties(timeline!, {
+      getBoundingClientRect: {
+        value: () => ({ left: 0, top: 0, right: 1000, bottom: 2000, width: 1000, height: 2000 }),
+      },
+      setPointerCapture: { value: setPointerCapture },
+      hasPointerCapture: { value: vi.fn(() => false) },
+      releasePointerCapture: { value: vi.fn() },
+    });
+
+    fireEvent.pointerDown(emptySlot!, { pointerId: 1, button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(timeline!, { pointerId: 1, buttons: 1, clientX: 103, clientY: 104 });
+    fireEvent.pointerUp(emptySlot!, { pointerId: 1, button: 0, clientX: 100, clientY: 100 });
+    fireEvent.click(emptySlot!);
+
+    expect(setPointerCapture).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("clears a pending marquee when the pointer leaves before dragging", () => {
+    const { container } = renderGrid();
+    const emptySlot = Array.from(container.querySelectorAll("button")).find(
+      (button) => !button.textContent?.trim() && !button.getAttribute("aria-label"),
+    );
+    const timeline = emptySlot?.closest<HTMLDivElement>(".relative.grid");
+    expect(emptySlot).toBeTruthy();
+    expect(timeline).toBeTruthy();
+    const setPointerCapture = vi.fn();
+    Object.defineProperties(timeline!, {
+      getBoundingClientRect: {
+        value: () => ({ left: 0, top: 0, right: 1000, bottom: 2000, width: 1000, height: 2000 }),
+      },
+      setPointerCapture: { value: setPointerCapture },
+    });
+
+    fireEvent.pointerDown(emptySlot!, { pointerId: 1, button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerLeave(timeline!, { pointerId: 1, buttons: 1, clientX: 102, clientY: 102 });
+    fireEvent.pointerMove(timeline!, { pointerId: 1, buttons: 0, clientX: 200, clientY: 200 });
+
+    expect(setPointerCapture).not.toHaveBeenCalled();
+  });
+
   it("uses a whole-card diagonal pattern instead of striking through the title", () => {
     renderGrid({ events: [scheduleEvent] });
 
@@ -221,7 +280,7 @@ describe("WeeklyTimeGrid interactions", () => {
     );
   });
 
-  it("keeps recurrence settings folded and offers compact minute shortcuts", () => {
+  it("shows the recurrence switch directly and offers compact minute shortcuts", () => {
     const { container } = renderGrid();
     const emptySlot = Array.from(container.querySelectorAll("button")).find(
       (button) => !button.textContent?.trim() && !button.getAttribute("aria-label"),
@@ -230,8 +289,9 @@ describe("WeeklyTimeGrid interactions", () => {
     fireEvent.click(emptySlot!);
 
     const dialog = screen.getByRole("dialog");
-    const recurrenceTrigger = within(dialog).getByRole("button", { name: /循环设置/ });
-    expect(recurrenceTrigger.getAttribute("aria-expanded")).toBe("false");
+    expect(within(dialog).getByRole("switch", { name: "\u5faa\u73af\u884c\u7a0b" })).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: /\u5faa\u73af\u8bbe\u7f6e/ })).toBeNull();
+
 
     const quickPick = dialog.querySelector('[aria-label="开始时间分钟快捷选择"]');
     expect(quickPick).toBeTruthy();
