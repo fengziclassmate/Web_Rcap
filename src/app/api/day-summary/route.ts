@@ -3,12 +3,11 @@ import {
   DAILY_BUDGET_SELECT_COLUMNS,
   EXPENSE_SELECT_COLUMNS,
   PERIOD_BUDGET_SELECT_COLUMNS,
-  getAuthenticatedSupabase,
   getBudgetPeriodRange,
   jsonError,
   normalizeMoney,
   parseDateQuery,
-  sumExpenses,
+  sumBudgetExpenses,
   toDailyBudgetDto,
   toExpenseDto,
   toPeriodBudgetDto,
@@ -16,6 +15,7 @@ import {
   type ExpenseDto,
   type PeriodBudgetDto,
 } from "@/lib/expense-api";
+import { getAuthenticatedSupabase } from "@/lib/server/supabase-auth";
 
 export const runtime = "nodejs";
 
@@ -55,7 +55,9 @@ function buildPeriodSummary(
   expenses: ExpenseDto[],
   budget: PeriodBudgetDto | null,
 ): PeriodSummary {
-  const totalExpense = sumExpenses(expenses.filter((expense) => isInRange(expense.expense_date, periodStart, periodEnd)));
+  const totalExpense = sumBudgetExpenses(
+    expenses.filter((expense) => isInRange(expense.expense_date, periodStart, periodEnd)),
+  );
   return {
     type,
     periodStart,
@@ -111,7 +113,7 @@ export async function GET(request: NextRequest) {
 
   const rangeExpenses = (expensesResult.data ?? []).map(toExpenseDto);
   const expenses = rangeExpenses.filter((expense) => expense.expense_date === parsedDate.date);
-  const totalExpense = sumExpenses(expenses);
+  const totalExpense = sumBudgetExpenses(expenses);
   const dailyBudget = dailyBudgetResult.data ? toDailyBudgetDto(dailyBudgetResult.data) : null;
   const periodBudgets = (periodBudgetsResult.data ?? []).map(toPeriodBudgetDto);
   const weekBudget =

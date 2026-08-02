@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 
-export { getAuthenticatedSupabase } from "@/lib/server/supabase-auth";
-
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -16,6 +14,7 @@ type ExpenseRow = {
   category_detail: string | null;
   note: string | null;
   expense_date: string;
+  excluded_from_budget: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -48,6 +47,7 @@ export type ExpenseDto = {
   category_detail: string;
   note: string;
   expense_date: string;
+  excluded_from_budget: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -77,6 +77,11 @@ type ExpenseInput = {
   category_detail: string;
   note: string;
   expense_date: string;
+  excluded_from_budget: boolean;
+};
+
+type ExpenseUpdateInput = Omit<ExpenseInput, "excluded_from_budget"> & {
+  excluded_from_budget?: boolean;
 };
 
 type DailyBudgetInput = {
@@ -188,6 +193,8 @@ export function parseExpenseInput(payload: unknown):
   }
 
   const note = typeof payload.note === "string" ? payload.note.trim() : "";
+  const excludedFromBudget =
+    payload.excluded_from_budget === true || payload.excludedFromBudget === true;
   return {
     value: {
       amount,
@@ -197,8 +204,28 @@ export function parseExpenseInput(payload: unknown):
       category_detail: categoryDetail,
       note,
       expense_date: expenseDate,
+      excluded_from_budget: excludedFromBudget,
     },
   };
+}
+
+export function parseExpenseUpdateInput(payload: unknown):
+  | { value: ExpenseUpdateInput; error?: never }
+  | { error: NextResponse; value?: never } {
+  const parsed = parseExpenseInput(payload);
+  if (parsed.error) return parsed;
+
+  if (
+    isRecord(payload) &&
+    (typeof payload.excluded_from_budget === "boolean" ||
+      typeof payload.excludedFromBudget === "boolean")
+  ) {
+    return parsed;
+  }
+
+  const value: ExpenseUpdateInput = { ...parsed.value };
+  delete value.excluded_from_budget;
+  return { value };
 }
 
 export function parseDailyBudgetInput(payload: unknown):
@@ -273,6 +300,7 @@ export function toExpenseDto(row: ExpenseRow): ExpenseDto {
     category_detail: categoryDetail,
     note: row.note ?? "",
     expense_date: row.expense_date,
+    excluded_from_budget: Boolean(row.excluded_from_budget),
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -304,8 +332,13 @@ export function normalizeMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-export function sumExpenses(expenses: ExpenseDto[]) {
-  return normalizeMoney(expenses.reduce((sum, expense) => sum + expense.amount, 0));
+export function sumBudgetExpenses(expenses: ExpenseDto[]) {
+  return normalizeMoney(
+    expenses.reduce(
+      (sum, expense) => sum + (expense.excluded_from_budget ? 0 : expense.amount),
+      0,
+    ),
+  );
 }
 
 function parseIsoDateParts(date: string) {
@@ -345,7 +378,7 @@ export function getBudgetPeriodRange(date: string, budgetType: BudgetPeriodType)
 }
 
 export const EXPENSE_SELECT_COLUMNS =
-  "id,amount,category,category_main,category_sub,category_detail,note,expense_date,created_at,updated_at";
+  "id,amount,category,category_main,category_sub,category_detail,note,expense_date,excluded_from_budget,created_at,updated_at";
 
 export const DAILY_BUDGET_SELECT_COLUMNS = "id,amount,budget_date,created_at,updated_at";
 

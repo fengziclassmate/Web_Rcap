@@ -1985,16 +1985,28 @@ export function TaskDashboard({
           open={annualSectionOpen}
           onOpenChange={(open) => patchUiPreferences({ annualSectionOpen: open })}
         >
-          <CollapsibleTrigger className="section-trigger mb-3 flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left">
-            <span className="text-sm font-semibold text-gray-700">年度任务清单</span>
-            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${annualSectionOpen ? "" : "-rotate-90"}`} />
-          </CollapsibleTrigger>
+          <div className="relative mb-3">
+            <CollapsibleTrigger
+              className="section-trigger relative flex w-full items-center rounded-xl py-2.5 pl-3 pr-20 text-left"
+              aria-label={annualSectionOpen ? "折叠年度任务清单" : "展开年度任务清单"}
+            >
+              <span className="text-sm font-semibold text-gray-700">年度任务清单</span>
+              <ChevronDown
+                className={`absolute right-3 h-4 w-4 text-gray-500 transition-transform ${annualSectionOpen ? "" : "-rotate-90"}`}
+              />
+            </CollapsibleTrigger>
+            <Button
+              type="button"
+              size="icon-sm"
+              className="absolute right-9 top-1/2 z-10 -translate-y-1/2"
+              onClick={() => setShowAddAnnualDialog(true)}
+              aria-label="添加年度任务"
+              title="添加年度任务"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
           <CollapsibleContent>
-            <div className="mb-3 flex items-center gap-1.5">
-              <Button type="button" size="icon-sm" onClick={() => setShowAddAnnualDialog(true)} aria-label="添加年度任务" title="添加年度任务">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
             <div className="space-y-3 rounded-2xl subtle-card p-3">
               {annualTasks.length > 0 ? (
                 <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">

@@ -280,6 +280,33 @@ describe("WeeklyTimeGrid interactions", () => {
     );
   });
 
+  it("keeps the center of a short card available for opening its editor", () => {
+    renderGrid({
+      events: [
+        {
+          ...scheduleEvent,
+          id: "short-edit-event",
+          title: "十五分钟行程",
+          startHour: 9,
+          endHour: 9.25,
+          isCompleted: false,
+        },
+      ],
+    });
+
+    const editTrigger = screen.getByRole("button", { name: "打开 十五分钟行程 编辑窗口" });
+    const startHandle = screen.getByRole("button", { name: "调整 十五分钟行程 的开始时间" });
+    const endHandle = screen.getByRole("button", { name: "调整 十五分钟行程 的结束时间" });
+
+    expect(startHandle.className).toContain("left-1");
+    expect(startHandle.className).toContain("max-w-8");
+    expect(endHandle.className).toContain("right-1");
+    expect(endHandle.className).toContain("max-w-8");
+
+    fireEvent.click(editTrigger);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
   it("shows the recurrence switch directly and offers compact minute shortcuts", () => {
     const { container } = renderGrid();
     const emptySlot = Array.from(container.querySelectorAll("button")).find(

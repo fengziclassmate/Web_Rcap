@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   EXPENSE_SELECT_COLUMNS,
-  getAuthenticatedSupabase,
   isUuid,
   jsonError,
-  parseExpenseInput,
+  parseExpenseUpdateInput,
   toExpenseDto,
 } from "@/lib/expense-api";
+import { getAuthenticatedSupabase } from "@/lib/server/supabase-auth";
 
 export const runtime = "nodejs";
 
@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return jsonError("Invalid JSON body.", 400);
   }
 
-  const parsedInput = parseExpenseInput(payload);
+  const parsedInput = parseExpenseUpdateInput(payload);
   if (parsedInput.error) return parsedInput.error;
 
   const { data, error } = await auth.supabase

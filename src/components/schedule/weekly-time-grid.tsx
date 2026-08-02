@@ -646,6 +646,7 @@ export function WeeklyTimeGrid({
           .from("expenses")
           .select("amount,expense_date")
           .eq("user_id", session.user.id)
+          .eq("excluded_from_budget", false)
           .gte("expense_date", rangeStart)
           .lte("expense_date", rangeEnd),
         supabase
@@ -1784,6 +1785,7 @@ export function WeeklyTimeGrid({
                               ) : null}
                               <button
                                 type="button"
+                                aria-label={`打开 ${event.title} 编辑窗口`}
                                 className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-[inherit] text-left outline-none focus-visible:ring-2 focus-visible:ring-stone-900/20 ${
                                   microCard
                                     ? "justify-center py-0 pl-3 pr-1.5"
@@ -1950,7 +1952,13 @@ export function WeeklyTimeGrid({
                                   <button
                                     type="button"
                                     data-resize-handle
-                                    className={`absolute top-0 z-30 h-2 cursor-ns-resize rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${microCard ? "inset-x-1" : "inset-x-4"}`}
+                                    className={`absolute z-30 cursor-ns-resize rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${
+                                      microCard
+                                        ? "left-1 top-0 h-1.5 w-[28%] min-w-3 max-w-8"
+                                        : compactCard
+                                          ? "left-2 top-0 h-1.5 w-1/3 max-w-10"
+                                          : "inset-x-4 top-0 h-2"
+                                    }`}
                                     onMouseDown={(mouseEvent) => startEventResize(mouseEvent, sourceEvent, "start")}
                                     aria-label={`调整 ${event.title} 的开始时间`}
                                     title="拖动调整开始时间"
@@ -1962,7 +1970,13 @@ export function WeeklyTimeGrid({
                                   <button
                                     type="button"
                                     data-resize-handle
-                                    className={`absolute bottom-0 z-30 h-2 cursor-ns-resize rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${microCard ? "inset-x-1" : "inset-x-4"}`}
+                                    className={`absolute z-30 cursor-ns-resize rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${
+                                      microCard
+                                        ? "bottom-0 right-1 h-1.5 w-[28%] min-w-3 max-w-8"
+                                        : compactCard
+                                          ? "bottom-0 right-2 h-1.5 w-1/3 max-w-10"
+                                          : "inset-x-4 bottom-0 h-2"
+                                    }`}
                                     onMouseDown={(mouseEvent) => startEventResize(mouseEvent, sourceEvent, "end")}
                                     aria-label={`调整 ${event.title} 的结束时间`}
                                     title="拖动调整结束时间"

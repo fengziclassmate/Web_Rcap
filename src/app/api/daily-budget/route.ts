@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   DAILY_BUDGET_SELECT_COLUMNS,
-  getAuthenticatedSupabase,
   jsonError,
   parseDailyBudgetInput,
   parseDateQuery,
   toDailyBudgetDto,
 } from "@/lib/expense-api";
+import { getAuthenticatedSupabase } from "@/lib/server/supabase-auth";
 
 export const runtime = "nodejs";
 

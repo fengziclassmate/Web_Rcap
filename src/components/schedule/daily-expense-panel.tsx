@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  BriefcaseBusiness,
   CalendarDays,
   CalendarRange,
   Check,
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -37,6 +39,7 @@ type ExpenseRecord = {
   category_detail?: string;
   note: string;
   expense_date: string;
+  excluded_from_budget: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -91,46 +94,121 @@ const expenseCategoryTree: ExpenseCategoryGroup[] = [
     main: "餐饮",
     branches: [
       { name: "正餐", details: ["早餐", "午餐", "晚餐", "夜宵"] },
+      { name: "外卖", details: ["工作餐", "简餐", "夜宵", "配送费"] },
+      { name: "食材", details: ["蔬菜", "肉蛋", "水产", "米面粮油", "调味品"] },
       { name: "水果", details: ["苹果", "香蕉", "草莓", "葡萄", "其他水果"] },
       { name: "饮品", details: ["奶茶", "咖啡", "果茶", "矿泉水", "其他饮品"] },
-      { name: "零食", details: ["甜点", "饼干", "坚果", "膨化食品"] },
+      { name: "零食", details: ["甜点", "饼干", "坚果", "膨化食品", "冰淇淋"] },
+      { name: "聚餐", details: ["朋友聚餐", "家庭聚餐", "工作聚餐", "请客"] },
     ],
   },
   {
     main: "交通",
     branches: [
-      { name: "公共交通", details: ["地铁", "公交", "火车", "高铁"] },
-      { name: "打车", details: ["网约车", "出租车", "顺风车"] },
-      { name: "自驾", details: ["加油", "停车", "高速费", "保养"] },
+      { name: "公共交通", details: ["地铁", "公交", "火车", "高铁", "飞机", "轮船"] },
+      { name: "打车", details: ["网约车", "出租车", "顺风车", "代驾"] },
+      { name: "自驾", details: ["加油", "充电", "停车", "高速费", "保养", "洗车"] },
+      { name: "骑行", details: ["共享单车", "自行车维修", "骑行装备"] },
+    ],
+  },
+  {
+    main: "居住",
+    branches: [
+      { name: "房屋", details: ["房租", "房贷", "物业费", "维修"] },
+      { name: "能源", details: ["水费", "电费", "燃气费", "取暖费"] },
+      { name: "家居", details: ["家具", "床品", "厨具", "装饰", "家电"] },
     ],
   },
   {
     main: "购物",
     branches: [
       { name: "日用品", details: ["纸巾", "洗护", "清洁", "收纳"] },
-      { name: "服饰", details: ["衣服", "鞋包", "配饰"] },
-      { name: "数码", details: ["配件", "软件", "设备"] },
+      { name: "服饰", details: ["衣服", "鞋包", "鞋靴", "箱包", "配饰", "洗护"] },
+      { name: "数码", details: ["手机", "电脑", "配件", "软件", "设备维修"] },
+      { name: "美妆", details: ["护肤", "彩妆", "香水", "美容美发"] },
+    ],
+  },
+  {
+    main: "通讯",
+    branches: [
+      { name: "通信", details: ["手机话费", "流量包", "宽带", "设备套餐"] },
+      { name: "邮寄", details: ["快递", "同城配送", "文件寄送"] },
     ],
   },
   {
     main: "学习",
     branches: [
-      { name: "课程", details: ["线上课", "线下课", "训练营"] },
-      { name: "资料", details: ["书籍", "论文", "会员", "文具"] },
+      { name: "课程", details: ["线上课", "线下课", "训练营", "考试报名"] },
+      { name: "资料", details: ["书籍", "论文", "数据库", "会员", "文具", "打印装订"] },
+      { name: "科研", details: ["实验耗材", "版面费", "会议注册", "学术差旅", "软件服务"] },
+    ],
+  },
+  {
+    main: "工作",
+    branches: [
+      { name: "差旅", details: ["交通", "住宿", "餐饮", "市内交通", "签证"] },
+      { name: "办公", details: ["办公用品", "打印", "软件", "设备", "场地"] },
+      { name: "代垫", details: ["项目代垫", "团队代垫", "客户代垫", "待报销"] },
     ],
   },
   {
     main: "娱乐",
     branches: [
-      { name: "休闲", details: ["电影", "游戏", "演出", "旅行"] },
-      { name: "社交", details: ["聚餐", "礼物", "活动"] },
+      { name: "休闲", details: ["电影", "游戏", "演出", "展览", "KTV", "桌游"] },
+      { name: "兴趣", details: ["摄影", "音乐", "手工", "收藏", "户外"] },
+    ],
+  },
+  {
+    main: "旅行",
+    branches: [
+      { name: "行程", details: ["机票", "火车", "租车", "当地交通"] },
+      { name: "住宿", details: ["酒店", "民宿", "青旅", "营地"] },
+      { name: "游玩", details: ["门票", "导览", "体验项目", "伴手礼"] },
     ],
   },
   {
     main: "健康",
     branches: [
-      { name: "医疗", details: ["挂号", "药品", "检查", "保险"] },
-      { name: "运动", details: ["健身", "装备", "场地"] },
+      { name: "医疗", details: ["挂号", "药品", "检查", "治疗", "牙科", "体检"] },
+      { name: "运动", details: ["健身", "课程", "装备", "场地", "赛事"] },
+      { name: "保障", details: ["医疗保险", "意外险", "健康服务"] },
+    ],
+  },
+  {
+    main: "人情往来",
+    branches: [
+      { name: "礼金", details: ["婚礼", "生日", "节日", "探望", "其他礼金"] },
+      { name: "礼物", details: ["家人", "朋友", "同事", "老师", "客户"] },
+      { name: "请客", details: ["聚餐", "茶饮", "活动", "答谢"] },
+    ],
+  },
+  {
+    main: "家庭",
+    branches: [
+      { name: "长辈", details: ["生活费", "医疗", "礼物", "出行"] },
+      { name: "儿童", details: ["教育", "用品", "医疗", "娱乐"] },
+      { name: "家庭事务", details: ["家政", "维修", "证件", "共同支出"] },
+    ],
+  },
+  {
+    main: "宠物",
+    branches: [
+      { name: "日常", details: ["主粮", "零食", "用品", "洗护"] },
+      { name: "医疗", details: ["疫苗", "驱虫", "看诊", "药品"] },
+    ],
+  },
+  {
+    main: "订阅服务",
+    branches: [
+      { name: "数字服务", details: ["影音会员", "软件订阅", "云存储", "AI 服务"] },
+      { name: "生活会员", details: ["购物会员", "外卖会员", "健身会员", "其他会员"] },
+    ],
+  },
+  {
+    main: "金融",
+    branches: [
+      { name: "费用", details: ["手续费", "利息", "税费", "罚款"] },
+      { name: "保障", details: ["财产保险", "车险", "其他保险"] },
     ],
   },
   { main: "其他", branches: [{ name: "未分类", details: ["临时支出", "其他"] }] },
@@ -274,11 +352,13 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
   const [expenseCategorySub, setExpenseCategorySub] = useState(defaultCategoryPath.sub);
   const [expenseCategoryDetail, setExpenseCategoryDetail] = useState(defaultCategoryPath.detail);
   const [expenseNote, setExpenseNote] = useState("");
+  const [expenseExcludedFromBudget, setExpenseExcludedFromBudget] = useState(false);
   const [editExpenseAmount, setEditExpenseAmount] = useState("");
   const [editExpenseCategoryMain, setEditExpenseCategoryMain] = useState(defaultCategoryPath.main);
   const [editExpenseCategorySub, setEditExpenseCategorySub] = useState(defaultCategoryPath.sub);
   const [editExpenseCategoryDetail, setEditExpenseCategoryDetail] = useState(defaultCategoryPath.detail);
   const [editExpenseNote, setEditExpenseNote] = useState("");
+  const [editExpenseExcludedFromBudget, setEditExpenseExcludedFromBudget] = useState(false);
   const [dailyBudgetAmount, setDailyBudgetAmount] = useState("");
   const [weeklyBudgetAmount, setWeeklyBudgetAmount] = useState("");
   const [monthlyBudgetAmount, setMonthlyBudgetAmount] = useState("");
@@ -286,6 +366,14 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
   const summary = summaryCache[date] ?? createEmptySummary(date);
   const loading = Boolean(loadingDates[date]);
   const hasCachedSummary = Boolean(summaryCache[date]);
+  const excludedExpenses = useMemo(
+    () => summary.expenses.filter((expense) => expense.excluded_from_budget),
+    [summary.expenses],
+  );
+  const excludedExpenseTotal = useMemo(
+    () => excludedExpenses.reduce((sum, expense) => sum + expense.amount, 0),
+    [excludedExpenses],
+  );
 
   const categorySubOptions = useMemo(
     () => getCategoryGroup(expenseCategoryMain).branches,
@@ -400,6 +488,7 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
           category_detail: expenseCategoryDetail,
           note: expenseNote,
           expense_date: date,
+          excluded_from_budget: expenseExcludedFromBudget,
         }),
       });
 
@@ -409,6 +498,7 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
 
       setExpenseAmount("");
       setExpenseNote("");
+      setExpenseExcludedFromBudget(false);
       await refreshAfterMutation();
       toast.success("支出已添加。");
     } catch (error) {
@@ -485,6 +575,7 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
     setEditExpenseCategorySub(path.sub);
     setEditExpenseCategoryDetail(path.detail);
     setEditExpenseNote(expense.note ?? "");
+    setEditExpenseExcludedFromBudget(Boolean(expense.excluded_from_budget));
   }
 
   function handleCancelEditExpense() {
@@ -494,6 +585,7 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
     setEditExpenseCategorySub(defaultCategoryPath.sub);
     setEditExpenseCategoryDetail(defaultCategoryPath.detail);
     setEditExpenseNote("");
+    setEditExpenseExcludedFromBudget(false);
   }
 
   async function handleUpdateExpense(expenseId: string) {
@@ -516,6 +608,7 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
           category_detail: editExpenseCategoryDetail,
           note: editExpenseNote,
           expense_date: date,
+          excluded_from_budget: editExpenseExcludedFromBudget,
         }),
       });
 
@@ -584,12 +677,18 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
           <div className="rounded-lg border border-stone-200 bg-white px-3 py-3">
             <p className="flex items-center gap-1.5 text-xs font-medium text-stone-500">
               <ReceiptText className="h-3.5 w-3.5" aria-hidden />
-              当天支出
+              个人预算支出
             </p>
             <p className="mt-1 text-xl font-semibold text-stone-950">{formatMoney(summary.totalExpense)}</p>
             <p className={`mt-1 text-xs font-medium ${remainingClassName}`}>
               每日预算 {summary.dailyBudget ? formatMoney(summary.dailyBudget.amount) : "未设置"}，剩余 {formatMoney(summary.remainingBudget)}
             </p>
+            {excludedExpenses.length > 0 ? (
+              <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-700">
+                <BriefcaseBusiness className="h-3 w-3" aria-hidden />
+                另有 {excludedExpenses.length} 笔不计预算 · {formatMoney(excludedExpenseTotal)}
+              </p>
+            ) : null}
           </div>
           <div className="rounded-lg border border-stone-200 bg-white px-3 py-3">
             <p className="flex items-center gap-1.5 text-xs font-medium text-stone-500">
@@ -691,6 +790,21 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
                             aria-label="支出备注"
                             placeholder="备注"
                           />
+                          <div className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50/70 px-2.5 py-2">
+                            <div className="min-w-0">
+                              <Label htmlFor={`edit-expense-excluded-${expense.id}`} className="text-xs font-semibold text-amber-950">
+                                不计入个人预算
+                              </Label>
+                              <p className="text-[11px] text-amber-700">出差、报销或代垫支出</p>
+                            </div>
+                            <Switch
+                              id={`edit-expense-excluded-${expense.id}`}
+                              size="sm"
+                              checked={editExpenseExcludedFromBudget}
+                              onCheckedChange={setEditExpenseExcludedFromBudget}
+                              aria-label="不计入个人预算"
+                            />
+                          </div>
                           <div className="flex justify-end gap-2">
                             <Button type="button" size="sm" variant="ghost" onClick={handleCancelEditExpense} disabled={isUpdating}>
                               <X className="h-3.5 w-3.5" />
@@ -711,6 +825,12 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
                                 {categoryPath.sub} / {categoryPath.detail}
                               </span>
                               <span className="text-sm font-semibold text-stone-950">{formatMoney(expense.amount)}</span>
+                              {expense.excluded_from_budget ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                                  <BriefcaseBusiness className="h-3 w-3" aria-hidden />
+                                  出差/报销 · 不计预算
+                                </span>
+                              ) : null}
                             </div>
                             {expense.note ? <p className="mt-1 truncate text-xs text-stone-500">{expense.note}</p> : null}
                           </div>
@@ -800,6 +920,20 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
                 <div className="space-y-1.5">
                   <Label htmlFor="expense-note">备注</Label>
                   <Input id="expense-note" value={expenseNote} onChange={(event) => setExpenseNote(event.target.value)} placeholder="可选" />
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2">
+                  <div className="min-w-0">
+                    <Label htmlFor="expense-excluded-from-budget" className="text-sm font-semibold text-amber-950">
+                      不计入个人预算
+                    </Label>
+                    <p className="text-[11px] text-amber-700">适合出差、报销或代垫支出</p>
+                  </div>
+                  <Switch
+                    id="expense-excluded-from-budget"
+                    checked={expenseExcludedFromBudget}
+                    onCheckedChange={setExpenseExcludedFromBudget}
+                    aria-label="不计入个人预算"
+                  />
                 </div>
                 <Button type="button" className="w-full" onClick={() => void handleAddExpense()} disabled={savingExpense}>
                   <Plus className="h-3.5 w-3.5" />

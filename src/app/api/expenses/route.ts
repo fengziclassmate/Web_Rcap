@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   EXPENSE_SELECT_COLUMNS,
-  getAuthenticatedSupabase,
   jsonError,
   parseDateQuery,
   parseExpenseInput,
-  sumExpenses,
+  sumBudgetExpenses,
   toExpenseDto,
 } from "@/lib/expense-api";
+import { getAuthenticatedSupabase } from "@/lib/server/supabase-auth";
 
 export const runtime = "nodejs";
 
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     date: parsedDate.date,
     expenses,
-    totalAmount: sumExpenses(expenses),
+    totalAmount: sumBudgetExpenses(expenses),
   });
 }
 
