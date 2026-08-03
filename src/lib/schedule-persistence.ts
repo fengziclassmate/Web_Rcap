@@ -1,4 +1,4 @@
-import type { FootprintItem, AnnualTask, DashboardUiPreferences, LongTask, ProjectCheckin, ScheduleEvent } from "@/lib/types";
+import type { FootprintItem, AnnualTask, DashboardUiPreferences, LongTask, ProjectCheckin, ScheduleEvent, ShoppingItem } from "@/lib/types";
 import type {
   Achievement,
   GroupMeetingRecord,
@@ -22,6 +22,7 @@ import {
   normalizePaperProgress,
   normalizeProjectCheckins,
   normalizeResearchProjects,
+  normalizeShoppingItems,
   normalizeSubmissions,
   normalizeTasks,
 } from "@/lib/normalizers";
@@ -33,6 +34,7 @@ export type PersistedSchedulePayload = {
   events: ScheduleEvent[];
   tasks: LongTask[];
   annual_tasks: AnnualTask[];
+  shopping_items: ShoppingItem[];
   project_checkins: ProjectCheckin[];
   footprints: FootprintItem[];
   achievements: Achievement[];
@@ -57,6 +59,7 @@ function normalizePersistedSchedulePayload(
     events: normalizeEvents(value.events),
     tasks: normalizeTasks(value.tasks),
     annual_tasks: normalizeAnnualTasks(value.annual_tasks),
+    shopping_items: normalizeShoppingItems(value.shopping_items),
     project_checkins: normalizeProjectCheckins(value.project_checkins),
     footprints: normalizeFootprints(value.footprints),
     achievements: normalizeAchievements(value.achievements),

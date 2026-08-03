@@ -10,6 +10,7 @@ import type {
   Priority,
   ProjectCheckin,
   ScheduleEvent,
+  ShoppingItem,
   TaskUncertaintyLevel,
   TaskUncertaintyProfile,
 } from "@/lib/types";
@@ -27,6 +28,7 @@ import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/cate
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   timeGranularity: 60,
   annualSectionOpen: true,
+  shoppingSectionOpen: true,
   longTaskSectionOpen: true,
   completedSectionOpen: true,
   dailyArchiveSectionOpen: false,
@@ -146,6 +148,24 @@ export function normalizeAnnualTasks(payload: unknown): AnnualTask[] {
       name: typeof value.name === "string" ? value.name : "\u672a\u547d\u540d\u5e74\u5ea6\u4efb\u52a1",
       done: Boolean(value.done),
     };
+  });
+}
+
+export function normalizeShoppingItems(payload: unknown): ShoppingItem[] {
+  if (!Array.isArray(payload)) return [];
+  return payload.flatMap((item, index) => {
+    if (!item || typeof item !== "object") return [];
+    const value = item as Partial<ShoppingItem>;
+    const name = typeof value.name === "string" ? value.name.trim() : "";
+    if (!name) return [];
+    return [{
+      id: typeof value.id === "string" && value.id.length > 0
+        ? value.id
+        : `shopping-restored-${index}`,
+      name,
+      addedAt: typeof value.addedAt === "string" ? value.addedAt : "",
+      done: Boolean(value.done),
+    }];
   });
 }
 
@@ -348,6 +368,8 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
       : 60,
     annualSectionOpen:
       typeof value.annualSectionOpen === "boolean" ? value.annualSectionOpen : true,
+    shoppingSectionOpen:
+      typeof value.shoppingSectionOpen === "boolean" ? value.shoppingSectionOpen : true,
     longTaskSectionOpen:
       typeof value.longTaskSectionOpen === "boolean" ? value.longTaskSectionOpen : true,
     completedSectionOpen:

@@ -32,6 +32,7 @@ import {
   type Priority,
   type ProjectCheckin,
   type ScheduleEvent,
+  type ShoppingItem,
   type SubTask,
   type TaskType,
   type TaskUncertaintyLevel,
@@ -57,6 +58,7 @@ import { ContextBadge } from "@/components/llm/context-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { Achievement } from "@/lib/legacy-research";
 import { DailyTaskPanel } from "@/components/schedule/daily-task-panel";
+import { ShoppingList } from "@/components/schedule/shopping-list";
 import { cn } from "@/lib/utils";
 
 type TaskDashboardProps = {
@@ -73,6 +75,10 @@ type TaskDashboardProps = {
   onDeleteAnnualTask: (taskId: string) => void;
   onUpdateAnnualTask: (taskId: string, name: string) => void;
   onReorderAnnualTask: (sourceTaskId: string, targetTaskId: string) => void;
+  shoppingItems: ShoppingItem[];
+  onAddShoppingItem: (name: string) => void;
+  onToggleShoppingItem: (itemId: string) => void;
+  onDeleteShoppingItem: (itemId: string) => void;
   onCreateDailyTaskTimeBlock: (
     task: LongTask,
     date: string,
@@ -303,6 +309,10 @@ export function TaskDashboard({
   onDeleteAnnualTask,
   onUpdateAnnualTask,
   onReorderAnnualTask,
+  shoppingItems,
+  onAddShoppingItem,
+  onToggleShoppingItem,
+  onDeleteShoppingItem,
   onCreateDailyTaskTimeBlock,
   projectCheckins,
   onAddProjectCheckin,
@@ -371,6 +381,7 @@ export function TaskDashboard({
   const [editingFootprintDate, setEditingFootprintDate] = useState(getTodayISODate);
   const longTaskSectionOpen = uiPreferences.longTaskSectionOpen;
   const annualSectionOpen = uiPreferences.annualSectionOpen;
+  const shoppingSectionOpen = uiPreferences.shoppingSectionOpen;
   const expandedCompletedTasks = useMemo(
     () => new Set(uiPreferences.expandedCompletedTasks),
     [uiPreferences.expandedCompletedTasks],
@@ -2075,6 +2086,17 @@ export function TaskDashboard({
           </CollapsibleContent>
         </Collapsible>
       </div>
+
+      <Separator />
+
+      <ShoppingList
+        items={shoppingItems}
+        open={shoppingSectionOpen}
+        onOpenChange={(open) => patchUiPreferences({ shoppingSectionOpen: open })}
+        onAddItem={onAddShoppingItem}
+        onToggleItem={onToggleShoppingItem}
+        onDeleteItem={onDeleteShoppingItem}
+      />
 
       {showFootprintsSection ? (
         <>

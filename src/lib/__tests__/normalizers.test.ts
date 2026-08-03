@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeDashboardUiPreferences,
   normalizeEvents,
+  normalizeShoppingItems,
   normalizeTasks,
 } from "../normalizers";
 
@@ -32,6 +33,25 @@ describe("normalizers", () => {
       expect.objectContaining({
         priority: "\u4e0d\u7d27\u6025\u4e0d\u91cd\u8981",
       }),
+    ]);
+  });
+
+  it("normalizes shopping items while preserving their added time", () => {
+    expect(normalizeShoppingItems([
+      {
+        id: "shopping-1",
+        name: "  便携水杯  ",
+        addedAt: "2026-08-03T10:15:00.000Z",
+        done: true,
+      },
+      { name: "" },
+    ])).toEqual([
+      {
+        id: "shopping-1",
+        name: "便携水杯",
+        addedAt: "2026-08-03T10:15:00.000Z",
+        done: true,
+      },
     ]);
   });
   it("keeps daily task metadata while defaulting legacy tasks to long tasks", () => {

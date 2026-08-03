@@ -297,7 +297,8 @@
   }
 
   .daily-task-row,
-  .annual-task-row {
+  .annual-task-row,
+  .shopping-item-row {
     display: flex;
     align-items: flex-start;
     gap: 0.55rem;

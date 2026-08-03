@@ -21,6 +21,10 @@ describe("TaskDashboard annual section", () => {
         onDeleteAnnualTask={noop}
         onUpdateAnnualTask={noop}
         onReorderAnnualTask={noop}
+        shoppingItems={[]}
+        onAddShoppingItem={noop}
+        onToggleShoppingItem={noop}
+        onDeleteShoppingItem={noop}
         onCreateDailyTaskTimeBlock={noop}
         projectCheckins={[]}
         onAddProjectCheckin={noop}
@@ -51,6 +55,10 @@ describe("TaskDashboard annual section", () => {
     expect(addButton.parentElement).toBe(collapseTrigger.parentElement);
     expect(addButton.className).toContain("right-9");
     expect(collapseTrigger.querySelector("svg")?.className.baseVal).toContain("right-3");
+    expect(
+      collapseTrigger.compareDocumentPosition(screen.getByTestId("shopping-list")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
 
     fireEvent.click(addButton);
     expect(screen.getByRole("dialog")).toBeTruthy();

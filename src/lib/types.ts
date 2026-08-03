@@ -84,6 +84,13 @@ export type AnnualTask = {
   done: boolean;
 };
 
+export type ShoppingItem = {
+  id: string;
+  name: string;
+  addedAt: string;
+  done: boolean;
+};
+
 export type DailyCheckinSlot = {
   id: string;
   label: string;
@@ -115,6 +122,7 @@ export type FootprintItem = {
 export type DashboardUiPreferences = {
   timeGranularity: 5 | 15 | 30 | 60 | "45-15" | "50-10";
   annualSectionOpen: boolean;
+  shoppingSectionOpen: boolean;
   longTaskSectionOpen: boolean;
   completedSectionOpen: boolean;
   dailyArchiveSectionOpen: boolean;

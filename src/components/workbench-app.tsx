@@ -29,6 +29,7 @@ import {
   type Priority,
   type ProjectCheckin,
   type ScheduleEvent,
+  type ShoppingItem,
 } from "@/lib/types";
 import {
   defaultDashboardUiPreferences,
@@ -44,6 +45,7 @@ import {
   normalizePaperProgress,
   normalizeProjectCheckins,
   normalizeResearchProjects,
+  normalizeShoppingItems,
   normalizeSubmissions,
   normalizeTasks,
 } from "@/lib/normalizers";
@@ -203,6 +205,7 @@ export function WorkbenchApp() {
   const [events, setEvents] = useState<ScheduleEvent[]>(defaultEvents);
   const [tasks, setTasks] = useState<LongTask[]>(defaultTasks);
   const [annualTasks, setAnnualTasks] = useState<AnnualTask[]>([]);
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
   const [projectCheckins, setProjectCheckins] = useState<ProjectCheckin[]>([]);
   const [footprints, setFootprints] = useState<FootprintItem[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -249,6 +252,7 @@ export function WorkbenchApp() {
       events,
       tasks,
       annual_tasks: annualTasks,
+      shopping_items: shoppingItems,
       project_checkins: projectCheckins,
       footprints,
       achievements,
@@ -270,6 +274,7 @@ export function WorkbenchApp() {
       paperProgress,
       projectCheckins,
       researchProjects,
+      shoppingItems,
       submissions,
       tasks,
     ],
@@ -417,6 +422,7 @@ export function WorkbenchApp() {
       setEvents(defaultEvents);
       setTasks(defaultTasks);
       setAnnualTasks([]);
+      setShoppingItems([]);
       setProjectCheckins([]);
       setFootprints([]);
       setAchievements([]);
@@ -460,6 +466,7 @@ export function WorkbenchApp() {
           events: unknown;
           tasks: unknown;
           annual_tasks: unknown;
+          shopping_items?: unknown;
           project_checkins: unknown;
           footprints: unknown;
           ui_preferences?: unknown;
@@ -474,7 +481,7 @@ export function WorkbenchApp() {
         const primary = await supabase
           .from("schedule_data")
           .select(
-            "events,tasks,annual_tasks,project_checkins,footprints,ui_preferences,achievements,research_projects,paper_progress,submissions,group_meetings,continuity_state",
+            "events,tasks,annual_tasks,shopping_items,project_checkins,footprints,ui_preferences,achievements,research_projects,paper_progress,submissions,group_meetings,continuity_state",
           )
           .eq("user_id", user.id)
           .maybeSingle();
@@ -489,7 +496,8 @@ export function WorkbenchApp() {
             isColumnMissing(error.message, "paper_progress") ||
             isColumnMissing(error.message, "submissions") ||
             isColumnMissing(error.message, "group_meetings") ||
-            isColumnMissing(error.message, "continuity_state"))
+            isColumnMissing(error.message, "continuity_state") ||
+            isColumnMissing(error.message, "shopping_items"))
         ) {
           const onlyContinuityMissing = isColumnMissing(error.message, "continuity_state") &&
             !isUiPreferencesColumnMissing(error.message) &&
@@ -497,12 +505,23 @@ export function WorkbenchApp() {
             !isColumnMissing(error.message, "research_projects") &&
             !isColumnMissing(error.message, "paper_progress") &&
             !isColumnMissing(error.message, "submissions") &&
-            !isColumnMissing(error.message, "group_meetings");
+            !isColumnMissing(error.message, "group_meetings") &&
+            !isColumnMissing(error.message, "shopping_items");
+          const onlyShoppingMissing = isColumnMissing(error.message, "shopping_items") &&
+            !isUiPreferencesColumnMissing(error.message) &&
+            !isColumnMissing(error.message, "achievements") &&
+            !isColumnMissing(error.message, "research_projects") &&
+            !isColumnMissing(error.message, "paper_progress") &&
+            !isColumnMissing(error.message, "submissions") &&
+            !isColumnMissing(error.message, "group_meetings") &&
+            !isColumnMissing(error.message, "continuity_state");
           const fallback = await supabase
             .from("schedule_data")
             .select(
               onlyContinuityMissing
-                ? "events,tasks,annual_tasks,project_checkins,footprints,ui_preferences,achievements,research_projects,paper_progress,submissions,group_meetings"
+                ? "events,tasks,annual_tasks,shopping_items,project_checkins,footprints,ui_preferences,achievements,research_projects,paper_progress,submissions,group_meetings"
+                : onlyShoppingMissing
+                  ? "events,tasks,annual_tasks,project_checkins,footprints,ui_preferences,achievements,research_projects,paper_progress,submissions,group_meetings,continuity_state"
                 : "events,tasks,annual_tasks,project_checkins,footprints",
             )
             .eq("user_id", user.id)
@@ -521,6 +540,7 @@ export function WorkbenchApp() {
             setEvents(localBackup.events);
             setTasks(localBackup.tasks);
             setAnnualTasks(localBackup.annual_tasks);
+            setShoppingItems(localBackup.shopping_items);
             setProjectCheckins(localBackup.project_checkins);
             setFootprints(localBackup.footprints);
             setAchievements(localBackup.achievements);
@@ -557,6 +577,9 @@ export function WorkbenchApp() {
             events: normalizeEvents(data.events),
             tasks: normalizeTasks(data.tasks),
             annual_tasks: normalizeAnnualTasks((data as { annual_tasks?: unknown }).annual_tasks),
+            shopping_items: normalizeShoppingItems(
+              (data as { shopping_items?: unknown }).shopping_items,
+            ),
             project_checkins: normalizeProjectCheckins(
               (data as { project_checkins?: unknown }).project_checkins,
             ),
@@ -584,6 +607,7 @@ export function WorkbenchApp() {
           setEvents(normalized.events);
           setTasks(normalized.tasks);
           setAnnualTasks(normalized.annual_tasks);
+          setShoppingItems(normalized.shopping_items);
           setProjectCheckins(normalized.project_checkins);
           setFootprints(normalized.footprints);
           setAchievements(normalized.achievements);
@@ -601,6 +625,7 @@ export function WorkbenchApp() {
             setEvents(localBackup.events);
             setTasks(localBackup.tasks);
             setAnnualTasks(localBackup.annual_tasks);
+            setShoppingItems(localBackup.shopping_items);
             setProjectCheckins(localBackup.project_checkins);
             setFootprints(localBackup.footprints);
             setAchievements(localBackup.achievements);
@@ -616,6 +641,7 @@ export function WorkbenchApp() {
               events: defaultEvents,
               tasks: defaultTasks,
               annual_tasks: [],
+              shopping_items: [],
               project_checkins: [],
               footprints: [],
               achievements: [],
@@ -631,6 +657,7 @@ export function WorkbenchApp() {
             setEvents(emptyState.events);
             setTasks(emptyState.tasks);
             setAnnualTasks(emptyState.annual_tasks);
+            setShoppingItems(emptyState.shopping_items);
             setProjectCheckins(emptyState.project_checkins);
             setFootprints(emptyState.footprints);
             setAchievements(emptyState.achievements);
@@ -687,6 +714,7 @@ export function WorkbenchApp() {
         const missingSubmissions = isColumnMissing(withPreferences.error.message, "submissions");
         const missingMeetings = isColumnMissing(withPreferences.error.message, "group_meetings");
         const missingContinuity = isColumnMissing(withPreferences.error.message, "continuity_state");
+        const missingShopping = isColumnMissing(withPreferences.error.message, "shopping_items");
         if (
           missingUi ||
           missingAchievements ||
@@ -694,13 +722,15 @@ export function WorkbenchApp() {
           missingPaper ||
           missingSubmissions ||
           missingMeetings ||
-          missingContinuity
+          missingContinuity ||
+          missingShopping
         ) {
           const fallbackPayload = {
             user_id: payload.user_id,
             events: payload.events,
             tasks: payload.tasks,
             annual_tasks: payload.annual_tasks,
+            ...(missingShopping ? {} : { shopping_items: payload.shopping_items }),
             project_checkins: payload.project_checkins,
             footprints: payload.footprints,
             ...(missingAchievements ? {} : { achievements: payload.achievements }),
@@ -2204,6 +2234,30 @@ export function WorkbenchApp() {
     });
   }
 
+  function handleAddShoppingItem(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setShoppingItems((prev) => [
+      ...prev,
+      {
+        id: createId("shopping"),
+        name: trimmed,
+        addedAt: new Date().toISOString(),
+        done: false,
+      },
+    ]);
+  }
+
+  function handleToggleShoppingItem(itemId: string) {
+    setShoppingItems((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, done: !item.done } : item)),
+    );
+  }
+
+  function handleDeleteShoppingItem(itemId: string) {
+    setShoppingItems((prev) => prev.filter((item) => item.id !== itemId));
+  }
+
   function handleAddProjectCheckin(name: string, description: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -2579,6 +2633,10 @@ export function WorkbenchApp() {
                   onDeleteAnnualTask={handleDeleteAnnualTask}
                   onUpdateAnnualTask={handleUpdateAnnualTask}
                   onReorderAnnualTask={handleReorderAnnualTask}
+                  shoppingItems={shoppingItems}
+                  onAddShoppingItem={handleAddShoppingItem}
+                  onToggleShoppingItem={handleToggleShoppingItem}
+                  onDeleteShoppingItem={handleDeleteShoppingItem}
                   onCreateDailyTaskTimeBlock={handleCreateDailyTaskTimeBlock}
                   projectCheckins={projectCheckins}
                   onAddProjectCheckin={handleAddProjectCheckin}
