@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Archive,
   CalendarRange,
   ChevronDown,
   CheckCircle,
@@ -88,6 +89,7 @@ type TaskDashboardProps = {
   projectCheckins: ProjectCheckin[];
   onAddProjectCheckin: (name: string, description: string) => void;
   onCheckinProject: (projectId: string, date: string, note: string) => void;
+  onArchiveProjectCheckin: (projectId: string) => void;
   onDeleteProjectCheckin: (projectId: string) => void;
   onUpdateProjectCheckin: (
     projectId: string,
@@ -317,6 +319,7 @@ export function TaskDashboard({
   projectCheckins,
   onAddProjectCheckin,
   onCheckinProject,
+  onArchiveProjectCheckin,
   onDeleteProjectCheckin,
   onUpdateProjectCheckin,
   onUpdateRoutineCheckins,
@@ -453,6 +456,7 @@ export function TaskDashboard({
         description: "",
         startDate: todayDate,
         checkins: [],
+        archives: [],
         dailyCheckins: [],
         dailyCompletions: [],
       },
@@ -1581,6 +1585,7 @@ export function TaskDashboard({
             <div className="space-y-3">
               {visibleProjectCheckins.map((project) => {
                 const projectExpanded = expandedProjects.has(project.id);
+                const archivedCycles = project.archives ?? [];
             const today = getTodayISODate();
             const doneCount = project.checkins.length;
             const trackedStartDate = project.checkins.reduce(
@@ -1631,15 +1636,21 @@ export function TaskDashboard({
                     <div className="mb-2 h-2 rounded bg-gray-100">
                       <div className="h-2 rounded bg-black" style={{ width: `${percent}%` }} />
                     </div>
-                    <p className="mb-2 text-xs text-gray-600">
-                      进度：{doneCount}/{totalDays}（{percent}%）
-                    </p>
+                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                      <span>本阶段：{doneCount}/{totalDays}（{percent}%）</span>
+                      {archivedCycles.length > 0 ? (
+                        <Badge variant="outline" className="h-5 bg-white text-[10px] font-normal text-stone-600">
+                          已存档 {archivedCycles.length} 期
+                        </Badge>
+                      ) : null}
+                    </div>
                     <div className="grid gap-2 rounded-lg border border-gray-200 bg-gray-50/70 p-2 sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-end">
                       <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-gray-600">打卡日期</Label>
                         <Input
                           type="date"
                           value={projectDateDraft[project.id] ?? todayDate}
+                          min={project.startDate}
                           max={todayDate}
                           onChange={(event) =>
                             setProjectDateDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
@@ -1682,15 +1693,32 @@ export function TaskDashboard({
                         </ul>
                       )}
                     </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="mt-2 w-full"
-                      onClick={() => setHistoryProjectId(project.id)}
-                    >
-                      查看全部打卡历史
-                    </Button>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setHistoryProjectId(project.id)}
+                      >
+                        查看记录与存档
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 border-amber-200 bg-amber-50/60 text-amber-800 hover:bg-amber-100"
+                        disabled={project.checkins.length === 0}
+                        onClick={() =>
+                          withOptionalConfirm(
+                            `将当前阶段的 ${project.checkins.length} 条打卡存档，并从今天重新计数吗？`,
+                            () => onArchiveProjectCheckin(project.id),
+                          )
+                        }
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                        存档并重新开始
+                      </Button>
+                    </div>
                   </>
                 ) : null}
               </div>
@@ -2357,10 +2385,15 @@ export function TaskDashboard({
           <DialogContent className="rounded-sm border-gray-200">
             <DialogHeader>
               <DialogTitle className="text-sm">
-                {historyProject.name} · 全部打卡历史
+                {historyProject.name} · 记录与存档
               </DialogTitle>
             </DialogHeader>
-            <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+            <div className="max-h-[520px] space-y-4 overflow-y-auto pr-1">
+              <section className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-stone-800">当前阶段</p>
+                  <span className="text-[11px] text-stone-500">{historyProject.startDate} 至今</span>
+                </div>
               {[...historyProject.checkins]
                 .sort((a, b) => b.date.localeCompare(a.date))
                 .map((entry, index) => (
@@ -2412,9 +2445,38 @@ export function TaskDashboard({
                 ))}
               {historyProject.checkins.length === 0 ? (
                 <p className="rounded-md border border-gray-200 p-3 text-sm text-gray-500">
-                  暂无打卡记录
+                  当前阶段暂无打卡记录
                 </p>
               ) : null}
+              </section>
+
+              <section className="space-y-2 border-t border-stone-200 pt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-stone-800">历史阶段</p>
+                  <span className="text-[11px] text-stone-500">{(historyProject.archives ?? []).length} 期</span>
+                </div>
+                {(historyProject.archives ?? []).map((archive, index) => (
+                  <details key={archive.id} className="group rounded-lg border border-amber-100 bg-amber-50/45 px-3 py-2">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs text-stone-700">
+                      <span className="font-medium">第 {(historyProject.archives ?? []).length - index} 期 · {archive.checkins.length} 次打卡</span>
+                      <span className="shrink-0 text-[11px] text-stone-500">{archive.startDate} 至 {archive.endDate}</span>
+                    </summary>
+                    <ul className="mt-2 space-y-1.5 border-t border-amber-100 pt-2">
+                      {[...archive.checkins].sort((a, b) => b.date.localeCompare(a.date)).map((entry, entryIndex) => (
+                        <li key={`${archive.id}-${entry.date}-${entryIndex}`} className="flex gap-2 text-xs text-stone-600">
+                          <span className="shrink-0 font-medium text-stone-700">{entry.date}</span>
+                          <span>{entry.note || "（无描述）"}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ))}
+                {(historyProject.archives ?? []).length === 0 ? (
+                  <p className="rounded-md border border-dashed border-stone-200 p-3 text-xs text-stone-500">
+                    还没有历史存档。当前阶段存档后，会在这里保留原有记录。
+                  </p>
+                ) : null}
+              </section>
             </div>
           </DialogContent>
         ) : null}

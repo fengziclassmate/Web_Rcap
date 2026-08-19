@@ -15,6 +15,7 @@ export type RecurrenceInstanceOverride = Partial<{
   notes: string;
   requirements: string[];
   isCompleted: boolean;
+  meetingRecordId: string;
   category: string;
   tag: string | null;
   linkedDailyTaskId: string;
@@ -30,6 +31,7 @@ export type ExpandableScheduleEvent = {
   notes: string;
   requirements: string[];
   isCompleted: boolean;
+  meetingRecordId?: string;
   category: string;
   tag: string | null;
   linkedDailyTaskId?: string;
@@ -142,6 +144,7 @@ const RECURRENCE_INSTANCE_OVERRIDE_KEYS = [
   "notes",
   "requirements",
   "isCompleted",
+  "meetingRecordId",
   "category",
   "tag",
   "linkedDailyTaskId",

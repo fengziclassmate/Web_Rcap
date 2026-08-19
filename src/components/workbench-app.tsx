@@ -17,6 +17,14 @@ import { Input } from "@/components/ui/input";
 import { DEFAULT_SCHEDULE_CATEGORY } from "@/lib/categories";
 import { createId } from "@/lib/id";
 import {
+  detachDeletedMeetingRecords,
+  reconcileMeetingRecordLinks,
+} from "@/lib/meeting-record-links";
+import {
+  archiveProjectCheckinCycle,
+  isProjectCheckinDateInCurrentCycle,
+} from "@/lib/project-checkins";
+import {
   parseSyntheticEventId,
   pickRecurrenceOverridePatch,
 } from "@/lib/recurrence";
@@ -26,6 +34,7 @@ import {
   type DashboardUiPreferences,
   type FootprintItem,
   type LongTask,
+  type MeetingCompletionInput,
   type Priority,
   type ProjectCheckin,
   type ScheduleEvent,
@@ -127,9 +136,12 @@ import { WeeklyReportDialog } from "@/components/llm/weekly-report-dialog";
 import { buildResearchWorkflowFromLegacy } from "@/lib/research-workflow-legacy";
 import {
   defaultResearchWorkflowState,
+  emptyLinkState,
+  type GroupMeetingRecord as WorkflowGroupMeetingRecord,
   type MeetingAttachment,
   type ProjectAttachment,
   type ResearchWorkflowState,
+  type TimelineEntry,
 } from "@/lib/research-workflow";
 import {
   type LogComposerInput,
@@ -199,6 +211,7 @@ export function WorkbenchApp() {
   const lastLoadedSnapshotRef = useRef<string | null>(null);
   const canSyncResearchWorkflowRef = useRef(false);
   const lastResearchWorkflowSnapshotRef = useRef<string | null>(null);
+  const researchWorkflowOperationQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [isBooted, setIsBooted] = useState(false);
   const [activeModule, setActiveModule] = useState<MonitoringModuleId>("schedule");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getCurrentWeekStart);
@@ -220,6 +233,10 @@ export function WorkbenchApp() {
   const [researchWorkflow, setResearchWorkflow] = useState<ResearchWorkflowState>(
     defaultResearchWorkflowState,
   );
+  const researchMeetingRecordIds = useMemo(
+    () => new Set(researchWorkflow.meetings.map((meeting) => meeting.id)),
+    [researchWorkflow.meetings],
+  );
   const [researchWorkflowReady, setResearchWorkflowReady] = useState(false);
   const [logPosts, setLogPosts] = useState<LogPostRecord[]>([]);
   const [logTags, setLogTags] = useState<LogTag[]>([]);
@@ -231,6 +248,17 @@ export function WorkbenchApp() {
   const [dashboardUiPreferences, setDashboardUiPreferences] = useState<DashboardUiPreferences>(
     defaultDashboardUiPreferences,
   );
+
+  function enqueueResearchWorkflowOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const result = researchWorkflowOperationQueueRef.current
+      .catch(() => undefined)
+      .then(operation);
+    researchWorkflowOperationQueueRef.current = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
   const timeGranularity = dashboardUiPreferences.timeGranularity;
   const [user, setUser] = useState<User | null>(null);
   const [authEmail, setAuthEmail] = useState("");
@@ -806,20 +834,35 @@ export function WorkbenchApp() {
 
       const projectAttachmentQuery = queries[2];
       const meetingAttachmentQuery = queries[11];
+      const meetingQuery = queries[10];
+      const compatibilityWorkflow = meetingQuery.error
+        ? legacyFallback
+        : {
+            ...legacyFallback,
+            meetings: (meetingQuery.data ?? []).map((item) => fromMeetingRow(item)),
+          };
       const nonAttachmentQueries = queries.filter((_, index) => index !== 2 && index !== 11);
       const firstError = nonAttachmentQueries.find((item) => item.error)?.error ?? null;
       if (firstError) {
         if (firstError.message.includes("does not exist")) {
           canSyncResearchWorkflowRef.current = false;
-          lastResearchWorkflowSnapshotRef.current = JSON.stringify(legacyFallback);
-          setResearchWorkflow(legacyFallback);
+          lastResearchWorkflowSnapshotRef.current = JSON.stringify(compatibilityWorkflow);
+          setEvents((prev) => reconcileMeetingRecordLinks(
+            prev,
+            new Set(compatibilityWorkflow.meetings.map((meeting) => meeting.id)),
+          ));
+          setResearchWorkflow(compatibilityWorkflow);
           setResearchWorkflowReady(true);
           return;
         }
         toast.error(`Failed to load research workflow: ${firstError.message}`);
         canSyncResearchWorkflowRef.current = false;
-        lastResearchWorkflowSnapshotRef.current = JSON.stringify(legacyFallback);
-        setResearchWorkflow(legacyFallback);
+        lastResearchWorkflowSnapshotRef.current = JSON.stringify(compatibilityWorkflow);
+        setEvents((prev) => reconcileMeetingRecordLinks(
+          prev,
+          new Set(compatibilityWorkflow.meetings.map((meeting) => meeting.id)),
+        ));
+        setResearchWorkflow(compatibilityWorkflow);
         setResearchWorkflowReady(true);
         return;
       }
@@ -875,11 +918,15 @@ export function WorkbenchApp() {
       const resolvedWorkflow = hasWorkflowData ? nextWorkflow : legacyFallback;
       canSyncResearchWorkflowRef.current = true;
       lastResearchWorkflowSnapshotRef.current = JSON.stringify(resolvedWorkflow);
+      setEvents((prev) => reconcileMeetingRecordLinks(
+        prev,
+        new Set(resolvedWorkflow.meetings.map((meeting) => meeting.id)),
+      ));
       setResearchWorkflow(resolvedWorkflow);
       setResearchWorkflowReady(true);
     }
 
-    loadResearchWorkflow();
+    void enqueueResearchWorkflowOperation(loadResearchWorkflow);
     return () => {
       cancelled = true;
     };
@@ -957,7 +1004,7 @@ export function WorkbenchApp() {
       lastResearchWorkflowSnapshotRef.current = researchWorkflowJson;
     }
 
-    saveResearchWorkflow();
+    void enqueueResearchWorkflowOperation(saveResearchWorkflow);
   }, [researchWorkflow, researchWorkflowJson, researchWorkflowReady, user]);
 
   useEffect(() => {
@@ -2267,8 +2314,9 @@ export function WorkbenchApp() {
         id: createId("project"),
         name: trimmed,
         description: description.trim(),
-        startDate: new Date().toISOString().slice(0, 10),
+        startDate: todayISO(),
         checkins: [],
+        archives: [],
         dailyCheckins: [],
         dailyCompletions: [],
       },
@@ -2277,6 +2325,11 @@ export function WorkbenchApp() {
 
   function handleCheckinProject(projectId: string, date: string, note: string) {
     const targetDate = date || todayISO();
+    const targetProject = projectCheckins.find((project) => project.id === projectId);
+    if (targetProject && !isProjectCheckinDateInCurrentCycle(targetProject, targetDate)) {
+      toast.error(`新阶段从 ${targetProject.startDate} 开始，不能补打更早的日期`);
+      return;
+    }
     setProjectCheckins((prev) =>
       prev.map((project) => {
         if (project.id !== projectId) return project;
@@ -2289,6 +2342,18 @@ export function WorkbenchApp() {
         return { ...project, checkins: nextCheckins };
       }),
     );
+  }
+
+  function handleArchiveProjectCheckin(projectId: string) {
+    const restartedAt = todayISO();
+    setProjectCheckins((prev) =>
+      prev.map((project) =>
+        project.id === projectId
+          ? archiveProjectCheckinCycle(project, restartedAt, createId("project-archive"))
+          : project,
+      ),
+    );
+    toast.success("当前阶段已存档，新阶段从今天开始计数");
   }
 
   function handleDeleteProjectCheckin(projectId: string) {
@@ -2322,6 +2387,7 @@ export function WorkbenchApp() {
           description: "",
           startDate: todayISO(),
           checkins: [],
+          archives: [],
           dailyCheckins: patch.dailyCheckins ?? [],
           dailyCompletions: patch.dailyCompletions ?? [],
         },
@@ -2392,6 +2458,89 @@ export function WorkbenchApp() {
   function handleCreateEvents(nextEvents: ScheduleEvent[]) {
     if (nextEvents.length === 0) return;
     setEvents((prev) => [...prev, ...nextEvents]);
+  }
+
+  async function handleCreateMeetingRecord(
+    event: ScheduleEvent,
+    input: MeetingCompletionInput,
+  ): Promise<string | null> {
+    if (!user || !researchWorkflowReady) {
+      toast.error("组会记录仍在同步，请稍后再试；日程仍保持未完成");
+      return null;
+    }
+    const currentUser = user;
+    return enqueueResearchWorkflowOperation(async () => {
+      const meetingId = createId("meeting");
+      const linkedEventId = parseSyntheticEventId(event.id)?.masterId ?? event.id;
+      const links = { ...emptyLinkState(), linkedEventIds: [linkedEventId] };
+      const meeting: WorkflowGroupMeetingRecord = {
+        id: meetingId,
+        date: input.date,
+        title: input.title || event.title,
+        meetingType: "group",
+        attendees: input.attendees,
+        summary: input.summary,
+        discussionNotes: input.discussionNotes,
+        mentorFeedback: input.mentorFeedback,
+        decisions: input.decisions,
+        nextMeetingDate: "",
+        projectIds: [],
+        paperIds: [],
+        submissionIds: [],
+        followUp: input.followUp,
+        ...links,
+      };
+      const timelineEntry: TimelineEntry = {
+        id: createId("timeline"),
+        entityType: "meeting",
+        entityId: meetingId,
+        date: input.date,
+        title: `组会记录：${meeting.title}`,
+        description: input.summary,
+        ...links,
+      };
+
+      try {
+        const { error: meetingError } = await supabase
+          .from("research_meetings")
+          .upsert({ ...toMeetingRow(meeting), user_id: currentUser.id }, { onConflict: "id" });
+        if (meetingError) throw meetingError;
+
+        const { error: timelineError } = await supabase
+          .from("research_timeline_entries")
+          .upsert({ ...toTimelineRow(timelineEntry), user_id: currentUser.id }, { onConflict: "id" });
+        if (timelineError) {
+          console.error("Failed to persist the meeting timeline entry", timelineError);
+        }
+
+        setResearchWorkflow((prev) => ({
+          ...prev,
+          meetings: [meeting, ...prev.meetings],
+          timelineEntries: [timelineEntry, ...prev.timelineEntries],
+        }));
+        return meetingId;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        toast.error(`组会记录保存失败，日程仍保持未完成：${message}`);
+        return null;
+      }
+    });
+  }
+
+  function handleResearchWorkflowChange(nextWorkflow: ResearchWorkflowState) {
+    const nextMeetingIds = new Set(nextWorkflow.meetings.map((meeting) => meeting.id));
+    const removedMeetingIds = new Set(
+      researchWorkflow.meetings
+        .map((meeting) => meeting.id)
+        .filter((meetingId) => !nextMeetingIds.has(meetingId)),
+    );
+
+    if (removedMeetingIds.size > 0) {
+      setEvents((prev) => detachDeletedMeetingRecords(prev, removedMeetingIds));
+      toast.info("已删除关联组会记录，对应会议日程已恢复为未完成");
+    }
+
+    setResearchWorkflow(nextWorkflow);
   }
 
   function handleCreateDailyTaskTimeBlock(
@@ -2598,9 +2747,11 @@ export function WorkbenchApp() {
                   currentWeekStart={currentWeekStart}
                   weekRange={displayRangeLabel}
                   events={events}
+                  meetingRecordIds={researchMeetingRecordIds}
                   onCreateEvent={handleCreateEvent}
                   onCreateEvents={handleCreateEvents}
                   onCreateDailyTask={(name, date) => handleAddTask(name, date, "daily")}
+                  onCreateMeetingRecord={handleCreateMeetingRecord}
                   onUpdateEvent={handleUpdateEvent}
                   onDeleteEvent={handleDeleteEvent}
                   onPrevWeek={handleGoPrevWeek}
@@ -2641,6 +2792,7 @@ export function WorkbenchApp() {
                   projectCheckins={projectCheckins}
                   onAddProjectCheckin={handleAddProjectCheckin}
                   onCheckinProject={handleCheckinProject}
+                  onArchiveProjectCheckin={handleArchiveProjectCheckin}
                   onDeleteProjectCheckin={handleDeleteProjectCheckin}
                   onUpdateProjectCheckin={handleUpdateProjectCheckin}
                   onUpdateRoutineCheckins={handleUpdateRoutineCheckins}
@@ -2681,7 +2833,7 @@ export function WorkbenchApp() {
             <ResearchWorkflowPanel
               module={activeModule}
               workflow={researchWorkflow}
-              onChange={setResearchWorkflow}
+              onChange={handleResearchWorkflowChange}
               onCreateTask={handleCreateWorkflowTask}
               onCreateEvent={handleCreateWorkflowEvent}
               onUploadProjectAttachments={handleUploadProjectAttachments}

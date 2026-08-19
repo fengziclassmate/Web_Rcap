@@ -56,6 +56,19 @@ describe("DailyExpensePanel", () => {
     expect(screen.getByText("适合出差、报销或代垫支出")).toBeTruthy();
   });
 
+  it("collapses and restores the expense details from the title row", async () => {
+    render(<DailyExpensePanel date="2026-08-02" title="本周花销" />);
+
+    expect(await screen.findByRole("button", { name: "折叠本周花销" })).toBeTruthy();
+    expect(screen.getByText("当天支出列表")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "折叠本周花销" }));
+    expect(screen.queryByText("当天支出列表")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "展开本周花销" }));
+    expect(screen.getByText("当天支出列表")).toBeTruthy();
+  });
+
   it("sends the budget exclusion tag when adding a business expense", async () => {
     render(<DailyExpensePanel date="2026-08-02" />);
 

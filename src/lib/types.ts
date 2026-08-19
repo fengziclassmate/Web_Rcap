@@ -13,6 +13,7 @@ export type ScheduleEvent = {
   notes: string;
   requirements: string[];
   isCompleted: boolean;
+  meetingRecordId?: string;
   category: string;
   tag: EventTag;
   linkedDailyTaskId?: string;
@@ -60,6 +61,17 @@ export type TaskUncertaintyProfile = {
   stopCondition: string;
 };
 
+export type MeetingCompletionInput = {
+  title: string;
+  date: string;
+  attendees: string;
+  summary: string;
+  discussionNotes: string;
+  mentorFeedback: string;
+  decisions: string;
+  followUp: string;
+};
+
 export type LongTask = {
   id: string;
   name: string;
@@ -103,12 +115,26 @@ export type DailyCheckinCompletion = {
   completedAt: string;
 };
 
+export type ProjectCheckinEntry = {
+  date: string;
+  note: string;
+};
+
+export type ProjectCheckinArchive = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  archivedAt: string;
+  checkins: ProjectCheckinEntry[];
+};
+
 export type ProjectCheckin = {
   id: string;
   name: string;
   description: string;
   startDate: string;
-  checkins: { date: string; note: string }[];
+  checkins: ProjectCheckinEntry[];
+  archives?: ProjectCheckinArchive[];
   dailyCheckins: DailyCheckinSlot[];
   dailyCompletions: DailyCheckinCompletion[];
 };

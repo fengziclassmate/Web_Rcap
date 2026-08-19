@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeDashboardUiPreferences,
   normalizeEvents,
+  normalizeProjectCheckins,
   normalizeShoppingItems,
   normalizeTasks,
 } from "../normalizers";
@@ -54,6 +55,29 @@ describe("normalizers", () => {
       },
     ]);
   });
+  it("keeps project archives and defaults legacy projects to an empty archive", () => {
+    const [archivedProject, legacyProject] = normalizeProjectCheckins([
+      {
+        id: "project-1",
+        name: "健身",
+        startDate: "2026-07-01",
+        checkins: [],
+        archives: [{
+          id: "archive-1",
+          startDate: "2026-06-01",
+          endDate: "2026-06-30",
+          archivedAt: "2026-07-01T00:00:00.000Z",
+          checkins: [{ date: "2026-06-30", note: "完成训练" }],
+        }],
+      },
+      { id: "project-2", name: "旧项目", checkins: [] },
+    ]);
+
+    expect(archivedProject.archives).toEqual([
+      expect.objectContaining({ id: "archive-1", checkins: [{ date: "2026-06-30", note: "完成训练" }] }),
+    ]);
+    expect(legacyProject.archives).toEqual([]);
+  });
   it("keeps daily task metadata while defaulting legacy tasks to long tasks", () => {
     const [dailyTask, legacyTask] = normalizeTasks([
       { name: "Today", taskType: "daily", isTodayFocus: true },
@@ -91,6 +115,7 @@ describe("normalizers", () => {
     const [event] = normalizeEvents([
       {
         title: "Read",
+        meetingRecordId: "meeting-1",
         recurrence: { kind: "weekly", weekdays: [1, 8, "x"] },
       },
     ]);
@@ -98,6 +123,7 @@ describe("normalizers", () => {
       title: "Read",
       startHour: 9,
       endHour: 10,
+      meetingRecordId: "meeting-1",
       recurrence: { kind: "weekly", weekdays: [1] },
       exceptionDates: [],
     });

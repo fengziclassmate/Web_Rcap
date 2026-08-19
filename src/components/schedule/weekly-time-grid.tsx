@@ -35,7 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { EventTag, ScheduleEvent } from "@/lib/types";
+import type { EventTag, MeetingCompletionInput, ScheduleEvent } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -160,9 +160,11 @@ type WeeklyTimeGridProps = {
   currentWeekStart: Date;
   weekRange: string;
   events: ScheduleEvent[];
+  meetingRecordIds?: ReadonlySet<string>;
   onCreateEvent: (event: ScheduleEvent) => void;
   onCreateEvents?: (events: ScheduleEvent[]) => void;
   onCreateDailyTask: (name: string, dueDate: string) => string | null;
+  onCreateMeetingRecord?: (event: ScheduleEvent, input: MeetingCompletionInput) => Promise<string | null>;
   onUpdateEvent: (
     eventId: string,
     patch: Partial<ScheduleEvent>,
@@ -182,6 +184,14 @@ type ContextMenuState = {
   x: number;
   y: number;
   eventId: string;
+};
+
+type MeetingCompletionRequest = {
+  event: ScheduleEvent;
+  patch: Partial<ScheduleEvent>;
+  seriesPatch?: Partial<ScheduleEvent>;
+  scope?: "occurrence" | "series";
+  returnToEdit: boolean;
 };
 
 type TimelineDayLayout = {
@@ -475,13 +485,32 @@ function buildRequirementLines(value: string) {
     .filter(Boolean);
 }
 
+function isMeetingCategory(category: string) {
+  return normalizeScheduleCategory(category) === "会议";
+}
+
+function createMeetingCompletionDraft(event: ScheduleEvent): MeetingCompletionInput {
+  return {
+    title: event.title,
+    date: event.date,
+    attendees: "",
+    summary: "",
+    discussionNotes: event.notes,
+    mentorFeedback: "",
+    decisions: "",
+    followUp: "",
+  };
+}
+
 export function WeeklyTimeGrid({
   currentWeekStart,
   weekRange,
   events,
+  meetingRecordIds,
   onCreateEvent,
   onCreateEvents,
   onCreateDailyTask,
+  onCreateMeetingRecord,
   onUpdateEvent,
   onDeleteEvent,
   onPrevWeek,
@@ -497,6 +526,9 @@ export function WeeklyTimeGrid({
   const [selectedCell, setSelectedCell] = useState<GridCell | null>(null);
   const [createForm, setCreateForm] = useState<EventFormState>(defaultForm);
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
+  const [meetingCompletionRequest, setMeetingCompletionRequest] = useState<MeetingCompletionRequest | null>(null);
+  const [meetingCompletionDraft, setMeetingCompletionDraft] = useState<MeetingCompletionInput | null>(null);
+  const [savingMeetingCompletion, setSavingMeetingCompletion] = useState(false);
   const [editScope, setEditScope] = useState<"occurrence" | "series">(() => {
     if (typeof window === "undefined") return "occurrence";
     const stored = window.localStorage.getItem(recurrenceEditScopeStorageKey);
@@ -785,6 +817,10 @@ export function WeeklyTimeGrid({
     () => expandedEvents.find((event) => event.id === editingEventId) ?? null,
     [editingEventId, expandedEvents],
   );
+  function hasPersistedMeetingRecord(event: ScheduleEvent) {
+    if (!event.meetingRecordId) return false;
+    return meetingRecordIds ? meetingRecordIds.has(event.meetingRecordId) : true;
+  }
   const todayIso = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
   const weekExpenseDateOptions = useMemo(
     () =>
@@ -802,7 +838,7 @@ export function WeeklyTimeGrid({
   }, [selectedExpenseDateIso, todayIso, viewMode, weekExpenseDateOptions]);
   const activeDayIso = viewMode === "day" ? format(currentWeekStart, "yyyy-MM-dd") : null;
   const activeExpenseDateIso = activeDayIso ?? selectedWeekExpenseDateIso;
-  const activeExpenseTitle = viewMode === "week" ? "选中日期花销" : "日期花销";
+  const activeExpenseTitle = viewMode === "week" ? "本周花销" : "日期花销";
 
   const gridTemplateRows = timeGridSlots
     .map((slot) => `${(slot.durationMinutes / minutesPerHour) * hourCellHeight}px`)
@@ -1072,7 +1108,7 @@ export function WeeklyTimeGrid({
       title: createForm.title.trim(),
       notes: createForm.notes.trim(),
       requirements: buildRequirementLines(createForm.requirements),
-      isCompleted: createForm.isCompleted,
+      isCompleted: isMeetingCategory(createForm.category) ? false : createForm.isCompleted,
       category: createForm.category,
       tag: createForm.tag,
       ...(linkedDailyTaskId ? { linkedDailyTaskId } : {}),
@@ -1105,12 +1141,9 @@ export function WeeklyTimeGrid({
     setCreateDialogOpen(false);
   }
 
-  function handleSaveEdit() {
-    if (!selectedEvent || !editForm.title.trim()) return;
-
+  function buildEditPatch(): Partial<ScheduleEvent> {
     const { startHour, endHour } = resolveFormTimeRange(editForm.startHour, editForm.endHour);
-
-    const patch: Partial<ScheduleEvent> = {
+    return {
       title: editForm.title.trim(),
       startHour,
       endHour,
@@ -1120,6 +1153,95 @@ export function WeeklyTimeGrid({
       category: editForm.category,
       tag: editForm.tag,
     };
+  }
+
+  function openMeetingCompletion(
+    event: ScheduleEvent,
+    patch: Partial<ScheduleEvent> = {},
+    returnToEdit = false,
+  ) {
+    const eventForRecord = { ...event, ...patch, isCompleted: false };
+    const parsed = parseSyntheticEventId(event.id);
+    const shouldSaveSeriesFields = Boolean(parsed && returnToEdit && editScope === "series");
+    const seriesPatch = shouldSaveSeriesFields ? { ...patch } : undefined;
+    if (seriesPatch) {
+      delete seriesPatch.isCompleted;
+      delete seriesPatch.meetingRecordId;
+    }
+    setMeetingCompletionRequest({
+      event: eventForRecord,
+      patch: shouldSaveSeriesFields ? {} : patch,
+      seriesPatch,
+      scope: parsed ? "occurrence" : undefined,
+      returnToEdit,
+    });
+    setMeetingCompletionDraft(createMeetingCompletionDraft(eventForRecord));
+    if (returnToEdit) setEditingEventId(null);
+  }
+
+  function closeMeetingCompletion() {
+    const request = meetingCompletionRequest;
+    setMeetingCompletionRequest(null);
+    setMeetingCompletionDraft(null);
+    if (request?.returnToEdit) setEditingEventId(request.event.id);
+  }
+
+  async function handleSubmitMeetingCompletion() {
+    if (!meetingCompletionRequest || !meetingCompletionDraft) return;
+    if (!meetingCompletionDraft.summary.trim()) {
+      toast.error("请先填写会议摘要，再完成该日程");
+      return;
+    }
+    if (!onCreateMeetingRecord) {
+      toast.error("组会记录功能尚未就绪，请稍后重试");
+      return;
+    }
+
+    const input = {
+      ...meetingCompletionDraft,
+      title: meetingCompletionDraft.title.trim(),
+      attendees: meetingCompletionDraft.attendees.trim(),
+      summary: meetingCompletionDraft.summary.trim(),
+      discussionNotes: meetingCompletionDraft.discussionNotes.trim(),
+      mentorFeedback: meetingCompletionDraft.mentorFeedback.trim(),
+      decisions: meetingCompletionDraft.decisions.trim(),
+      followUp: meetingCompletionDraft.followUp.trim(),
+    };
+    setSavingMeetingCompletion(true);
+    const meetingRecordId = await onCreateMeetingRecord(meetingCompletionRequest.event, input);
+    if (!meetingRecordId) {
+      setSavingMeetingCompletion(false);
+      return;
+    }
+    if (meetingCompletionRequest.seriesPatch) {
+      onUpdateEvent(meetingCompletionRequest.event.id, meetingCompletionRequest.seriesPatch, {
+        scope: "series",
+      });
+    }
+    onUpdateEvent(
+      meetingCompletionRequest.event.id,
+      { ...meetingCompletionRequest.patch, isCompleted: true, meetingRecordId },
+      meetingCompletionRequest.scope ? { scope: meetingCompletionRequest.scope } : undefined,
+    );
+    setSavingMeetingCompletion(false);
+    setMeetingCompletionRequest(null);
+    setMeetingCompletionDraft(null);
+    toast.success("组会记录已保存，会议日程已完成");
+  }
+
+  function handleSaveEdit() {
+    if (!selectedEvent || !editForm.title.trim()) return;
+
+    const patch = buildEditPatch();
+
+    if (
+      editForm.isCompleted &&
+      !hasPersistedMeetingRecord(selectedEvent) &&
+      isMeetingCategory(editForm.category)
+    ) {
+      openMeetingCompletion(selectedEvent, patch, true);
+      return;
+    }
 
     const parsed = parseSyntheticEventId(selectedEvent.id);
     if (parsed) {
@@ -1224,7 +1346,11 @@ export function WeeklyTimeGrid({
   function handleToggleComplete(eventId: string) {
     const target = expandedEvents.find((event) => event.id === eventId);
     if (target) {
-      onUpdateEvent(eventId, { isCompleted: !target.isCompleted });
+      if (!target.isCompleted && !hasPersistedMeetingRecord(target) && isMeetingCategory(target.category)) {
+        openMeetingCompletion(target);
+      } else {
+        onUpdateEvent(eventId, { isCompleted: !target.isCompleted });
+      }
     }
     closeContextMenu();
   }
@@ -2362,7 +2488,13 @@ export function WeeklyTimeGrid({
                     <Switch
                       id="create-completed"
                       checked={createForm.isCompleted}
-                      onCheckedChange={(checked) => setCreateForm((prev) => ({ ...prev, isCompleted: checked }))}
+                      onCheckedChange={(checked) => {
+                        if (checked && isMeetingCategory(createForm.category)) {
+                          toast.info("请先创建会议；完成时会要求填写组会记录");
+                          return;
+                        }
+                        setCreateForm((prev) => ({ ...prev, isCompleted: checked }));
+                      }}
                     />
                     <Label htmlFor="create-completed">标记为已完成</Label>
                   </div>
@@ -2493,7 +2625,17 @@ export function WeeklyTimeGrid({
                     <Switch
                       id="edit-completed"
                       checked={editForm.isCompleted}
-                      onCheckedChange={(checked) => setEditForm((prev) => ({ ...prev, isCompleted: checked }))}
+                      onCheckedChange={(checked) => {
+                        if (checked && !hasPersistedMeetingRecord(selectedEvent) && isMeetingCategory(editForm.category)) {
+                          openMeetingCompletion(
+                            selectedEvent,
+                            { ...buildEditPatch(), isCompleted: true },
+                            true,
+                          );
+                          return;
+                        }
+                        setEditForm((prev) => ({ ...prev, isCompleted: checked }));
+                      }}
                     />
                     <Label htmlFor="edit-completed">标记为已完成</Label>
                   </div>
@@ -2624,6 +2766,101 @@ export function WeeklyTimeGrid({
                       保存修改
                     </Button>
                   </div>
+                </div>
+              </DialogContent>
+            ) : null}
+          </Dialog>
+
+          <Dialog
+            open={Boolean(meetingCompletionRequest && meetingCompletionDraft)}
+            onOpenChange={(open) => !open && !savingMeetingCompletion && closeMeetingCompletion()}
+          >
+            {meetingCompletionRequest && meetingCompletionDraft ? (
+              <DialogContent className="max-h-[88vh] overflow-y-auto rounded-2xl border-stone-200 bg-stone-50 sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-lg text-stone-900">
+                    <Users className="h-5 w-5 text-emerald-700" />
+                    完成会议并记录
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-900">
+                  <p className="font-medium">{meetingCompletionRequest.event.title}</p>
+                  <p className="mt-1 text-xs text-emerald-700">
+                    {meetingCompletionRequest.event.date} · 提交后会同步保存到“组会记录”，并将此日程标记完成。
+                  </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="meeting-record-title">记录标题</Label>
+                    <Input
+                      id="meeting-record-title"
+                      value={meetingCompletionDraft.title}
+                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, title: event.target.value } : prev)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="meeting-record-attendees">参会人</Label>
+                    <Input
+                      id="meeting-record-attendees"
+                      value={meetingCompletionDraft.attendees}
+                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, attendees: event.target.value } : prev)}
+                      placeholder="导师、课题组成员等"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="meeting-record-summary">会议摘要（必填）</Label>
+                  <Textarea
+                    id="meeting-record-summary"
+                    value={meetingCompletionDraft.summary}
+                    onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, summary: event.target.value } : prev)}
+                    placeholder="概括本次会议讨论了什么、得出了什么结论"
+                    className="min-h-24 bg-white"
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="meeting-record-discussion">讨论要点</Label>
+                    <Textarea
+                      id="meeting-record-discussion"
+                      value={meetingCompletionDraft.discussionNotes}
+                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, discussionNotes: event.target.value } : prev)}
+                      className="min-h-20 bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="meeting-record-feedback">导师反馈</Label>
+                    <Textarea
+                      id="meeting-record-feedback"
+                      value={meetingCompletionDraft.mentorFeedback}
+                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, mentorFeedback: event.target.value } : prev)}
+                      className="min-h-20 bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="meeting-record-decisions">会议决定</Label>
+                    <Textarea
+                      id="meeting-record-decisions"
+                      value={meetingCompletionDraft.decisions}
+                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, decisions: event.target.value } : prev)}
+                      className="min-h-20 bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="meeting-record-follow-up">后续行动</Label>
+                    <Textarea
+                      id="meeting-record-follow-up"
+                      value={meetingCompletionDraft.followUp}
+                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, followUp: event.target.value } : prev)}
+                      className="min-h-20 bg-white"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={closeMeetingCompletion} disabled={savingMeetingCompletion}>暂不完成</Button>
+                  <Button type="button" onClick={() => void handleSubmitMeetingCompletion()} disabled={savingMeetingCompletion}>
+                    {savingMeetingCompletion ? "正在保存记录…" : "保存记录并完成会议"}
+                  </Button>
                 </div>
               </DialogContent>
             ) : null}

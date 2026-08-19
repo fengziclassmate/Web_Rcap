@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CalendarRange,
   Check,
+  ChevronDown,
   Pencil,
   Plus,
   ReceiptText,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -340,6 +342,7 @@ async function readErrorMessage(response: Response) {
   }
 }
 export function DailyExpensePanel({ date, title = "今日花销", onChanged }: DailyExpensePanelProps) {
+  const [panelOpen, setPanelOpen] = useState(true);
   const [summaryCache, setSummaryCache] = useState<Record<string, DaySummaryResponse>>({});
   const [loadingDates, setLoadingDates] = useState<Record<string, boolean>>({});
   const [savingExpense, setSavingExpense] = useState(false);
@@ -655,24 +658,32 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
         : "text-emerald-700";
   return (
     <section className="border-t border-gray-200 bg-stone-50/80 px-4 py-4 sm:px-6">
-      <div className="flex flex-col gap-4">
+      <Collapsible open={panelOpen} onOpenChange={setPanelOpen}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+          <CollapsibleTrigger
+            className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+            aria-label={panelOpen ? `折叠${title}` : `展开${title}`}
+          >
             <h3 className="flex items-center gap-2 text-base font-semibold text-stone-950">
               <WalletCards className="h-4 w-4 text-stone-700" aria-hidden />
               {title}
             </h3>
-            <p className="mt-0.5 text-xs text-stone-500">
+            <p className="min-w-0 truncate text-xs text-stone-500">
               {date}
               {loading ? <span className="ml-2 text-stone-400">同步中</span> : null}
             </p>
-          </div>
-          <Button type="button" size="sm" variant="outline" onClick={() => void loadSummary(date)} disabled={loading}>
+            <ChevronDown
+              className={`ml-auto h-4 w-4 shrink-0 text-stone-500 transition-transform ${panelOpen ? "" : "-rotate-90"}`}
+              aria-hidden
+            />
+          </CollapsibleTrigger>
+          <Button type="button" size="sm" variant="outline" onClick={() => void loadSummary(date)} disabled={loading} aria-label="刷新花销记录">
             <RefreshCw className={loading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
             刷新
           </Button>
         </div>
 
+        <CollapsibleContent className="mt-4 flex flex-col gap-4">
         <div className="grid gap-3 lg:grid-cols-3">
           <div className="rounded-lg border border-stone-200 bg-white px-3 py-3">
             <p className="flex items-center gap-1.5 text-xs font-medium text-stone-500">
@@ -1009,7 +1020,8 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
             </div>
           </div>
         </div>
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
     </section>
   );
 }

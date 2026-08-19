@@ -29,6 +29,7 @@ describe("TaskDashboard annual section", () => {
         projectCheckins={[]}
         onAddProjectCheckin={noop}
         onCheckinProject={noop}
+        onArchiveProjectCheckin={noop}
         onDeleteProjectCheckin={noop}
         onUpdateProjectCheckin={noop}
         onUpdateRoutineCheckins={noop}

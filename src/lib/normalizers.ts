@@ -9,6 +9,7 @@ import type {
   KnowledgeWorkType,
   Priority,
   ProjectCheckin,
+  ProjectCheckinArchive,
   ScheduleEvent,
   ShoppingItem,
   TaskUncertaintyLevel,
@@ -206,12 +207,36 @@ export function normalizeProjectCheckins(payload: unknown): ProjectCheckin[] {
           }))
           .filter((completion) => completion.date.length > 0 && completion.slotId.length > 0)
       : [];
+    const archives = Array.isArray(value.archives)
+      ? value.archives.flatMap((archive, archiveIndex) => {
+          if (!archive || typeof archive !== "object") return [];
+          const archived = archive as Partial<ProjectCheckinArchive>;
+          const archivedCheckins = Array.isArray(archived.checkins)
+            ? archived.checkins
+                .map((checkin) => ({
+                  date: typeof checkin.date === "string" ? checkin.date : "",
+                  note: typeof checkin.note === "string" ? checkin.note : "",
+                }))
+                .filter((checkin) => checkin.date.length > 0)
+            : [];
+          return [{
+            id: typeof archived.id === "string" && archived.id.length > 0
+              ? archived.id
+              : `project-archive-${index}-${archiveIndex}`,
+            startDate: typeof archived.startDate === "string" ? archived.startDate : todayIso(),
+            endDate: typeof archived.endDate === "string" ? archived.endDate : todayIso(),
+            archivedAt: typeof archived.archivedAt === "string" ? archived.archivedAt : "",
+            checkins: archivedCheckins,
+          }];
+        })
+      : [];
     return {
       id: value.id ?? `project-restored-${index}`,
       name: typeof value.name === "string" ? value.name : "\u672a\u547d\u540d\u9879\u76ee",
       description: typeof value.description === "string" ? value.description : "",
       startDate: typeof value.startDate === "string" ? value.startDate : todayIso(),
       checkins,
+      archives,
       dailyCheckins,
       dailyCompletions,
     };
@@ -472,6 +497,10 @@ export function normalizeEvents(payload: unknown): ScheduleEvent[] {
         ? value.requirements.filter((item): item is string => typeof item === "string")
         : [],
       isCompleted: Boolean(value.isCompleted),
+      meetingRecordId:
+        typeof value.meetingRecordId === "string" && value.meetingRecordId.length > 0
+          ? value.meetingRecordId
+          : undefined,
       category: normalizeScheduleCategory(value.category ?? DEFAULT_SCHEDULE_CATEGORY),
       tag: (value.tag as EventTag) ?? null,
       linkedDailyTaskId:
