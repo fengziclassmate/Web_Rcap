@@ -115,7 +115,6 @@ describe("normalizers", () => {
     const [event] = normalizeEvents([
       {
         title: "Read",
-        meetingRecordId: "meeting-1",
         recurrence: { kind: "weekly", weekdays: [1, 8, "x"] },
       },
     ]);
@@ -123,7 +122,6 @@ describe("normalizers", () => {
       title: "Read",
       startHour: 9,
       endHour: 10,
-      meetingRecordId: "meeting-1",
       recurrence: { kind: "weekly", weekdays: [1] },
       exceptionDates: [],
     });

@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 
 /**
  * 日程管理应用的工作台主组件
- * 展示时间线、任务、日程、文献、记录等功能
+ * 展示时间线、任务、日程与动态记录等功能
  */
 import { addDays, addMonths, addWeeks, format, startOfMonth, startOfWeek } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -16,10 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DEFAULT_SCHEDULE_CATEGORY } from "@/lib/categories";
 import { createId } from "@/lib/id";
-import {
-  detachDeletedMeetingRecords,
-  reconcileMeetingRecordLinks,
-} from "@/lib/meeting-record-links";
 import {
   archiveProjectCheckinCycle,
   isProjectCheckinDateInCurrentCycle,
@@ -34,8 +30,6 @@ import {
   type DashboardUiPreferences,
   type FootprintItem,
   type LongTask,
-  type MeetingCompletionInput,
-  type Priority,
   type ProjectCheckin,
   type ScheduleEvent,
   type ShoppingItem,
@@ -43,27 +37,22 @@ import {
 import {
   defaultDashboardUiPreferences,
   defaultEvents,
-  defaultPaperProgress,
   defaultTasks,
   normalizeAchievements,
   normalizeAnnualTasks,
   normalizeDashboardUiPreferences,
   normalizeEvents,
   normalizeFootprints,
-  normalizeGroupMeetings,
-  normalizePaperProgress,
   normalizeProjectCheckins,
-  normalizeResearchProjects,
   normalizeShoppingItems,
-  normalizeSubmissions,
   normalizeTasks,
 } from "@/lib/normalizers";
 import {
-  getScheduleBackupStorageKey,
   isColumnMissing,
   isUiPreferencesColumnMissing,
   readDashboardUiPreferencesFromLocal,
   readScheduleBackupFromLocal,
+  writeScheduleBackupToLocal,
   writeDashboardUiPreferencesToLocal,
   type PersistedSchedulePayload,
 } from "@/lib/schedule-persistence";
@@ -74,103 +63,27 @@ import {
   fromLogPostRow,
   fromLogTagRow,
 } from "@/lib/log-mappers";
-import {
-  composeLiteratureItems,
-  fromLiteratureAttachmentRow,
-  fromLiteratureExcerptRow,
-  fromLiteratureMethodNoteRow,
-  fromLiteratureNoteRow,
-  fromLiteraturePaperUsageRow,
-  fromLiteratureProjectLinkRow,
-  fromLiteratureReadingLogRow,
-  fromLiteratureRow,
-  fromLiteratureTagRow,
-} from "@/lib/literature-mappers";
-import {
-  fromMeetingActionRow,
-  fromMeetingAttachmentRow,
-  fromMeetingRow,
-  fromPaperFeedbackRow,
-  fromPaperProjectLinkRow,
-  fromPaperRow,
-  fromPaperSectionRow,
-  fromProjectAttachmentRow,
-  fromProjectLogRow,
-  fromProjectRow,
-  fromReviewCommentRow,
-  fromSubmissionHistoryRow,
-  fromSubmissionRow,
-  fromTimelineRow,
-  toMeetingActionRow,
-  toMeetingAttachmentRow,
-  toMeetingRow,
-  toPaperFeedbackRow,
-  toPaperProjectLinkRow,
-  toPaperRow,
-  toPaperSectionRow,
-  toProjectAttachmentRow,
-  toProjectLogRow,
-  toProjectRow,
-  toReviewCommentRow,
-  toSubmissionHistoryRow,
-  toSubmissionRow,
-  toTimelineRow,
-} from "@/lib/research-workflow-mappers";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { todayISO } from "@/lib/date-utils";
 import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
-import type {
-  Achievement,
-  GroupMeetingRecord,
-  PaperProgress,
-  ResearchProject,
-  SubmissionRecord,
-} from "@/lib/legacy-research";
+import type { Achievement } from "@/lib/achievements";
 import { EfficiencyAnalysisDialog } from "@/components/llm/analysis-dialog";
 import { LLMChatSidebar } from "@/components/llm/chat-sidebar";
 import { QuickEventInput } from "@/components/llm/quick-event-input";
 import { QuickNoteFab } from "@/components/llm/quick-note-fab";
 import { LLMSettingsButton } from "@/components/llm/settings-button";
 import { WeeklyReportDialog } from "@/components/llm/weekly-report-dialog";
-import { buildResearchWorkflowFromLegacy } from "@/lib/research-workflow-legacy";
-import {
-  defaultResearchWorkflowState,
-  emptyLinkState,
-  type GroupMeetingRecord as WorkflowGroupMeetingRecord,
-  type MeetingAttachment,
-  type ProjectAttachment,
-  type ResearchWorkflowState,
-  type TimelineEntry,
-} from "@/lib/research-workflow";
 import {
   type LogComposerInput,
   type LogPostEditorInput,
   type LogPostRecord,
   type LogTag,
 } from "@/lib/logs";
-import {
-  type LiteratureExcerptInput,
-  type LiteratureFormInput,
-  type LiteratureItem,
-  type LiteratureMethodNoteInput,
-  type LiteratureNoteInput,
-  type LiteraturePaperUsageInput,
-  type LiteratureReadingLogInput,
-  type LiteratureTag,
-} from "@/lib/literature";
 const LogPage = dynamic(() => import("@/components/logs/log-page").then((module) => module.LogPage), {
   ssr: false,
   loading: ModuleLoadingState,
 });
-const LiteraturePage = dynamic(
-  () => import("@/components/monitoring/literature-page").then((module) => module.LiteraturePage),
-  { ssr: false, loading: ModuleLoadingState },
-);
-const ResearchWorkflowPanel = dynamic(
-  () => import("@/components/monitoring/research-workflow-panel").then((module) => module.ResearchWorkflowPanel),
-  { ssr: false, loading: ModuleLoadingState },
-);
 function ModuleLoadingState() {
   return (
     <section className="min-h-[520px] animate-pulse rounded-2xl border border-stone-200 bg-white/70 p-6">
@@ -185,18 +98,9 @@ function getCurrentWeekStart() {
   return startOfWeek(new Date(), { weekStartsOn: 1 });
 }
 
-type ResearchWorkflowModule = "research" | "paper" | "submissions" | "meetings";
-
-function isResearchWorkflowModule(module: MonitoringModuleId): module is ResearchWorkflowModule {
-  return module === "research" || module === "paper" || module === "submissions" || module === "meetings";
-}
-
 export function WorkbenchApp() {
   const canSaveRemoteRef = useRef(false);
   const lastLoadedSnapshotRef = useRef<string | null>(null);
-  const canSyncResearchWorkflowRef = useRef(false);
-  const lastResearchWorkflowSnapshotRef = useRef<string | null>(null);
-  const researchWorkflowOperationQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [isBooted, setIsBooted] = useState(false);
   const [activeModule, setActiveModule] = useState<MonitoringModuleId>("schedule");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getCurrentWeekStart);
@@ -207,39 +111,14 @@ export function WorkbenchApp() {
   const [projectCheckins, setProjectCheckins] = useState<ProjectCheckin[]>([]);
   const [footprints, setFootprints] = useState<FootprintItem[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [researchProjects, setResearchProjects] = useState<ResearchProject[]>([]);
-  const [paperProgress, setPaperProgress] = useState<PaperProgress>(defaultPaperProgress);
-  const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
-  const [groupMeetings, setGroupMeetings] = useState<GroupMeetingRecord[]>([]);
-  const [researchWorkflow, setResearchWorkflow] = useState<ResearchWorkflowState>(
-    defaultResearchWorkflowState,
-  );
-  const researchMeetingRecordIds = useMemo(
-    () => new Set(researchWorkflow.meetings.map((meeting) => meeting.id)),
-    [researchWorkflow.meetings],
-  );
-  const [researchWorkflowReady, setResearchWorkflowReady] = useState(false);
   const [logPosts, setLogPosts] = useState<LogPostRecord[]>([]);
   const [logTags, setLogTags] = useState<LogTag[]>([]);
   const [logReady, setLogReady] = useState(false);
   const [logUploading, setLogUploading] = useState(false);
-  const [literatureItems, setLiteratureItems] = useState<LiteratureItem[]>([]);
-  const [literatureTags, setLiteratureTags] = useState<LiteratureTag[]>([]);
-  const [literatureReady, setLiteratureReady] = useState(false);
   const [dashboardUiPreferences, setDashboardUiPreferences] = useState<DashboardUiPreferences>(
     defaultDashboardUiPreferences,
   );
 
-  function enqueueResearchWorkflowOperation<T>(operation: () => Promise<T>): Promise<T> {
-    const result = researchWorkflowOperationQueueRef.current
-      .catch(() => undefined)
-      .then(operation);
-    researchWorkflowOperationQueueRef.current = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
-  }
   const timeGranularity = dashboardUiPreferences.timeGranularity;
   const [user, setUser] = useState<User | null>(null);
   const [authEmail, setAuthEmail] = useState("");
@@ -265,10 +144,6 @@ export function WorkbenchApp() {
       project_checkins: projectCheckins,
       footprints,
       achievements,
-      research_projects: researchProjects,
-      paper_progress: paperProgress,
-      submissions,
-      group_meetings: groupMeetings,
       ui_preferences: dashboardUiPreferences,
     }),
     [
@@ -277,71 +152,12 @@ export function WorkbenchApp() {
       dashboardUiPreferences,
       events,
       footprints,
-      groupMeetings,
-      paperProgress,
       projectCheckins,
-      researchProjects,
       shoppingItems,
-      submissions,
       tasks,
     ],
   );
   const persistedPayloadJson = useMemo(() => JSON.stringify(persistedPayload), [persistedPayload]);
-  const researchWorkflowJson = useMemo(() => JSON.stringify(researchWorkflow), [researchWorkflow]);
-  const literatureProjectOptions = useMemo(
-    () => researchWorkflow.projects.map((item) => ({ id: item.id, title: item.title })),
-    [researchWorkflow.projects],
-  );
-  const literaturePaperOptions = useMemo(
-    () => researchWorkflow.papers.map((item) => ({ id: item.id, title: item.title })),
-    [researchWorkflow.papers],
-  );
-
-  async function refreshLiteratures(currentUser: User) {
-    const results = await Promise.all([
-      supabase.from("literatures").select("*").eq("user_id", currentUser.id).order("updated_at", { ascending: false }),
-      supabase.from("literature_notes").select("*").eq("user_id", currentUser.id),
-      supabase.from("literature_excerpts").select("*").eq("user_id", currentUser.id),
-      supabase.from("literature_method_notes").select("*").eq("user_id", currentUser.id),
-      supabase.from("literature_paper_usages").select("*").eq("user_id", currentUser.id),
-      supabase.from("literature_project_links").select("*").eq("user_id", currentUser.id),
-      supabase.from("literature_reading_logs").select("*").eq("user_id", currentUser.id),
-      supabase.from("literature_attachments").select("*").eq("user_id", currentUser.id),
-      supabase.from("literature_tags").select("*").eq("user_id", currentUser.id),
-      supabase.from("literature_tag_links").select("*").eq("user_id", currentUser.id),
-    ]);
-    const firstError = results.find((item) => item.error)?.error;
-    if (firstError) throw firstError;
-
-    const records = (results[0].data ?? []).map((item) => fromLiteratureRow(item));
-    const notes = (results[1].data ?? []).map((item) => fromLiteratureNoteRow(item));
-    const excerpts = (results[2].data ?? []).map((item) => fromLiteratureExcerptRow(item));
-    const methodNotes = (results[3].data ?? []).map((item) => fromLiteratureMethodNoteRow(item));
-    const paperUsages = (results[4].data ?? []).map((item) => fromLiteraturePaperUsageRow(item));
-    const projectLinks = (results[5].data ?? []).map((item) => fromLiteratureProjectLinkRow(item));
-    const readingLogs = (results[6].data ?? []).map((item) => fromLiteratureReadingLogRow(item));
-    const rawAttachments = (results[7].data ?? []).map((item) => fromLiteratureAttachmentRow(item));
-    const attachments = await Promise.all(
-      rawAttachments.map(async (attachment) => {
-        if (!attachment.storagePath) return attachment;
-        const { data } = await supabase.storage
-          .from("literature-attachments")
-          .createSignedUrl(attachment.storagePath, 60 * 60 * 24 * 30);
-        return { ...attachment, fileUrl: data?.signedUrl ?? attachment.fileUrl };
-      }),
-    );
-    const tags = (results[8].data ?? []).map((item) => fromLiteratureTagRow(item));
-    const tagLinks = (results[9].data ?? []).map((item) => ({
-      literatureId: String(item.literature_id),
-      tagId: String(item.tag_id),
-      userId: String(item.user_id),
-    }));
-
-    setLiteratureTags(tags);
-    setLiteratureItems(
-      composeLiteratureItems(records, notes, excerpts, methodNotes, paperUsages, projectLinks, readingLogs, attachments, tags, tagLinks),
-    );
-  }
 
   async function refreshLogs(currentUser: User) {
     const results = await Promise.all([
@@ -404,8 +220,6 @@ export function WorkbenchApp() {
     if (!user) {
       canSaveRemoteRef.current = false;
       lastLoadedSnapshotRef.current = null;
-      canSyncResearchWorkflowRef.current = false;
-      lastResearchWorkflowSnapshotRef.current = null;
       setEvents(defaultEvents);
       setTasks(defaultTasks);
       setAnnualTasks([]);
@@ -413,18 +227,9 @@ export function WorkbenchApp() {
       setProjectCheckins([]);
       setFootprints([]);
       setAchievements([]);
-      setResearchProjects([]);
-      setPaperProgress(defaultPaperProgress);
-      setSubmissions([]);
-      setGroupMeetings([]);
-      setResearchWorkflow(defaultResearchWorkflowState);
-      setResearchWorkflowReady(false);
       setLogPosts([]);
       setLogTags([]);
       setLogReady(false);
-      setLiteratureItems([]);
-      setLiteratureTags([]);
-      setLiteratureReady(false);
       setDashboardUiPreferences(defaultDashboardUiPreferences);
       setDataReady(false);
       return;
@@ -456,16 +261,12 @@ export function WorkbenchApp() {
           footprints: unknown;
           ui_preferences?: unknown;
           achievements?: unknown;
-          research_projects?: unknown;
-          paper_progress?: unknown;
-          submissions?: unknown;
-          group_meetings?: unknown;
         };
 
         const primary = await supabase
           .from("schedule_data")
           .select(
-            "events,tasks,annual_tasks,shopping_items,project_checkins,footprints,ui_preferences,achievements,research_projects,paper_progress,submissions,group_meetings",
+            "events,tasks,annual_tasks,shopping_items,project_checkins,footprints,ui_preferences,achievements",
           )
           .eq("user_id", user.id)
           .maybeSingle();
@@ -476,24 +277,16 @@ export function WorkbenchApp() {
           error?.message &&
           (isUiPreferencesColumnMissing(error.message) ||
             isColumnMissing(error.message, "achievements") ||
-            isColumnMissing(error.message, "research_projects") ||
-            isColumnMissing(error.message, "paper_progress") ||
-            isColumnMissing(error.message, "submissions") ||
-            isColumnMissing(error.message, "group_meetings") ||
             isColumnMissing(error.message, "shopping_items"))
         ) {
           const onlyShoppingMissing = isColumnMissing(error.message, "shopping_items") &&
             !isUiPreferencesColumnMissing(error.message) &&
-            !isColumnMissing(error.message, "achievements") &&
-            !isColumnMissing(error.message, "research_projects") &&
-            !isColumnMissing(error.message, "paper_progress") &&
-            !isColumnMissing(error.message, "submissions") &&
-            !isColumnMissing(error.message, "group_meetings");
+            !isColumnMissing(error.message, "achievements");
           const fallback = await supabase
             .from("schedule_data")
             .select(
               onlyShoppingMissing
-                  ? "events,tasks,annual_tasks,project_checkins,footprints,ui_preferences,achievements,research_projects,paper_progress,submissions,group_meetings"
+                ? "events,tasks,annual_tasks,project_checkins,footprints,ui_preferences,achievements"
                 : "events,tasks,annual_tasks,project_checkins,footprints",
             )
             .eq("user_id", user.id)
@@ -516,10 +309,6 @@ export function WorkbenchApp() {
             setProjectCheckins(localBackup.project_checkins);
             setFootprints(localBackup.footprints);
             setAchievements(localBackup.achievements);
-            setResearchProjects(localBackup.research_projects);
-            setPaperProgress(localBackup.paper_progress);
-            setSubmissions(localBackup.submissions);
-            setGroupMeetings(localBackup.group_meetings);
             setDashboardUiPreferences(localBackup.ui_preferences);
             toast.warning("Remote read failed. Restored from local backup.");
             setDataReady(true);
@@ -556,16 +345,6 @@ export function WorkbenchApp() {
             ),
             footprints: normalizeFootprints((data as { footprints?: unknown }).footprints),
             achievements: normalizeAchievements((data as { achievements?: unknown }).achievements),
-            research_projects: normalizeResearchProjects(
-              (data as { research_projects?: unknown }).research_projects,
-            ),
-            paper_progress: normalizePaperProgress(
-              (data as { paper_progress?: unknown }).paper_progress,
-            ),
-            submissions: normalizeSubmissions((data as { submissions?: unknown }).submissions),
-            group_meetings: normalizeGroupMeetings(
-              (data as { group_meetings?: unknown }).group_meetings,
-            ),
             ui_preferences: (data as { ui_preferences?: unknown }).ui_preferences
               ? normalizeDashboardUiPreferences((data as { ui_preferences?: unknown }).ui_preferences)
               : readDashboardUiPreferencesFromLocal(),
@@ -579,10 +358,6 @@ export function WorkbenchApp() {
           setProjectCheckins(normalized.project_checkins);
           setFootprints(normalized.footprints);
           setAchievements(normalized.achievements);
-          setResearchProjects(normalized.research_projects);
-          setPaperProgress(normalized.paper_progress);
-          setSubmissions(normalized.submissions);
-          setGroupMeetings(normalized.group_meetings);
           setDashboardUiPreferences(normalized.ui_preferences);
         } else {
           const localBackup = readScheduleBackupFromLocal(user.id);
@@ -596,10 +371,6 @@ export function WorkbenchApp() {
             setProjectCheckins(localBackup.project_checkins);
             setFootprints(localBackup.footprints);
             setAchievements(localBackup.achievements);
-            setResearchProjects(localBackup.research_projects);
-            setPaperProgress(localBackup.paper_progress);
-            setSubmissions(localBackup.submissions);
-            setGroupMeetings(localBackup.group_meetings);
             setDashboardUiPreferences(localBackup.ui_preferences);
             toast.warning("Remote data was empty. Restored from local backup.");
           } else {
@@ -611,10 +382,6 @@ export function WorkbenchApp() {
               project_checkins: [],
               footprints: [],
               achievements: [],
-              research_projects: [],
-              paper_progress: defaultPaperProgress,
-              submissions: [],
-              group_meetings: [],
               ui_preferences: readDashboardUiPreferencesFromLocal(),
             };
             canSaveRemoteRef.current = false;
@@ -626,10 +393,6 @@ export function WorkbenchApp() {
             setProjectCheckins(emptyState.project_checkins);
             setFootprints(emptyState.footprints);
             setAchievements(emptyState.achievements);
-            setResearchProjects(emptyState.research_projects);
-            setPaperProgress(emptyState.paper_progress);
-            setSubmissions(emptyState.submissions);
-            setGroupMeetings(emptyState.group_meetings);
             setDashboardUiPreferences(emptyState.ui_preferences);
           }
         }
@@ -673,20 +436,8 @@ export function WorkbenchApp() {
       if (withPreferences.error.message) {
         const missingUi = isUiPreferencesColumnMissing(withPreferences.error.message);
         const missingAchievements = isColumnMissing(withPreferences.error.message, "achievements");
-        const missingResearch = isColumnMissing(withPreferences.error.message, "research_projects");
-        const missingPaper = isColumnMissing(withPreferences.error.message, "paper_progress");
-        const missingSubmissions = isColumnMissing(withPreferences.error.message, "submissions");
-        const missingMeetings = isColumnMissing(withPreferences.error.message, "group_meetings");
         const missingShopping = isColumnMissing(withPreferences.error.message, "shopping_items");
-        if (
-          missingUi ||
-          missingAchievements ||
-          missingResearch ||
-          missingPaper ||
-          missingSubmissions ||
-          missingMeetings ||
-          missingShopping
-        ) {
+        if (missingUi || missingAchievements || missingShopping) {
           const fallbackPayload = {
             user_id: payload.user_id,
             events: payload.events,
@@ -696,10 +447,6 @@ export function WorkbenchApp() {
             project_checkins: payload.project_checkins,
             footprints: payload.footprints,
             ...(missingAchievements ? {} : { achievements: payload.achievements }),
-            ...(missingResearch ? {} : { research_projects: payload.research_projects }),
-            ...(missingPaper ? {} : { paper_progress: payload.paper_progress }),
-            ...(missingSubmissions ? {} : { submissions: payload.submissions }),
-            ...(missingMeetings ? {} : { group_meetings: payload.group_meetings }),
             ...(missingUi ? {} : { ui_preferences: payload.ui_preferences }),
           };
 
@@ -726,248 +473,8 @@ export function WorkbenchApp() {
 
   useEffect(() => {
     if (!user || !dataReady) return;
-    try {
-      localStorage.setItem(getScheduleBackupStorageKey(user.id), persistedPayloadJson);
-    } catch {
-      // ignore
-    }
-  }, [dataReady, persistedPayloadJson, user]);
-
-  useEffect(() => {
-    if (!user || !dataReady) return;
-    let cancelled = false;
-    const currentUser = user;
-
-    async function loadResearchWorkflow() {
-      const legacyFallback = buildResearchWorkflowFromLegacy(
-        researchProjects,
-        paperProgress,
-        submissions,
-        groupMeetings,
-      );
-
-      const queries = await Promise.all([
-        supabase.from("research_projects").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_project_logs").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_project_attachments").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_papers").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_paper_project_links").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_paper_sections").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_paper_feedback").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_submissions").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_submission_status_history").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_review_comments").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_meetings").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_meeting_attachments").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_meeting_action_items").select("*").eq("user_id", currentUser.id),
-        supabase.from("research_timeline_entries").select("*").eq("user_id", currentUser.id),
-      ]);
-
-      if (cancelled) return;
-
-      const projectAttachmentQuery = queries[2];
-      const meetingAttachmentQuery = queries[11];
-      const meetingQuery = queries[10];
-      const compatibilityWorkflow = meetingQuery.error
-        ? legacyFallback
-        : {
-            ...legacyFallback,
-            meetings: (meetingQuery.data ?? []).map((item) => fromMeetingRow(item)),
-          };
-      const nonAttachmentQueries = queries.filter((_, index) => index !== 2 && index !== 11);
-      const firstError = nonAttachmentQueries.find((item) => item.error)?.error ?? null;
-      if (firstError) {
-        if (firstError.message.includes("does not exist")) {
-          canSyncResearchWorkflowRef.current = false;
-          lastResearchWorkflowSnapshotRef.current = JSON.stringify(compatibilityWorkflow);
-          setEvents((prev) => reconcileMeetingRecordLinks(
-            prev,
-            new Set(compatibilityWorkflow.meetings.map((meeting) => meeting.id)),
-          ));
-          setResearchWorkflow(compatibilityWorkflow);
-          setResearchWorkflowReady(true);
-          return;
-        }
-        toast.error(`Failed to load research workflow: ${firstError.message}`);
-        canSyncResearchWorkflowRef.current = false;
-        lastResearchWorkflowSnapshotRef.current = JSON.stringify(compatibilityWorkflow);
-        setEvents((prev) => reconcileMeetingRecordLinks(
-          prev,
-          new Set(compatibilityWorkflow.meetings.map((meeting) => meeting.id)),
-        ));
-        setResearchWorkflow(compatibilityWorkflow);
-        setResearchWorkflowReady(true);
-        return;
-      }
-
-      const rawProjectAttachments =
-        projectAttachmentQuery.error && projectAttachmentQuery.error.message.includes("does not exist")
-          ? []
-          : (projectAttachmentQuery.data ?? []).map((item) => fromProjectAttachmentRow(item));
-      const signedProjectAttachments = await Promise.all(
-        rawProjectAttachments.map(async (attachment) => {
-          if (!attachment.storagePath) return attachment;
-          const { data } = await supabase.storage
-            .from("research-project-attachments")
-            .createSignedUrl(attachment.storagePath, 60 * 60 * 24 * 30);
-          return { ...attachment, fileUrl: data?.signedUrl ?? attachment.fileUrl };
-        }),
-      );
-
-      const rawMeetingAttachments =
-        meetingAttachmentQuery.error && meetingAttachmentQuery.error.message.includes("does not exist")
-          ? []
-          : (meetingAttachmentQuery.data ?? []).map((item) => fromMeetingAttachmentRow(item));
-      const signedMeetingAttachments = await Promise.all(
-        rawMeetingAttachments.map(async (attachment) => {
-          if (!attachment.storagePath) return attachment;
-          const { data } = await supabase.storage
-            .from("research-meeting-attachments")
-            .createSignedUrl(attachment.storagePath, 60 * 60 * 24 * 30);
-          return { ...attachment, fileUrl: data?.signedUrl ?? attachment.fileUrl };
-        }),
-      );
-
-      const nextWorkflow: ResearchWorkflowState = {
-        projects: (queries[0].data ?? []).map((item) => fromProjectRow(item)),
-        projectLogs: (queries[1].data ?? []).map((item) => fromProjectLogRow(item)),
-        projectAttachments: signedProjectAttachments,
-        papers: (queries[3].data ?? []).map((item) => fromPaperRow(item)),
-        paperProjectLinks: (queries[4].data ?? []).map((item) => fromPaperProjectLinkRow(item)),
-        paperSections: (queries[5].data ?? []).map((item) => fromPaperSectionRow(item)),
-        paperFeedback: (queries[6].data ?? []).map((item) => fromPaperFeedbackRow(item)),
-        submissions: (queries[7].data ?? []).map((item) => fromSubmissionRow(item)),
-        submissionStatusHistory: (queries[8].data ?? []).map((item) => fromSubmissionHistoryRow(item)),
-        reviewComments: (queries[9].data ?? []).map((item) => fromReviewCommentRow(item)),
-        meetings: (queries[10].data ?? []).map((item) => fromMeetingRow(item)),
-        meetingAttachments: signedMeetingAttachments,
-        meetingActionItems: (queries[12].data ?? []).map((item) => fromMeetingActionRow(item)),
-        timelineEntries: (queries[13].data ?? []).map((item) => fromTimelineRow(item)),
-      };
-
-      const hasWorkflowData = Object.values(nextWorkflow).some(
-        (value) => Array.isArray(value) && value.length > 0,
-      );
-      const resolvedWorkflow = hasWorkflowData ? nextWorkflow : legacyFallback;
-      canSyncResearchWorkflowRef.current = true;
-      lastResearchWorkflowSnapshotRef.current = JSON.stringify(resolvedWorkflow);
-      setEvents((prev) => reconcileMeetingRecordLinks(
-        prev,
-        new Set(resolvedWorkflow.meetings.map((meeting) => meeting.id)),
-      ));
-      setResearchWorkflow(resolvedWorkflow);
-      setResearchWorkflowReady(true);
-    }
-
-    void enqueueResearchWorkflowOperation(loadResearchWorkflow);
-    return () => {
-      cancelled = true;
-    };
-  }, [dataReady, groupMeetings, paperProgress, researchProjects, submissions, user]);
-
-  useEffect(() => {
-    if (!user || !researchWorkflowReady) return;
-    if (!canSyncResearchWorkflowRef.current) return;
-    if (lastResearchWorkflowSnapshotRef.current === researchWorkflowJson) return;
-    const currentUser = user;
-
-    async function syncTable(table: string, rows: Array<Record<string, unknown>>) {
-      if (rows.length > 0) {
-        const { error } = await supabase
-          .from(table)
-          .upsert(rows.map((row) => ({ ...row, user_id: currentUser.id })), { onConflict: "id" });
-        if (error) return error;
-      }
-
-      const deleteQuery = supabase.from(table).delete().eq("user_id", currentUser.id);
-      if (rows.length === 0) {
-        return (await deleteQuery).error;
-      }
-      const ids = rows
-        .map((row) => row.id)
-        .filter((value): value is string => typeof value === "string")
-        .map((value) => `"${value}"`)
-        .join(",");
-      return (await deleteQuery.not("id", "in", `(${ids})`)).error;
-    }
-
-    async function saveResearchWorkflow() {
-      const syncJobs: Array<[string, Array<Record<string, unknown>>]> = [
-        ["research_projects", researchWorkflow.projects.map((item) => toProjectRow(item))],
-        ["research_project_logs", researchWorkflow.projectLogs.map((item) => toProjectLogRow(item))],
-        [
-          "research_project_attachments",
-          researchWorkflow.projectAttachments.map((item) => toProjectAttachmentRow(item)),
-        ],
-        ["research_papers", researchWorkflow.papers.map((item) => toPaperRow(item))],
-        ["research_paper_project_links", researchWorkflow.paperProjectLinks.map((item) => toPaperProjectLinkRow(item))],
-        ["research_paper_sections", researchWorkflow.paperSections.map((item) => toPaperSectionRow(item))],
-        ["research_paper_feedback", researchWorkflow.paperFeedback.map((item) => toPaperFeedbackRow(item))],
-        ["research_submissions", researchWorkflow.submissions.map((item) => toSubmissionRow(item))],
-        [
-          "research_submission_status_history",
-          researchWorkflow.submissionStatusHistory.map((item) => toSubmissionHistoryRow(item)),
-        ],
-        ["research_review_comments", researchWorkflow.reviewComments.map((item) => toReviewCommentRow(item))],
-        ["research_meetings", researchWorkflow.meetings.map((item) => toMeetingRow(item))],
-        [
-          "research_meeting_attachments",
-          researchWorkflow.meetingAttachments.map((item) => toMeetingAttachmentRow(item)),
-        ],
-        [
-          "research_meeting_action_items",
-          researchWorkflow.meetingActionItems.map((item) => toMeetingActionRow(item)),
-        ],
-        ["research_timeline_entries", researchWorkflow.timelineEntries.map((item) => toTimelineRow(item))],
-      ];
-
-      for (const [table, rows] of syncJobs) {
-        const error = await syncTable(table, rows);
-        if (error) {
-          if (table === "research_project_attachments" && error.message.includes("does not exist")) {
-            continue;
-          }
-          if (table === "research_meeting_attachments" && error.message.includes("does not exist")) {
-            continue;
-          }
-          toast.error(`Failed to sync ${table}: ${error.message}`);
-          return;
-        }
-      }
-      lastResearchWorkflowSnapshotRef.current = researchWorkflowJson;
-    }
-
-    void enqueueResearchWorkflowOperation(saveResearchWorkflow);
-  }, [researchWorkflow, researchWorkflowJson, researchWorkflowReady, user]);
-
-  useEffect(() => {
-    if (!user || !dataReady) return;
-    let cancelled = false;
-    const currentUser = user;
-
-    async function loadLiteratures() {
-      try {
-        await refreshLiteratures(currentUser);
-        if (!cancelled) setLiteratureReady(true);
-      } catch (firstError) {
-        if (cancelled) return;
-        const message = firstError instanceof Error ? firstError.message : String(firstError);
-        if (message.includes("does not exist")) {
-          setLiteratureItems([]);
-          setLiteratureTags([]);
-          setLiteratureReady(true);
-          return;
-        }
-        toast.error(`Failed to load literatures: ${message}`);
-        setLiteratureReady(true);
-      }
-    }
-
-    loadLiteratures();
-    return () => {
-      cancelled = true;
-    };
-  }, [dataReady, user]);
+    writeScheduleBackupToLocal(user.id, persistedPayload);
+  }, [dataReady, persistedPayload, user]);
 
   useEffect(() => {
     if (!user || !dataReady) return;
@@ -1111,7 +618,11 @@ export function WorkbenchApp() {
     if (!user) return false;
     setLogUploading(true);
     const currentUser = user;
-    const now = new Date().toISOString();
+    const nowDate = new Date();
+    const now = nowDate.toISOString();
+    const createdAt = input.recordDate
+      ? new Date(`${input.recordDate}T${format(nowDate, "HH:mm:ss.SSS")}`).toISOString()
+      : now;
     let basePostCreated = false;
     try {
       const { data, error } = await supabase
@@ -1124,7 +635,7 @@ export function WorkbenchApp() {
           location: input.location,
           visibility: "private",
           source_type: "manual",
-          created_at: now,
+          created_at: createdAt,
           updated_at: now,
         })
         .select("*")
@@ -1260,573 +771,6 @@ export function WorkbenchApp() {
     await refreshLogs(user);
   }
 
-  async function upsertLiteratureTagsForUser(currentUser: User, tagNames: string[]) {
-    const cleaned = Array.from(new Set(tagNames.map((item) => item.trim()).filter(Boolean)));
-    if (cleaned.length === 0) return [] as LiteratureTag[];
-    const { error } = await supabase.from("literature_tags").upsert(
-      cleaned.map((name) => ({
-        user_id: currentUser.id,
-        name,
-      })),
-      { onConflict: "user_id,name" },
-    );
-    if (error) throw error;
-    const { data, error: selectError } = await supabase
-      .from("literature_tags")
-      .select("*")
-      .eq("user_id", currentUser.id)
-      .in("name", cleaned);
-    if (selectError) throw selectError;
-    return (data ?? []).map((item) => fromLiteratureTagRow(item));
-  }
-
-  async function recalculateLiteratureTagUsage(currentUser: User) {
-    const [{ data: links, error: linksError }, { data: tagsData, error: tagsError }] = await Promise.all([
-      supabase.from("literature_tag_links").select("tag_id").eq("user_id", currentUser.id),
-      supabase.from("literature_tags").select("*").eq("user_id", currentUser.id),
-    ]);
-    if (linksError) throw linksError;
-    if (tagsError) throw tagsError;
-    const usageMap = new Map<string, number>();
-    (links ?? []).forEach((item) => {
-      const tagId = String(item.tag_id);
-      usageMap.set(tagId, (usageMap.get(tagId) ?? 0) + 1);
-    });
-    for (const row of tagsData ?? []) {
-      const count = usageMap.get(String(row.id)) ?? 0;
-      const { error } = await supabase
-        .from("literature_tags")
-        .update({ usage_count: count, updated_at: new Date().toISOString() })
-        .eq("id", row.id)
-        .eq("user_id", currentUser.id);
-      if (error) throw error;
-    }
-  }
-
-  async function syncLiteratureTagLinks(currentUser: User, literatureId: string, tagNames: string[]) {
-    await supabase.from("literature_tag_links").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id);
-    const tags = await upsertLiteratureTagsForUser(currentUser, tagNames);
-    if (tags.length > 0) {
-      const { error } = await supabase.from("literature_tag_links").insert(
-        tags.map((tag) => ({
-          literature_id: literatureId,
-          tag_id: tag.id,
-          user_id: currentUser.id,
-        })),
-      );
-      if (error) throw error;
-    }
-    await recalculateLiteratureTagUsage(currentUser);
-  }
-
-  async function syncLiteratureProjectLinks(currentUser: User, literatureId: string, projectIds: string[]) {
-    await supabase.from("literature_project_links").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id);
-    const cleaned = Array.from(new Set(projectIds.filter(Boolean)));
-    if (cleaned.length === 0) return;
-    const { error } = await supabase.from("literature_project_links").insert(
-      cleaned.map((projectId) => ({
-        literature_id: literatureId,
-        user_id: currentUser.id,
-        project_id: projectId,
-      })),
-    );
-    if (error) throw error;
-  }
-
-  async function syncLiteraturePaperUsages(currentUser: User, literatureId: string, paperIds: string[]) {
-    const cleaned = Array.from(new Set(paperIds.filter(Boolean)));
-    const { data: existingRows, error: selectError } = await supabase
-      .from("literature_paper_usages")
-      .select("id,paper_id")
-      .eq("literature_id", literatureId)
-      .eq("user_id", currentUser.id);
-    if (selectError) throw selectError;
-
-    const existing = (existingRows ?? []).map((row) => ({
-      id: String(row.id ?? ""),
-      paperId: String(row.paper_id ?? ""),
-    }));
-    const deleteIds = existing.filter((row) => !cleaned.includes(row.paperId)).map((row) => row.id).filter(Boolean);
-    if (deleteIds.length > 0) {
-      const { error } = await supabase
-        .from("literature_paper_usages")
-        .delete()
-        .eq("user_id", currentUser.id)
-        .in("id", deleteIds);
-      if (error) throw error;
-    }
-
-    const existingPaperIds = new Set(existing.map((row) => row.paperId));
-    const newPaperIds = cleaned.filter((paperId) => !existingPaperIds.has(paperId));
-    if (newPaperIds.length === 0) return;
-    const now = new Date().toISOString();
-    const { error } = await supabase.from("literature_paper_usages").insert(
-      newPaperIds.map((paperId) => ({
-        literature_id: literatureId,
-        user_id: currentUser.id,
-        paper_id: paperId,
-        chapter: "",
-        usage_type: "background",
-        note: "",
-        citation_status: "planned",
-        created_at: now,
-        updated_at: now,
-      })),
-    );
-    if (error) throw error;
-  }
-
-  async function handleCreateLiterature(input: LiteratureFormInput) {
-    if (!user) return;
-    const currentUser = user;
-    const now = new Date().toISOString();
-    try {
-      const { data, error } = await supabase
-        .from("literatures")
-        .insert({
-          user_id: currentUser.id,
-          title: input.title.trim(),
-          authors: input.authors.trim(),
-          publish_year: input.year.trim() ? Number(input.year.trim()) : null,
-          venue: input.venue.trim(),
-          doi: input.doi.trim(),
-          url: input.url.trim(),
-          pdf_url: input.pdfUrl.trim(),
-          abstract: input.abstract.trim(),
-          keywords: input.keywords
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean),
-          status: input.status,
-          importance: input.importance,
-          summary: input.summary.trim(),
-          contributions: input.contributions.trim(),
-          limitations: input.limitations.trim(),
-          created_at: now,
-          updated_at: now,
-          linked_task_ids: [],
-          linked_event_ids: [],
-          linked_meeting_ids: [],
-          linked_log_post_ids: [],
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
-      const literatureId = String(data.id);
-      await Promise.all([
-        syncLiteratureTagLinks(currentUser, literatureId, input.tagNames),
-        syncLiteratureProjectLinks(currentUser, literatureId, input.projectIds),
-        syncLiteraturePaperUsages(currentUser, literatureId, input.paperIds),
-      ]);
-      await refreshLiteratures(currentUser);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to create literature: ${message}`);
-    }
-  }
-
-  async function handleUpdateLiterature(literatureId: string, input: LiteratureFormInput) {
-    if (!user) return;
-    const currentUser = user;
-    try {
-      const { error } = await supabase
-        .from("literatures")
-        .update({
-          title: input.title.trim(),
-          authors: input.authors.trim(),
-          publish_year: input.year.trim() ? Number(input.year.trim()) : null,
-          venue: input.venue.trim(),
-          doi: input.doi.trim(),
-          url: input.url.trim(),
-          pdf_url: input.pdfUrl.trim(),
-          abstract: input.abstract.trim(),
-          keywords: input.keywords
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean),
-          status: input.status,
-          importance: input.importance,
-          summary: input.summary.trim(),
-          contributions: input.contributions.trim(),
-          limitations: input.limitations.trim(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", literatureId)
-        .eq("user_id", currentUser.id);
-      if (error) throw error;
-      await Promise.all([
-        syncLiteratureTagLinks(currentUser, literatureId, input.tagNames),
-        syncLiteratureProjectLinks(currentUser, literatureId, input.projectIds),
-        syncLiteraturePaperUsages(currentUser, literatureId, input.paperIds),
-      ]);
-      await refreshLiteratures(currentUser);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to update literature: ${message}`);
-    }
-  }
-
-  async function handleDeleteLiterature(literatureId: string) {
-    if (!user) return;
-    const currentUser = user;
-    try {
-      await Promise.all([
-        supabase.from("literature_tag_links").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
-        supabase.from("literature_paper_usages").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
-        supabase.from("literature_project_links").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
-        supabase.from("literature_excerpts").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
-        supabase.from("literature_method_notes").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
-        supabase.from("literature_reading_logs").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
-        supabase.from("literature_notes").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
-        supabase.from("literature_attachments").delete().eq("literature_id", literatureId).eq("user_id", currentUser.id),
-      ]);
-      const { error } = await supabase.from("literatures").delete().eq("id", literatureId).eq("user_id", currentUser.id);
-      if (error) throw error;
-      await recalculateLiteratureTagUsage(currentUser);
-      await refreshLiteratures(currentUser);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to delete literature: ${message}`);
-    }
-  }
-
-  async function handleSaveLiteratureNote(literatureId: string, input: LiteratureNoteInput) {
-    if (!user) return;
-    try {
-      const { error } = await supabase.from("literature_notes").upsert(
-        {
-          literature_id: literatureId,
-          user_id: user.id,
-          research_question: input.researchQuestion.trim(),
-          research_background: input.researchBackground.trim(),
-          data_source: input.dataSource.trim(),
-          method: input.method.trim(),
-          findings: input.findings.trim(),
-          innovations: input.innovations.trim(),
-          shortcomings: input.shortcomings.trim(),
-          inspiration: input.inspiration.trim(),
-          quotable_content: input.quotableContent.trim(),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "literature_id,user_id" },
-      );
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to save literature note: ${message}`);
-    }
-  }
-
-  async function handleCreateLiteratureExcerpt(literatureId: string, input: LiteratureExcerptInput) {
-    if (!user) return;
-    try {
-      const now = new Date().toISOString();
-      const { error } = await supabase.from("literature_excerpts").insert({
-        literature_id: literatureId,
-        user_id: user.id,
-        content: input.content.trim(),
-        page: input.page.trim(),
-        note: input.note.trim(),
-        excerpt_type: input.excerptType,
-        paper_section: input.paperSection,
-        tags: input.tags,
-        created_at: now,
-        updated_at: now,
-      });
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to create excerpt: ${message}`);
-    }
-  }
-
-  async function handleUpdateLiteratureExcerpt(excerptId: string, input: LiteratureExcerptInput) {
-    if (!user) return;
-    try {
-      const { error } = await supabase
-        .from("literature_excerpts")
-        .update({
-          content: input.content.trim(),
-          page: input.page.trim(),
-          note: input.note.trim(),
-          excerpt_type: input.excerptType,
-          paper_section: input.paperSection,
-          tags: input.tags,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", excerptId)
-        .eq("user_id", user.id);
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to update excerpt: ${message}`);
-    }
-  }
-
-  async function handleDeleteLiteratureExcerpt(excerptId: string) {
-    if (!user) return;
-    try {
-      const { error } = await supabase
-        .from("literature_excerpts")
-        .delete()
-        .eq("id", excerptId)
-        .eq("user_id", user.id);
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to delete excerpt: ${message}`);
-    }
-  }
-
-  async function handleCreateLiteratureMethodNote(literatureId: string, input: LiteratureMethodNoteInput) {
-    if (!user) return;
-    try {
-      const now = new Date().toISOString();
-      const { error } = await supabase.from("literature_method_notes").insert({
-        literature_id: literatureId,
-        user_id: user.id,
-        name: input.name.trim(),
-        description: input.description.trim(),
-        required_data: input.requiredData.trim(),
-        strengths: input.strengths.trim(),
-        weaknesses: input.weaknesses.trim(),
-        applicability: input.applicability.trim(),
-        planned_to_use: input.plannedToUse,
-        project_id: input.projectId,
-        paper_id: input.paperId,
-        created_at: now,
-        updated_at: now,
-      });
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to create method note: ${message}`);
-    }
-  }
-
-  async function handleUpdateLiteratureMethodNote(methodId: string, input: LiteratureMethodNoteInput) {
-    if (!user) return;
-    try {
-      const { error } = await supabase
-        .from("literature_method_notes")
-        .update({
-          name: input.name.trim(),
-          description: input.description.trim(),
-          required_data: input.requiredData.trim(),
-          strengths: input.strengths.trim(),
-          weaknesses: input.weaknesses.trim(),
-          applicability: input.applicability.trim(),
-          planned_to_use: input.plannedToUse,
-          project_id: input.projectId,
-          paper_id: input.paperId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", methodId)
-        .eq("user_id", user.id);
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to update method note: ${message}`);
-    }
-  }
-
-  async function handleDeleteLiteratureMethodNote(methodId: string) {
-    if (!user) return;
-    try {
-      const { error } = await supabase.from("literature_method_notes").delete().eq("id", methodId).eq("user_id", user.id);
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to delete method note: ${message}`);
-    }
-  }
-
-  async function handleCreateLiteraturePaperUsage(literatureId: string, input: LiteraturePaperUsageInput) {
-    if (!user) return;
-    try {
-      const now = new Date().toISOString();
-      const { error } = await supabase.from("literature_paper_usages").insert({
-        literature_id: literatureId,
-        user_id: user.id,
-        paper_id: input.paperId,
-        chapter: input.chapter.trim(),
-        usage_type: input.usageType,
-        note: input.note.trim(),
-        citation_status: input.citationStatus,
-        created_at: now,
-        updated_at: now,
-      });
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to create paper usage: ${message}`);
-    }
-  }
-
-  async function handleUpdateLiteraturePaperUsage(usageId: string, input: LiteraturePaperUsageInput) {
-    if (!user) return;
-    try {
-      const { error } = await supabase
-        .from("literature_paper_usages")
-        .update({
-          paper_id: input.paperId,
-          chapter: input.chapter.trim(),
-          usage_type: input.usageType,
-          note: input.note.trim(),
-          citation_status: input.citationStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", usageId)
-        .eq("user_id", user.id);
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to update paper usage: ${message}`);
-    }
-  }
-
-  async function handleDeleteLiteraturePaperUsage(usageId: string) {
-    if (!user) return;
-    try {
-      const { error } = await supabase.from("literature_paper_usages").delete().eq("id", usageId).eq("user_id", user.id);
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to delete paper usage: ${message}`);
-    }
-  }
-
-  async function handleCreateLiteratureReadingLog(literatureId: string, input: LiteratureReadingLogInput) {
-    if (!user) return;
-    try {
-      const { error } = await supabase.from("literature_reading_logs").insert({
-        literature_id: literatureId,
-        user_id: user.id,
-        logged_at: input.loggedAt ? new Date(input.loggedAt).toISOString() : new Date().toISOString(),
-        duration_minutes: Math.max(0, Number(input.durationMinutes) || 0),
-        progress_text: input.progressText.trim(),
-        status_after: input.statusAfter,
-        linked_task_id: input.linkedTaskId.trim() || null,
-        linked_event_id: input.linkedEventId.trim() || null,
-        linked_log_post_id: input.linkedLogPostId.trim() || null,
-      });
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to create reading log: ${message}`);
-    }
-  }
-
-  async function handleUpdateLiteratureReadingLog(logId: string, input: LiteratureReadingLogInput) {
-    if (!user) return;
-    try {
-      const { error } = await supabase
-        .from("literature_reading_logs")
-        .update({
-          logged_at: input.loggedAt ? new Date(input.loggedAt).toISOString() : new Date().toISOString(),
-          duration_minutes: Math.max(0, Number(input.durationMinutes) || 0),
-          progress_text: input.progressText.trim(),
-          status_after: input.statusAfter,
-          linked_task_id: input.linkedTaskId.trim() || null,
-          linked_event_id: input.linkedEventId.trim() || null,
-          linked_log_post_id: input.linkedLogPostId.trim() || null,
-        })
-        .eq("id", logId)
-        .eq("user_id", user.id);
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to update reading log: ${message}`);
-    }
-  }
-
-  async function handleDeleteLiteratureReadingLog(logId: string) {
-    if (!user) return;
-    try {
-      const { error } = await supabase.from("literature_reading_logs").delete().eq("id", logId).eq("user_id", user.id);
-      if (error) throw error;
-      await refreshLiteratures(user);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to delete reading log: ${message}`);
-    }
-  }
-
-  async function handleUploadLiteratureAttachments(literatureId: string, files: File[]) {
-    if (!user || files.length === 0) return;
-    const currentUser = user;
-    try {
-      for (const file of files) {
-        const safeName = file.name.replace(/[^\w.\-]+/g, "_");
-        const storagePath = `${currentUser.id}/${literatureId}/${Date.now()}-${safeName}`;
-        const { error: uploadError } = await supabase.storage
-          .from("literature-attachments")
-          .upload(storagePath, file, { upsert: false });
-        if (uploadError) throw uploadError;
-
-        const { data: signedData } = await supabase.storage
-          .from("literature-attachments")
-          .createSignedUrl(storagePath, 60 * 60 * 24 * 30);
-
-        const { error: insertError } = await supabase.from("literature_attachments").insert({
-          id: createId("literature-attachment"),
-          literature_id: literatureId,
-          user_id: currentUser.id,
-          file_name: file.name,
-          file_type: file.type || "application/octet-stream",
-          file_size: file.size,
-          storage_path: storagePath,
-          file_url: signedData?.signedUrl ?? "",
-          created_at: new Date().toISOString(),
-        });
-        if (insertError) throw insertError;
-      }
-      await refreshLiteratures(currentUser);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to upload literature attachments: ${message}`);
-    }
-  }
-
-  async function handleDeleteLiteratureAttachment(attachmentId: string) {
-    if (!user) return;
-    const currentUser = user;
-    const attachment = literatureItems
-      .flatMap((item) => item.attachments)
-      .find((item) => item.id === attachmentId);
-    if (!attachment) return;
-    try {
-      if (attachment.storagePath) {
-        const { error: storageError } = await supabase.storage
-          .from("literature-attachments")
-          .remove([attachment.storagePath]);
-        if (storageError) throw storageError;
-      }
-      const { error } = await supabase
-        .from("literature_attachments")
-        .delete()
-        .eq("id", attachmentId)
-        .eq("user_id", currentUser.id);
-      if (error) throw error;
-      await refreshLiteratures(currentUser);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to delete literature attachment: ${message}`);
-    }
-  }
-
   function handleAddAchievement(value: Omit<Achievement, "id">) {
     setAchievements((prev) => [...prev, { id: createId("achievement"), ...value }]);
   }
@@ -1960,197 +904,6 @@ export function WorkbenchApp() {
       },
     ]);
     return id;
-  }
-
-  function handleCreateWorkflowTask(input: { title: string; dueDate?: string; notes?: string }) {
-    const trimmedTitle = input.title.trim();
-    if (!trimmedTitle) return null;
-    const id = createId("task");
-    setTasks((prev) => [
-      ...prev,
-      {
-        id,
-        name: trimmedTitle,
-        dueDate: input.dueDate || todayISO(),
-        createdAt: new Date().toISOString(),
-        completedAt: null,
-        done: false,
-        notes: input.notes?.trim() ?? "",
-        precautions: [],
-        completionLog: "",
-        priority: "不紧急重要" as Priority,
-        subtasks: [],
-        taskType: "long",
-        isTodayFocus: false,
-      },
-    ]);
-    return id;
-  }
-
-  function handleCreateWorkflowEvent(input: { title: string; date: string; notes?: string }) {
-    const trimmedTitle = input.title.trim();
-    if (!trimmedTitle || !input.date) return null;
-    const id = createId("evt");
-    setEvents((prev) => [
-      ...prev,
-      {
-        id,
-        date: input.date,
-        startHour: 9,
-        endHour: 10,
-        title: trimmedTitle,
-        notes: input.notes?.trim() ?? "",
-        requirements: [],
-        isCompleted: false,
-        category: DEFAULT_SCHEDULE_CATEGORY,
-        tag: null,
-      },
-    ]);
-    return id;
-  }
-
-  async function handleUploadProjectAttachments(projectId: string, files: File[]) {
-    if (!user || files.length === 0) return;
-    const currentUser = user;
-    try {
-      const uploaded: ProjectAttachment[] = [];
-      for (const file of files) {
-        const safeName = file.name.replace(/[^\w.\-]+/g, "_");
-        const storagePath = `${currentUser.id}/${projectId}/${Date.now()}-${safeName}`;
-        const { error: uploadError } = await supabase.storage
-          .from("research-project-attachments")
-          .upload(storagePath, file, { upsert: false });
-        if (uploadError) throw uploadError;
-
-        const { data: signedData } = await supabase.storage
-          .from("research-project-attachments")
-          .createSignedUrl(storagePath, 60 * 60 * 24 * 30);
-
-        const attachment: ProjectAttachment = {
-          id: createId("project-attachment"),
-          projectId,
-          fileName: file.name,
-          fileType: file.type || "application/octet-stream",
-          fileSize: file.size,
-          storagePath,
-          fileUrl: signedData?.signedUrl ?? "",
-          createdAt: new Date().toISOString(),
-        };
-
-        const { error: insertError } = await supabase
-          .from("research_project_attachments")
-          .insert({ ...toProjectAttachmentRow(attachment), user_id: currentUser.id });
-        if (insertError) throw insertError;
-        uploaded.push(attachment);
-      }
-
-      setResearchWorkflow((prev) => ({
-        ...prev,
-        projectAttachments: [...uploaded, ...prev.projectAttachments],
-      }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to upload project attachments: ${message}`);
-    }
-  }
-
-  async function handleDeleteProjectAttachment(attachmentId: string) {
-    if (!user) return;
-    const attachment = researchWorkflow.projectAttachments.find((item) => item.id === attachmentId);
-    if (!attachment) return;
-    try {
-      if (attachment.storagePath) {
-        const { error: storageError } = await supabase.storage
-          .from("research-project-attachments")
-          .remove([attachment.storagePath]);
-        if (storageError) throw storageError;
-      }
-      const { error } = await supabase
-        .from("research_project_attachments")
-        .delete()
-        .eq("id", attachmentId)
-        .eq("user_id", user.id);
-      if (error) throw error;
-      setResearchWorkflow((prev) => ({
-        ...prev,
-        projectAttachments: prev.projectAttachments.filter((item) => item.id !== attachmentId),
-      }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to delete project attachment: ${message}`);
-    }
-  }
-
-  async function handleUploadMeetingAttachments(meetingId: string, files: File[]) {
-    if (!user || files.length === 0) return;
-    const currentUser = user;
-    try {
-      const uploaded: MeetingAttachment[] = [];
-      for (const file of files) {
-        const safeName = file.name.replace(/[^\w.\-]+/g, "_");
-        const storagePath = `${currentUser.id}/${meetingId}/${Date.now()}-${safeName}`;
-        const { error: uploadError } = await supabase.storage
-          .from("research-meeting-attachments")
-          .upload(storagePath, file, { upsert: false });
-        if (uploadError) throw uploadError;
-
-        const { data: signedData } = await supabase.storage
-          .from("research-meeting-attachments")
-          .createSignedUrl(storagePath, 60 * 60 * 24 * 30);
-
-        const attachment: MeetingAttachment = {
-          id: createId("meeting-attachment"),
-          meetingId,
-          fileName: file.name,
-          fileType: file.type || "application/octet-stream",
-          fileSize: file.size,
-          storagePath,
-          fileUrl: signedData?.signedUrl ?? "",
-          createdAt: new Date().toISOString(),
-        };
-
-        const { error: insertError } = await supabase
-          .from("research_meeting_attachments")
-          .insert({ ...toMeetingAttachmentRow(attachment), user_id: currentUser.id });
-        if (insertError) throw insertError;
-        uploaded.push(attachment);
-      }
-
-      setResearchWorkflow((prev) => ({
-        ...prev,
-        meetingAttachments: [...uploaded, ...prev.meetingAttachments],
-      }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to upload meeting attachments: ${message}`);
-    }
-  }
-
-  async function handleDeleteMeetingAttachment(attachmentId: string) {
-    if (!user) return;
-    const attachment = researchWorkflow.meetingAttachments.find((item) => item.id === attachmentId);
-    if (!attachment) return;
-    try {
-      if (attachment.storagePath) {
-        const { error: storageError } = await supabase.storage
-          .from("research-meeting-attachments")
-          .remove([attachment.storagePath]);
-        if (storageError) throw storageError;
-      }
-      const { error } = await supabase
-        .from("research_meeting_attachments")
-        .delete()
-        .eq("id", attachmentId)
-        .eq("user_id", user.id);
-      if (error) throw error;
-      setResearchWorkflow((prev) => ({
-        ...prev,
-        meetingAttachments: prev.meetingAttachments.filter((item) => item.id !== attachmentId),
-      }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to delete meeting attachment: ${message}`);
-    }
   }
 
   function handleUpdateTask(taskId: string, patch: Partial<LongTask>) {
@@ -2407,89 +1160,6 @@ export function WorkbenchApp() {
     setEvents((prev) => [...prev, ...nextEvents]);
   }
 
-  async function handleCreateMeetingRecord(
-    event: ScheduleEvent,
-    input: MeetingCompletionInput,
-  ): Promise<string | null> {
-    if (!user || !researchWorkflowReady) {
-      toast.error("组会记录仍在同步，请稍后再试；日程仍保持未完成");
-      return null;
-    }
-    const currentUser = user;
-    return enqueueResearchWorkflowOperation(async () => {
-      const meetingId = createId("meeting");
-      const linkedEventId = parseSyntheticEventId(event.id)?.masterId ?? event.id;
-      const links = { ...emptyLinkState(), linkedEventIds: [linkedEventId] };
-      const meeting: WorkflowGroupMeetingRecord = {
-        id: meetingId,
-        date: input.date,
-        title: input.title || event.title,
-        meetingType: "group",
-        attendees: input.attendees,
-        summary: input.summary,
-        discussionNotes: input.discussionNotes,
-        mentorFeedback: input.mentorFeedback,
-        decisions: input.decisions,
-        nextMeetingDate: "",
-        projectIds: [],
-        paperIds: [],
-        submissionIds: [],
-        followUp: input.followUp,
-        ...links,
-      };
-      const timelineEntry: TimelineEntry = {
-        id: createId("timeline"),
-        entityType: "meeting",
-        entityId: meetingId,
-        date: input.date,
-        title: `组会记录：${meeting.title}`,
-        description: input.summary,
-        ...links,
-      };
-
-      try {
-        const { error: meetingError } = await supabase
-          .from("research_meetings")
-          .upsert({ ...toMeetingRow(meeting), user_id: currentUser.id }, { onConflict: "id" });
-        if (meetingError) throw meetingError;
-
-        const { error: timelineError } = await supabase
-          .from("research_timeline_entries")
-          .upsert({ ...toTimelineRow(timelineEntry), user_id: currentUser.id }, { onConflict: "id" });
-        if (timelineError) {
-          console.error("Failed to persist the meeting timeline entry", timelineError);
-        }
-
-        setResearchWorkflow((prev) => ({
-          ...prev,
-          meetings: [meeting, ...prev.meetings],
-          timelineEntries: [timelineEntry, ...prev.timelineEntries],
-        }));
-        return meetingId;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        toast.error(`组会记录保存失败，日程仍保持未完成：${message}`);
-        return null;
-      }
-    });
-  }
-
-  function handleResearchWorkflowChange(nextWorkflow: ResearchWorkflowState) {
-    const nextMeetingIds = new Set(nextWorkflow.meetings.map((meeting) => meeting.id));
-    const removedMeetingIds = new Set(
-      researchWorkflow.meetings
-        .map((meeting) => meeting.id)
-        .filter((meetingId) => !nextMeetingIds.has(meetingId)),
-    );
-
-    if (removedMeetingIds.size > 0) {
-      setEvents((prev) => detachDeletedMeetingRecords(prev, removedMeetingIds));
-      toast.info("已删除关联组会记录，对应会议日程已恢复为未完成");
-    }
-
-    setResearchWorkflow(nextWorkflow);
-  }
-
   function handleCreateDailyTaskTimeBlock(
     task: LongTask,
     date: string,
@@ -2694,11 +1364,9 @@ export function WorkbenchApp() {
                   currentWeekStart={currentWeekStart}
                   weekRange={displayRangeLabel}
                   events={events}
-                  meetingRecordIds={researchMeetingRecordIds}
                   onCreateEvent={handleCreateEvent}
                   onCreateEvents={handleCreateEvents}
                   onCreateDailyTask={(name, date) => handleAddTask(name, date, "daily")}
-                  onCreateMeetingRecord={handleCreateMeetingRecord}
                   onUpdateEvent={handleUpdateEvent}
                   onDeleteEvent={handleDeleteEvent}
                   onPrevWeek={handleGoPrevWeek}
@@ -2706,6 +1374,7 @@ export function WorkbenchApp() {
                   onViewModeChange={handleViewModeChange}
                   onTimeGranularityChange={handleTimeGranularityChange}
                   onCreateLogPost={handleCreateLogPost}
+                  logPosts={logPosts}
                   onOpenLogs={() => setActiveModule("logs")}
                   logSaving={logUploading}
                   toolbarContent={(
@@ -2764,50 +1433,7 @@ export function WorkbenchApp() {
                 />
               </section>
             </div>
-          ) : isResearchWorkflowModule(activeModule) ? (
-            <ResearchWorkflowPanel
-              module={activeModule}
-              workflow={researchWorkflow}
-              onChange={handleResearchWorkflowChange}
-              onCreateTask={handleCreateWorkflowTask}
-              onCreateEvent={handleCreateWorkflowEvent}
-              onUploadProjectAttachments={handleUploadProjectAttachments}
-              onDeleteProjectAttachment={handleDeleteProjectAttachment}
-              onUploadMeetingAttachments={handleUploadMeetingAttachments}
-              onDeleteMeetingAttachment={handleDeleteMeetingAttachment}
-            />
-          ) : activeModule === "literature" ? (
-            literatureReady ? (
-              <LiteraturePage
-                items={literatureItems}
-                tags={literatureTags}
-                projects={literatureProjectOptions}
-                papers={literaturePaperOptions}
-                onCreateLiterature={handleCreateLiterature}
-                onUpdateLiterature={handleUpdateLiterature}
-                onDeleteLiterature={handleDeleteLiterature}
-                onSaveNote={handleSaveLiteratureNote}
-                onCreateExcerpt={handleCreateLiteratureExcerpt}
-                onUpdateExcerpt={handleUpdateLiteratureExcerpt}
-                onDeleteExcerpt={handleDeleteLiteratureExcerpt}
-                onCreateMethodNote={handleCreateLiteratureMethodNote}
-                onUpdateMethodNote={handleUpdateLiteratureMethodNote}
-                onDeleteMethodNote={handleDeleteLiteratureMethodNote}
-                onCreatePaperUsage={handleCreateLiteraturePaperUsage}
-                onUpdatePaperUsage={handleUpdateLiteraturePaperUsage}
-                onDeletePaperUsage={handleDeleteLiteraturePaperUsage}
-                onCreateReadingLog={handleCreateLiteratureReadingLog}
-                onUpdateReadingLog={handleUpdateLiteratureReadingLog}
-                onDeleteReadingLog={handleDeleteLiteratureReadingLog}
-                onUploadAttachments={handleUploadLiteratureAttachments}
-                onDeleteAttachment={handleDeleteLiteratureAttachment}
-              />
-            ) : (
-              <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-md">
-                <p className="text-sm text-gray-600">正在加载文献阅读模块...</p>
-              </section>
-            )
-          ) : activeModule === "logs" ? (
+          ) : (
             logReady ? (
               <LogPage
                 posts={logPosts}
@@ -2824,10 +1450,6 @@ export function WorkbenchApp() {
                 <p className="text-sm text-gray-600">正在加载动态日志...</p>
               </section>
             )
-          ) : (
-            <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-md">
-              <p className="text-sm text-gray-600">模块开发中：{activeModule}</p>
-            </section>
           )}
         </div>
       </div>

@@ -35,7 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { EventTag, MeetingCompletionInput, ScheduleEvent } from "@/lib/types";
+import type { EventTag, ScheduleEvent } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -56,7 +56,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { createId } from "@/lib/id";
-import type { LogComposerInput } from "@/lib/logs";
+import type { LogComposerInput, LogPostRecord } from "@/lib/logs";
 import { supabase } from "@/lib/supabase";
 import {
   getCenteredScrollTop,
@@ -163,11 +163,9 @@ type WeeklyTimeGridProps = {
   currentWeekStart: Date;
   weekRange: string;
   events: ScheduleEvent[];
-  meetingRecordIds?: ReadonlySet<string>;
   onCreateEvent: (event: ScheduleEvent) => void;
   onCreateEvents?: (events: ScheduleEvent[]) => void;
   onCreateDailyTask: (name: string, dueDate: string) => string | null;
-  onCreateMeetingRecord?: (event: ScheduleEvent, input: MeetingCompletionInput) => Promise<string | null>;
   onUpdateEvent: (
     eventId: string,
     patch: Partial<ScheduleEvent>,
@@ -179,6 +177,7 @@ type WeeklyTimeGridProps = {
   onViewModeChange?: (mode: ViewMode) => void;
   onTimeGranularityChange?: (granularity: TimeGranularity) => void;
   onCreateLogPost?: (input: LogComposerInput) => Promise<boolean>;
+  logPosts?: LogPostRecord[];
   onOpenLogs?: () => void;
   logSaving?: boolean;
   toolbarContent?: React.ReactNode;
@@ -190,14 +189,6 @@ type ContextMenuState = {
   x: number;
   y: number;
   eventId: string;
-};
-
-type MeetingCompletionRequest = {
-  event: ScheduleEvent;
-  patch: Partial<ScheduleEvent>;
-  seriesPatch?: Partial<ScheduleEvent>;
-  scope?: "occurrence" | "series";
-  returnToEdit: boolean;
 };
 
 type TimelineDayLayout = {
@@ -247,6 +238,7 @@ const endHourOptions = Array.from({ length: 25 }, (_, hour) => hour);
 const minuteOptions = Array.from({ length: 60 }, (_, minute) => minute);
 const quickMinuteOptions = [0, 10, 15, 30, 45, 50];
 const emptySelectedEventIds = new Set<string>();
+const emptyLogPosts: LogPostRecord[] = [];
 const compactMoneyFormatter = new Intl.NumberFormat("zh-CN", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
@@ -491,32 +483,13 @@ function buildRequirementLines(value: string) {
     .filter(Boolean);
 }
 
-function isMeetingCategory(category: string) {
-  return normalizeScheduleCategory(category) === "会议";
-}
-
-function createMeetingCompletionDraft(event: ScheduleEvent): MeetingCompletionInput {
-  return {
-    title: event.title,
-    date: event.date,
-    attendees: "",
-    summary: "",
-    discussionNotes: event.notes,
-    mentorFeedback: "",
-    decisions: "",
-    followUp: "",
-  };
-}
-
 export function WeeklyTimeGrid({
   currentWeekStart,
   weekRange,
   events,
-  meetingRecordIds,
   onCreateEvent,
   onCreateEvents,
   onCreateDailyTask,
-  onCreateMeetingRecord,
   onUpdateEvent,
   onDeleteEvent,
   onPrevWeek,
@@ -524,6 +497,7 @@ export function WeeklyTimeGrid({
   onViewModeChange,
   onTimeGranularityChange,
   onCreateLogPost,
+  logPosts,
   onOpenLogs,
   logSaving = false,
   toolbarContent,
@@ -536,9 +510,6 @@ export function WeeklyTimeGrid({
   const [createForm, setCreateForm] = useState<EventFormState>(defaultForm);
   const [createDetailsOpen, setCreateDetailsOpen] = useState(false);
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
-  const [meetingCompletionRequest, setMeetingCompletionRequest] = useState<MeetingCompletionRequest | null>(null);
-  const [meetingCompletionDraft, setMeetingCompletionDraft] = useState<MeetingCompletionInput | null>(null);
-  const [savingMeetingCompletion, setSavingMeetingCompletion] = useState(false);
   const [editScope, setEditScope] = useState<"occurrence" | "series">(() => {
     if (typeof window === "undefined") return "occurrence";
     const stored = window.localStorage.getItem(recurrenceEditScopeStorageKey);
@@ -559,6 +530,7 @@ export function WeeklyTimeGrid({
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [returnToCreateAfterTemplate, setReturnToCreateAfterTemplate] = useState(false);
   const [scheduleTemplates, setScheduleTemplates] = useState<ScheduleTemplate[]>(() =>
     loadScheduleTemplates(),
   );
@@ -840,11 +812,36 @@ export function WeeklyTimeGrid({
     () => expandedEvents.find((event) => event.id === editingEventId) ?? null,
     [editingEventId, expandedEvents],
   );
-  function hasPersistedMeetingRecord(event: ScheduleEvent) {
-    if (!event.meetingRecordId) return false;
-    return meetingRecordIds ? meetingRecordIds.has(event.meetingRecordId) : true;
-  }
-  const todayIso = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const [todayIso, setTodayIso] = useState("");
+  useEffect(() => {
+    let midnightTimer: ReturnType<typeof setTimeout>;
+    const refreshToday = () => {
+      const now = new Date();
+      setTodayIso(format(now, "yyyy-MM-dd"));
+      const nextMidnight = new Date(now);
+      nextMidnight.setHours(24, 0, 1, 0);
+      midnightTimer = setTimeout(refreshToday, nextMidnight.getTime() - now.getTime());
+    };
+    refreshToday();
+    return () => clearTimeout(midnightTimer);
+  }, []);
+  const reflectionDays = useMemo(
+    () => {
+      const reflectionDates = viewMode === "month"
+        ? (todayIso ? [parse(todayIso, "yyyy-MM-dd", new Date())] : [])
+        : displayDates;
+      return reflectionDates.map((date) => {
+        const dateIso = format(date, "yyyy-MM-dd");
+        return {
+          date: dateIso,
+          weekday: format(date, "EEE", { locale: zhCN }),
+          shortDate: format(date, "M/d"),
+          isToday: dateIso === todayIso,
+        };
+      });
+    },
+    [displayDates, todayIso, viewMode],
+  );
   const weekExpenseDateOptions = useMemo(
     () =>
       viewMode === "week"
@@ -991,23 +988,23 @@ export function WeeklyTimeGrid({
     });
   }
 
-  function handleOpenTemplateDialog() {
-    const selected =
-      scheduleTemplates.find((template) => template.id === editingTemplateId) ??
-      scheduleTemplates[0];
-    if (selected) {
-      loadTemplateIntoEditor(selected);
-    } else {
-      setEditingTemplateId(null);
-      setTemplateForm({
-        title: "",
-        category: defaultCreateCategory,
-        tag: null,
-        notes: "",
-        requirements: "",
-      });
-    }
+  function handleOpenTemplateDialog(returnToCreate = false, createNew = false) {
+    const selected = createNew
+      ? null
+      : scheduleTemplates.find((template) => template.id === editingTemplateId) ?? scheduleTemplates[0];
+    if (selected) loadTemplateIntoEditor(selected);
+    else handleNewTemplate();
+    setReturnToCreateAfterTemplate(returnToCreate);
+    if (returnToCreate) setCreateDialogOpen(false);
     setTemplateDialogOpen(true);
+  }
+
+  function handleTemplateDialogOpenChange(open: boolean) {
+    setTemplateDialogOpen(open);
+    if (!open && returnToCreateAfterTemplate && selectedCell) {
+      setReturnToCreateAfterTemplate(false);
+      setCreateDialogOpen(true);
+    }
   }
 
   function handleNewTemplate() {
@@ -1106,6 +1103,7 @@ export function WeeklyTimeGrid({
       ? `，跳过 ${templatePlacementPreview.skipped} 个已占用格`
       : "";
     toast.success(`已铺入 ${nextEvents.length} 个「${template.title}」行程${skippedText}`);
+    setReturnToCreateAfterTemplate(false);
     setTemplateDialogOpen(false);
   }
 
@@ -1149,7 +1147,7 @@ export function WeeklyTimeGrid({
       title: createForm.title.trim(),
       notes: createForm.notes.trim(),
       requirements: buildRequirementLines(createForm.requirements),
-      isCompleted: isMeetingCategory(createForm.category) ? false : createForm.isCompleted,
+      isCompleted: createForm.isCompleted,
       category: createForm.category,
       tag: createForm.tag,
       ...(linkedDailyTaskId ? { linkedDailyTaskId } : {}),
@@ -1196,93 +1194,10 @@ export function WeeklyTimeGrid({
     };
   }
 
-  function openMeetingCompletion(
-    event: ScheduleEvent,
-    patch: Partial<ScheduleEvent> = {},
-    returnToEdit = false,
-  ) {
-    const eventForRecord = { ...event, ...patch, isCompleted: false };
-    const parsed = parseSyntheticEventId(event.id);
-    const shouldSaveSeriesFields = Boolean(parsed && returnToEdit && editScope === "series");
-    const seriesPatch = shouldSaveSeriesFields ? { ...patch } : undefined;
-    if (seriesPatch) {
-      delete seriesPatch.isCompleted;
-      delete seriesPatch.meetingRecordId;
-    }
-    setMeetingCompletionRequest({
-      event: eventForRecord,
-      patch: shouldSaveSeriesFields ? {} : patch,
-      seriesPatch,
-      scope: parsed ? "occurrence" : undefined,
-      returnToEdit,
-    });
-    setMeetingCompletionDraft(createMeetingCompletionDraft(eventForRecord));
-    if (returnToEdit) setEditingEventId(null);
-  }
-
-  function closeMeetingCompletion() {
-    const request = meetingCompletionRequest;
-    setMeetingCompletionRequest(null);
-    setMeetingCompletionDraft(null);
-    if (request?.returnToEdit) setEditingEventId(request.event.id);
-  }
-
-  async function handleSubmitMeetingCompletion() {
-    if (!meetingCompletionRequest || !meetingCompletionDraft) return;
-    if (!meetingCompletionDraft.summary.trim()) {
-      toast.error("请先填写会议摘要，再完成该日程");
-      return;
-    }
-    if (!onCreateMeetingRecord) {
-      toast.error("组会记录功能尚未就绪，请稍后重试");
-      return;
-    }
-
-    const input = {
-      ...meetingCompletionDraft,
-      title: meetingCompletionDraft.title.trim(),
-      attendees: meetingCompletionDraft.attendees.trim(),
-      summary: meetingCompletionDraft.summary.trim(),
-      discussionNotes: meetingCompletionDraft.discussionNotes.trim(),
-      mentorFeedback: meetingCompletionDraft.mentorFeedback.trim(),
-      decisions: meetingCompletionDraft.decisions.trim(),
-      followUp: meetingCompletionDraft.followUp.trim(),
-    };
-    setSavingMeetingCompletion(true);
-    const meetingRecordId = await onCreateMeetingRecord(meetingCompletionRequest.event, input);
-    if (!meetingRecordId) {
-      setSavingMeetingCompletion(false);
-      return;
-    }
-    if (meetingCompletionRequest.seriesPatch) {
-      onUpdateEvent(meetingCompletionRequest.event.id, meetingCompletionRequest.seriesPatch, {
-        scope: "series",
-      });
-    }
-    onUpdateEvent(
-      meetingCompletionRequest.event.id,
-      { ...meetingCompletionRequest.patch, isCompleted: true, meetingRecordId },
-      meetingCompletionRequest.scope ? { scope: meetingCompletionRequest.scope } : undefined,
-    );
-    setSavingMeetingCompletion(false);
-    setMeetingCompletionRequest(null);
-    setMeetingCompletionDraft(null);
-    toast.success("组会记录已保存，会议日程已完成");
-  }
-
   function handleSaveEdit() {
     if (!selectedEvent || !editForm.title.trim()) return;
 
     const patch = buildEditPatch();
-
-    if (
-      editForm.isCompleted &&
-      !hasPersistedMeetingRecord(selectedEvent) &&
-      isMeetingCategory(editForm.category)
-    ) {
-      openMeetingCompletion(selectedEvent, patch, true);
-      return;
-    }
 
     const parsed = parseSyntheticEventId(selectedEvent.id);
     if (parsed) {
@@ -1387,11 +1302,7 @@ export function WeeklyTimeGrid({
   function handleToggleComplete(eventId: string) {
     const target = expandedEvents.find((event) => event.id === eventId);
     if (target) {
-      if (!target.isCompleted && !hasPersistedMeetingRecord(target) && isMeetingCategory(target.category)) {
-        openMeetingCompletion(target);
-      } else {
-        onUpdateEvent(eventId, { isCompleted: !target.isCompleted });
-      }
+      onUpdateEvent(eventId, { isCompleted: !target.isCompleted });
     }
     closeContextMenu();
   }
@@ -1791,7 +1702,7 @@ export function WeeklyTimeGrid({
             <ChevronRight className="h-3.5 w-3.5" />
           </Button>
           {viewMode !== "month" ? (
-            <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={handleOpenTemplateDialog}>
+            <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={() => handleOpenTemplateDialog(false)}>
               <Stamp className="h-3.5 w-3.5" />
               模板
             </Button>
@@ -2281,9 +2192,11 @@ export function WeeklyTimeGrid({
               </div>
             </div>
           )}
-          {onCreateLogPost && onOpenLogs ? (
+          {todayIso && onCreateLogPost && onOpenLogs && reflectionDays.length > 0 ? (
             <DailyReflectionPanel
-              date={todayIso}
+              key={`${viewMode}:${todayIso}:${reflectionDays[0].date}:${reflectionDays.at(-1)?.date ?? ""}`}
+              days={reflectionDays}
+              posts={logPosts ?? emptyLogPosts}
               saving={logSaving}
               onCreatePost={onCreateLogPost}
               onOpenLogs={onOpenLogs}
@@ -2427,8 +2340,11 @@ export function WeeklyTimeGrid({
                       </Select>
                     </div>
                   </div>
-                  <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="space-y-3">
+                    <section
+                      aria-label="循环行程设置"
+                      className="rounded-xl border border-stone-200 bg-stone-50/80 p-3"
+                    >
                       <div className="flex items-center gap-3">
                         <Switch
                           id="create-recurring"
@@ -2446,8 +2362,92 @@ export function WeeklyTimeGrid({
                         />
                         <Label htmlFor="create-recurring">循环行程</Label>
                       </div>
-                      <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 overflow-x-auto" aria-label="快捷事件">
-                        <span className="shrink-0 text-[11px] font-medium text-stone-500">快捷</span>
+                      {createRecurrence.enabled ? (
+                        <div className="mt-4 space-y-4 border-t border-stone-200 pt-4">
+                          <div className="space-y-2">
+                            <Label>重复方式</Label>
+                            <Select
+                              value={createRecurrence.kind}
+                              onValueChange={(value) =>
+                                setCreateRecurrence((prev) => ({
+                                  ...prev,
+                                  kind: value as "daily" | "weekly",
+                                }))
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="daily">每天</SelectItem>
+                                <SelectItem value="weekly">每周指定星期</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {createRecurrence.kind === "weekly" ? (
+                            <div className="space-y-2">
+                              <Label>重复的星期</Label>
+                              <div className="flex flex-wrap gap-2">
+                                {WEEKDAY_UI_ORDER.map((day) => (
+                                  <Button
+                                    key={day}
+                                    type="button"
+                                    size="sm"
+                                    variant={createRecurrence.weekdays.includes(day) ? "default" : "outline"}
+                                    onClick={() =>
+                                      setCreateRecurrence((prev) => ({
+                                        ...prev,
+                                        weekdays: prev.weekdays.includes(day)
+                                          ? prev.weekdays.filter((item) => item !== day)
+                                          : [...prev.weekdays, day],
+                                      }))
+                                    }
+                                  >
+                                    周{WEEKDAY_SHORT_LABEL[day]}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                          <div className="space-y-2">
+                            <Label htmlFor="create-exceptions">例外日期</Label>
+                            <Textarea
+                              id="create-exceptions"
+                              value={createRecurrence.exceptionText}
+                              onChange={(event) =>
+                                setCreateRecurrence((prev) => ({ ...prev, exceptionText: event.target.value }))
+                              }
+                              placeholder={"每行一个或用逗号分隔"}
+                              className="min-h-[72px]"
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+                    </section>
+
+                    <section
+                      aria-label="快捷事件"
+                      className="rounded-xl border border-amber-200/80 bg-amber-50/55 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-stone-800">快捷事件</p>
+                          <p className="mt-0.5 text-[10px] text-stone-500">一键填入标题、分类和准备信息</p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 shrink-0 gap-1 rounded-full border-amber-300 bg-white px-2.5 text-[11px] text-stone-700 hover:bg-amber-100"
+                          onClick={() => handleOpenTemplateDialog(true, true)}
+                          aria-label="添加快捷事件模板"
+                          title="添加快捷事件模板"
+                        >
+                          <Plus className="h-3.5 w-3.5" aria-hidden />
+                          添加模板
+                        </Button>
+                      </div>
+                      <div className="mt-2.5 flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5">
                         {quickEventTemplates.map((template) => (
                           <Button
                             key={template.id}
@@ -2462,80 +2462,8 @@ export function WeeklyTimeGrid({
                             {template.title}
                           </Button>
                         ))}
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          className="h-7 w-7 shrink-0 rounded-full"
-                          onClick={handleOpenTemplateDialog}
-                          aria-label="管理快捷事件模板"
-                          title="管理快捷事件模板"
-                        >
-                          <Plus className="h-3.5 w-3.5" aria-hidden />
-                        </Button>
                       </div>
-                    </div>
-                    {createRecurrence.enabled ? (
-                      <div className="mt-4 space-y-4">
-                        <div className="space-y-2">
-                          <Label>重复方式</Label>
-                          <Select
-                            value={createRecurrence.kind}
-                            onValueChange={(value) =>
-                              setCreateRecurrence((prev) => ({
-                                ...prev,
-                                kind: value as "daily" | "weekly",
-                              }))
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="daily">每天</SelectItem>
-                              <SelectItem value="weekly">每周指定星期</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {createRecurrence.kind === "weekly" ? (
-                          <div className="space-y-2">
-                            <Label>重复的星期</Label>
-                            <div className="flex flex-wrap gap-2">
-                              {WEEKDAY_UI_ORDER.map((day) => (
-                                <Button
-                                  key={day}
-                                  type="button"
-                                  size="sm"
-                                  variant={createRecurrence.weekdays.includes(day) ? "default" : "outline"}
-                                  onClick={() =>
-                                    setCreateRecurrence((prev) => ({
-                                      ...prev,
-                                      weekdays: prev.weekdays.includes(day)
-                                        ? prev.weekdays.filter((item) => item !== day)
-                                        : [...prev.weekdays, day],
-                                    }))
-                                  }
-                                >
-                                  周{WEEKDAY_SHORT_LABEL[day]}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        ) : null}
-                        <div className="space-y-2">
-                          <Label htmlFor="create-exceptions">例外日期</Label>
-                          <Textarea
-                            id="create-exceptions"
-                            value={createRecurrence.exceptionText}
-                            onChange={(event) =>
-                              setCreateRecurrence((prev) => ({ ...prev, exceptionText: event.target.value }))
-                            }
-                            placeholder={"每行一个或用逗号分隔"}
-                            className="min-h-[72px]"
-                          />
-                        </div>
-                      </div>
-                    ) : null}
+                    </section>
                   </div>
                   <TimeRangeEditor
                     startHour={createForm.startHour}
@@ -2593,13 +2521,9 @@ export function WeeklyTimeGrid({
                     <Switch
                       id="create-completed"
                       checked={createForm.isCompleted}
-                      onCheckedChange={(checked) => {
-                        if (checked && isMeetingCategory(createForm.category)) {
-                          toast.info("请先创建会议；完成时会要求填写组会记录");
-                          return;
-                        }
-                        setCreateForm((prev) => ({ ...prev, isCompleted: checked }));
-                      }}
+                      onCheckedChange={(checked) =>
+                        setCreateForm((prev) => ({ ...prev, isCompleted: checked }))
+                      }
                     />
                     <Label htmlFor="create-completed">标记为已完成</Label>
                   </div>
@@ -2730,17 +2654,9 @@ export function WeeklyTimeGrid({
                     <Switch
                       id="edit-completed"
                       checked={editForm.isCompleted}
-                      onCheckedChange={(checked) => {
-                        if (checked && !hasPersistedMeetingRecord(selectedEvent) && isMeetingCategory(editForm.category)) {
-                          openMeetingCompletion(
-                            selectedEvent,
-                            { ...buildEditPatch(), isCompleted: true },
-                            true,
-                          );
-                          return;
-                        }
-                        setEditForm((prev) => ({ ...prev, isCompleted: checked }));
-                      }}
+                      onCheckedChange={(checked) =>
+                        setEditForm((prev) => ({ ...prev, isCompleted: checked }))
+                      }
                     />
                     <Label htmlFor="edit-completed">标记为已完成</Label>
                   </div>
@@ -2876,102 +2792,7 @@ export function WeeklyTimeGrid({
             ) : null}
           </Dialog>
 
-          <Dialog
-            open={Boolean(meetingCompletionRequest && meetingCompletionDraft)}
-            onOpenChange={(open) => !open && !savingMeetingCompletion && closeMeetingCompletion()}
-          >
-            {meetingCompletionRequest && meetingCompletionDraft ? (
-              <DialogContent className="max-h-[88vh] overflow-y-auto rounded-2xl border-stone-200 bg-stone-50 sm:max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2 text-lg text-stone-900">
-                    <Users className="h-5 w-5 text-emerald-700" />
-                    完成会议并记录
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-900">
-                  <p className="font-medium">{meetingCompletionRequest.event.title}</p>
-                  <p className="mt-1 text-xs text-emerald-700">
-                    {meetingCompletionRequest.event.date} · 提交后会同步保存到“组会记录”，并将此日程标记完成。
-                  </p>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-record-title">记录标题</Label>
-                    <Input
-                      id="meeting-record-title"
-                      value={meetingCompletionDraft.title}
-                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, title: event.target.value } : prev)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-record-attendees">参会人</Label>
-                    <Input
-                      id="meeting-record-attendees"
-                      value={meetingCompletionDraft.attendees}
-                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, attendees: event.target.value } : prev)}
-                      placeholder="导师、课题组成员等"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="meeting-record-summary">会议摘要（必填）</Label>
-                  <Textarea
-                    id="meeting-record-summary"
-                    value={meetingCompletionDraft.summary}
-                    onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, summary: event.target.value } : prev)}
-                    placeholder="概括本次会议讨论了什么、得出了什么结论"
-                    className="min-h-24 bg-white"
-                  />
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-record-discussion">讨论要点</Label>
-                    <Textarea
-                      id="meeting-record-discussion"
-                      value={meetingCompletionDraft.discussionNotes}
-                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, discussionNotes: event.target.value } : prev)}
-                      className="min-h-20 bg-white"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-record-feedback">导师反馈</Label>
-                    <Textarea
-                      id="meeting-record-feedback"
-                      value={meetingCompletionDraft.mentorFeedback}
-                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, mentorFeedback: event.target.value } : prev)}
-                      className="min-h-20 bg-white"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-record-decisions">会议决定</Label>
-                    <Textarea
-                      id="meeting-record-decisions"
-                      value={meetingCompletionDraft.decisions}
-                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, decisions: event.target.value } : prev)}
-                      className="min-h-20 bg-white"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="meeting-record-follow-up">后续行动</Label>
-                    <Textarea
-                      id="meeting-record-follow-up"
-                      value={meetingCompletionDraft.followUp}
-                      onChange={(event) => setMeetingCompletionDraft((prev) => prev ? { ...prev, followUp: event.target.value } : prev)}
-                      className="min-h-20 bg-white"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={closeMeetingCompletion} disabled={savingMeetingCompletion}>暂不完成</Button>
-                  <Button type="button" onClick={() => void handleSubmitMeetingCompletion()} disabled={savingMeetingCompletion}>
-                    {savingMeetingCompletion ? "正在保存记录…" : "保存记录并完成会议"}
-                  </Button>
-                </div>
-              </DialogContent>
-            ) : null}
-          </Dialog>
-
-          <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+          <Dialog open={templateDialogOpen} onOpenChange={handleTemplateDialogOpenChange}>
             <DialogContent className="max-h-[84vh] overflow-hidden rounded-3xl border-stone-200 bg-stone-50 p-0 shadow-[0_28px_80px_rgba(28,25,23,0.24)] sm:max-w-4xl">
               <DialogHeader className="border-b border-stone-200 bg-white px-5 py-4">
                 <DialogTitle className="flex items-center gap-2 text-base font-semibold text-stone-950">
@@ -3435,7 +3256,7 @@ export function WeeklyTimeGrid({
                       {(["cold", "warm", "neutral"] as const).map((hue) => (
                         <div key={hue}>
                           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-400">
-                            {hue === "cold" ? "冷色 · 科研学习" : hue === "warm" ? "暖色 · 生活沟通" : "中性色 · 事务缓冲"}
+                            {hue === "cold" ? "冷色 · 作息学术健康" : hue === "warm" ? "暖色 · 饮食社交出行" : "中性色 · 事务缓冲"}
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {CATEGORY_VISUALS.filter((item) => item.hue === hue).map((item) => (

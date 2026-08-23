@@ -1,5 +1,5 @@
 import { addDays, format, isWithinInterval, parseISO } from "date-fns";
-import type { Achievement } from "@/lib/legacy-research";
+import type { Achievement } from "@/lib/achievements";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
 import { normalizeScheduleCategory } from "@/lib/categories";
 

@@ -52,7 +52,7 @@ import { toast } from "sonner";
 import { TaskDecompositionDialog } from "@/components/llm/task-decomposition-dialog";
 import { ContextBadge } from "@/components/llm/context-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { Achievement } from "@/lib/legacy-research";
+import type { Achievement } from "@/lib/achievements";
 import { DailyTaskPanel } from "@/components/schedule/daily-task-panel";
 import { ShoppingList } from "@/components/schedule/shopping-list";
 import { cn } from "@/lib/utils";

@@ -32,15 +32,7 @@ interface AppDBSchema extends DBSchema {
     key: string;
     value: UserPayloadRecord;
   };
-  "research-workflow": {
-    key: string;
-    value: UserPayloadRecord;
-  };
   logs: {
-    key: string;
-    value: UserPayloadRecord;
-  };
-  literature: {
     key: string;
     value: UserPayloadRecord;
   };
@@ -70,14 +62,8 @@ async function getDB(): Promise<AppDatabase> {
       if (!db.objectStoreNames.contains("schedule-data")) {
         db.createObjectStore("schedule-data", { keyPath: "userId" });
       }
-      if (!db.objectStoreNames.contains("research-workflow")) {
-        db.createObjectStore("research-workflow", { keyPath: "userId" });
-      }
       if (!db.objectStoreNames.contains("logs")) {
         db.createObjectStore("logs", { keyPath: "userId" });
-      }
-      if (!db.objectStoreNames.contains("literature")) {
-        db.createObjectStore("literature", { keyPath: "userId" });
       }
       if (!db.objectStoreNames.contains("chat-sessions")) {
         db.createObjectStore("chat-sessions", { keyPath: "id" });

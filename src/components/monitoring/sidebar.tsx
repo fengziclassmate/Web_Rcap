@@ -2,24 +2,14 @@
 
 import type { ReactNode } from "react";
 import {
-  BookOpen,
   CalendarDays,
-  FileText,
-  FlaskConical,
   LayoutDashboard,
   NotebookPen,
-  Send,
-  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type MonitoringModuleId =
   | "schedule"
-  | "research"
-  | "paper"
-  | "submissions"
-  | "meetings"
-  | "literature"
   | "logs";
 
 const items: Array<{
@@ -29,11 +19,6 @@ const items: Array<{
   icon: ReactNode;
 }> = [
   { id: "schedule", label: "个人日程", group: "Today", icon: <CalendarDays className="h-4 w-4" aria-hidden /> },
-  { id: "research", label: "科研项目", group: "Research", icon: <FlaskConical className="h-4 w-4" aria-hidden /> },
-  { id: "paper", label: "论文进度", group: "Writing", icon: <FileText className="h-4 w-4" aria-hidden /> },
-  { id: "literature", label: "文献阅读", group: "Reading", icon: <BookOpen className="h-4 w-4" aria-hidden /> },
-  { id: "submissions", label: "投稿记录", group: "Publish", icon: <Send className="h-4 w-4" aria-hidden /> },
-  { id: "meetings", label: "组会记录", group: "Meeting", icon: <Users className="h-4 w-4" aria-hidden /> },
   { id: "logs", label: "动态日志", group: "Journal", icon: <NotebookPen className="h-4 w-4" aria-hidden /> },
 ];
 

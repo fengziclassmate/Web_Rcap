@@ -4,6 +4,7 @@ import {
   getScheduleBackupStorageKey,
   readDashboardUiPreferencesFromLocal,
   readScheduleBackupFromLocal,
+  writeScheduleBackupToLocal,
   writeDashboardUiPreferencesToLocal,
 } from "../schedule-persistence";
 
@@ -79,5 +80,34 @@ describe("schedule UI preference persistence", () => {
     expect(restored).not.toHaveProperty("continuity_state");
     expect(restored?.events).toEqual([]);
     expect(restored?.tasks).toEqual([]);
+  });
+
+  it("preserves retired module data when refreshing the active local backup", () => {
+    const storageKey = getScheduleBackupStorageKey("user-retired-modules");
+    localStorage.setItem(storageKey, JSON.stringify({
+      research_projects: [{ id: "research-1", name: "历史项目" }],
+      paper_progress: { title: "历史论文" },
+      submissions: [{ id: "submission-1" }],
+      group_meetings: [{ id: "meeting-1" }],
+    }));
+
+    writeScheduleBackupToLocal("user-retired-modules", {
+      events: [],
+      tasks: [],
+      annual_tasks: [],
+      shopping_items: [],
+      project_checkins: [],
+      footprints: [],
+      achievements: [],
+      ui_preferences: defaultDashboardUiPreferences,
+    });
+
+    expect(JSON.parse(localStorage.getItem(storageKey) ?? "{}")).toMatchObject({
+      research_projects: [{ id: "research-1", name: "历史项目" }],
+      paper_progress: { title: "历史论文" },
+      submissions: [{ id: "submission-1" }],
+      group_meetings: [{ id: "meeting-1" }],
+      events: [],
+    });
   });
 });

@@ -13,7 +13,6 @@ export type ScheduleEvent = {
   notes: string;
   requirements: string[];
   isCompleted: boolean;
-  meetingRecordId?: string;
   category: string;
   tag: EventTag;
   linkedDailyTaskId?: string;
@@ -59,17 +58,6 @@ export type TaskUncertaintyProfile = {
   minimumValidationStep: string;
   branchOptions: string[];
   stopCondition: string;
-};
-
-export type MeetingCompletionInput = {
-  title: string;
-  date: string;
-  attendees: string;
-  summary: string;
-  discussionNotes: string;
-  mentorFeedback: string;
-  decisions: string;
-  followUp: string;
 };
 
 export type LongTask = {

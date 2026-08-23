@@ -15,15 +15,7 @@ import type {
   TaskUncertaintyLevel,
   TaskUncertaintyProfile,
 } from "@/lib/types";
-import type {
-  Achievement,
-  GroupMeetingRecord,
-  PaperPlanItem,
-  PaperProgress,
-  PlanItem,
-  ResearchProject,
-  SubmissionRecord,
-} from "@/lib/legacy-research";
+import type { Achievement } from "@/lib/achievements";
 import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/categories";
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
@@ -69,17 +61,6 @@ function normalizePriority(value: unknown): Priority {
     ? (value as Priority)
     : defaultPriority;
 }
-
-export const defaultPaperProgress: PaperProgress = {
-  title: "",
-  totalChapters: 0,
-  doneChapters: 0,
-  nextStepPlan: "",
-  milestones: "",
-  dailyPlans: [],
-  weeklyPlans: [],
-  monthlyPlans: [],
-};
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -274,116 +255,6 @@ export function normalizeAchievements(payload: unknown): Achievement[] {
     .filter((x): x is Achievement => x !== null);
 }
 
-function normalizePlanItems(payload: unknown): PlanItem[] {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .map((item, index) => {
-      const value = item as Partial<PlanItem>;
-      const content = typeof value.content === "string" ? value.content.trim() : "";
-      if (!content) return null;
-      return {
-        id: value.id ?? `plan-restored-${index}`,
-        date: typeof value.date === "string" && value.date.length > 0 ? value.date : "",
-        content,
-        done: Boolean(value.done),
-      } satisfies PlanItem;
-    })
-    .filter((x): x is PlanItem => Boolean(x));
-}
-
-function normalizePaperPlanItems(payload: unknown): PaperPlanItem[] {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .map((item, index) => {
-      const value = item as Partial<PaperPlanItem>;
-      const content = typeof value.content === "string" ? value.content.trim() : "";
-      if (!content) return null;
-      return {
-        id: value.id ?? `paper-plan-restored-${index}`,
-        date: typeof value.date === "string" && value.date.length > 0 ? value.date : "",
-        content,
-        done: Boolean(value.done),
-      } satisfies PaperPlanItem;
-    })
-    .filter((x): x is PaperPlanItem => Boolean(x));
-}
-
-export function normalizeResearchProjects(payload: unknown): ResearchProject[] {
-  if (!Array.isArray(payload)) return [];
-  return payload.map((item, index) => {
-    const value = item as Partial<ResearchProject>;
-    return {
-      id: value.id ?? `research-restored-${index}`,
-      name: typeof value.name === "string" ? value.name : "\u672a\u547d\u540d\u9879\u76ee",
-      content: typeof value.content === "string" ? value.content : "",
-      techDetails: typeof value.techDetails === "string" ? value.techDetails : "",
-      nextStepPlan: typeof value.nextStepPlan === "string" ? value.nextStepPlan : "",
-      milestones: typeof value.milestones === "string" ? value.milestones : "",
-      dailyPlans: normalizePlanItems(value.dailyPlans),
-      weeklyPlans: normalizePlanItems(value.weeklyPlans),
-      monthlyPlans: normalizePlanItems(value.monthlyPlans),
-    };
-  });
-}
-
-export function normalizePaperProgress(payload: unknown): PaperProgress {
-  if (!payload || typeof payload !== "object") return defaultPaperProgress;
-  const value = payload as Partial<PaperProgress>;
-  return {
-    title: typeof value.title === "string" ? value.title : "",
-    totalChapters: typeof value.totalChapters === "number" ? value.totalChapters : 0,
-    doneChapters: typeof value.doneChapters === "number" ? value.doneChapters : 0,
-    nextStepPlan: typeof value.nextStepPlan === "string" ? value.nextStepPlan : "",
-    milestones: typeof value.milestones === "string" ? value.milestones : "",
-    dailyPlans: normalizePaperPlanItems(value.dailyPlans),
-    weeklyPlans: normalizePaperPlanItems(value.weeklyPlans),
-    monthlyPlans: normalizePaperPlanItems(value.monthlyPlans),
-  };
-}
-
-export function normalizeSubmissions(payload: unknown): SubmissionRecord[] {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .map((item, index) => {
-      const value = item as Partial<SubmissionRecord>;
-      const content = typeof value.content === "string" ? value.content.trim() : "";
-      const journal = typeof value.journal === "string" ? value.journal.trim() : "";
-      if (!content || !journal) return null;
-      return {
-        id: value.id ?? `submission-restored-${index}`,
-        content,
-        journal,
-        submittedAt:
-          typeof value.submittedAt === "string" && value.submittedAt.length > 0
-            ? value.submittedAt
-            : todayIso(),
-        status: (value.status as SubmissionRecord["status"]) ?? "\u51c6\u5907\u4e2d",
-        resultNote: typeof value.resultNote === "string" ? value.resultNote : "",
-      } satisfies SubmissionRecord;
-    })
-    .filter((x): x is SubmissionRecord => Boolean(x));
-}
-
-export function normalizeGroupMeetings(payload: unknown): GroupMeetingRecord[] {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .map((item, index) => {
-      const value = item as Partial<GroupMeetingRecord>;
-      const topic = typeof value.topic === "string" ? value.topic.trim() : "";
-      const date = typeof value.date === "string" && value.date.length > 0 ? value.date : todayIso();
-      if (!topic) return null;
-      return {
-        id: value.id ?? `meeting-restored-${index}`,
-        date,
-        topic,
-        attendees: typeof value.attendees === "string" ? value.attendees : "",
-        notes: typeof value.notes === "string" ? value.notes : "",
-        actionItems: typeof value.actionItems === "string" ? value.actionItems : "",
-      } satisfies GroupMeetingRecord;
-    })
-    .filter((x): x is GroupMeetingRecord => Boolean(x));
-}
-
 export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPreferences {
   if (!payload || typeof payload !== "object") return defaultDashboardUiPreferences;
   const value = payload as Partial<DashboardUiPreferences>;
@@ -497,10 +368,6 @@ export function normalizeEvents(payload: unknown): ScheduleEvent[] {
         ? value.requirements.filter((item): item is string => typeof item === "string")
         : [],
       isCompleted: Boolean(value.isCompleted),
-      meetingRecordId:
-        typeof value.meetingRecordId === "string" && value.meetingRecordId.length > 0
-          ? value.meetingRecordId
-          : undefined,
       category: normalizeScheduleCategory(value.category ?? DEFAULT_SCHEDULE_CATEGORY),
       tag: (value.tag as EventTag) ?? null,
       linkedDailyTaskId:

@@ -1,11 +1,5 @@
 import type { FootprintItem, AnnualTask, DashboardUiPreferences, LongTask, ProjectCheckin, ScheduleEvent, ShoppingItem } from "@/lib/types";
-import type {
-  Achievement,
-  GroupMeetingRecord,
-  PaperProgress,
-  ResearchProject,
-  SubmissionRecord,
-} from "@/lib/legacy-research";
+import type { Achievement } from "@/lib/achievements";
 import {
   defaultDashboardUiPreferences,
   normalizeAchievements,
@@ -13,12 +7,8 @@ import {
   normalizeDashboardUiPreferences,
   normalizeEvents,
   normalizeFootprints,
-  normalizeGroupMeetings,
-  normalizePaperProgress,
   normalizeProjectCheckins,
-  normalizeResearchProjects,
   normalizeShoppingItems,
-  normalizeSubmissions,
   normalizeTasks,
 } from "@/lib/normalizers";
 
@@ -33,10 +23,6 @@ export type PersistedSchedulePayload = {
   project_checkins: ProjectCheckin[];
   footprints: FootprintItem[];
   achievements: Achievement[];
-  research_projects: ResearchProject[];
-  paper_progress: PaperProgress;
-  submissions: SubmissionRecord[];
-  group_meetings: GroupMeetingRecord[];
   ui_preferences: DashboardUiPreferences;
 };
 
@@ -57,10 +43,6 @@ function normalizePersistedSchedulePayload(
     project_checkins: normalizeProjectCheckins(value.project_checkins),
     footprints: normalizeFootprints(value.footprints),
     achievements: normalizeAchievements(value.achievements),
-    research_projects: normalizeResearchProjects(value.research_projects),
-    paper_progress: normalizePaperProgress(value.paper_progress),
-    submissions: normalizeSubmissions(value.submissions),
-    group_meetings: normalizeGroupMeetings(value.group_meetings),
     ui_preferences: normalizeDashboardUiPreferences(value.ui_preferences),
   };
 }
@@ -73,6 +55,26 @@ export function readScheduleBackupFromLocal(userId: string): PersistedSchedulePa
     return normalizePersistedSchedulePayload(JSON.parse(raw));
   } catch {
     return null;
+  }
+}
+
+export function writeScheduleBackupToLocal(userId: string, payload: PersistedSchedulePayload) {
+  if (typeof window === "undefined") return;
+  const storageKey = getScheduleBackupStorageKey(userId);
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const existing = raw ? JSON.parse(raw) : null;
+    const preservedFields =
+      existing && typeof existing === "object" && !Array.isArray(existing)
+        ? existing as Record<string, unknown>
+        : {};
+    localStorage.setItem(storageKey, JSON.stringify({ ...preservedFields, ...payload }));
+  } catch {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(payload));
+    } catch {
+      // Local backup is best-effort only.
+    }
   }
 }
 

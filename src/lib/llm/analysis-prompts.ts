@@ -1,5 +1,5 @@
 import { addDays, format, isWithinInterval, parseISO } from "date-fns";
-import type { Achievement } from "@/lib/legacy-research";
+import type { Achievement } from "@/lib/achievements";
 import type { LogPostRecord } from "@/lib/logs";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
 import { normalizeScheduleCategory } from "@/lib/categories";
@@ -42,7 +42,7 @@ export function buildEfficiencyStats(
     const category = normalizeScheduleCategory(event.category);
     categoryMap.set(category, (categoryMap.get(category) ?? 0) + hours);
     dailyEventCount.set(event.date, (dailyEventCount.get(event.date) ?? 0) + 1);
-    if (/科研|文献阅读|会议|学习|论文|文献|实验|写作|投稿/.test(category + event.title)) {
+    if (/科研|项目工作|项目推进|文献阅读|会议|学习|论文|文献|实验|写作|投稿/.test(category + event.title)) {
       dailyResearchMap.set(event.date, (dailyResearchMap.get(event.date) ?? 0) + hours);
     }
   }

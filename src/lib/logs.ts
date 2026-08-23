@@ -100,6 +100,7 @@ export type LogComposerInput = {
   content: string;
   category: LogCategory;
   mood: LogMood | "";
+  recordDate?: string;
   location: string;
   tagNames: string[];
   images: File[];

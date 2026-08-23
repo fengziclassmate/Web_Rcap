@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -86,23 +86,17 @@ function renderGrid({
   events = [],
   onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>(),
   onDeleteEvent = vi.fn<WeeklyTimeGridProps["onDeleteEvent"]>(),
-  onCreateMeetingRecord = vi.fn<NonNullable<WeeklyTimeGridProps["onCreateMeetingRecord"]>>(async () => "meeting-record-1"),
-  meetingRecordIds,
 }: {
   events?: ScheduleEvent[];
   onUpdateEvent?: WeeklyTimeGridProps["onUpdateEvent"];
   onDeleteEvent?: WeeklyTimeGridProps["onDeleteEvent"];
-  onCreateMeetingRecord?: NonNullable<WeeklyTimeGridProps["onCreateMeetingRecord"]>;
-  meetingRecordIds?: ReadonlySet<string>;
 } = {}) {
   const props: WeeklyTimeGridProps = {
     currentWeekStart: new Date(2026, 6, 27),
     weekRange: "2026/07/27 - 2026/08/02",
     events,
-    meetingRecordIds,
     onCreateEvent: vi.fn(),
     onCreateDailyTask: vi.fn(() => null),
-    onCreateMeetingRecord,
     onUpdateEvent,
     onDeleteEvent,
     onPrevWeek: vi.fn(),
@@ -317,140 +311,20 @@ describe("WeeklyTimeGrid interactions", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
-  it("requires a group-meeting record before completing a meeting event", async () => {
+  it("completes a meeting event without requiring a separate meeting record", () => {
     const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
-    const onCreateMeetingRecord = vi.fn<NonNullable<WeeklyTimeGridProps["onCreateMeetingRecord"]>>(async () => "meeting-record-1");
     renderGrid({
       events: [{ ...scheduleEvent, title: "课题组周会", category: "会议", isCompleted: false }],
       onUpdateEvent,
-      onCreateMeetingRecord,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "打开 课题组周会 编辑窗口" }));
     fireEvent.click(screen.getByRole("switch", { name: "标记为已完成" }));
-
-    const recordDialog = screen.getByRole("dialog");
-    expect(within(recordDialog).getByText("完成会议并记录")).toBeTruthy();
-    fireEvent.click(within(recordDialog).getByRole("button", { name: "保存记录并完成会议" }));
-    expect(onCreateMeetingRecord).not.toHaveBeenCalled();
-    expect(onUpdateEvent).not.toHaveBeenCalled();
-
-    fireEvent.change(within(recordDialog).getByLabelText("会议摘要（必填）"), {
-      target: { value: "确定本周实验方案并明确分工" },
-    });
-    fireEvent.click(within(recordDialog).getByRole("button", { name: "保存记录并完成会议" }));
-
-    await waitFor(() => {
-      expect(onCreateMeetingRecord).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "event-1", title: "课题组周会" }),
-        expect.objectContaining({ summary: "确定本周实验方案并明确分工" }),
-      );
-      expect(onUpdateEvent).toHaveBeenCalledWith(
-        "event-1",
-        expect.objectContaining({ isCompleted: true, meetingRecordId: "meeting-record-1" }),
-        undefined,
-      );
-    });
-  });
-
-  it("keeps a meeting unfinished when the meeting record cannot be persisted", async () => {
-    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
-    const onCreateMeetingRecord = vi.fn<NonNullable<WeeklyTimeGridProps["onCreateMeetingRecord"]>>(async () => null);
-    renderGrid({
-      events: [{ ...scheduleEvent, title: "失败重试会议", category: "会议", isCompleted: false }],
-      onUpdateEvent,
-      onCreateMeetingRecord,
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "打开 失败重试会议 编辑窗口" }));
-    fireEvent.click(screen.getByRole("switch", { name: "标记为已完成" }));
-    const recordDialog = screen.getByRole("dialog");
-    fireEvent.change(within(recordDialog).getByLabelText("会议摘要（必填）"), {
-      target: { value: "这条记录会模拟保存失败" },
-    });
-    fireEvent.click(within(recordDialog).getByRole("button", { name: "保存记录并完成会议" }));
-
-    await waitFor(() => expect(onCreateMeetingRecord).toHaveBeenCalledTimes(1));
-    expect(onUpdateEvent).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).toBeTruthy();
-  });
-
-  it("requires a record for an already-completed meeting without a linked record", () => {
-    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
-    renderGrid({
-      events: [{ ...scheduleEvent, title: "历史会议", category: "会议", isCompleted: true }],
-      onUpdateEvent,
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "打开 历史会议 编辑窗口" }));
     fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
 
-    expect(screen.getByText("完成会议并记录")).toBeTruthy();
-    expect(onUpdateEvent).not.toHaveBeenCalled();
-  });
-
-  it("does not trust a dangling meeting record id", () => {
-    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
-    renderGrid({
-      events: [{
-        ...scheduleEvent,
-        title: "记录已删除的会议",
-        category: "会议",
-        isCompleted: false,
-        meetingRecordId: "deleted-meeting",
-      }],
-      meetingRecordIds: new Set(),
-      onUpdateEvent,
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "打开 记录已删除的会议 编辑窗口" }));
-    fireEvent.click(screen.getByRole("switch", { name: "标记为已完成" }));
-
-    expect(screen.getByText("完成会议并记录")).toBeTruthy();
-    expect(onUpdateEvent).not.toHaveBeenCalled();
-  });
-
-  it("saves recurring meeting edits to the series but completes only the current occurrence", async () => {
-    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
-    const onCreateMeetingRecord = vi.fn<NonNullable<WeeklyTimeGridProps["onCreateMeetingRecord"]>>(async () => "meeting-series-1");
-    renderGrid({
-      events: [{
-        ...scheduleEvent,
-        id: "recurring-meeting",
-        title: "循环组会",
-        category: "会议",
-        isCompleted: false,
-        recurrence: { kind: "daily" },
-      }],
-      onUpdateEvent,
-      onCreateMeetingRecord,
-    });
-
-    fireEvent.click(screen.getAllByRole("button", { name: "打开 循环组会 编辑窗口" })[0]);
-    fireEvent.click(screen.getByRole("button", { name: /循环行程设置/ }));
-    fireEvent.click(screen.getByRole("button", { name: "整个系列" }));
-    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "循环组会（新主题）" } });
-    fireEvent.click(screen.getByRole("switch", { name: "标记为已完成" }));
-
-    const recordDialog = screen.getByRole("dialog");
-    fireEvent.change(within(recordDialog).getByLabelText("会议摘要（必填）"), {
-      target: { value: "完成当前日期的组会记录" },
-    });
-    fireEvent.click(within(recordDialog).getByRole("button", { name: "保存记录并完成会议" }));
-
-    await waitFor(() => expect(onUpdateEvent).toHaveBeenCalledTimes(2));
-    expect(onUpdateEvent).toHaveBeenNthCalledWith(
-      1,
-      "recurring-meeting__2026-07-27",
-      expect.objectContaining({ title: "循环组会（新主题）", category: "会议" }),
-      { scope: "series" },
-    );
-    expect(onUpdateEvent.mock.calls[0][1]).not.toHaveProperty("isCompleted");
-    expect(onUpdateEvent).toHaveBeenNthCalledWith(
-      2,
-      "recurring-meeting__2026-07-27",
-      { isCompleted: true, meetingRecordId: "meeting-series-1" },
-      { scope: "occurrence" },
+    expect(onUpdateEvent).toHaveBeenCalledWith(
+      "event-1",
+      expect.objectContaining({ isCompleted: true, category: "会议" }),
     );
   });
 
@@ -465,6 +339,8 @@ describe("WeeklyTimeGrid interactions", () => {
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByRole("switch", { name: "\u5faa\u73af\u884c\u7a0b" })).toBeTruthy();
     expect(within(dialog).queryByRole("button", { name: /\u5faa\u73af\u8bbe\u7f6e/ })).toBeNull();
+    expect(within(dialog).getByRole("region", { name: "循环行程设置" })).toBeTruthy();
+    expect(within(dialog).getByRole("region", { name: "快捷事件" })).toBeTruthy();
 
 
     const quickPick = dialog.querySelector('[aria-label="开始时间分钟快捷选择"]');
@@ -508,10 +384,16 @@ describe("WeeklyTimeGrid interactions", () => {
     expect((within(dialog).getByLabelText("备注") as HTMLTextAreaElement).value).toBe("阅读方法章");
     expect((within(dialog).getByLabelText("所需物品\/准备事项") as HTMLTextAreaElement).value).toBe("纸笔");
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "管理快捷事件模板" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "添加快捷事件模板" }));
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
     const templateHeading = screen.getByRole("heading", { name: /行程模板/ });
     const templateDialog = templateHeading.closest('[role="dialog"]') as HTMLElement;
-    expect((within(templateDialog).getByLabelText("所需物品\/准备事项") as HTMLTextAreaElement).value).toBe("纸笔");
+    expect((within(templateDialog).getByLabelText("标题") as HTMLInputElement).value).toBe("");
+    expect((within(templateDialog).getByLabelText("所需物品\/准备事项") as HTMLTextAreaElement).value).toBe("");
+
+    fireEvent.click(within(templateDialog).getByRole("button", { name: "Close" }));
+    const restoredCreateDialog = screen.getByRole("dialog");
+    expect((within(restoredCreateDialog).getByLabelText("标题") as HTMLInputElement).value).toBe("文献阅读");
   });
 
   it("marquee-selects multiple cards and deletes them together", () => {

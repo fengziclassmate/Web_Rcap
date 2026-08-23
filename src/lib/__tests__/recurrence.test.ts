@@ -63,7 +63,7 @@ describe("expandScheduleEvents", () => {
         event({
           recurrence: { kind: "daily" },
           recurrenceOverrides: {
-            "2026-05-02": { title: "Changed", isCompleted: true, meetingRecordId: "meeting-1" },
+            "2026-05-02": { title: "Changed", isCompleted: true },
           },
         }),
       ],
@@ -73,7 +73,6 @@ describe("expandScheduleEvents", () => {
     expect(result[0]).toMatchObject({
       title: "Changed",
       isCompleted: true,
-      meetingRecordId: "meeting-1",
       date: "2026-05-02",
     });
   });
