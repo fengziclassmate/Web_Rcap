@@ -224,6 +224,33 @@ describe("WeeklyTimeGrid interactions", () => {
     expect(card?.querySelector('[class*="repeating-linear-gradient(45deg"]')).toBeTruthy();
   });
 
+  it("uses the same title font size for short and long events", () => {
+    renderGrid({
+      events: [
+        {
+          ...scheduleEvent,
+          id: "short-title-event",
+          title: "短行程标题",
+          startHour: 9,
+          endHour: 9.25,
+        },
+        {
+          ...scheduleEvent,
+          id: "long-title-event",
+          title: "长行程标题",
+          startHour: 10,
+          endHour: 12,
+        },
+      ],
+    });
+
+    const shortTitle = screen.getByText("短行程标题");
+    const longTitle = screen.getByText("长行程标题");
+    expect(shortTitle.className).toContain("text-[10px]");
+    expect(longTitle.className).toContain("text-[10px]");
+    expect(longTitle.className).not.toContain("text-xs");
+  });
+
   it("commits an end-time resize after dragging the bottom edge", () => {
     const onUpdateEvent = vi.fn();
     renderGrid({ events: [{ ...scheduleEvent, isCompleted: false }], onUpdateEvent });

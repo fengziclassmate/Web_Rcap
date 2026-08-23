@@ -1937,7 +1937,7 @@ export function WeeklyTimeGrid({
                                         <Repeat className="mt-0.5 h-3 w-3 shrink-0 text-gray-600" aria-hidden />
                                       ) : null}
                                       <p
-                                        className="min-w-0 flex-1 truncate text-xs font-semibold leading-snug"
+                                        className="min-w-0 flex-1 truncate text-[10px] font-semibold leading-snug"
                                         title={`${event.title} (${fullTimeLabel})`}
                                       >
                                         {event.title}
@@ -1998,7 +1998,7 @@ export function WeeklyTimeGrid({
                                       </div>
 
                                       <p
-                                        className={`min-w-0 flex-1 overflow-hidden break-words text-xs font-semibold leading-snug ${
+                                        className={`min-w-0 flex-1 overflow-hidden break-words text-[10px] font-semibold leading-snug ${
                                           mediumCard || denseCard
                                             ? "[display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
                                             : ""
