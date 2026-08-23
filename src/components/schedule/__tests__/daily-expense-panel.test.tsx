@@ -38,6 +38,7 @@ const emptySummary = {
 
 describe("DailyExpensePanel", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -57,16 +58,39 @@ describe("DailyExpensePanel", () => {
   });
 
   it("collapses and restores the expense details from the title row", async () => {
-    render(<DailyExpensePanel date="2026-08-02" title="本周花销" />);
+    render(
+      <DailyExpensePanel
+        date="2026-08-02"
+        title="本周花销"
+        contentHeader={<p>每日花销选择</p>}
+      />,
+    );
 
     expect(await screen.findByRole("button", { name: "折叠本周花销" })).toBeTruthy();
+    expect(screen.getByText("每日花销选择")).toBeTruthy();
     expect(screen.getByText("当天支出列表")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "折叠本周花销" }));
+    expect(screen.queryByText("每日花销选择")).toBeNull();
     expect(screen.queryByText("当天支出列表")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "展开本周花销" }));
     expect(screen.getByText("当天支出列表")).toBeTruthy();
+  });
+
+  it("remembers the last collapsed state", async () => {
+    window.localStorage.setItem("schedule-expense-panel-open-v1", "closed");
+    render(<DailyExpensePanel date="2026-08-02" title="本周花销" />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "展开本周花销" })).toBeTruthy();
+      expect(screen.queryByText("当天支出列表")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "展开本周花销" }));
+    await waitFor(() => {
+      expect(window.localStorage.getItem("schedule-expense-panel-open-v1")).toBe("open");
+    });
   });
 
   it("sends the budget exclusion tag when adding a business expense", async () => {

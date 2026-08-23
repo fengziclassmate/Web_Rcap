@@ -14,7 +14,6 @@ import {
   Trash2,
   AlertTriangle,
   Footprints,
-  FileCheck2,
   KanbanSquare,
   GripVertical,
   Pencil,
@@ -38,10 +37,6 @@ import {
   type TaskType,
   type TaskUncertaintyLevel,
 } from "@/lib/types";
-import {
-  buildDeviationInsights,
-  type ExecutionOutcome,
-} from "@/lib/execution-continuity";
 import {
   Collapsible,
   CollapsibleContent,
@@ -117,8 +112,6 @@ type TaskDashboardProps = {
   confirmDangerousActions: boolean;
   uiPreferences: DashboardUiPreferences;
   onUiPreferencesChange: (value: DashboardUiPreferences) => void;
-  onRecordTaskOutcome?: (taskId: string) => void;
-  executionOutcomes?: ExecutionOutcome[];
 };
 
 const PRIORITY_ORDER: Priority[] = ["紧急且重要", "紧急不重要", "不紧急重要", "不紧急不重要"];
@@ -339,8 +332,6 @@ export function TaskDashboard({
   confirmDangerousActions,
   uiPreferences,
   onUiPreferencesChange,
-  onRecordTaskOutcome,
-  executionOutcomes = [],
 }: TaskDashboardProps) {
   const [taskName, setTaskName] = useState("");
   const [annualTaskName, setAnnualTaskName] = useState("");
@@ -423,14 +414,7 @@ export function TaskDashboard({
     () => tasks.filter((task) => task.taskType === "long" && task.done),
     [tasks],
   );
-  const deviationInsights = useMemo(
-    () => buildDeviationInsights(executionOutcomes),
-    [executionOutcomes],
-  );
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
-  const editingTaskDeviationInsight = taskDraft
-    ? deviationInsights.find((item) => item.workType === taskDraft.workType) ?? null
-    : null;
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -2623,15 +2607,6 @@ export function TaskDashboard({
                 </div>
                 {taskDraft.uncertaintyEnabled ? (
                   <div className="mt-3 space-y-3 border-t border-teal-900/10 pt-3">
-                    {editingTaskDeviationInsight ? (
-                      <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-                        历史 {editingTaskDeviationInsight.sampleSize} 次“{workTypeLabels[taskDraft.workType]}”记录平均为计划的
-                        <span className="mx-1 font-semibold">{editingTaskDeviationInsight.averageMultiplier} 倍</span>
-                        ，平均偏差 {editingTaskDeviationInsight.averageDeltaMinutes > 0 ? "+" : ""}{editingTaskDeviationInsight.averageDeltaMinutes} 分钟。
-                      </div>
-                    ) : (
-                      <p className="rounded-lg bg-white/70 px-3 py-2 text-xs text-stone-500">尚无同类型执行样本，完成任务后记录计划与实际时长即可开始学习。</p>
-                    )}
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-1">
                         <Label htmlFor="task-uncertainty-level">不确定性等级</Label>
@@ -2800,21 +2775,6 @@ export function TaskDashboard({
               >
                 保存任务
               </Button>
-              {onRecordTaskOutcome ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full rounded-sm border-emerald-200 bg-emerald-50/60 text-emerald-900 hover:bg-emerald-100"
-                  onClick={() => {
-                    onRecordTaskOutcome(editingTask.id);
-                    setEditingTaskId(null);
-                    setTaskDraft(null);
-                  }}
-                >
-                  <FileCheck2 className="size-4" />
-                  记录执行结果与证据
-                </Button>
-              ) : null}
               <Button
                 type="button"
                 variant="outline"

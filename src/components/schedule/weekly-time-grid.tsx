@@ -40,6 +40,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DailyExpensePanel } from "@/components/schedule/daily-expense-panel";
+import { DailyReflectionPanel } from "@/components/schedule/daily-reflection-panel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,6 +56,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { createId } from "@/lib/id";
+import type { LogComposerInput } from "@/lib/logs";
 import { supabase } from "@/lib/supabase";
 import {
   getCenteredScrollTop,
@@ -97,6 +99,7 @@ import {
 } from "@/lib/recurrence";
 import {
   buildSplitTailPlacements,
+  defaultScheduleTemplates,
   loadScheduleTemplates,
   saveScheduleTemplates,
   type ScheduleTemplate,
@@ -175,6 +178,9 @@ type WeeklyTimeGridProps = {
   onNextWeek: () => void;
   onViewModeChange?: (mode: ViewMode) => void;
   onTimeGranularityChange?: (granularity: TimeGranularity) => void;
+  onCreateLogPost?: (input: LogComposerInput) => Promise<boolean>;
+  onOpenLogs?: () => void;
+  logSaving?: boolean;
   toolbarContent?: React.ReactNode;
   viewMode?: ViewMode;
   timeGranularity?: TimeGranularity;
@@ -517,6 +523,9 @@ export function WeeklyTimeGrid({
   onNextWeek,
   onViewModeChange,
   onTimeGranularityChange,
+  onCreateLogPost,
+  onOpenLogs,
+  logSaving = false,
   toolbarContent,
   viewMode = "week",
   timeGranularity = 60,
@@ -525,6 +534,7 @@ export function WeeklyTimeGrid({
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [selectedCell, setSelectedCell] = useState<GridCell | null>(null);
   const [createForm, setCreateForm] = useState<EventFormState>(defaultForm);
+  const [createDetailsOpen, setCreateDetailsOpen] = useState(false);
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
   const [meetingCompletionRequest, setMeetingCompletionRequest] = useState<MeetingCompletionRequest | null>(null);
   const [meetingCompletionDraft, setMeetingCompletionDraft] = useState<MeetingCompletionInput | null>(null);
@@ -558,6 +568,7 @@ export function WeeklyTimeGrid({
     category: DEFAULT_SCHEDULE_CATEGORY,
     tag: null as EventTag,
     notes: "",
+    requirements: "",
   });
   const [templateWeekdays, setTemplateWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [templateStartHour, setTemplateStartHour] = useState(9);
@@ -614,6 +625,18 @@ export function WeeklyTimeGrid({
     exceptionText: "",
   });
   const [editRecurrenceOpen, setEditRecurrenceOpen] = useState(false);
+
+  const quickEventTemplates = useMemo(() => {
+    const restTemplate = defaultScheduleTemplates[0];
+    return [
+      restTemplate,
+      ...scheduleTemplates.filter(
+        (template) =>
+          template.id !== restTemplate.id &&
+          !(template.title === restTemplate.title && template.category === restTemplate.category),
+      ),
+    ];
+  }, [scheduleTemplates]);
 
   const timeGridSlots = useMemo(() => getTimeGridSlots(timeGranularity), [timeGranularity]);
 
@@ -936,7 +959,22 @@ export function WeeklyTimeGrid({
       weekdays: [day.getDay()],
       exceptionText: "",
     });
+    setCreateDetailsOpen(false);
     setCreateDialogOpen(true);
+  }
+
+  function handleApplyQuickEvent(template: ScheduleTemplate) {
+    const category = categories.some((item) => item.name === template.category)
+      ? template.category
+      : defaultCreateCategory;
+    setCreateForm((previous) => ({
+      ...previous,
+      title: template.title,
+      category,
+      tag: template.tag,
+      notes: template.notes,
+      requirements: template.requirements.join("\n"),
+    }));
   }
 
   function loadTemplateIntoEditor(template: ScheduleTemplate) {
@@ -949,6 +987,7 @@ export function WeeklyTimeGrid({
       category,
       tag: template.tag,
       notes: template.notes,
+      requirements: template.requirements.join("\n"),
     });
   }
 
@@ -965,6 +1004,7 @@ export function WeeklyTimeGrid({
         category: defaultCreateCategory,
         tag: null,
         notes: "",
+        requirements: "",
       });
     }
     setTemplateDialogOpen(true);
@@ -977,6 +1017,7 @@ export function WeeklyTimeGrid({
       category: defaultCreateCategory,
       tag: null,
       notes: "",
+      requirements: "",
     });
   }
 
@@ -994,7 +1035,7 @@ export function WeeklyTimeGrid({
       category: templateForm.category,
       tag: templateForm.tag,
       notes: templateForm.notes.trim(),
-      requirements: existing?.requirements ?? [],
+      requirements: buildRequirementLines(templateForm.requirements),
     };
 
     setScheduleTemplates((previous) =>
@@ -2240,72 +2281,80 @@ export function WeeklyTimeGrid({
               </div>
             </div>
           )}
-          {viewMode === "week" && selectedWeekExpenseDateIso ? (
-            <div className="border-t border-gray-200 bg-white px-4 py-4 sm:px-6">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-950">本周花销</h3>
-                  <p className="mt-0.5 text-xs text-stone-500">选择日期后在下方记录支出和预算</p>
-                </div>
-                <span className="rounded-md border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600">
-                  {selectedWeekExpenseDateIso}
-                </span>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
-                {weekExpenseDateOptions.map(({ date, dateIso }) => {
-                  const summary = dateExpenseSummaries[dateIso] ?? {
-                    totalExpense: 0,
-                    dailyBudget: null,
-                  };
-                  const isSelected = selectedWeekExpenseDateIso === dateIso;
-                  const isOverBudget =
-                    summary.dailyBudget !== null && summary.totalExpense > summary.dailyBudget;
-
-                  return (
-                    <button
-                      key={dateIso}
-                      type="button"
-                      aria-pressed={isSelected}
-                      onClick={() => setSelectedExpenseDateIso(dateIso)}
-                      className={`min-h-20 rounded-lg border px-3 py-2 text-left transition ${
-                        isSelected
-                          ? "border-stone-900 bg-stone-950 text-white shadow-sm"
-                          : "border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:bg-white"
-                      }`}
-                    >
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="truncate text-xs font-medium opacity-80">
-                          {format(date, "M/d")} {format(date, "EEE", { locale: zhCN })}
-                        </span>
-                        {isOverBudget ? (
-                          <span
-                            className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold ${
-                              isSelected ? "bg-white/15 text-white" : "bg-rose-100 text-rose-700"
-                            }`}
-                          >
-                            超支
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="mt-2 block truncate text-base font-semibold">
-                        {getMonthlyExpenseLabel(summary)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          {onCreateLogPost && onOpenLogs ? (
+            <DailyReflectionPanel
+              date={todayIso}
+              saving={logSaving}
+              onCreatePost={onCreateLogPost}
+              onOpenLogs={onOpenLogs}
+            />
           ) : null}
           {activeExpenseDateIso ? (
             <DailyExpensePanel
               date={activeExpenseDateIso}
               title={activeExpenseTitle}
               onChanged={handleExpenseChanged}
+              contentHeader={viewMode === "week" && selectedWeekExpenseDateIso ? (
+                <div className="rounded-xl border border-stone-200 bg-white/80 p-3">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-semibold text-stone-950">每日花销</h4>
+                      <p className="mt-0.5 text-xs text-stone-500">选择一天，查看并记录当天支出</p>
+                    </div>
+                    <span className="rounded-md border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600">
+                      {selectedWeekExpenseDateIso}
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
+                    {weekExpenseDateOptions.map(({ date, dateIso }) => {
+                      const summary = dateExpenseSummaries[dateIso] ?? {
+                        totalExpense: 0,
+                        dailyBudget: null,
+                      };
+                      const isSelected = selectedWeekExpenseDateIso === dateIso;
+                      const isOverBudget =
+                        summary.dailyBudget !== null && summary.totalExpense > summary.dailyBudget;
+
+                      return (
+                        <button
+                          key={dateIso}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => setSelectedExpenseDateIso(dateIso)}
+                          className={`min-h-20 rounded-lg border px-3 py-2 text-left transition ${
+                            isSelected
+                              ? "border-stone-900 bg-stone-950 text-white shadow-sm"
+                              : "border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:bg-white"
+                          }`}
+                        >
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="truncate text-xs font-medium opacity-80">
+                              {format(date, "M/d")} {format(date, "EEE", { locale: zhCN })}
+                            </span>
+                            {isOverBudget ? (
+                              <span
+                                className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold ${
+                                  isSelected ? "bg-white/15 text-white" : "bg-rose-100 text-rose-700"
+                                }`}
+                              >
+                                超支
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="mt-2 block truncate text-base font-semibold">
+                            {getMonthlyExpenseLabel(summary)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : undefined}
             />
           ) : null}
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             {selectedCell ? (
-              <DialogContent className="rounded-lg border-gray-200 shadow-lg sm:max-w-lg">
+              <DialogContent className="max-h-[92vh] overflow-y-auto rounded-lg border-gray-200 shadow-lg sm:max-w-lg">
                 <DialogHeader>
                   <DialogTitle className="text-lg font-semibold text-gray-900">
                     新建行程 - {selectedCell.date} {formatHour(selectedCell.startHour)}
@@ -2378,23 +2427,53 @@ export function WeeklyTimeGrid({
                       </Select>
                     </div>
                   </div>
-                  <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-4">
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        id="create-recurring"
-                        checked={createRecurrence.enabled}
-                        onCheckedChange={(checked) =>
-                          setCreateRecurrence((prev) => {
-                            const next = { ...prev, enabled: checked };
-                            if (checked && prev.kind === "weekly" && prev.weekdays.length === 0) {
-                              const weekday = parse(selectedCell.date, "yyyy-MM-dd", new Date()).getDay();
-                              next.weekdays = [weekday];
-                            }
-                            return next;
-                          })
-                        }
-                      />
-                      <Label htmlFor="create-recurring">循环行程</Label>
+                  <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          id="create-recurring"
+                          checked={createRecurrence.enabled}
+                          onCheckedChange={(checked) =>
+                            setCreateRecurrence((prev) => {
+                              const next = { ...prev, enabled: checked };
+                              if (checked && prev.kind === "weekly" && prev.weekdays.length === 0) {
+                                const weekday = parse(selectedCell.date, "yyyy-MM-dd", new Date()).getDay();
+                                next.weekdays = [weekday];
+                              }
+                              return next;
+                            })
+                          }
+                        />
+                        <Label htmlFor="create-recurring">循环行程</Label>
+                      </div>
+                      <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 overflow-x-auto" aria-label="快捷事件">
+                        <span className="shrink-0 text-[11px] font-medium text-stone-500">快捷</span>
+                        {quickEventTemplates.map((template) => (
+                          <Button
+                            key={template.id}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 shrink-0 rounded-full border-stone-200 bg-white px-2.5 text-xs"
+                            onClick={() => handleApplyQuickEvent(template)}
+                            aria-label={`快捷填写：${template.title}`}
+                          >
+                            {template.category === "休息" ? <Coffee className="h-3 w-3" aria-hidden /> : null}
+                            {template.title}
+                          </Button>
+                        ))}
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0 rounded-full"
+                          onClick={handleOpenTemplateDialog}
+                          aria-label="管理快捷事件模板"
+                          title="管理快捷事件模板"
+                        >
+                          <Plus className="h-3.5 w-3.5" aria-hidden />
+                        </Button>
+                      </div>
                     </div>
                     {createRecurrence.enabled ? (
                       <div className="mt-4 space-y-4">
@@ -2464,26 +2543,52 @@ export function WeeklyTimeGrid({
                     onStartHourChange={(value) => setCreateForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setCreateForm((prev) => ({ ...prev, endHour: value }))}
                   />
-                  <div className="space-y-3">
-                    <Label htmlFor="create-notes">备注</Label>
-                    <Textarea
-                      id="create-notes"
-                      value={createForm.notes}
-                      onChange={(event) => setCreateForm((prev) => ({ ...prev, notes: event.target.value }))}
-                      placeholder="输入备注信息"
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="create-requirements">所需物品/准备事项</Label>
-                    <Textarea
-                      id="create-requirements"
-                      value={createForm.requirements}
-                      onChange={(event) =>
-                        setCreateForm((prev) => ({ ...prev, requirements: event.target.value }))
-                      }
-                      placeholder="每行一项"
-                    />
-                  </div>
+                  <Collapsible
+                    open={createDetailsOpen}
+                    onOpenChange={setCreateDetailsOpen}
+                    className="overflow-hidden rounded-lg border border-stone-200 bg-stone-50/70"
+                  >
+                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400">
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-stone-800">补充信息</span>
+                        <span className="block truncate text-[11px] text-stone-500">
+                          {createForm.notes.trim() || createForm.requirements.trim()
+                            ? "已填写备注或准备事项"
+                            : "备注与所需物品，需要时再展开"}
+                        </span>
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${createDetailsOpen ? "rotate-180" : ""}`}
+                        aria-hidden
+                      />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid gap-3 border-t border-stone-200 bg-white p-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="create-notes">备注</Label>
+                          <Textarea
+                            id="create-notes"
+                            value={createForm.notes}
+                            onChange={(event) => setCreateForm((prev) => ({ ...prev, notes: event.target.value }))}
+                            placeholder="输入备注信息"
+                            className="min-h-20"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="create-requirements">所需物品/准备事项</Label>
+                          <Textarea
+                            id="create-requirements"
+                            value={createForm.requirements}
+                            onChange={(event) =>
+                              setCreateForm((prev) => ({ ...prev, requirements: event.target.value }))
+                            }
+                            placeholder="每行一项"
+                            className="min-h-20"
+                          />
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                   <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-4">
                     <Switch
                       id="create-completed"
@@ -3005,19 +3110,36 @@ export function WeeklyTimeGrid({
                     </Select>
                   </div>
 
-                  <div className="mt-4 space-y-2">
-                    <Label htmlFor="template-notes">备注</Label>
-                    <Textarea
-                      id="template-notes"
-                      className="min-h-20"
-                      value={templateForm.notes}
-                      onChange={(event) =>
-                        setTemplateForm((previous) => ({
-                          ...previous,
-                          notes: event.target.value,
-                        }))
-                      }
-                    />
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="template-notes">备注</Label>
+                      <Textarea
+                        id="template-notes"
+                        className="min-h-20"
+                        value={templateForm.notes}
+                        onChange={(event) =>
+                          setTemplateForm((previous) => ({
+                            ...previous,
+                            notes: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="template-requirements">所需物品/准备事项</Label>
+                      <Textarea
+                        id="template-requirements"
+                        className="min-h-20"
+                        value={templateForm.requirements}
+                        placeholder="每行一项"
+                        onChange={(event) =>
+                          setTemplateForm((previous) => ({
+                            ...previous,
+                            requirements: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
                   </div>
 
                   <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4">

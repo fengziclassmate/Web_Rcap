@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CenteredTimePartSelect,
   WeeklyTimeGrid,
@@ -20,6 +20,10 @@ vi.mock("@/lib/supabase", () => ({
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 describe("CenteredTimePartSelect", () => {
   it("shows the first minute option without blank content above it", async () => {
@@ -468,6 +472,46 @@ describe("WeeklyTimeGrid interactions", () => {
     expect(
       Array.from(quickPick!.querySelectorAll("button")).map((button) => button.textContent),
     ).toEqual(["00", "10", "15", "30", "45", "50"]);
+  });
+
+  it("keeps optional details folded and applies quick event templates", () => {
+    window.localStorage.setItem(
+      "schedule-event-templates-v1",
+      JSON.stringify([
+        {
+          id: "custom-reading",
+          title: "文献阅读",
+          category: "科研",
+          tag: "不着急",
+          notes: "阅读方法章",
+          requirements: ["纸笔"],
+        },
+      ]),
+    );
+    const { container } = renderGrid();
+    const emptySlot = Array.from(container.querySelectorAll("button")).find(
+      (button) => !button.textContent?.trim() && !button.getAttribute("aria-label"),
+    );
+    fireEvent.click(emptySlot!);
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).queryByLabelText("备注")).toBeNull();
+    expect(within(dialog).getByRole("button", { name: /补充信息/ })).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "快捷填写：休息" }));
+    expect((within(dialog).getByLabelText("标题") as HTMLInputElement).value).toBe("休息");
+    expect(within(dialog).getAllByRole("combobox")[0].textContent).toContain("休息");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "快捷填写：文献阅读" }));
+    expect((within(dialog).getByLabelText("标题") as HTMLInputElement).value).toBe("文献阅读");
+    fireEvent.click(within(dialog).getByRole("button", { name: /补充信息/ }));
+    expect((within(dialog).getByLabelText("备注") as HTMLTextAreaElement).value).toBe("阅读方法章");
+    expect((within(dialog).getByLabelText("所需物品\/准备事项") as HTMLTextAreaElement).value).toBe("纸笔");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "管理快捷事件模板" }));
+    const templateHeading = screen.getByRole("heading", { name: /行程模板/ });
+    const templateDialog = templateHeading.closest('[role="dialog"]') as HTMLElement;
+    expect((within(templateDialog).getByLabelText("所需物品\/准备事项") as HTMLTextAreaElement).value).toBe("纸笔");
   });
 
   it("marquee-selects multiple cards and deletes them together", () => {

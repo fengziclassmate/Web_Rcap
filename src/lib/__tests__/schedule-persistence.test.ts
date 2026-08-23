@@ -59,4 +59,25 @@ describe("schedule UI preference persistence", () => {
       },
     ]);
   });
+
+  it("ignores retired execution continuity data in an older local backup", () => {
+    localStorage.setItem(
+      getScheduleBackupStorageKey("user-legacy"),
+      JSON.stringify({
+        events: [],
+        tasks: [],
+        continuity_state: {
+          recoveryPacks: [{ id: "legacy-pack", title: "旧恢复包" }],
+          outcomes: [{ id: "legacy-outcome" }],
+        },
+      }),
+    );
+
+    const restored = readScheduleBackupFromLocal("user-legacy");
+
+    expect(restored).not.toBeNull();
+    expect(restored).not.toHaveProperty("continuity_state");
+    expect(restored?.events).toEqual([]);
+    expect(restored?.tasks).toEqual([]);
+  });
 });

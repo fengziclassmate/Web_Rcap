@@ -36,7 +36,7 @@ type LogPageProps = {
   posts: LogPostRecord[];
   tags: LogTag[];
   uploading: boolean;
-  onCreatePost: (input: LogComposerInput) => Promise<void>;
+  onCreatePost: (input: LogComposerInput) => Promise<unknown>;
   onUpdatePost: (postId: string, input: LogPostEditorInput) => Promise<void>;
   onDeletePost: (postId: string) => Promise<void>;
   onTogglePinned: (postId: string) => Promise<void>;
@@ -136,7 +136,7 @@ function LogComposer({
   onSubmit,
 }: {
   uploading: boolean;
-  onSubmit: (input: LogComposerInput) => Promise<void>;
+  onSubmit: (input: LogComposerInput) => Promise<unknown>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState<ComposerDraft>(defaultComposerDraft);

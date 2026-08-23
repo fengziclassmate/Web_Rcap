@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   BriefcaseBusiness,
   CalendarDays,
@@ -86,7 +86,10 @@ type DailyExpensePanelProps = {
   date: string;
   title?: string;
   onChanged?: () => void;
+  contentHeader?: ReactNode;
 };
+
+const expensePanelOpenStorageKey = "schedule-expense-panel-open-v1";
 
 type ExpenseCategoryBranch = { name: string; details: string[] };
 type ExpenseCategoryGroup = { main: string; branches: ExpenseCategoryBranch[] };
@@ -341,8 +344,14 @@ async function readErrorMessage(response: Response) {
     return response.statusText;
   }
 }
-export function DailyExpensePanel({ date, title = "今日花销", onChanged }: DailyExpensePanelProps) {
-  const [panelOpen, setPanelOpen] = useState(true);
+export function DailyExpensePanel({
+  date,
+  title = "今日花销",
+  onChanged,
+  contentHeader,
+}: DailyExpensePanelProps) {
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelPreferenceReady, setPanelPreferenceReady] = useState(false);
   const [summaryCache, setSummaryCache] = useState<Record<string, DaySummaryResponse>>({});
   const [loadingDates, setLoadingDates] = useState<Record<string, boolean>>({});
   const [savingExpense, setSavingExpense] = useState(false);
@@ -365,6 +374,26 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
   const [dailyBudgetAmount, setDailyBudgetAmount] = useState("");
   const [weeklyBudgetAmount, setWeeklyBudgetAmount] = useState("");
   const [monthlyBudgetAmount, setMonthlyBudgetAmount] = useState("");
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(expensePanelOpenStorageKey);
+      setPanelOpen(stored !== "closed");
+    } catch {
+      setPanelOpen(true);
+    } finally {
+      setPanelPreferenceReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!panelPreferenceReady) return;
+    try {
+      window.localStorage.setItem(expensePanelOpenStorageKey, panelOpen ? "open" : "closed");
+    } catch {
+      // localStorage may be unavailable in private browsing mode.
+    }
+  }, [panelOpen, panelPreferenceReady]);
 
   const summary = summaryCache[date] ?? createEmptySummary(date);
   const loading = Boolean(loadingDates[date]);
@@ -684,7 +713,8 @@ export function DailyExpensePanel({ date, title = "今日花销", onChanged }: D
         </div>
 
         <CollapsibleContent className="mt-4 flex flex-col gap-4">
-        <div className="grid gap-3 lg:grid-cols-3">
+          {contentHeader}
+          <div className="grid gap-3 lg:grid-cols-3">
           <div className="rounded-lg border border-stone-200 bg-white px-3 py-3">
             <p className="flex items-center gap-1.5 text-xs font-medium text-stone-500">
               <ReceiptText className="h-3.5 w-3.5" aria-hidden />
