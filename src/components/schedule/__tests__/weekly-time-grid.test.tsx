@@ -400,6 +400,8 @@ describe("WeeklyTimeGrid interactions", () => {
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).queryByLabelText("备注")).toBeNull();
     expect(within(dialog).getByRole("button", { name: /补充信息/ })).toBeTruthy();
+    expect(within(dialog).queryByText("一键填入标题、分类和准备信息")).toBeNull();
+    expect(within(dialog).queryByText("备注与所需物品，需要时再展开")).toBeNull();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "快捷填写：休息" }));
     expect((within(dialog).getByLabelText("标题") as HTMLInputElement).value).toBe("休息");
@@ -407,6 +409,7 @@ describe("WeeklyTimeGrid interactions", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "快捷填写：文献阅读" }));
     expect((within(dialog).getByLabelText("标题") as HTMLInputElement).value).toBe("文献阅读");
+    expect(within(dialog).queryByText("已填写备注或准备事项")).toBeNull();
     fireEvent.click(within(dialog).getByRole("button", { name: /补充信息/ }));
     expect((within(dialog).getByLabelText("备注") as HTMLTextAreaElement).value).toBe("阅读方法章");
     expect((within(dialog).getByLabelText("所需物品\/准备事项") as HTMLTextAreaElement).value).toBe("纸笔");

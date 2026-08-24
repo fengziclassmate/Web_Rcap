@@ -2430,10 +2430,7 @@ export function WeeklyTimeGrid({
                       className="rounded-xl border border-amber-200/80 bg-amber-50/55 p-3"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-stone-800">快捷事件</p>
-                          <p className="mt-0.5 text-[10px] text-stone-500">一键填入标题、分类和准备信息</p>
-                        </div>
+                        <p className="min-w-0 text-xs font-semibold text-stone-800">快捷事件</p>
                         <Button
                           type="button"
                           size="sm"
@@ -2477,14 +2474,7 @@ export function WeeklyTimeGrid({
                     className="overflow-hidden rounded-lg border border-stone-200 bg-stone-50/70"
                   >
                     <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400">
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-stone-800">补充信息</span>
-                        <span className="block truncate text-[11px] text-stone-500">
-                          {createForm.notes.trim() || createForm.requirements.trim()
-                            ? "已填写备注或准备事项"
-                            : "备注与所需物品，需要时再展开"}
-                        </span>
-                      </span>
+                      <span className="min-w-0 text-sm font-semibold text-stone-800">补充信息</span>
                       <ChevronDown
                         className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${createDetailsOpen ? "rotate-180" : ""}`}
                         aria-hidden
