@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { ArrowUpRight, BookHeart, PenLine, Send } from "lucide-react";
+import { ArrowUpRight, ChevronDown, NotebookPen, PenLine, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import {
   logMoodOptions,
@@ -23,6 +24,8 @@ const moodEmoji: Record<LogMood, string> = {
   excited: "🤩",
   neutral: "😐",
 };
+
+const reflectionPanelOpenStorageKey = "schedule-reflection-panel-open-v1";
 
 type ReflectionDay = {
   date: string;
@@ -59,6 +62,28 @@ export function DailyReflectionPanel({
   const [mood, setMood] = useState<LogMood | "">("");
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelPreferenceReady, setPanelPreferenceReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(reflectionPanelOpenStorageKey);
+      setPanelOpen(stored !== "closed");
+    } catch {
+      setPanelOpen(true);
+    } finally {
+      setPanelPreferenceReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!panelPreferenceReady) return;
+    try {
+      window.localStorage.setItem(reflectionPanelOpenStorageKey, panelOpen ? "open" : "closed");
+    } catch {
+      // localStorage may be unavailable in private browsing mode.
+    }
+  }, [panelOpen, panelPreferenceReady]);
 
   useEffect(() => {
     if (!days.some((day) => day.date === selectedDate)) {
@@ -85,6 +110,7 @@ export function DailyReflectionPanel({
   const recordedDayCount = days.filter((day) => (postsByDate.get(day.date)?.length ?? 0) > 0).length;
   const selectedDay = days.find((day) => day.date === selectedDate);
   const canSubmit = Boolean(selectedDate && (mood || content.trim()));
+  const panelTitle = days.length > 1 ? "本周日志" : "当日日志";
 
   function selectDay(date: string) {
     setSelectedDate(date);
@@ -117,33 +143,37 @@ export function DailyReflectionPanel({
 
   return (
     <section className="border-t border-stone-200 bg-[linear-gradient(120deg,rgba(236,253,245,0.72),rgba(255,251,235,0.64))] px-4 py-4 sm:px-6">
-      <div className="rounded-xl border border-emerald-900/10 bg-white/85 p-3 shadow-[0_10px_30px_rgba(28,25,23,0.05)]">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-950 text-emerald-50">
-              <BookHeart className="h-4 w-4" aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-stone-950">{days.length > 1 ? "本周日志" : "当日日志"}</h3>
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
-                  已记录 {recordedDayCount}/{days.length} 天
-                </span>
-              </div>
-              <p className="truncate text-[11px] text-stone-500">每天的心情和文字会同步到动态日志</p>
+      <Collapsible open={panelOpen} onOpenChange={setPanelOpen}>
+        <div className="rounded-xl border border-emerald-900/10 bg-white/85 p-3 shadow-[0_10px_30px_rgba(28,25,23,0.05)]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <NotebookPen className="h-4 w-4 shrink-0 text-stone-700" aria-hidden />
+              <h3 className="text-sm font-semibold text-stone-950">{panelTitle}</h3>
+              <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-600">
+                已记录 {recordedDayCount}/{days.length} 天
+              </span>
+              <CollapsibleTrigger
+                className="ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+                aria-label={panelOpen ? `折叠${panelTitle}` : `展开${panelTitle}`}
+              >
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${panelOpen ? "" : "-rotate-90"}`}
+                  aria-hidden
+                />
+              </CollapsibleTrigger>
             </div>
+            <Button type="button" size="sm" variant="ghost" onClick={onOpenLogs}>
+              打开动态日志
+              <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+            </Button>
           </div>
-          <Button type="button" size="sm" variant="ghost" onClick={onOpenLogs}>
-            打开动态日志
-            <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
-          </Button>
-        </div>
 
-        <div
-          role="group"
-          aria-label="选择日志日期"
-          className={`mt-3 grid overflow-hidden rounded-xl border border-stone-200 bg-stone-200 shadow-inner ${days.length === 1 ? "grid-cols-1" : "grid-cols-7"}`}
-        >
+          <CollapsibleContent>
+            <div
+              role="group"
+              aria-label="选择日志日期"
+              className={`mt-3 grid overflow-hidden rounded-xl border border-stone-200 bg-stone-200 shadow-inner ${days.length === 1 ? "grid-cols-1" : "grid-cols-7"}`}
+            >
           {days.map((day) => {
             const dayPosts = postsByDate.get(day.date) ?? [];
             const latestPost = dayPosts[0];
@@ -191,10 +221,10 @@ export function DailyReflectionPanel({
               </button>
             );
           })}
-        </div>
+            </div>
 
-        {selectedDay ? (
-          <div className="mt-3 grid gap-3 rounded-lg border border-stone-200 bg-stone-50/80 p-2.5 xl:grid-cols-[auto_minmax(12rem,1fr)_auto] xl:items-center">
+            {selectedDay ? (
+              <div className="mt-3 grid gap-3 rounded-lg border border-stone-200 bg-stone-50/80 p-2.5 xl:grid-cols-[auto_minmax(12rem,1fr)_auto] xl:items-center">
             <div className="flex items-center gap-2">
               <span className="w-16 shrink-0 text-[11px] font-medium text-stone-600">
                 {selectedDay.weekday} {selectedDay.shortDate}
@@ -247,9 +277,11 @@ export function DailyReflectionPanel({
               <Send className="h-3.5 w-3.5" aria-hidden />
               {submitting || saving ? "写入中…" : "记入动态"}
             </Button>
-          </div>
-        ) : null}
-      </div>
+              </div>
+            ) : null}
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
     </section>
   );
 }

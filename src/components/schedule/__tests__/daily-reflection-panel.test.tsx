@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LogPostRecord } from "@/lib/logs";
 import { DailyReflectionPanel } from "../daily-reflection-panel";
 
@@ -37,6 +37,10 @@ function createPost(overrides: Partial<LogPostRecord> = {}): LogPostRecord {
 }
 
 describe("DailyReflectionPanel", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("shows each day in a weekly grid and displays recorded content", () => {
     render(
       <DailyReflectionPanel
@@ -53,9 +57,31 @@ describe("DailyReflectionPanel", () => {
     expect(screen.getByRole("heading", { name: "本周日志" })).toBeTruthy();
     expect(screen.getByText("已记录 1/7 天")).toBeTruthy();
     expect(screen.getByText("周一完成实验复盘。")).toBeTruthy();
+    expect(screen.queryByText("每天的心情和文字会同步到动态日志")).toBeNull();
     expect(screen.queryByText("已归档记录")).toBeNull();
     expect(screen.getByRole("button", { name: "2026-08-24 日志：已记录 1 条" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "2026-08-30 日志：尚未记录" })).toBeTruthy();
+  });
+
+  it("remembers whether the weekly journal is expanded", async () => {
+    const props = {
+      days,
+      posts: [] as LogPostRecord[],
+      onCreatePost: vi.fn(async () => true),
+      onOpenLogs: vi.fn(),
+    };
+    const { unmount } = render(<DailyReflectionPanel {...props} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "折叠本周日志" }));
+    expect(screen.queryByRole("group", { name: "选择日志日期" })).toBeNull();
+    await waitFor(() => {
+      expect(window.localStorage.getItem("schedule-reflection-panel-open-v1")).toBe("closed");
+    });
+
+    unmount();
+    render(<DailyReflectionPanel {...props} />);
+    expect(await screen.findByRole("button", { name: "展开本周日志" })).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "选择日志日期" })).toBeNull();
   });
 
   it("uses the full row for a single-day view", () => {

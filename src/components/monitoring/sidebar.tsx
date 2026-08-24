@@ -1,12 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   CalendarDays,
   LayoutDashboard,
   NotebookPen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 export type MonitoringModuleId =
   | "schedule"
@@ -22,6 +23,8 @@ const items: Array<{
   { id: "logs", label: "动态日志", group: "Journal", icon: <NotebookPen className="h-4 w-4" aria-hidden /> },
 ];
 
+const motivationMessageStorageKey = "workbench-motivation-message-v1";
+
 export function MonitoringSidebar({
   active,
   onChange,
@@ -29,19 +32,48 @@ export function MonitoringSidebar({
   active: MonitoringModuleId;
   onChange: (id: MonitoringModuleId) => void;
 }) {
+  const [motivationMessage, setMotivationMessage] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      return window.localStorage.getItem(motivationMessageStorageKey) ?? "";
+    } catch {
+      return "";
+    }
+  });
+
+  function handleMotivationMessageChange(value: string) {
+    setMotivationMessage(value);
+    try {
+      window.localStorage.setItem(motivationMessageStorageKey, value);
+    } catch {
+      // localStorage may be unavailable in private browsing mode.
+    }
+  }
+
   return (
     <section className="glass-panel overflow-hidden rounded-[1.35rem]">
-      <div className="flex flex-col gap-4 px-4 py-4 xl:flex-row xl:items-center xl:justify-between">
+      <div className="grid gap-4 px-4 py-4 xl:grid-cols-[max-content_minmax(18rem,1fr)_max-content] xl:items-center">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="nav-orb flex size-11 shrink-0 items-center justify-center rounded-2xl">
-            <LayoutDashboard className="h-5 w-5 text-white" aria-hidden />
+          <div className="flex size-8 shrink-0 items-center justify-center">
+            <LayoutDashboard className="h-5 w-5 text-stone-700" aria-hidden />
           </div>
           <div className="min-w-0">
             <p className="truncate text-base font-semibold tracking-tight text-stone-950">个人科研与生活工作台</p>
           </div>
         </div>
 
-        <nav className="-mx-1 overflow-x-auto pb-1 xl:mx-0 xl:flex-1 xl:pb-0" aria-label="模块切换">
+        <div className="mx-auto w-full max-w-2xl">
+          <Input
+            value={motivationMessage}
+            onChange={(event) => handleMotivationMessageChange(event.target.value)}
+            aria-label="工作台提醒"
+            placeholder="今天要记住什么？"
+            maxLength={160}
+            className="h-11 rounded-2xl border-stone-200/70 bg-white/55 px-5 text-center text-sm font-medium tracking-wide text-stone-800 shadow-inner placeholder:text-stone-400 focus-visible:border-stone-300 focus-visible:ring-stone-300/40"
+          />
+        </div>
+
+        <nav className="-mx-1 overflow-x-auto pb-1 xl:mx-0 xl:pb-0" aria-label="模块切换">
           <div className="flex min-w-max items-center gap-2 px-1 xl:justify-end">
             {items.map((item) => {
               const selected = item.id === active;
