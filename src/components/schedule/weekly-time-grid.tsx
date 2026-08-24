@@ -2444,19 +2444,24 @@ export function WeeklyTimeGrid({
                           添加模板
                         </Button>
                       </div>
-                      <div className="mt-2.5 flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5">
+                      <div
+                        role="group"
+                        aria-label="快捷事件模板列表"
+                        className="mt-2.5 flex min-w-0 flex-wrap items-center gap-1.5"
+                      >
                         {quickEventTemplates.map((template) => (
                           <Button
                             key={template.id}
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="h-7 shrink-0 rounded-full border-stone-200 bg-white px-2.5 text-xs"
+                            className="h-7 max-w-full min-w-0 overflow-hidden rounded-full border-stone-200 bg-white px-2.5 text-xs"
                             onClick={() => handleApplyQuickEvent(template)}
                             aria-label={`快捷填写：${template.title}`}
+                            title={template.title}
                           >
                             {template.category === "休息" ? <Coffee className="h-3 w-3" aria-hidden /> : null}
-                            {template.title}
+                            <span className="min-w-0 truncate">{template.title}</span>
                           </Button>
                         ))}
                       </div>
@@ -2856,6 +2861,7 @@ export function WeeklyTimeGrid({
                         id="template-title"
                         value={templateForm.title}
                         placeholder="例如：休息"
+                        maxLength={80}
                         onChange={(event) =>
                           setTemplateForm((previous) => ({
                             ...previous,

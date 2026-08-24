@@ -368,7 +368,9 @@ describe("WeeklyTimeGrid interactions", () => {
     expect(within(dialog).queryByRole("button", { name: /\u5faa\u73af\u8bbe\u7f6e/ })).toBeNull();
     expect(within(dialog).getByRole("region", { name: "循环行程设置" })).toBeTruthy();
     expect(within(dialog).getByRole("region", { name: "快捷事件" })).toBeTruthy();
-
+    const templateList = within(dialog).getByRole("group", { name: "快捷事件模板列表" });
+    expect(templateList.className).toContain("flex-wrap");
+    expect(templateList.className).not.toContain("overflow-x-auto");
 
     const quickPick = dialog.querySelector('[aria-label="开始时间分钟快捷选择"]');
     expect(quickPick).toBeTruthy();
@@ -378,6 +380,7 @@ describe("WeeklyTimeGrid interactions", () => {
   });
 
   it("keeps optional details folded and applies quick event templates", () => {
+    const longTemplateTitle = "这是一个名称很长但仍然不会撑出新建行程弹窗的快捷事件模板";
     window.localStorage.setItem(
       "schedule-event-templates-v1",
       JSON.stringify([
@@ -388,6 +391,14 @@ describe("WeeklyTimeGrid interactions", () => {
           tag: "不着急",
           notes: "阅读方法章",
           requirements: ["纸笔"],
+        },
+        {
+          id: "custom-long-title",
+          title: longTemplateTitle,
+          category: "项目工作",
+          tag: null,
+          notes: "",
+          requirements: [],
         },
       ]),
     );
@@ -402,6 +413,10 @@ describe("WeeklyTimeGrid interactions", () => {
     expect(within(dialog).getByRole("button", { name: /补充信息/ })).toBeTruthy();
     expect(within(dialog).queryByText("一键填入标题、分类和准备信息")).toBeNull();
     expect(within(dialog).queryByText("备注与所需物品，需要时再展开")).toBeNull();
+    const longTemplateButton = within(dialog).getByRole("button", { name: `快捷填写：${longTemplateTitle}` });
+    expect(longTemplateButton.className).toContain("max-w-full");
+    expect(longTemplateButton.className).toContain("overflow-hidden");
+    expect(within(longTemplateButton).getByText(longTemplateTitle).className).toContain("truncate");
 
     fireEvent.click(within(dialog).getByRole("button", { name: "快捷填写：休息" }));
     expect((within(dialog).getByLabelText("标题") as HTMLInputElement).value).toBe("休息");
@@ -419,6 +434,7 @@ describe("WeeklyTimeGrid interactions", () => {
     const templateHeading = screen.getByRole("heading", { name: /行程模板/ });
     const templateDialog = templateHeading.closest('[role="dialog"]') as HTMLElement;
     expect((within(templateDialog).getByLabelText("标题") as HTMLInputElement).value).toBe("");
+    expect((within(templateDialog).getByLabelText("标题") as HTMLInputElement).maxLength).toBe(80);
     expect((within(templateDialog).getByLabelText("所需物品\/准备事项") as HTMLTextAreaElement).value).toBe("");
 
     fireEvent.click(within(templateDialog).getByRole("button", { name: "Close" }));
