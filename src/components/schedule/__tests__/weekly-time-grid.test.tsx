@@ -268,6 +268,45 @@ describe("WeeklyTimeGrid interactions", () => {
     );
   });
 
+  it("drags a single recurring occurrence without changing the whole series", () => {
+    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
+    const { container } = renderGrid({
+      events: [
+        {
+          ...scheduleEvent,
+          id: "recurring-event",
+          title: "循环锻炼",
+          isCompleted: false,
+          recurrence: { kind: "daily" },
+          exceptionDates: [],
+          recurrenceOverrides: {},
+        },
+      ],
+      onUpdateEvent,
+    });
+
+    const card = screen.getAllByText("循环锻炼")[0].closest<HTMLElement>("[data-schedule-card]");
+    const targetSlot = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
+      (button) => !button.textContent?.trim() && !button.getAttribute("aria-label"),
+    );
+    expect(card).toBeTruthy();
+    expect(targetSlot).toBeTruthy();
+    expect(card!.draggable).toBe(true);
+
+    fireEvent.dragStart(card!);
+    fireEvent.drop(targetSlot!);
+
+    expect(onUpdateEvent).toHaveBeenCalledWith(
+      "recurring-event__2026-07-27",
+      {
+        date: "2026-07-27",
+        startHour: 0,
+        endHour: 1,
+      },
+      { scope: "occurrence" },
+    );
+  });
+
   it("keeps resize handles available for short and cross-midnight cards", () => {
     const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
     const { rerenderGrid } = renderGrid({

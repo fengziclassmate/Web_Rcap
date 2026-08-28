@@ -21,6 +21,7 @@ import {
   isProjectCheckinDateInCurrentCycle,
 } from "@/lib/project-checkins";
 import {
+  moveRecurrenceOccurrence,
   parseSyntheticEventId,
   pickRecurrenceOverridePatch,
 } from "@/lib/recurrence";
@@ -1202,6 +1203,13 @@ export function WorkbenchApp() {
             if (event.id !== parsed.masterId) return event;
             return { ...event, ...patch, id: event.id };
           }),
+        );
+        return;
+      }
+      if (patch.date && patch.date !== parsed.occurrenceDate) {
+        const detachedEventId = createId("event");
+        setEvents((prev) =>
+          moveRecurrenceOccurrence(prev, eventId, patch, detachedEventId),
         );
         return;
       }

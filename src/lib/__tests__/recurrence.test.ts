@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { expandScheduleEvents, type ExpandableScheduleEvent } from "../recurrence";
+import {
+  expandScheduleEvents,
+  moveRecurrenceOccurrence,
+  type ExpandableScheduleEvent,
+} from "../recurrence";
 
 function event(patch: Partial<ExpandableScheduleEvent> = {}): ExpandableScheduleEvent {
   return {
@@ -84,5 +88,41 @@ describe("expandScheduleEvents", () => {
       "2026-05-05",
     );
     expect(result.map((item) => item.date)).toEqual(["2026-05-01", "2026-05-02"]);
+  });
+});
+
+describe("moveRecurrenceOccurrence", () => {
+  it("detaches one occurrence when it is moved to another date", () => {
+    const result = moveRecurrenceOccurrence(
+      [
+        event({
+          recurrence: { kind: "daily" },
+          recurrenceOverrides: {
+            "2026-05-02": { title: "Changed occurrence", category: "personal" },
+          },
+        }),
+      ],
+      "evt-1__2026-05-02",
+      { date: "2026-05-03", startHour: 11, endHour: 12 },
+      "event-detached",
+    );
+
+    expect(result[0]).toMatchObject({
+      id: "evt-1",
+      exceptionDates: ["2026-05-02"],
+      recurrenceOverrides: {},
+    });
+    expect(result[1]).toMatchObject({
+      id: "event-detached",
+      date: "2026-05-03",
+      startHour: 11,
+      endHour: 12,
+      title: "Changed occurrence",
+      category: "personal",
+      recurrence: null,
+      exceptionDates: [],
+      recurrenceOverrides: {},
+      recurrenceEndExclusive: null,
+    });
   });
 });

@@ -51,6 +51,52 @@ export function parseSyntheticEventId(id: string): { masterId: string; occurrenc
   return { masterId, occurrenceDate };
 }
 
+/**
+ * 将被拖到其他日期的单次循环实例从系列中拆出。
+ * 原日期加入例外列表，实例已有覆盖内容会继承到新的普通行程中。
+ */
+export function moveRecurrenceOccurrence<T extends ExpandableScheduleEvent>(
+  events: T[],
+  occurrenceId: string,
+  patch: Partial<T>,
+  detachedId: string,
+): T[] {
+  const parsed = parseSyntheticEventId(occurrenceId);
+  const targetDate = patch.date;
+  if (!parsed || !targetDate || targetDate === parsed.occurrenceDate) return events;
+
+  let detachedEvent: T | null = null;
+  const nextEvents = events.map((event) => {
+    if (event.id !== parsed.masterId || !event.recurrence?.kind) return event;
+
+    const currentOverride = event.recurrenceOverrides?.[parsed.occurrenceDate] ?? {};
+    const nextOverrides = { ...(event.recurrenceOverrides ?? {}) };
+    delete nextOverrides[parsed.occurrenceDate];
+
+    detachedEvent = {
+      ...event,
+      ...currentOverride,
+      ...patch,
+      id: detachedId,
+      date: targetDate,
+      recurrence: null,
+      exceptionDates: [],
+      recurrenceOverrides: {},
+      recurrenceEndExclusive: null,
+    } as T;
+
+    return {
+      ...event,
+      exceptionDates: [
+        ...new Set([...(event.exceptionDates ?? []), parsed.occurrenceDate]),
+      ],
+      recurrenceOverrides: nextOverrides,
+    };
+  });
+
+  return detachedEvent ? [...nextEvents, detachedEvent] : events;
+}
+
 function parseISODateLocal(iso: string): Date {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d);

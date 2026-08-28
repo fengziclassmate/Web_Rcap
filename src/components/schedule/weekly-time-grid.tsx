@@ -1244,24 +1244,23 @@ export function WeeklyTimeGrid({
 
   function handleDropEvent(targetDate: string, targetHour: number) {
     if (!draggingEventId) return;
-    if (parseSyntheticEventId(draggingEventId)) {
-      toast.info("循环行程暂不支持直接拖拽，请通过编辑修改时间。");
-      setDraggingEventId(null);
-      return;
-    }
-
     const source = expandedEvents.find((event) => event.id === draggingEventId);
     if (!source) return;
 
     const duration = getScheduleEventDurationHour(source);
     const nextStartHour = normalizeStartTimeValue(targetHour);
     const nextEndHour = getEndHourFromStartAndDuration(nextStartHour, duration);
+    const occurrence = parseSyntheticEventId(source.id);
 
-    onUpdateEvent(source.id, {
-      date: targetDate,
-      startHour: nextStartHour,
-      endHour: nextEndHour,
-    });
+    onUpdateEvent(
+      source.id,
+      {
+        date: targetDate,
+        startHour: nextStartHour,
+        endHour: nextEndHour,
+      },
+      occurrence ? { scope: "occurrence" } : undefined,
+    );
     setDraggingEventId(null);
   }
 
@@ -1850,7 +1849,7 @@ export function WeeklyTimeGrid({
                               data-density={microCard ? "micro" : compactCard ? "compact" : "regular"}
                               data-schedule-card
                               data-schedule-event-id={event.id}
-                              draggable={!parseSyntheticEventId(event.id) && resizeState?.eventId !== event.id}
+                              draggable={resizeState?.eventId !== event.id}
                               onDragStart={() => setDraggingEventId(event.id)}
                               onDragEnd={() => setDraggingEventId(null)}
                               onContextMenu={(mouseEvent) => handleContextMenu(mouseEvent, event.id)}
