@@ -55,6 +55,8 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { Achievement } from "@/lib/achievements";
 import { DailyTaskPanel } from "@/components/schedule/daily-task-panel";
 import { ShoppingList } from "@/components/schedule/shopping-list";
+import { ResearchProgressPanel } from "@/components/schedule/research-progress-panel";
+import type { LogComposerInput, LogPostRecord } from "@/lib/logs";
 import { cn } from "@/lib/utils";
 
 type TaskDashboardProps = {
@@ -75,6 +77,10 @@ type TaskDashboardProps = {
   onAddShoppingItem: (name: string) => void;
   onToggleShoppingItem: (itemId: string) => void;
   onDeleteShoppingItem: (itemId: string) => void;
+  logPosts: LogPostRecord[];
+  logSaving?: boolean;
+  onCreateLogPost: (input: LogComposerInput) => Promise<boolean>;
+  onOpenLogs: () => void;
   onCreateDailyTaskTimeBlock: (
     task: LongTask,
     date: string,
@@ -308,6 +314,10 @@ export function TaskDashboard({
   onAddShoppingItem,
   onToggleShoppingItem,
   onDeleteShoppingItem,
+  logPosts,
+  logSaving = false,
+  onCreateLogPost,
+  onOpenLogs,
   onCreateDailyTaskTimeBlock,
   projectCheckins,
   onAddProjectCheckin,
@@ -2108,6 +2118,16 @@ export function TaskDashboard({
         onAddItem={onAddShoppingItem}
         onToggleItem={onToggleShoppingItem}
         onDeleteItem={onDeleteShoppingItem}
+      />
+
+      <Separator />
+
+      <ResearchProgressPanel
+        date={todayDate}
+        posts={logPosts}
+        saving={logSaving}
+        onCreatePost={onCreateLogPost}
+        onOpenLogs={onOpenLogs}
       />
 
       {showFootprintsSection ? (

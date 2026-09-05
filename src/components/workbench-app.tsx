@@ -1415,6 +1415,10 @@ export function WorkbenchApp() {
                   onAddShoppingItem={handleAddShoppingItem}
                   onToggleShoppingItem={handleToggleShoppingItem}
                   onDeleteShoppingItem={handleDeleteShoppingItem}
+                  logPosts={logPosts}
+                  logSaving={logUploading}
+                  onCreateLogPost={handleCreateLogPost}
+                  onOpenLogs={() => setActiveModule("logs")}
                   onCreateDailyTaskTimeBlock={handleCreateDailyTaskTimeBlock}
                   projectCheckins={projectCheckins}
                   onAddProjectCheckin={handleAddProjectCheckin}

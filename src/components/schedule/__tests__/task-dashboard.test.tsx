@@ -25,6 +25,9 @@ describe("TaskDashboard annual section", () => {
         onAddShoppingItem={noop}
         onToggleShoppingItem={noop}
         onDeleteShoppingItem={noop}
+        logPosts={[]}
+        onCreateLogPost={vi.fn(async () => true)}
+        onOpenLogs={noop}
         onCreateDailyTaskTimeBlock={noop}
         projectCheckins={[]}
         onAddProjectCheckin={noop}
@@ -59,6 +62,11 @@ describe("TaskDashboard annual section", () => {
     expect(
       collapseTrigger.compareDocumentPosition(screen.getByTestId("shopping-list")) &
         Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      screen.getByTestId("shopping-list").compareDocumentPosition(
+        screen.getByTestId("research-progress-panel"),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
 
     fireEvent.click(addButton);

@@ -2,11 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { ArrowUpRight, ChevronDown, NotebookPen, PenLine, Send } from "lucide-react";
+import {
+  ArrowUpRight,
+  ChevronDown,
+  FlaskConical,
+  Heart,
+  NotebookPen,
+  PenLine,
+  Send,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import {
+  getDailyLogKind,
   logMoodOptions,
   moodLabel,
   type LogComposerInput,
@@ -44,10 +53,6 @@ type DailyReflectionPanelProps = {
 
 function getPostDate(post: LogPostRecord) {
   return format(parseISO(post.createdAt), "yyyy-MM-dd");
-}
-
-function isDailyReflection(post: LogPostRecord) {
-  return !post.isArchived && (post.category === "mood" || post.tags.some((tag) => tag.name === "每日记录"));
 }
 
 export function DailyReflectionPanel({
@@ -96,7 +101,7 @@ export function DailyReflectionPanel({
   const postsByDate = useMemo(() => {
     const grouped = new Map<string, LogPostRecord[]>();
     posts
-      .filter(isDailyReflection)
+      .filter((post) => getDailyLogKind(post) !== null)
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .forEach((post) => {
         const date = getPostDate(post);
@@ -125,11 +130,11 @@ export function DailyReflectionPanel({
     try {
       const saved = await onCreatePost({
         content: normalizedContent,
-        category: "mood",
+        category: "life",
         mood,
         recordDate: selectedDate,
         location: "",
-        tagNames: ["每日记录"],
+        tagNames: ["每日记录", "生活日志"],
         images: [],
         links: [],
       });
@@ -151,6 +156,14 @@ export function DailyReflectionPanel({
               <h3 className="text-sm font-semibold text-stone-950">{panelTitle}</h3>
               <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-600">
                 已记录 {recordedDayCount}/{days.length} 天
+              </span>
+              <span className="hidden items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700 lg:flex">
+                <Heart className="h-3 w-3" aria-hidden />
+                生活日志
+              </span>
+              <span className="hidden items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800 lg:flex">
+                <FlaskConical className="h-3 w-3" aria-hidden />
+                科研日志
               </span>
               <CollapsibleTrigger
                 className="ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
@@ -176,9 +189,12 @@ export function DailyReflectionPanel({
             >
           {days.map((day) => {
             const dayPosts = postsByDate.get(day.date) ?? [];
-            const latestPost = dayPosts[0];
+            const latestLifePost = dayPosts.find((post) => getDailyLogKind(post) === "life");
+            const latestResearchPost = dayPosts.find((post) => getDailyLogKind(post) === "research");
+            const visiblePostCount = Number(Boolean(latestLifePost)) + Number(Boolean(latestResearchPost));
+            const hiddenPostCount = dayPosts.length - visiblePostCount;
             const selected = selectedDate === day.date;
-            const statusLabel = latestPost ? `已记录 ${dayPosts.length} 条` : "尚未记录";
+            const statusLabel = dayPosts.length > 0 ? `已记录 ${dayPosts.length} 条` : "尚未记录";
             return (
               <button
                 key={day.date}
@@ -203,14 +219,33 @@ export function DailyReflectionPanel({
                   ) : null}
                 </span>
 
-                {latestPost ? (
-                  <span className="mt-2 block">
-                    <span className="flex items-center gap-1 text-[10px] font-medium text-stone-600">
-                      {latestPost.mood ? <span aria-hidden>{moodEmoji[latestPost.mood]}</span> : null}
-                      <span>{latestPost.mood ? moodLabel(latestPost.mood) : "日志"}</span>
-                      {dayPosts.length > 1 ? <span className="ml-auto text-stone-400">+{dayPosts.length - 1}</span> : null}
-                    </span>
-                    <span className="mt-1 line-clamp-3 text-[11px] leading-4 text-stone-700">{latestPost.content}</span>
+                {latestLifePost || latestResearchPost ? (
+                  <span className="mt-2 grid gap-1.5">
+                    {latestLifePost ? (
+                      <span className="block min-w-0 rounded-md bg-rose-50/80 px-1.5 py-1">
+                        <span className="flex items-center gap-1 text-[9px] font-semibold text-rose-700">
+                          {latestLifePost.mood ? <span aria-hidden>{moodEmoji[latestLifePost.mood]}</span> : <Heart className="h-2.5 w-2.5" aria-hidden />}
+                          生活
+                        </span>
+                        <span className="mt-0.5 line-clamp-2 text-[10px] leading-3.5 text-stone-700">
+                          {latestLifePost.content}
+                        </span>
+                      </span>
+                    ) : null}
+                    {latestResearchPost ? (
+                      <span className="block min-w-0 rounded-md bg-sky-50/90 px-1.5 py-1">
+                        <span className="flex items-center gap-1 text-[9px] font-semibold text-sky-800">
+                          <FlaskConical className="h-2.5 w-2.5" aria-hidden />
+                          科研
+                        </span>
+                        <span className="mt-0.5 line-clamp-2 whitespace-pre-line text-[10px] leading-3.5 text-stone-700">
+                          {latestResearchPost.content}
+                        </span>
+                      </span>
+                    ) : null}
+                    {hiddenPostCount > 0 ? (
+                      <span className="text-right text-[9px] text-stone-400">另有 {hiddenPostCount} 条</span>
+                    ) : null}
                   </span>
                 ) : (
                   <span className="mt-3 flex items-center gap-1 text-[10px] text-stone-400 group-hover:text-emerald-700">
@@ -227,7 +262,8 @@ export function DailyReflectionPanel({
               <div className="mt-3 grid gap-3 rounded-lg border border-stone-200 bg-stone-50/80 p-2.5 xl:grid-cols-[auto_minmax(12rem,1fr)_auto] xl:items-center">
             <div className="flex items-center gap-2">
               <span className="w-16 shrink-0 text-[11px] font-medium text-stone-600">
-                {selectedDay.weekday} {selectedDay.shortDate}
+                <span className="block">生活日志</span>
+                <span className="mt-0.5 block font-normal text-stone-400">{selectedDay.weekday} {selectedDay.shortDate}</span>
               </span>
               <div className="flex flex-wrap items-center gap-1" role="group" aria-label={`选择 ${selectedDate} 心情`}>
                 {logMoodOptions.map((option) => {

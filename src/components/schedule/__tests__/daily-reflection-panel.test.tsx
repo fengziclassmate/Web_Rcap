@@ -47,6 +47,23 @@ describe("DailyReflectionPanel", () => {
         days={days}
         posts={[
           createPost(),
+          createPost({
+            id: "research-log",
+            content: "今日完成：整理实验图表。",
+            category: "research",
+            mood: null,
+            tags: [
+              {
+                id: "research-tag",
+                userId: "user-1",
+                name: "科研日志",
+                color: null,
+                usageCount: 1,
+                createdAt: new Date("2026-08-24T12:00:00").toISOString(),
+                updatedAt: new Date("2026-08-24T12:00:00").toISOString(),
+              },
+            ],
+          }),
           createPost({ id: "archived-log", content: "已归档记录", isArchived: true }),
         ]}
         onCreatePost={vi.fn(async () => true)}
@@ -57,9 +74,12 @@ describe("DailyReflectionPanel", () => {
     expect(screen.getByRole("heading", { name: "本周日志" })).toBeTruthy();
     expect(screen.getByText("已记录 1/7 天")).toBeTruthy();
     expect(screen.getByText("周一完成实验复盘。")).toBeTruthy();
+    expect(screen.getByText("今日完成：整理实验图表。")).toBeTruthy();
+    expect(screen.getAllByText("生活日志").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("科研日志").length).toBeGreaterThan(0);
     expect(screen.queryByText("每天的心情和文字会同步到动态日志")).toBeNull();
     expect(screen.queryByText("已归档记录")).toBeNull();
-    expect(screen.getByRole("button", { name: "2026-08-24 日志：已记录 1 条" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "2026-08-24 日志：已记录 2 条" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "2026-08-30 日志：尚未记录" })).toBeTruthy();
   });
 
@@ -82,6 +102,27 @@ describe("DailyReflectionPanel", () => {
     render(<DailyReflectionPanel {...props} />);
     expect(await screen.findByRole("button", { name: "展开本周日志" })).toBeTruthy();
     expect(screen.queryByRole("group", { name: "选择日志日期" })).toBeNull();
+  });
+
+  it("counts hidden entries when one day has multiple logs of the same kind", () => {
+    render(
+      <DailyReflectionPanel
+        days={days}
+        posts={[
+          createPost({ id: "research-1", category: "research", mood: null }),
+          createPost({
+            id: "research-2",
+            category: "research",
+            mood: null,
+            createdAt: new Date("2026-08-24T13:00:00").toISOString(),
+          }),
+        ]}
+        onCreatePost={vi.fn(async () => true)}
+        onOpenLogs={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("另有 1 条")).toBeTruthy();
   });
 
   it("uses the full row for a single-day view", () => {
@@ -120,11 +161,11 @@ describe("DailyReflectionPanel", () => {
     await waitFor(() => {
       expect(onCreatePost).toHaveBeenCalledWith({
         content: "今天的实验进展很稳。",
-        category: "mood",
+        category: "life",
         mood: "calm",
         recordDate: "2026-08-25",
         location: "",
-        tagNames: ["每日记录"],
+        tagNames: ["每日记录", "生活日志"],
         images: [],
         links: [],
       });

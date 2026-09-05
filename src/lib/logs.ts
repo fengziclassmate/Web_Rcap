@@ -107,6 +107,8 @@ export type LogComposerInput = {
   links: LinkedEntity[];
 };
 
+export type DailyLogKind = "life" | "research";
+
 export type LogPostEditorInput = {
   content: string;
   category: LogCategory;
@@ -170,6 +172,21 @@ export function categoryLabel(value: LogCategory) {
 
 export function moodLabel(value: LogMood) {
   return logMoodOptions.find((item) => item.value === value)?.label ?? value;
+}
+
+export function getDailyLogKind(post: LogPostRecord): DailyLogKind | null {
+  if (post.isArchived) return null;
+  const tagNames = new Set(post.tags.map((tag) => tag.name));
+  if (post.category === "research" || tagNames.has("科研日志")) return "research";
+  if (
+    post.category === "life" ||
+    post.category === "mood" ||
+    tagNames.has("生活日志") ||
+    tagNames.has("每日记录")
+  ) {
+    return "life";
+  }
+  return null;
 }
 
 export function groupLogsByDate(posts: LogPostRecord[]) {
