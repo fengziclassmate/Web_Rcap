@@ -21,6 +21,9 @@ export type PositionedScheduleEvent<TEvent extends ScheduleEvent = ScheduleEvent
 };
 
 const dayHourCount = 24;
+const minutesPerHour = 60;
+const minutesPerDay = dayHourCount * minutesPerHour;
+const millisecondsPerDay = 86_400_000;
 
 export function getCenteredScrollTop({
   currentScrollTop,
@@ -55,6 +58,77 @@ export function getScheduleEventDurationHour(
   if (event.endHour > event.startHour) return event.endHour - event.startHour;
   if (event.endHour < event.startHour) return dayHourCount - event.startHour + event.endHour;
   return 0;
+}
+
+function isoDateToDayNumber(dateIso: string) {
+  const [year, month, day] = dateIso.split("-").map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / millisecondsPerDay);
+}
+
+function dayNumberToIsoDate(dayNumber: number) {
+  return new Date(dayNumber * millisecondsPerDay).toISOString().slice(0, 10);
+}
+
+/**
+ * Finds the first interval at or after the requested drop position that does
+ * not overlap another event. Minute-based arithmetic keeps adjacent 15-minute
+ * cards exact and also lets the search continue across midnight.
+ */
+export function findNextAvailableScheduleSlot({
+  events,
+  excludeEventId,
+  targetDate,
+  targetStartHour,
+  durationHour,
+  searchThroughDate = targetDate,
+}: {
+  events: ScheduleEvent[];
+  excludeEventId: string;
+  targetDate: string;
+  targetStartHour: number;
+  durationHour: number;
+  searchThroughDate?: string;
+}) {
+  const durationMinutes = Math.max(1, Math.round(durationHour * minutesPerHour));
+  const searchEndExclusive =
+    (isoDateToDayNumber(searchThroughDate) + 1) * minutesPerDay;
+  let candidateStart =
+    isoDateToDayNumber(targetDate) * minutesPerDay +
+    Math.round(targetStartHour * minutesPerHour);
+
+  const occupiedIntervals = events
+    .filter((event) => event.id !== excludeEventId)
+    .map((event) => {
+      const start =
+        isoDateToDayNumber(event.date) * minutesPerDay +
+        Math.round(event.startHour * minutesPerHour);
+      const duration = Math.round(getScheduleEventDurationHour(event) * minutesPerHour);
+      return { start, end: start + duration };
+    })
+    .filter((interval) => interval.end > interval.start)
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+
+  for (const interval of occupiedIntervals) {
+    if (interval.end <= candidateStart) continue;
+    if (interval.start >= candidateStart + durationMinutes) break;
+    candidateStart = interval.end;
+  }
+
+  const candidateEnd = candidateStart + durationMinutes;
+  if (candidateEnd > searchEndExclusive) return null;
+
+  const startDayNumber = Math.floor(candidateStart / minutesPerDay);
+  const startMinuteOfDay = candidateStart - startDayNumber * minutesPerDay;
+  const endMinuteOfDay = candidateEnd - startDayNumber * minutesPerDay;
+
+  return {
+    date: dayNumberToIsoDate(startDayNumber),
+    startHour: startMinuteOfDay / minutesPerHour,
+    endHour:
+      endMinuteOfDay <= minutesPerDay
+        ? endMinuteOfDay / minutesPerHour
+        : (endMinuteOfDay - minutesPerDay) / minutesPerHour,
+  };
 }
 
 export function getScheduleEventVisualMetrics(

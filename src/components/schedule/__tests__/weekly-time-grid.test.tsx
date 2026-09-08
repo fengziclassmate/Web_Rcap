@@ -307,6 +307,54 @@ describe("WeeklyTimeGrid interactions", () => {
     );
   });
 
+  it("drops a short event onto an occupied card and places it in the next free interval", () => {
+    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
+    renderGrid({
+      events: [
+        {
+          ...scheduleEvent,
+          id: "occupied-event",
+          title: "九点事项",
+          startHour: 9,
+          endHour: 9.25,
+          isCompleted: false,
+        },
+        {
+          ...scheduleEvent,
+          id: "dragged-event",
+          title: "待移动的十五分钟事件",
+          startHour: 10,
+          endHour: 10.25,
+          isCompleted: false,
+        },
+      ],
+      onUpdateEvent,
+    });
+
+    const draggedCard = screen
+      .getByText("待移动的十五分钟事件")
+      .closest<HTMLElement>("[data-schedule-card]");
+    const occupiedCard = screen
+      .getByText("九点事项")
+      .closest<HTMLElement>("[data-schedule-card]");
+    expect(draggedCard).toBeTruthy();
+    expect(occupiedCard).toBeTruthy();
+
+    fireEvent.dragStart(draggedCard!);
+    fireEvent.dragOver(occupiedCard!);
+    fireEvent.drop(occupiedCard!);
+
+    expect(onUpdateEvent).toHaveBeenCalledWith(
+      "dragged-event",
+      {
+        date: "2026-07-27",
+        startHour: 9.25,
+        endHour: 9.5,
+      },
+      undefined,
+    );
+  });
+
   it("keeps resize handles available for short and cross-midnight cards", () => {
     const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
     const { rerenderGrid } = renderGrid({

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   doScheduleEventsOverlap,
+  findNextAvailableScheduleSlot,
   getCenteredScrollTop,
   getScheduleEventVisualMetrics,
   getScheduleEventDurationHour,
@@ -46,6 +47,57 @@ describe("schedule event layout", () => {
         event({ id: "b", startHour: 10, endHour: 11 }),
       ),
     ).toBe(false);
+  });
+
+  it("places a short event immediately after an occupied target interval", () => {
+    expect(
+      findNextAvailableScheduleSlot({
+        events: [event({ id: "occupied", startHour: 9, endHour: 9.25 })],
+        excludeEventId: "dragged",
+        targetDate: "2026-06-11",
+        targetStartHour: 9,
+        durationHour: 0.25,
+      }),
+    ).toEqual({
+      date: "2026-06-11",
+      startHour: 9.25,
+      endHour: 9.5,
+    });
+  });
+
+  it("skips consecutive conflicts but keeps an exact free gap", () => {
+    const occupiedEvents = [
+      event({ id: "first", startHour: 9, endHour: 9.25 }),
+      event({ id: "second", startHour: 9.25, endHour: 9.5 }),
+      event({ id: "later", startHour: 10, endHour: 11 }),
+    ];
+
+    expect(
+      findNextAvailableScheduleSlot({
+        events: occupiedEvents,
+        excludeEventId: "dragged",
+        targetDate: "2026-06-11",
+        targetStartHour: 9,
+        durationHour: 0.25,
+      }),
+    ).toEqual({
+      date: "2026-06-11",
+      startHour: 9.5,
+      endHour: 9.75,
+    });
+  });
+
+  it("does not claim a free slot beyond the expanded collision window", () => {
+    expect(
+      findNextAvailableScheduleSlot({
+        events: [event({ id: "late", startHour: 23.75, endHour: 0 })],
+        excludeEventId: "dragged",
+        targetDate: "2026-06-11",
+        targetStartHour: 23.75,
+        durationHour: 0.25,
+        searchThroughDate: "2026-06-11",
+      }),
+    ).toBeNull();
   });
 
   it("keeps adjacent short event cards inside their real time ranges", () => {

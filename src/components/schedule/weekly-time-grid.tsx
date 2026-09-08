@@ -59,6 +59,7 @@ import { createId } from "@/lib/id";
 import type { LogComposerInput, LogPostRecord } from "@/lib/logs";
 import { supabase } from "@/lib/supabase";
 import {
+  findNextAvailableScheduleSlot,
   getCenteredScrollTop,
   getScheduleEventDurationHour,
   getScheduleEventVisualMetrics,
@@ -515,7 +516,7 @@ export function WeeklyTimeGrid({
     const stored = window.localStorage.getItem(recurrenceEditScopeStorageKey);
     return stored === "series" || stored === "occurrence" ? stored : "occurrence";
   });
-  const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
+  const draggingEventIdRef = useRef<string | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
   const resizePreviewRef = useRef<ResizePreview | null>(null);
@@ -727,9 +728,17 @@ export function WeeklyTimeGrid({
   const expandedEvents = useMemo(() => {
     if (displayDates.length === 0) return [] as ScheduleEvent[];
     const first = format(addDays(displayDates[0], -1), "yyyy-MM-dd");
-    const last = format(displayDates[displayDates.length - 1], "yyyy-MM-dd");
+    const last = format(addDays(displayDates[displayDates.length - 1], 1), "yyyy-MM-dd");
     return expandScheduleEvents(events, first, last) as ScheduleEvent[];
   }, [displayDates, events]);
+
+  const dragCollisionSearchThroughDate = useMemo(
+    () =>
+      displayDates.length > 0
+        ? format(addDays(displayDates[displayDates.length - 1], 1), "yyyy-MM-dd")
+        : null,
+    [displayDates],
+  );
 
   const displayDateKeys = useMemo(
     () => new Set(displayDates.map((date) => format(date, "yyyy-MM-dd"))),
@@ -1243,25 +1252,37 @@ export function WeeklyTimeGrid({
   }
 
   function handleDropEvent(targetDate: string, targetHour: number) {
+    const draggingEventId = draggingEventIdRef.current;
     if (!draggingEventId) return;
     const source = expandedEvents.find((event) => event.id === draggingEventId);
-    if (!source) return;
+    if (!source || !dragCollisionSearchThroughDate) return;
 
     const duration = getScheduleEventDurationHour(source);
-    const nextStartHour = normalizeStartTimeValue(targetHour);
-    const nextEndHour = getEndHourFromStartAndDuration(nextStartHour, duration);
+    const nextSlot = findNextAvailableScheduleSlot({
+      events: expandedEvents,
+      excludeEventId: source.id,
+      targetDate,
+      targetStartHour: normalizeStartTimeValue(targetHour),
+      durationHour: duration,
+      searchThroughDate: dragCollisionSearchThroughDate,
+    });
+    if (!nextSlot) {
+      draggingEventIdRef.current = null;
+      toast.error("后续日期暂无足够的连续空闲时间");
+      return;
+    }
     const occurrence = parseSyntheticEventId(source.id);
 
     onUpdateEvent(
       source.id,
       {
-        date: targetDate,
-        startHour: nextStartHour,
-        endHour: nextEndHour,
+        date: nextSlot.date,
+        startHour: nextSlot.startHour,
+        endHour: nextSlot.endHour,
       },
       occurrence ? { scope: "occurrence" } : undefined,
     );
-    setDraggingEventId(null);
+    draggingEventIdRef.current = null;
   }
 
   function handleContextMenu(event: React.MouseEvent, eventId: string) {
@@ -1418,7 +1439,7 @@ export function WeeklyTimeGrid({
   }
 
   function handleSelectionPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0 || resizeState || draggingEventId) return;
+    if (event.button !== 0 || resizeState || draggingEventIdRef.current) return;
     const target = event.target as Element;
     if (target.closest("[data-schedule-card], [data-resize-handle]")) return;
 
@@ -1850,8 +1871,23 @@ export function WeeklyTimeGrid({
                               data-schedule-card
                               data-schedule-event-id={event.id}
                               draggable={resizeState?.eventId !== event.id}
-                              onDragStart={() => setDraggingEventId(event.id)}
-                              onDragEnd={() => setDraggingEventId(null)}
+                              onDragStart={() => {
+                                draggingEventIdRef.current = event.id;
+                              }}
+                              onDragEnd={() => {
+                                draggingEventIdRef.current = null;
+                              }}
+                              onDragOver={(dragEvent) => {
+                                if (draggingEventIdRef.current !== event.id) {
+                                  dragEvent.preventDefault();
+                                  dragEvent.stopPropagation();
+                                }
+                              }}
+                              onDrop={(dragEvent) => {
+                                dragEvent.preventDefault();
+                                dragEvent.stopPropagation();
+                                handleDropEvent(event.displayDate, event.startHour);
+                              }}
                               onContextMenu={(mouseEvent) => handleContextMenu(mouseEvent, event.id)}
                             >
                               <div
