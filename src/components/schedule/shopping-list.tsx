@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { ChevronDown, Clock3, Plus, ShoppingBasket, Trash2 } from "lucide-react";
+import { ChevronDown, Clock3, GripVertical, Plus, ShoppingBasket, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -21,6 +21,7 @@ type ShoppingListProps = {
   onAddItem: (name: string) => void;
   onToggleItem: (itemId: string) => void;
   onDeleteItem: (itemId: string) => void;
+  onReorderItem: (sourceItemId: string, targetItemId: string) => void;
 };
 
 function formatAddedAt(value: string) {
@@ -35,9 +36,20 @@ export function ShoppingList({
   onAddItem,
   onToggleItem,
   onDeleteItem,
+  onReorderItem,
 }: ShoppingListProps) {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [itemName, setItemName] = useState("");
+  const [sortAnnouncement, setSortAnnouncement] = useState("");
+  const draggingItemIdRef = useRef<string | null>(null);
+  const orderedItems = useMemo(() => {
+    const pending: ShoppingItem[] = [];
+    const completed: ShoppingItem[] = [];
+    for (const item of items) {
+      (item.done ? completed : pending).push(item);
+    }
+    return [...pending, ...completed];
+  }, [items]);
 
   function handleAddItem() {
     const name = itemName.trim();
@@ -45,6 +57,30 @@ export function ShoppingList({
     onAddItem(name);
     setItemName("");
     setShowAddDialog(false);
+  }
+
+  function handleDropItem(targetItem: ShoppingItem) {
+    const sourceItemId = draggingItemIdRef.current;
+    if (!sourceItemId || sourceItemId === targetItem.id) return;
+    const sourceItem = items.find((item) => item.id === sourceItemId);
+    if (!sourceItem || sourceItem.done !== targetItem.done) return;
+    onReorderItem(sourceItemId, targetItem.id);
+    const group = orderedItems.filter((candidate) => candidate.done === sourceItem.done);
+    const targetPosition = group.findIndex((candidate) => candidate.id === targetItem.id) + 1;
+    setSortAnnouncement(`${sourceItem.name}已移至当前分组第 ${targetPosition} 项`);
+    draggingItemIdRef.current = null;
+  }
+
+  function moveItemWithKeyboard(item: ShoppingItem, direction: -1 | 1) {
+    const group = orderedItems.filter((candidate) => candidate.done === item.done);
+    const index = group.findIndex((candidate) => candidate.id === item.id);
+    const target = group[index + direction];
+    if (!target) {
+      setSortAnnouncement(`${item.name}已在当前分组${direction < 0 ? "最上方" : "最下方"}`);
+      return;
+    }
+    onReorderItem(item.id, target.id);
+    setSortAnnouncement(`${item.name}已移至当前分组第 ${index + direction + 1} 项`);
   }
 
   return (
@@ -81,8 +117,41 @@ export function ShoppingList({
           <div className="space-y-3 rounded-2xl subtle-card p-3">
             {items.length > 0 ? (
               <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
-                {items.map((item) => (
-                  <li key={item.id} className="shopping-item-row">
+                {orderedItems.map((item) => (
+                  <li
+                    key={item.id}
+                    className={`shopping-item-row transition-[opacity,transform,background-color] ${item.done ? "bg-stone-50/70 opacity-70" : ""}`}
+                    onDragOver={(event) => {
+                      const source = items.find((candidate) => candidate.id === draggingItemIdRef.current);
+                      if (source && source.done === item.done && source.id !== item.id) {
+                        event.preventDefault();
+                      }
+                    }}
+                    onDrop={() => handleDropItem(item)}
+                  >
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={(event) => {
+                        draggingItemIdRef.current = item.id;
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/shopping-item-id", item.id);
+                      }}
+                      onDragEnd={() => {
+                        draggingItemIdRef.current = null;
+                      }}
+                      className="mt-0.5 rounded-md p-0.5 text-stone-300 transition-colors hover:bg-amber-50 hover:text-amber-700"
+                      onKeyDown={(event) => {
+                        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+                        event.preventDefault();
+                        moveItemWithKeyboard(item, event.key === "ArrowUp" ? -1 : 1);
+                      }}
+                      aria-label={`移动购物项 ${item.name}，可使用上下方向键排序`}
+                      aria-keyshortcuts="ArrowUp ArrowDown"
+                      title={item.done ? "拖动或使用方向键调整已购买顺序" : "拖动或使用方向键调整待购买顺序"}
+                    >
+                      <GripVertical className="h-4 w-4" aria-hidden />
+                    </button>
                     <Checkbox
                       checked={item.done}
                       onCheckedChange={() => onToggleItem(item.id)}
@@ -121,6 +190,9 @@ export function ShoppingList({
             ) : (
               <p className="py-2 text-center text-sm text-gray-500">清单还是空的，添加下一件要买的东西吧。</p>
             )}
+            <p className="sr-only" role="status" aria-live="polite">
+              {sortAnnouncement}
+            </p>
           </div>
         </CollapsibleContent>
       </Collapsible>

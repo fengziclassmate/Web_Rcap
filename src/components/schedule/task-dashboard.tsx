@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   CalendarRange,
@@ -77,6 +77,7 @@ type TaskDashboardProps = {
   onAddShoppingItem: (name: string) => void;
   onToggleShoppingItem: (itemId: string) => void;
   onDeleteShoppingItem: (itemId: string) => void;
+  onReorderShoppingItem: (sourceItemId: string, targetItemId: string) => void;
   logPosts: LogPostRecord[];
   logSaving?: boolean;
   onCreateLogPost: (input: LogComposerInput) => Promise<boolean>;
@@ -90,6 +91,7 @@ type TaskDashboardProps = {
   projectCheckins: ProjectCheckin[];
   onAddProjectCheckin: (name: string, description: string) => void;
   onCheckinProject: (projectId: string, date: string, note: string) => void;
+  onReorderProjectCheckin: (sourceProjectId: string, targetProjectId: string) => void;
   onArchiveProjectCheckin: (projectId: string) => void;
   onDeleteProjectCheckin: (projectId: string) => void;
   onUpdateProjectCheckin: (
@@ -219,6 +221,10 @@ function getTodayISODate() {
   return formatDateToISODate(new Date());
 }
 
+function hasProjectCheckinOnDate(project: ProjectCheckin, date: string) {
+  return project.checkins.some((entry) => entry.date === date);
+}
+
 function isISODateString(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
@@ -314,6 +320,7 @@ export function TaskDashboard({
   onAddShoppingItem,
   onToggleShoppingItem,
   onDeleteShoppingItem,
+  onReorderShoppingItem,
   logPosts,
   logSaving = false,
   onCreateLogPost,
@@ -322,6 +329,7 @@ export function TaskDashboard({
   projectCheckins,
   onAddProjectCheckin,
   onCheckinProject,
+  onReorderProjectCheckin,
   onArchiveProjectCheckin,
   onDeleteProjectCheckin,
   onUpdateProjectCheckin,
@@ -358,6 +366,9 @@ export function TaskDashboard({
   const [newProjectDesc, setNewProjectDesc] = useState("");
   const [projectNoteDraft, setProjectNoteDraft] = useState<Record<string, string>>({});
   const [projectDateDraft, setProjectDateDraft] = useState<Record<string, string>>({});
+  const [projectSortAnnouncement, setProjectSortAnnouncement] = useState("");
+  const draggingProjectIdRef = useRef<string | null>(null);
+  const projectTitleButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const [dailyCheckinDrafts, setDailyCheckinDrafts] = useState<Record<string, DailyCheckinDraft>>({});
   const [newFootprintName, setNewFootprintName] = useState("");
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
@@ -439,8 +450,16 @@ export function TaskDashboard({
 
   const orderedIncompleteTasks = useMemo(() => [...incompleteTasks], [incompleteTasks]);
   const visibleProjectCheckins = useMemo(
-    () => projectCheckins.filter((project) => project.id !== ROUTINE_CHECKIN_PROJECT_ID),
-    [projectCheckins],
+    () => {
+      const pending: ProjectCheckin[] = [];
+      const completed: ProjectCheckin[] = [];
+      for (const project of projectCheckins) {
+        if (project.id === ROUTINE_CHECKIN_PROJECT_ID) continue;
+        (hasProjectCheckinOnDate(project, todayDate) ? completed : pending).push(project);
+      }
+      return [...pending, ...completed];
+    },
+    [projectCheckins, todayDate],
   );
   const routineProject = useMemo<ProjectCheckin>(
     () =>
@@ -826,8 +845,62 @@ export function TaskDashboard({
     }
 
     onCheckinProject(projectId, checkinDate, projectNoteDraft[projectId] ?? "");
+    if (checkinDate === todayDate && expandedProjects.has(projectId)) {
+      patchUiPreferences({
+        expandedProjects: uiPreferences.expandedProjects.filter((id) => id !== projectId),
+      });
+    }
+    if (checkinDate === todayDate) {
+      const projectName = visibleProjectCheckins.find((project) => project.id === projectId)?.name;
+      setProjectSortAnnouncement(
+        `${projectName ?? "项目"}已打卡、已收起并移到下方`,
+      );
+      window.requestAnimationFrame(() => {
+        projectTitleButtonRefs.current.get(projectId)?.focus();
+      });
+    }
     setProjectNoteDraft((prev) => ({ ...prev, [projectId]: "" }));
     toast.success(checkinDate === todayDate ? "项目已打卡" : `已补打 ${checkinDate}`);
+  }
+
+  function handleDropProject(targetProjectId: string) {
+    const sourceProjectId = draggingProjectIdRef.current;
+    if (!sourceProjectId || sourceProjectId === targetProjectId) return;
+    const source = visibleProjectCheckins.find((project) => project.id === sourceProjectId);
+    const target = visibleProjectCheckins.find((project) => project.id === targetProjectId);
+    if (
+      !source ||
+      !target ||
+      hasProjectCheckinOnDate(source, todayDate) ||
+      hasProjectCheckinOnDate(target, todayDate)
+    ) {
+      return;
+    }
+    onReorderProjectCheckin(sourceProjectId, targetProjectId);
+    const pendingProjects = visibleProjectCheckins.filter(
+      (project) => !hasProjectCheckinOnDate(project, todayDate),
+    );
+    const targetPosition = pendingProjects.findIndex((project) => project.id === target.id) + 1;
+    setProjectSortAnnouncement(`${source.name}已移至今日待打卡第 ${targetPosition} 项`);
+    draggingProjectIdRef.current = null;
+  }
+
+  function moveProjectWithKeyboard(project: ProjectCheckin, direction: -1 | 1) {
+    const pendingProjects = visibleProjectCheckins.filter(
+      (candidate) => !hasProjectCheckinOnDate(candidate, todayDate),
+    );
+    const index = pendingProjects.findIndex((candidate) => candidate.id === project.id);
+    const target = pendingProjects[index + direction];
+    if (!target) {
+      setProjectSortAnnouncement(
+        `${project.name}已在今日待打卡项目${direction < 0 ? "最上方" : "最下方"}`,
+      );
+      return;
+    }
+    onReorderProjectCheckin(project.id, target.id);
+    setProjectSortAnnouncement(
+      `${project.name}已移至今日待打卡第 ${index + direction + 1} 项`,
+    );
   }
 
   function getDailyCheckinDraft(projectId: string): DailyCheckinDraft {
@@ -1579,6 +1652,7 @@ export function TaskDashboard({
             <div className="space-y-3">
               {visibleProjectCheckins.map((project) => {
                 const projectExpanded = expandedProjects.has(project.id);
+                const checkedInToday = hasProjectCheckinOnDate(project, todayDate);
                 const archivedCycles = project.archives ?? [];
             const today = getTodayISODate();
             const doneCount = project.checkins.length;
@@ -1592,11 +1666,66 @@ export function TaskDashboard({
               .sort((a, b) => b.date.localeCompare(a.date))
               .slice(0, 5);
             return (
-              <div key={project.id} className="rounded-lg border border-gray-200 p-3">
+              <div
+                key={project.id}
+                data-testid="project-checkin-card"
+                data-project-checkin-id={project.id}
+                className={`rounded-lg border p-3 transition-[border-color,background-color,transform] ${
+                  checkedInToday
+                    ? "border-emerald-100 bg-emerald-50/30"
+                    : "border-gray-200 bg-white/35"
+                }`}
+                onDragOver={(event) => {
+                  const source = visibleProjectCheckins.find(
+                    (candidate) => candidate.id === draggingProjectIdRef.current,
+                  );
+                  if (
+                    source &&
+                    !checkedInToday &&
+                    !hasProjectCheckinOnDate(source, todayDate) &&
+                    source.id !== project.id
+                  ) {
+                    event.preventDefault();
+                  }
+                }}
+                onDrop={() => handleDropProject(project.id)}
+              >
                 <div className="mb-2 flex items-center justify-between gap-2">
+                  {!checkedInToday ? (
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={(event) => {
+                        draggingProjectIdRef.current = project.id;
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/project-checkin-id", project.id);
+                      }}
+                      onDragEnd={() => {
+                        draggingProjectIdRef.current = null;
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+                        event.preventDefault();
+                        moveProjectWithKeyboard(project, event.key === "ArrowUp" ? -1 : 1);
+                      }}
+                      className="rounded-md p-0.5 text-stone-300 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                      aria-label={`移动项目 ${project.name}，可使用上下方向键排序`}
+                      aria-keyshortcuts="ArrowUp ArrowDown"
+                      title="拖动或使用方向键调整今日待打卡项目顺序"
+                    >
+                      <GripVertical className="h-4 w-4" aria-hidden />
+                    </button>
+                  ) : (
+                    <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" aria-label="今日已打卡" />
+                  )}
                   <button
                     type="button"
+                    ref={(node) => {
+                      if (node) projectTitleButtonRefs.current.set(project.id, node);
+                      else projectTitleButtonRefs.current.delete(project.id);
+                    }}
                     className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    aria-label={`${projectExpanded ? "折叠" : "展开"}项目 ${project.name}`}
                     onClick={() => patchUiPreferences({
                       expandedProjects: toggleStoredId(uiPreferences.expandedProjects, project.id),
                     })}
@@ -1605,6 +1734,11 @@ export function TaskDashboard({
                     <p className="truncate text-sm font-medium" title={project.name}>
                       {project.name}
                     </p>
+                    {checkedInToday ? (
+                      <Badge className="shrink-0 border border-emerald-100 bg-emerald-50 text-[10px] font-normal text-emerald-700">
+                        今日已打卡
+                      </Badge>
+                    ) : null}
                   </button>
                   <div className="flex items-center gap-1">
                     <Button type="button" size="sm" variant="ghost" onClick={() => openEditProject(project)}>
@@ -1719,6 +1853,14 @@ export function TaskDashboard({
             );
               })}
               {visibleProjectCheckins.length === 0 ? <p className="text-xs text-gray-500">暂无项目打卡项</p> : null}
+              <p
+                className="sr-only"
+                role="status"
+                aria-live="polite"
+                data-testid="project-sort-status"
+              >
+                {projectSortAnnouncement}
+              </p>
             </div>
           </CollapsibleContent>
         </Collapsible>
@@ -2118,6 +2260,7 @@ export function TaskDashboard({
         onAddItem={onAddShoppingItem}
         onToggleItem={onToggleShoppingItem}
         onDeleteItem={onDeleteShoppingItem}
+        onReorderItem={onReorderShoppingItem}
       />
 
       <Separator />

@@ -1006,6 +1006,19 @@ export function WorkbenchApp() {
     setShoppingItems((prev) => prev.filter((item) => item.id !== itemId));
   }
 
+  function handleReorderShoppingItem(sourceItemId: string, targetItemId: string) {
+    if (!sourceItemId || !targetItemId || sourceItemId === targetItemId) return;
+    setShoppingItems((prev) => {
+      const next = [...prev];
+      const sourceIndex = next.findIndex((item) => item.id === sourceItemId);
+      const targetIndex = next.findIndex((item) => item.id === targetItemId);
+      if (sourceIndex < 0 || targetIndex < 0) return prev;
+      const [moved] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+  }
+
   function handleAddProjectCheckin(name: string, description: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -1043,6 +1056,19 @@ export function WorkbenchApp() {
         return { ...project, checkins: nextCheckins };
       }),
     );
+  }
+
+  function handleReorderProjectCheckin(sourceProjectId: string, targetProjectId: string) {
+    if (!sourceProjectId || !targetProjectId || sourceProjectId === targetProjectId) return;
+    setProjectCheckins((prev) => {
+      const next = [...prev];
+      const sourceIndex = next.findIndex((project) => project.id === sourceProjectId);
+      const targetIndex = next.findIndex((project) => project.id === targetProjectId);
+      if (sourceIndex < 0 || targetIndex < 0) return prev;
+      const [moved] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
   }
 
   function handleArchiveProjectCheckin(projectId: string) {
@@ -1415,6 +1441,7 @@ export function WorkbenchApp() {
                   onAddShoppingItem={handleAddShoppingItem}
                   onToggleShoppingItem={handleToggleShoppingItem}
                   onDeleteShoppingItem={handleDeleteShoppingItem}
+                  onReorderShoppingItem={handleReorderShoppingItem}
                   logPosts={logPosts}
                   logSaving={logUploading}
                   onCreateLogPost={handleCreateLogPost}
@@ -1423,6 +1450,7 @@ export function WorkbenchApp() {
                   projectCheckins={projectCheckins}
                   onAddProjectCheckin={handleAddProjectCheckin}
                   onCheckinProject={handleCheckinProject}
+                  onReorderProjectCheckin={handleReorderProjectCheckin}
                   onArchiveProjectCheckin={handleArchiveProjectCheckin}
                   onDeleteProjectCheckin={handleDeleteProjectCheckin}
                   onUpdateProjectCheckin={handleUpdateProjectCheckin}

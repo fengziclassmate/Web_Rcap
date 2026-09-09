@@ -21,6 +21,7 @@ describe("ShoppingList", () => {
         onAddItem={vi.fn()}
         onToggleItem={onToggleItem}
         onDeleteItem={vi.fn()}
+        onReorderItem={vi.fn()}
       />,
     );
 
@@ -42,6 +43,7 @@ describe("ShoppingList", () => {
         onAddItem={onAddItem}
         onToggleItem={vi.fn()}
         onDeleteItem={vi.fn()}
+        onReorderItem={vi.fn()}
       />,
     );
 
@@ -53,5 +55,63 @@ describe("ShoppingList", () => {
 
     expect(onAddItem).toHaveBeenCalledWith("差旅转换插头");
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("keeps pending items above completed items and lets pending items be reordered", () => {
+    const onReorderItem = vi.fn();
+
+    render(
+      <ShoppingList
+        items={[
+          {
+            id: "done",
+            name: "已买咖啡豆",
+            addedAt: "2026-09-08T09:00:00+08:00",
+            done: true,
+          },
+          {
+            id: "first",
+            name: "实验记录本",
+            addedAt: "2026-09-08T10:00:00+08:00",
+            done: false,
+          },
+          {
+            id: "second",
+            name: "打印纸",
+            addedAt: "2026-09-08T11:00:00+08:00",
+            done: false,
+          },
+        ]}
+        open
+        onOpenChange={vi.fn()}
+        onAddItem={vi.fn()}
+        onToggleItem={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onReorderItem={onReorderItem}
+      />,
+    );
+
+    expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual([
+      expect.stringContaining("实验记录本"),
+      expect.stringContaining("打印纸"),
+      expect.stringContaining("已买咖啡豆"),
+    ]);
+
+    fireEvent.dragStart(screen.getByRole("button", { name: /移动购物项 打印纸/ }), {
+      dataTransfer: {
+        effectAllowed: "none",
+        setData: vi.fn(),
+      },
+    });
+    fireEvent.dragOver(screen.getByText("实验记录本").closest("li")!);
+    fireEvent.drop(screen.getByText("实验记录本").closest("li")!);
+
+    expect(onReorderItem).toHaveBeenCalledWith("second", "first");
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /移动购物项 实验记录本/ }), {
+      key: "ArrowDown",
+    });
+    expect(onReorderItem).toHaveBeenNthCalledWith(2, "first", "second");
+    expect(screen.getByRole("status").textContent).toContain("实验记录本已移至当前分组第 2 项");
   });
 });
