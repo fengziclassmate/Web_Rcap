@@ -3,7 +3,7 @@ import "server-only";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
-export type AuthenticatedSupabase = {
+type AuthenticatedSupabase = {
   supabase: SupabaseClient;
   user: User;
 };

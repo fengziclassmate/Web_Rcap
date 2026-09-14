@@ -1,6 +1,6 @@
 import { addDays } from "date-fns";
 
-export type RecurrenceKind = "daily" | "weekly";
+type RecurrenceKind = "daily" | "weekly";
 
 export type RecurrenceConfig = {
   kind: RecurrenceKind;
@@ -204,6 +204,65 @@ export function pickRecurrenceOverridePatch(
     }
   }
   return o;
+}
+
+export function getLinkedDailyTaskIdsForEventUpdate(
+  events: ExpandableScheduleEvent[],
+  eventId: string,
+  scope: "occurrence" | "series" = "occurrence",
+): string[] {
+  const parsed = parseSyntheticEventId(eventId);
+  if (!parsed) {
+    const linkedDailyTaskId = events.find((event) => event.id === eventId)?.linkedDailyTaskId;
+    return linkedDailyTaskId ? [linkedDailyTaskId] : [];
+  }
+
+  const master = events.find((event) => event.id === parsed.masterId);
+  if (!master) return [];
+  if (scope === "series") {
+    return [
+      ...new Set([
+        master.linkedDailyTaskId,
+        ...Object.values(master.recurrenceOverrides ?? {}).map(
+          (override) => override.linkedDailyTaskId,
+        ),
+      ].filter((taskId): taskId is string => Boolean(taskId))),
+    ];
+  }
+
+  const linkedDailyTaskId =
+    master.recurrenceOverrides?.[parsed.occurrenceDate]?.linkedDailyTaskId
+    ?? master.linkedDailyTaskId;
+  return linkedDailyTaskId ? [linkedDailyTaskId] : [];
+}
+
+export function updateEventsLinkedToDailyTask<T extends ExpandableScheduleEvent>(
+  events: T[],
+  taskId: string,
+  isCompleted: boolean,
+): T[] {
+  return events.map((event) => {
+    const baseChanged =
+      event.linkedDailyTaskId === taskId && event.isCompleted !== isCompleted;
+    let overridesChanged = false;
+    const nextOverrides = Object.fromEntries(
+      Object.entries(event.recurrenceOverrides ?? {}).map(([date, override]) => {
+        const effectiveTaskId = override.linkedDailyTaskId ?? event.linkedDailyTaskId;
+        if (effectiveTaskId !== taskId || override.isCompleted === isCompleted) {
+          return [date, override];
+        }
+        overridesChanged = true;
+        return [date, { ...override, isCompleted }];
+      }),
+    );
+
+    if (!baseChanged && !overridesChanged) return event;
+    return {
+      ...event,
+      ...(baseChanged ? { isCompleted } : {}),
+      ...(overridesChanged ? { recurrenceOverrides: nextOverrides } : {}),
+    } as T;
+  });
 }
 
 /** 周一=1 … 周日=0，用于 UI 展示顺序 */

@@ -91,19 +91,19 @@ export type ShoppingItem = {
   done: boolean;
 };
 
-export type DailyCheckinSlot = {
+type DailyCheckinSlot = {
   id: string;
   label: string;
   time: string;
 };
 
-export type DailyCheckinCompletion = {
+type DailyCheckinCompletion = {
   date: string;
   slotId: string;
   completedAt: string;
 };
 
-export type ProjectCheckinEntry = {
+type ProjectCheckinEntry = {
   date: string;
   note: string;
 };

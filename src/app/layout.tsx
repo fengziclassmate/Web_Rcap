@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { NetworkBanner } from "@/components/schedule/network-banner";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -21,7 +22,7 @@ const siteUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "研究手札与日常切片",
-  description: "一个面向科研人员的个人研究空间，记录研究项目、文献阅读、日程节律与日常观察。",
+  description: "个人科研与生活执行工作台，用于管理日程、任务、习惯、花销与每日日志。",
   applicationName: "研究手札与日常切片",
   formatDetection: {
     telephone: false,
@@ -34,8 +35,6 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
 };
 
-import { AppProviders } from "@/app/app-providers";
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -44,7 +43,8 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <AppProviders>{children}</AppProviders>
+        {children}
+        <NetworkBanner />
         <Toaster position="top-center" />
       </body>
     </html>

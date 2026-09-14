@@ -231,7 +231,7 @@ const minutesPerDay = hoursPerDay * minutesPerHour;
 const maxStartMinute = minutesPerDay - 1;
 const minimumDurationHour = 1 / minutesPerHour;
 const contextMenuWidth = 208;
-const contextMenuHeight = 360;
+const contextMenuHeight = 280;
 const contextMenuViewportPadding = 12;
 const recurrenceEditScopeStorageKey = "recurrence-edit-scope";
 const hourOptions = Array.from({ length: 24 }, (_, hour) => hour);
@@ -1224,30 +1224,28 @@ export function WeeklyTimeGrid({
   }
 
   function handleAddSelectedEventToDailyTask() {
-    if (!selectedEvent || selectedEvent.linkedDailyTaskId) return;
-    const linkedDailyTaskId = onCreateDailyTask(selectedEvent.title, selectedEvent.date);
+    if (!selectedEvent) return;
+    handleAddEventToDailyTask(selectedEvent.id);
+  }
+
+  function handleAddEventToDailyTask(eventId: string) {
+    const target = expandedEvents.find((event) => event.id === eventId);
+    if (!target) return;
+    if (target.linkedDailyTaskId) {
+      toast.info("该行程已加入当日日常任务");
+      closeContextMenu();
+      return;
+    }
+    const linkedDailyTaskId = onCreateDailyTask(target.title, target.date);
     if (!linkedDailyTaskId) return;
 
-    const parsed = parseSyntheticEventId(selectedEvent.id);
+    const parsed = parseSyntheticEventId(target.id);
     onUpdateEvent(
-      selectedEvent.id,
-      { linkedDailyTaskId },
+      target.id,
+      { linkedDailyTaskId, isCompleted: target.isCompleted },
       parsed ? { scope: "occurrence" } : undefined,
     );
     toast.success("已加入当日日常任务");
-  }
-
-  function handleAskAiForEvent(eventId: string) {
-    const target = expandedEvents.find((event) => event.id === eventId);
-    if (!target) return;
-    window.__injectLLMContext?.({
-      kind: "event",
-      id: target.id,
-      title: target.title,
-      date: target.date,
-      category: normalizeCategoryName(target.category),
-      time: formatEventTimeRange(target),
-    });
     closeContextMenu();
   }
 
@@ -1324,11 +1322,6 @@ export function WeeklyTimeGrid({
     if (target) {
       onUpdateEvent(eventId, { isCompleted: !target.isCompleted });
     }
-    closeContextMenu();
-  }
-
-  function handleSetTag(eventId: string, tag: EventTag) {
-    onUpdateEvent(eventId, { tag });
     closeContextMenu();
   }
 
@@ -3342,24 +3335,16 @@ export function WeeklyTimeGrid({
             <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleToggleComplete(contextMenu.eventId)}>
               {contextMenuEvent?.isCompleted ? "标记为未完成" : "标记为已完成"}
             </button>
-            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleAskAiForEvent(contextMenu.eventId)}>
-              问 AI 分析该行程
-            </button>
-            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50" onClick={() => handleDeleteFromContext(contextMenu.eventId)}>
-              删除该行程
+            <button
+              className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent"
+              disabled={Boolean(contextMenuEvent?.linkedDailyTaskId)}
+              onClick={() => handleAddEventToDailyTask(contextMenu.eventId)}
+            >
+              {contextMenuEvent?.linkedDailyTaskId ? "已加入日常任务" : "加入日常任务"}
             </button>
             <div className="my-1 border-t border-stone-100" />
-            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleSetTag(contextMenu.eventId, "待定")}>
-              标记为待定
-            </button>
-            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleSetTag(contextMenu.eventId, "不着急")}>
-              标记为不着急
-            </button>
-            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleSetTag(contextMenu.eventId, "不可后退")}>
-              标记为不可后退
-            </button>
-            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleSetTag(contextMenu.eventId, null)}>
-              移除标记
+            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50" onClick={() => handleDeleteFromContext(contextMenu.eventId)}>
+              删除该行程
             </button>
           </div>,
           document.body,

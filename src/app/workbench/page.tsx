@@ -1,7 +1,5 @@
-"use client";
-
-import { WorkbenchApp } from "@/components/workbench-app";
+import { redirect } from "next/navigation";
 
 export default function WorkbenchPage() {
-  return <WorkbenchApp />;
+  redirect("/");
 }

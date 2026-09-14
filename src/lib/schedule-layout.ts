@@ -1,6 +1,6 @@
 import type { ScheduleEvent } from "@/lib/types";
 
-export type ScheduleEventSegmentRole = "single" | "starts" | "continues";
+type ScheduleEventSegmentRole = "single" | "starts" | "continues";
 
 export type ScheduleEventSegment<TEvent extends ScheduleEvent = ScheduleEvent> = TEvent & {
   segmentId: string;

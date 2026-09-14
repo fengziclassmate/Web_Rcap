@@ -115,8 +115,6 @@ type TaskDashboardProps = {
     itemId: string,
     patch: Partial<Pick<FootprintItem, "name" | "lastDate">>,
   ) => void;
-  showFootprintsSection?: boolean;
-  showProjectSection?: boolean;
   confirmDangerousActions: boolean;
   uiPreferences: DashboardUiPreferences;
   onUiPreferencesChange: (value: DashboardUiPreferences) => void;
@@ -345,8 +343,6 @@ export function TaskDashboard({
   onResetFootprint,
   onDeleteFootprint,
   onUpdateFootprint,
-  showFootprintsSection = true,
-  showProjectSection = true,
   confirmDangerousActions,
   uiPreferences,
   onUiPreferencesChange,
@@ -412,7 +408,6 @@ export function TaskDashboard({
           : uiPreferences.footprintSectionOpen
             ? "footprint"
             : null;
-  const footprintSectionOpen = uiPreferences.footprintSectionOpen;
   const expandedProjects = useMemo(
     () => new Set(uiPreferences.expandedProjects),
     [uiPreferences.expandedProjects],
@@ -1641,7 +1636,6 @@ export function TaskDashboard({
           </Button>
         ) : null}
       </div>
-      {showProjectSection ? (
       <section className="utility-panel utility-panel-project">
         <Collapsible
           className="utility-panel-root"
@@ -1865,7 +1859,6 @@ export function TaskDashboard({
           </CollapsibleContent>
         </Collapsible>
       </section>
-      ) : null}
 
       <section className="utility-panel utility-panel-routine">
         <Collapsible
@@ -2272,100 +2265,6 @@ export function TaskDashboard({
         onCreatePost={onCreateLogPost}
         onOpenLogs={onOpenLogs}
       />
-
-      {showFootprintsSection ? (
-        <>
-          <Separator />
-
-          <section className="task-dashboard-section space-y-4">
-            <Collapsible
-              open={footprintSectionOpen}
-              onOpenChange={(open) => patchUiPreferences({ footprintSectionOpen: open })}
-            >
-              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left">
-                <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
-                  <Footprints className="h-4 w-4 text-primary" />
-                  足迹跟踪栏
-                </h3>
-                <ChevronDown
-                  className={`h-4 w-4 text-gray-500 transition-transform ${
-                    footprintSectionOpen ? "" : "-rotate-90"
-                  }`}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 space-y-3">
-                <div className="flex justify-end">
-                  <Button type="button" size="icon-sm" onClick={() => setShowAddFootprintDialog(true)} aria-label="添加足迹项" title="添加足迹项">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {footprints.map((item) => {
-                    const itemExpanded = expandedFootprints.has(item.id);
-                    const days = daysSince(item.lastDate);
-                    const dayLabel = days === 0 ? "今天" : `${days} 天`;
-                    return (
-                      <div key={item.id} className="rounded-lg border border-gray-200 p-3 text-center">
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-between gap-2 text-left"
-                          onClick={() => patchUiPreferences({
-                            expandedFootprints: toggleStoredId(uiPreferences.expandedFootprints, item.id),
-                          })}
-                        >
-                          <p className="truncate text-sm font-medium" title={item.name}>
-                            {item.name}
-                          </p>
-                          <ChevronDown
-                            className={`h-4 w-4 text-gray-500 transition-transform ${
-                              itemExpanded ? "" : "-rotate-90"
-                            }`}
-                          />
-                        </button>
-                        {itemExpanded ? (
-                          <>
-                            <p className="mt-2 text-lg font-semibold">{dayLabel}</p>
-                            <p className="text-xs text-gray-500">距上次</p>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="mt-2"
-                              onClick={() => handleResetFootprint(item.id)}
-                            >
-                              今天重置
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="mt-1"
-                              onClick={() => openEditFootprint(item)}
-                            >
-                              编辑
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="mt-1 text-xs text-red-500 hover:text-red-600"
-                              onClick={() =>
-                                withOptionalConfirm("确认删除这个足迹项吗？", () => onDeleteFootprint(item.id))
-                              }
-                            >
-                              删除
-                            </Button>
-                          </>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </section>
-        </>
-      ) : null}
 
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
         <DialogContent className="rounded-sm border-gray-200">

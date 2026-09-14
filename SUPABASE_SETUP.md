@@ -7,43 +7,18 @@
   - `anon public key`
 
 ## 2. 创建数据表和 RLS 策略
-在 Supabase SQL Editor 执行以下 SQL：
 
-```sql
-create table if not exists public.schedule_data (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  events jsonb not null default '[]'::jsonb,
-  tasks jsonb not null default '[]'::jsonb,
-  updated_at timestamptz not null default now()
-);
+数据库结构以 `supabase/migrations` 为唯一来源。使用 Supabase CLI 关联项目后运行：
 
-alter table public.schedule_data enable row level security;
-
-drop policy if exists "Users can read own schedule data" on public.schedule_data;
-create policy "Users can read own schedule data"
-on public.schedule_data
-for select
-to authenticated
-using (auth.uid() = user_id);
-
-drop policy if exists "Users can write own schedule data" on public.schedule_data;
-create policy "Users can write own schedule data"
-on public.schedule_data
-for insert
-to authenticated
-with check (auth.uid() = user_id);
-
-drop policy if exists "Users can update own schedule data" on public.schedule_data;
-create policy "Users can update own schedule data"
-on public.schedule_data
-for update
-to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
+```bash
+supabase link --project-ref 你的项目编号
+supabase db push
 ```
 
+如果使用网页 SQL Editor，请按文件名时间顺序执行 `supabase/migrations` 中尚未应用的迁移，不要重复运行仓库外的旧版建表脚本。
+
 ## 3. 配置本地环境变量
-复制 `.env.example` 为 `.env.local`，填写：
+新建 `.env.local`，填写：
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=你的 Project URL

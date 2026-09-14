@@ -11,7 +11,7 @@ export type ScheduleTemplate = {
   requirements: string[];
 };
 
-export type TemplatePlacement = {
+type TemplatePlacement = {
   date: string;
   startHour: number;
   endHour: number;

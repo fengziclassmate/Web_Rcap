@@ -1,4 +1,4 @@
-export type CategoryHue = "cold" | "warm" | "neutral";
+type CategoryHue = "cold" | "warm" | "neutral";
 export type ScheduleCategoryGroup = "routine" | "meals" | "social" | "academic" | "health" | "other";
 export type ScheduleCategoryIcon =
   | "moon"

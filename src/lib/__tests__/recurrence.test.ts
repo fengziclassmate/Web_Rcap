@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   expandScheduleEvents,
+  getLinkedDailyTaskIdsForEventUpdate,
   moveRecurrenceOccurrence,
+  updateEventsLinkedToDailyTask,
   type ExpandableScheduleEvent,
 } from "../recurrence";
 
@@ -124,5 +126,49 @@ describe("moveRecurrenceOccurrence", () => {
       recurrenceOverrides: {},
       recurrenceEndExclusive: null,
     });
+  });
+});
+
+describe("daily task links", () => {
+  it("updates normal events and only matching recurring overrides", () => {
+    const result = updateEventsLinkedToDailyTask(
+      [
+        event({ linkedDailyTaskId: "task-1" }),
+        event({
+          id: "recurring-event",
+          recurrence: { kind: "daily" },
+          recurrenceOverrides: {
+            "2026-05-02": { linkedDailyTaskId: "task-1" },
+            "2026-05-03": { linkedDailyTaskId: "task-2", isCompleted: false },
+          },
+        }),
+      ],
+      "task-1",
+      true,
+    );
+
+    expect(result[0].isCompleted).toBe(true);
+    expect(result[1].recurrenceOverrides?.["2026-05-02"]?.isCompleted).toBe(true);
+    expect(result[1].recurrenceOverrides?.["2026-05-03"]?.isCompleted).toBe(false);
+  });
+
+  it("finds the daily task linked to one recurring occurrence", () => {
+    const events = [
+      event({
+        recurrence: { kind: "daily" },
+        linkedDailyTaskId: "series-task",
+        recurrenceOverrides: {
+          "2026-05-02": { linkedDailyTaskId: "occurrence-task" },
+        },
+      }),
+    ];
+
+    expect(
+      getLinkedDailyTaskIdsForEventUpdate(
+        events,
+        "evt-1__2026-05-02",
+        "occurrence",
+      ),
+    ).toEqual(["occurrence-task"]);
   });
 });

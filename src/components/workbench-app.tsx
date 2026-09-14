@@ -21,9 +21,11 @@ import {
   isProjectCheckinDateInCurrentCycle,
 } from "@/lib/project-checkins";
 import {
+  getLinkedDailyTaskIdsForEventUpdate,
   moveRecurrenceOccurrence,
   parseSyntheticEventId,
   pickRecurrenceOverridePatch,
+  updateEventsLinkedToDailyTask,
 } from "@/lib/recurrence";
 import {
   ROUTINE_CHECKIN_PROJECT_ID,
@@ -865,10 +867,12 @@ export function WorkbenchApp() {
   }
 
   function handleToggleTask(taskId: string) {
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target) return;
+    const nextDone = !target.done;
     setTasks((prev) =>
       prev.map((task) => {
         if (task.id !== taskId) return task;
-        const nextDone = !task.done;
         return {
           ...task,
           done: nextDone,
@@ -876,6 +880,7 @@ export function WorkbenchApp() {
         };
       }),
     );
+    setEvents((prev) => updateEventsLinkedToDailyTask(prev, taskId, nextDone));
   }
 
   function handleAddTask(
@@ -923,6 +928,10 @@ export function WorkbenchApp() {
         return nextTask;
       }),
     );
+    const isCompleted = patch.done;
+    if (typeof isCompleted === "boolean") {
+      setEvents((prev) => updateEventsLinkedToDailyTask(prev, taskId, isCompleted));
+    }
   }
 
   function handleDeleteTask(taskId: string) {
@@ -1203,7 +1212,7 @@ export function WorkbenchApp() {
         title: task.name,
         notes: `来自日常任务：${task.name}`,
         requirements: [],
-        isCompleted: false,
+        isCompleted: task.done,
         category: DEFAULT_SCHEDULE_CATEGORY,
         tag: null,
         linkedDailyTaskId: task.id,
@@ -1220,6 +1229,34 @@ export function WorkbenchApp() {
     patch: Partial<ScheduleEvent>,
     options?: { scope?: "occurrence" | "series" },
   ) {
+    const isCompleted = patch.isCompleted;
+    if (typeof isCompleted === "boolean") {
+      const linkedTaskIds = new Set(
+        getLinkedDailyTaskIdsForEventUpdate(
+          events,
+          eventId,
+          options?.scope ?? "occurrence",
+        ),
+      );
+      if (patch.linkedDailyTaskId) linkedTaskIds.add(patch.linkedDailyTaskId);
+      if (linkedTaskIds.size > 0) {
+        const completedAt = new Date().toISOString();
+        setTasks((prev) =>
+          prev.map((task) =>
+            linkedTaskIds.has(task.id)
+              ? {
+                  ...task,
+                  done: isCompleted,
+                  completedAt: isCompleted
+                    ? task.completedAt ?? completedAt
+                    : null,
+                }
+              : task,
+          ),
+        );
+      }
+    }
+
     const parsed = parseSyntheticEventId(eventId);
     if (parsed) {
       const scope = options?.scope ?? "occurrence";
@@ -1466,7 +1503,6 @@ export function WorkbenchApp() {
                   onResetFootprint={handleResetFootprint}
                   onDeleteFootprint={handleDeleteFootprint}
                   onUpdateFootprint={handleUpdateFootprint}
-                  showFootprintsSection={false}
                   confirmDangerousActions={confirmDangerousActions}
                   uiPreferences={dashboardUiPreferences}
                   onUiPreferencesChange={setDashboardUiPreferences}

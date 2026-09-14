@@ -84,10 +84,12 @@ describe("CenteredTimePartSelect", () => {
 
 function renderGrid({
   events = [],
+  onCreateDailyTask = vi.fn<WeeklyTimeGridProps["onCreateDailyTask"]>(() => null),
   onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>(),
   onDeleteEvent = vi.fn<WeeklyTimeGridProps["onDeleteEvent"]>(),
 }: {
   events?: ScheduleEvent[];
+  onCreateDailyTask?: WeeklyTimeGridProps["onCreateDailyTask"];
   onUpdateEvent?: WeeklyTimeGridProps["onUpdateEvent"];
   onDeleteEvent?: WeeklyTimeGridProps["onDeleteEvent"];
 } = {}) {
@@ -96,7 +98,7 @@ function renderGrid({
     weekRange: "2026/07/27 - 2026/08/02",
     events,
     onCreateEvent: vi.fn(),
-    onCreateDailyTask: vi.fn(() => null),
+    onCreateDailyTask,
     onUpdateEvent,
     onDeleteEvent,
     onPrevWeek: vi.fn(),
@@ -165,6 +167,31 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("keeps the context menu focused and can link an event to a daily task", () => {
+    const onCreateDailyTask = vi.fn<WeeklyTimeGridProps["onCreateDailyTask"]>(() => "task-1");
+    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
+    renderGrid({
+      events: [{ ...scheduleEvent, isCompleted: false }],
+      onCreateDailyTask,
+      onUpdateEvent,
+    });
+
+    const card = screen.getByText("完成态行程").closest<HTMLElement>("[data-schedule-card]");
+    expect(card).toBeTruthy();
+    fireEvent.contextMenu(card!, { clientX: 120, clientY: 120 });
+
+    expect(screen.queryByText("问 AI 分析该行程")).toBeNull();
+    expect(screen.queryByText("标记为待定")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "加入日常任务" }));
+
+    expect(onCreateDailyTask).toHaveBeenCalledWith("完成态行程", "2026-07-27");
+    expect(onUpdateEvent).toHaveBeenCalledWith(
+      "event-1",
+      { linkedDailyTaskId: "task-1", isCompleted: false },
+      undefined,
+    );
+  });
+
   it("keeps a simple blank-cell press available for creating an event", () => {
     const { container } = renderGrid();
     const emptySlot = Array.from(container.querySelectorAll("button")).find(
