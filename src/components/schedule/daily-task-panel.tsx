@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle, CalendarDays, CheckCircle, Clock, ListTodo, Plus, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { AlertTriangle, CalendarDays, CheckCircle, ListTodo, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -97,6 +98,11 @@ export function DailyTaskPanel({
   const [duration, setDuration] = useState("30");
   const [dailyCloseOpen, setDailyCloseOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    taskId: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const dailyTasks = tasks.filter(
     (task) => task.taskType === "daily" && !task.done && !task.abandonedAt,
@@ -142,14 +148,40 @@ export function DailyTaskPanel({
     .map((task) => ({ task, days: dayDistance(today, task.dueDate) }))
     .filter(({ days }) => days <= 7)
     .sort((a, b) => a.days - b.days);
-  const scheduledDailyTaskIds = new Set(
-    events.flatMap((event) => (event.linkedDailyTaskId ? [event.linkedDailyTaskId] : [])),
-  );
+  const scheduledDailyTaskIds = useMemo(() => {
+    const taskIds = new Set<string>();
+    for (const event of events) {
+      if (event.linkedDailyTaskId) taskIds.add(event.linkedDailyTaskId);
+      for (const override of Object.values(event.recurrenceOverrides ?? {})) {
+        if (override.linkedDailyTaskId) taskIds.add(override.linkedDailyTaskId);
+      }
+    }
+    return taskIds;
+  }, [events]);
   const legacyScheduledDailyTaskNames = new Set(
     events
       .map((event) => event.notes.match(/^来自日常任务：(.+)$/)?.[1])
       .filter((name): name is string => Boolean(name)),
   );
+  const contextMenuTask = contextMenu
+    ? dailyTasks.find((task) => task.id === contextMenu.taskId) ?? null
+    : null;
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("contextmenu", close);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("contextmenu", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [contextMenu]);
 
   function addDailyTask() {
     const trimmed = name.trim();
@@ -209,6 +241,24 @@ export function DailyTaskPanel({
     onUpdateTask(task.id, { done: false, completedAt: null, abandonedAt: null });
   }
 
+  function openContextMenu(event: React.MouseEvent, task: LongTask) {
+    event.preventDefault();
+    event.stopPropagation();
+    const menuWidth = 224;
+    const menuHeight = 332;
+    const padding = 12;
+    setContextMenu({
+      taskId: task.id,
+      x: Math.max(padding, Math.min(event.clientX, window.innerWidth - menuWidth - padding)),
+      y: Math.max(padding, Math.min(event.clientY, window.innerHeight - menuHeight - padding)),
+    });
+  }
+
+  function runContextAction(action: () => void) {
+    action();
+    setContextMenu(null);
+  }
+
   return (
     <section className="daily-task-panel">
       <div className="flex items-center justify-between gap-3">
@@ -261,7 +311,11 @@ export function DailyTaskPanel({
       <div className="mt-3 space-y-2">
         {dailyTasks.length > 0 ? (
           dailyTasks.map((task) => (
-            <article key={task.id} className="daily-task-row">
+            <article
+              key={task.id}
+              className="daily-task-row"
+              onContextMenu={(event) => openContextMenu(event, task)}
+            >
               <Checkbox
                 checked={task.done}
                 onCheckedChange={() => onToggleTask(task.id)}
@@ -271,28 +325,6 @@ export function DailyTaskPanel({
                 <p className="truncate text-sm font-medium text-stone-900">{task.name}</p>
                 <p className="mt-0.5 text-xs tabular-nums text-stone-500">{task.dueDate}</p>
               </div>
-              {task.dueDate === today ? (
-                <Button
-                  type="button"
-                  size="xs"
-                  variant={task.isTodayFocus ? "default" : "outline"}
-                  className={task.isTodayFocus ? "bg-emerald-700 hover:bg-emerald-800" : ""}
-                  onClick={() => toggleFocus(task)}
-                >
-                  {task.isTodayFocus ? "今日重点" : "设为重点"}
-                </Button>
-              ) : null}
-              {scheduledDailyTaskIds.has(task.id) || legacyScheduledDailyTaskNames.has(task.name) ? (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
-                  <CheckCircle className="h-3 w-3" aria-hidden />
-                  已排入日程
-                </span>
-              ) : (
-                <Button type="button" size="xs" variant="outline" onClick={() => openSchedule(task)}>
-                  <Clock className="h-3 w-3" />
-                  排入日程
-                </Button>
-              )}
             </article>
           ))
         ) : (
@@ -337,6 +369,83 @@ export function DailyTaskPanel({
           </div>
         ) : null}
       </div>
+
+      {contextMenu && contextMenuTask && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              role="menu"
+              aria-label={`${contextMenuTask.name} 操作`}
+              className="fixed z-[1000] max-h-[calc(100vh-24px)] w-56 overflow-y-auto rounded-2xl border border-stone-200 bg-white/95 p-1.5 shadow-[0_24px_60px_rgba(68,64,60,0.28)] backdrop-blur-md"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              <div className="border-b border-stone-100 px-3 py-2">
+                <p className="truncate text-sm font-semibold text-stone-900">{contextMenuTask.name}</p>
+                <p className="mt-0.5 text-xs tabular-nums text-stone-400">{contextMenuTask.dueDate}</p>
+              </div>
+              {contextMenuTask.dueDate === today ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100"
+                  onClick={() => runContextAction(() => toggleFocus(contextMenuTask))}
+                >
+                  {contextMenuTask.isTodayFocus ? "不设为重点" : "设为重点"}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                role="menuitem"
+                disabled={
+                  scheduledDailyTaskIds.has(contextMenuTask.id)
+                  || legacyScheduledDailyTaskNames.has(contextMenuTask.name)
+                }
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent"
+                onClick={() => runContextAction(() => openSchedule(contextMenuTask))}
+              >
+                {scheduledDailyTaskIds.has(contextMenuTask.id)
+                || legacyScheduledDailyTaskNames.has(contextMenuTask.name)
+                  ? "已排入日程"
+                  : "排入日程"}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100"
+                onClick={() => runContextAction(() => onToggleTask(contextMenuTask.id))}
+              >
+                标记完成
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100"
+                onClick={() => runContextAction(() => moveToTomorrow(contextMenuTask))}
+              >
+                移到明天
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100"
+                onClick={() => runContextAction(() => turnIntoLongTask(contextMenuTask))}
+              >
+                转为长期任务
+              </button>
+              <div className="my-1 border-t border-stone-100" />
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
+                onClick={() => runContextAction(() => abandonDailyTask(contextMenuTask))}
+              >
+                标记放弃
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
 
       <div className="deadline-radar mt-3">
         <div className="flex items-center justify-between gap-2">

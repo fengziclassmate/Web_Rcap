@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DailyTaskPanel } from "@/components/schedule/daily-task-panel";
-import type { LongTask } from "@/lib/types";
+import type { LongTask, ScheduleEvent } from "@/lib/types";
 
 function task(overrides: Partial<LongTask>): LongTask {
   return {
@@ -25,6 +25,77 @@ afterEach(() => {
 });
 
 describe("DailyTaskPanel completion archive", () => {
+  it("moves task actions into the context menu and recognizes recurring event links", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 27, 15, 0));
+    const onUpdateTask = vi.fn();
+    const recurringEvent: ScheduleEvent = {
+      id: "recurring-event",
+      date: "2026-07-27",
+      startHour: 9,
+      endHour: 10,
+      title: "循环任务",
+      notes: "",
+      requirements: [],
+      isCompleted: false,
+      category: "生活",
+      tag: null,
+      recurrence: { kind: "daily" },
+      recurrenceOverrides: {
+        "2026-07-27": { linkedDailyTaskId: "task" },
+      },
+    };
+
+    render(
+      <DailyTaskPanel
+        tasks={[task({ name: "循环日常任务" })]}
+        events={[recurringEvent]}
+        onAddTask={vi.fn()}
+        onToggleTask={vi.fn()}
+        onUpdateTask={onUpdateTask}
+        onCreateTimeBlock={vi.fn()}
+        archivedSectionOpen={false}
+        onArchivedSectionOpenChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("已排入日程")).toBeNull();
+    expect(screen.queryByRole("button", { name: "设为重点" })).toBeNull();
+
+    const taskRow = screen.getByText("循环日常任务").closest("article");
+    expect(taskRow).toBeTruthy();
+    fireEvent.contextMenu(taskRow!, { clientX: 120, clientY: 120 });
+
+    expect(screen.getByRole("menuitem", { name: "已排入日程" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("menuitem", { name: "设为重点" }));
+    expect(onUpdateTask).toHaveBeenCalledWith("task", { isTodayFocus: true });
+  });
+
+  it("opens the scheduling dialog from an unscheduled task context menu", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 27, 15, 0));
+
+    render(
+      <DailyTaskPanel
+        tasks={[task({ name: "未排期任务" })]}
+        events={[]}
+        onAddTask={vi.fn()}
+        onToggleTask={vi.fn()}
+        onUpdateTask={vi.fn()}
+        onCreateTimeBlock={vi.fn()}
+        archivedSectionOpen={false}
+        onArchivedSectionOpenChange={vi.fn()}
+      />,
+    );
+
+    const taskRow = screen.getByText("未排期任务").closest("article");
+    expect(taskRow).toBeTruthy();
+    fireEvent.contextMenu(taskRow!, { clientX: 120, clientY: 120 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "排入日程" }));
+
+    expect(screen.getByRole("dialog", { name: "排入日程" })).toBeTruthy();
+  });
+
   it("shows only today's completions in the panel and groups older records in history", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 6, 27, 15, 0));
