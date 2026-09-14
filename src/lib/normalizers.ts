@@ -20,6 +20,7 @@ import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/cate
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   timeGranularity: 60,
+  dailyTaskSortMode: "time",
   annualSectionOpen: true,
   shoppingSectionOpen: true,
   longTaskSectionOpen: true,
@@ -262,6 +263,7 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
     timeGranularity: validTimeGranularities.has(value.timeGranularity as DashboardUiPreferences["timeGranularity"])
       ? value.timeGranularity as DashboardUiPreferences["timeGranularity"]
       : 60,
+    dailyTaskSortMode: value.dailyTaskSortMode === "custom" ? "custom" : "time",
     annualSectionOpen:
       typeof value.annualSectionOpen === "boolean" ? value.annualSectionOpen : true,
     shoppingSectionOpen:

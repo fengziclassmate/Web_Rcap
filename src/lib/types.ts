@@ -35,6 +35,7 @@ export type Priority =
   | "\u4e0d\u7d27\u6025\u4e0d\u91cd\u8981";
 
 export type TaskType = "daily" | "long";
+export type DailyTaskSortMode = "time" | "custom";
 
 export type KnowledgeWorkType =
   | "reading"
@@ -135,6 +136,7 @@ export type FootprintItem = {
 
 export type DashboardUiPreferences = {
   timeGranularity: 5 | 15 | 30 | 60 | "45-15" | "50-10";
+  dailyTaskSortMode: DailyTaskSortMode;
   annualSectionOpen: boolean;
   shoppingSectionOpen: boolean;
   longTaskSectionOpen: boolean;

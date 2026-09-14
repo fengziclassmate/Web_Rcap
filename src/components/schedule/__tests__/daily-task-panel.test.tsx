@@ -54,6 +54,9 @@ describe("DailyTaskPanel completion archive", () => {
         onToggleTask={vi.fn()}
         onUpdateTask={onUpdateTask}
         onRequestDeleteTask={vi.fn()}
+        onReorderTask={vi.fn()}
+        sortMode="time"
+        onSortModeChange={vi.fn()}
         onCreateTimeBlock={vi.fn()}
         archivedSectionOpen={false}
         onArchivedSectionOpenChange={vi.fn()}
@@ -84,6 +87,9 @@ describe("DailyTaskPanel completion archive", () => {
         onToggleTask={vi.fn()}
         onUpdateTask={vi.fn()}
         onRequestDeleteTask={vi.fn()}
+        onReorderTask={vi.fn()}
+        sortMode="time"
+        onSortModeChange={vi.fn()}
         onCreateTimeBlock={vi.fn()}
         archivedSectionOpen={false}
         onArchivedSectionOpenChange={vi.fn()}
@@ -111,6 +117,9 @@ describe("DailyTaskPanel completion archive", () => {
         onToggleTask={vi.fn()}
         onUpdateTask={vi.fn()}
         onRequestDeleteTask={onRequestDeleteTask}
+        onReorderTask={vi.fn()}
+        sortMode="time"
+        onSortModeChange={vi.fn()}
         onCreateTimeBlock={vi.fn()}
         archivedSectionOpen={false}
         onArchivedSectionOpenChange={vi.fn()}
@@ -123,6 +132,113 @@ describe("DailyTaskPanel completion archive", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "删除任务" }));
 
     expect(onRequestDeleteTask).toHaveBeenCalledWith("task");
+  });
+
+  it("orders daily tasks by date and linked schedule start time", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 27, 15, 0));
+    const events: ScheduleEvent[] = [
+      {
+        id: "late-event",
+        date: "2026-07-27",
+        startHour: 15,
+        endHour: 16,
+        title: "下午任务",
+        notes: "",
+        requirements: [],
+        isCompleted: false,
+        category: "生活",
+        tag: null,
+        linkedDailyTaskId: "late",
+      },
+      {
+        id: "recurring-event",
+        date: "2026-07-01",
+        startHour: 9,
+        endHour: 10,
+        title: "循环任务",
+        notes: "",
+        requirements: [],
+        isCompleted: false,
+        category: "生活",
+        tag: null,
+        recurrence: { kind: "daily" },
+        recurrenceOverrides: {
+          "2026-07-27": { linkedDailyTaskId: "early", startHour: 8.5 },
+        },
+      },
+    ];
+
+    render(
+      <DailyTaskPanel
+        tasks={[
+          task({ id: "late", name: "下午任务" }),
+          task({ id: "tomorrow", name: "明日任务", dueDate: "2026-07-28" }),
+          task({ id: "early", name: "早间任务" }),
+          task({ id: "unscheduled", name: "今日未排期" }),
+        ]}
+        events={events}
+        onAddTask={vi.fn()}
+        onToggleTask={vi.fn()}
+        onUpdateTask={vi.fn()}
+        onRequestDeleteTask={vi.fn()}
+        onReorderTask={vi.fn()}
+        sortMode="time"
+        onSortModeChange={vi.fn()}
+        onCreateTimeBlock={vi.fn()}
+        archivedSectionOpen={false}
+        onArchivedSectionOpenChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByRole("article").map((row) => row.textContent)).toEqual([
+      "早间任务2026-07-27",
+      "下午任务2026-07-27",
+      "今日未排期2026-07-27",
+      "明日任务2026-07-28",
+    ]);
+  });
+
+  it("keeps custom order and lets the user reorder daily tasks", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 27, 15, 0));
+    const onReorderTask = vi.fn();
+    const onSortModeChange = vi.fn();
+
+    render(
+      <DailyTaskPanel
+        tasks={[
+          task({ id: "second", name: "自定义第二项" }),
+          task({ id: "first", name: "自定义第一项" }),
+        ]}
+        events={[]}
+        onAddTask={vi.fn()}
+        onToggleTask={vi.fn()}
+        onUpdateTask={vi.fn()}
+        onRequestDeleteTask={vi.fn()}
+        onReorderTask={onReorderTask}
+        sortMode="custom"
+        onSortModeChange={onSortModeChange}
+        onCreateTimeBlock={vi.fn()}
+        archivedSectionOpen={false}
+        onArchivedSectionOpenChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByRole("article").map((row) => row.textContent)).toEqual([
+      "自定义第二项2026-07-27",
+      "自定义第一项2026-07-27",
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "按时间排序" }));
+    expect(onSortModeChange).toHaveBeenCalledWith("time");
+
+    const dragHandle = screen.getByRole("button", { name: "调整顺序 自定义第二项" });
+    const targetRow = screen.getByText("自定义第一项").closest("article");
+    expect(targetRow).toBeTruthy();
+    fireEvent.dragStart(dragHandle);
+    fireEvent.dragOver(targetRow!);
+    fireEvent.drop(targetRow!);
+    expect(onReorderTask).toHaveBeenCalledWith("second", "first");
   });
 
   it("shows only today's completions in the panel and groups older records in history", () => {
@@ -158,6 +274,9 @@ describe("DailyTaskPanel completion archive", () => {
         onToggleTask={vi.fn()}
         onUpdateTask={vi.fn()}
         onRequestDeleteTask={vi.fn()}
+        onReorderTask={vi.fn()}
+        sortMode="time"
+        onSortModeChange={vi.fn()}
         onCreateTimeBlock={vi.fn()}
         archivedSectionOpen
         onArchivedSectionOpenChange={vi.fn()}

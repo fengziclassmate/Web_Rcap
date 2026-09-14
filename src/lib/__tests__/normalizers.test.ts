@@ -130,10 +130,12 @@ describe("normalizers", () => {
   it("normalizes dashboard preferences safely", () => {
     expect(normalizeDashboardUiPreferences({
       timeGranularity: "45-15",
+      dailyTaskSortMode: "custom",
       dailyArchiveSectionOpen: true,
       expandedTasks: ["a", 1],
     })).toMatchObject({
       timeGranularity: "45-15",
+      dailyTaskSortMode: "custom",
       annualSectionOpen: true,
       longTaskSectionOpen: true,
       completedSectionOpen: true,
@@ -142,6 +144,7 @@ describe("normalizers", () => {
     });
     expect(normalizeDashboardUiPreferences({ timeGranularity: "invalid" })).toMatchObject({
       timeGranularity: 60,
+      dailyTaskSortMode: "time",
       dailyArchiveSectionOpen: false,
     });
   });

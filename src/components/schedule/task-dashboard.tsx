@@ -1400,6 +1400,9 @@ export function TaskDashboard({
           setPendingDeleteTaskId(taskId);
           setConfirmDeleteOpen(true);
         }}
+        onReorderTask={onReorderTask}
+        sortMode={uiPreferences.dailyTaskSortMode}
+        onSortModeChange={(dailyTaskSortMode) => patchUiPreferences({ dailyTaskSortMode })}
         onCreateTimeBlock={onCreateDailyTaskTimeBlock}
         archivedSectionOpen={uiPreferences.dailyArchiveSectionOpen}
         onArchivedSectionOpenChange={(open) => patchUiPreferences({ dailyArchiveSectionOpen: open })}

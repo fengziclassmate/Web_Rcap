@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CalendarDays, CheckCircle, ListTodo, Plus, RotateCcw } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle, GripVertical, ListTodo, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { LongTask, ScheduleEvent, TaskType } from "@/lib/types";
+import type { DailyTaskSortMode, LongTask, ScheduleEvent, TaskType } from "@/lib/types";
 
 type DailyTaskPanelProps = {
   tasks: LongTask[];
@@ -17,6 +17,9 @@ type DailyTaskPanelProps = {
   onToggleTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<LongTask>) => void;
   onRequestDeleteTask: (taskId: string) => void;
+  onReorderTask: (sourceTaskId: string, targetTaskId: string) => void;
+  sortMode: DailyTaskSortMode;
+  onSortModeChange: (mode: DailyTaskSortMode) => void;
   onCreateTimeBlock: (task: LongTask, date: string, startHour: number, durationMinutes: number) => void;
   archivedSectionOpen: boolean;
   onArchivedSectionOpenChange: (open: boolean) => void;
@@ -86,6 +89,9 @@ export function DailyTaskPanel({
   onToggleTask,
   onUpdateTask,
   onRequestDeleteTask,
+  onReorderTask,
+  sortMode,
+  onSortModeChange,
   onCreateTimeBlock,
   archivedSectionOpen,
   onArchivedSectionOpenChange,
@@ -100,15 +106,55 @@ export function DailyTaskPanel({
   const [duration, setDuration] = useState("30");
   const [dailyCloseOpen, setDailyCloseOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     taskId: string;
     x: number;
     y: number;
   } | null>(null);
 
-  const dailyTasks = tasks.filter(
-    (task) => task.taskType === "daily" && !task.done && !task.abandonedAt,
-  );
+  const dailyTaskScheduleTimes = useMemo(() => {
+    const values = new Map<string, { date: string; startHour: number }>();
+    const register = (taskId: string | undefined, date: string, startHour: number) => {
+      if (!taskId) return;
+      const current = values.get(taskId);
+      if (
+        !current
+        || date < current.date
+        || (date === current.date && startHour < current.startHour)
+      ) {
+        values.set(taskId, { date, startHour });
+      }
+    };
+
+    for (const event of events) {
+      register(event.linkedDailyTaskId, event.date, event.startHour);
+      for (const [date, override] of Object.entries(event.recurrenceOverrides ?? {})) {
+        register(override.linkedDailyTaskId, date, override.startHour ?? event.startHour);
+      }
+    }
+    return values;
+  }, [events]);
+  const dailyTasks = useMemo(() => {
+    const activeTasks = tasks.filter(
+      (task) => task.taskType === "daily" && !task.done && !task.abandonedAt,
+    );
+    if (sortMode === "custom") return activeTasks;
+
+    return activeTasks
+      .map((task, index) => ({ task, index, schedule: dailyTaskScheduleTimes.get(task.id) }))
+      .sort((left, right) => {
+        const leftDate = left.schedule?.date ?? left.task.dueDate;
+        const rightDate = right.schedule?.date ?? right.task.dueDate;
+        const dateOrder = leftDate.localeCompare(rightDate);
+        if (dateOrder !== 0) return dateOrder;
+        const timeOrder =
+          (left.schedule?.startHour ?? Number.POSITIVE_INFINITY)
+          - (right.schedule?.startHour ?? Number.POSITIVE_INFINITY);
+        return timeOrder || left.index - right.index;
+      })
+      .map(({ task }) => task);
+  }, [dailyTaskScheduleTimes, sortMode, tasks]);
   const archivedDailyTasks = tasks.filter(
     (task) => task.taskType === "daily" && (task.done || task.abandonedAt),
   );
@@ -261,6 +307,33 @@ export function DailyTaskPanel({
     setContextMenu(null);
   }
 
+  function handleTaskDragStart(taskId: string, event: React.DragEvent<HTMLButtonElement>) {
+    setDraggingTaskId(taskId);
+    if (!event.dataTransfer) return;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/daily-task-id", taskId);
+  }
+
+  function handleTaskDrop(event: React.DragEvent<HTMLElement>, targetTaskId: string) {
+    if (sortMode !== "custom" || !draggingTaskId || draggingTaskId === targetTaskId) return;
+    event.preventDefault();
+    onReorderTask(draggingTaskId, targetTaskId);
+    setDraggingTaskId(null);
+  }
+
+  function handleTaskOrderKeyDown(
+    taskId: string,
+    event: React.KeyboardEvent<HTMLButtonElement>,
+  ) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    const currentIndex = dailyTasks.findIndex((task) => task.id === taskId);
+    const targetIndex = currentIndex + (event.key === "ArrowUp" ? -1 : 1);
+    const targetTask = dailyTasks[targetIndex];
+    if (!targetTask) return;
+    event.preventDefault();
+    onReorderTask(taskId, targetTask.id);
+  }
+
   return (
     <section className="daily-task-panel">
       <div className="flex items-center justify-between gap-3">
@@ -270,10 +343,44 @@ export function DailyTaskPanel({
             日常任务
           </p>
         </div>
-        <Button type="button" size="sm" variant="outline" onClick={() => setDailyCloseOpen(true)}>
-          <RotateCcw className="h-3.5 w-3.5" />
-          每日收尾
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <div
+            role="group"
+            aria-label="日常任务排序方式"
+            className="flex rounded-lg bg-stone-100 p-0.5"
+          >
+            <button
+              type="button"
+              aria-label="按时间排序"
+              aria-pressed={sortMode === "time"}
+              className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
+                sortMode === "time"
+                  ? "bg-white text-stone-900 shadow-sm"
+                  : "text-stone-500 hover:text-stone-800"
+              }`}
+              onClick={() => onSortModeChange("time")}
+            >
+              按时间
+            </button>
+            <button
+              type="button"
+              aria-label="自定义排序"
+              aria-pressed={sortMode === "custom"}
+              className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
+                sortMode === "custom"
+                  ? "bg-white text-stone-900 shadow-sm"
+                  : "text-stone-500 hover:text-stone-800"
+              }`}
+              onClick={() => onSortModeChange("custom")}
+            >
+              自定义
+            </button>
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={() => setDailyCloseOpen(true)}>
+            <RotateCcw className="h-3.5 w-3.5" />
+            每日收尾
+          </Button>
+        </div>
       </div>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_132px_auto]">
@@ -315,9 +422,27 @@ export function DailyTaskPanel({
           dailyTasks.map((task) => (
             <article
               key={task.id}
-              className="daily-task-row"
+              className={`daily-task-row ${draggingTaskId === task.id ? "opacity-60" : ""}`}
               onContextMenu={(event) => openContextMenu(event, task)}
+              onDragOver={(event) => {
+                if (sortMode === "custom") event.preventDefault();
+              }}
+              onDrop={(event) => handleTaskDrop(event, task.id)}
             >
+              {sortMode === "custom" ? (
+                <button
+                  type="button"
+                  draggable
+                  aria-label={`调整顺序 ${task.name}`}
+                  title="拖动排序，也可使用上下方向键"
+                  className="-ml-1 rounded-md p-0.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700 active:cursor-grabbing"
+                  onDragStart={(event) => handleTaskDragStart(task.id, event)}
+                  onDragEnd={() => setDraggingTaskId(null)}
+                  onKeyDown={(event) => handleTaskOrderKeyDown(task.id, event)}
+                >
+                  <GripVertical className="h-4 w-4" aria-hidden />
+                </button>
+              ) : null}
               <Checkbox
                 checked={task.done}
                 onCheckedChange={() => onToggleTask(task.id)}
