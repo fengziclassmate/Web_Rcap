@@ -236,6 +236,33 @@ export function getLinkedDailyTaskIdsForEventUpdate(
   return linkedDailyTaskId ? [linkedDailyTaskId] : [];
 }
 
+export function unlinkDailyTaskFromEvents<T extends ExpandableScheduleEvent>(
+  events: T[],
+  taskId: string,
+): T[] {
+  return events.map((event) => {
+    const baseChanged = event.linkedDailyTaskId === taskId;
+    let overridesChanged = false;
+    const nextOverrides = Object.fromEntries(
+      Object.entries(event.recurrenceOverrides ?? {}).map(([date, override]) => {
+        if (override.linkedDailyTaskId !== taskId) return [date, override];
+        overridesChanged = true;
+        const unlinkedOverride = { ...override };
+        delete unlinkedOverride.linkedDailyTaskId;
+        return [date, unlinkedOverride];
+      }),
+    );
+
+    if (!baseChanged && !overridesChanged) return event;
+    const unlinkedEvent = { ...event };
+    delete unlinkedEvent.linkedDailyTaskId;
+    return {
+      ...(baseChanged ? unlinkedEvent : event),
+      ...(overridesChanged ? { recurrenceOverrides: nextOverrides } : {}),
+    } as T;
+  });
+}
+
 export function updateEventsLinkedToDailyTask<T extends ExpandableScheduleEvent>(
   events: T[],
   taskId: string,

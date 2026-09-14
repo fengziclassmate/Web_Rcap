@@ -25,6 +25,7 @@ import {
   moveRecurrenceOccurrence,
   parseSyntheticEventId,
   pickRecurrenceOverridePatch,
+  unlinkDailyTaskFromEvents,
   updateEventsLinkedToDailyTask,
 } from "@/lib/recurrence";
 import {
@@ -936,6 +937,7 @@ export function WorkbenchApp() {
 
   function handleDeleteTask(taskId: string) {
     setTasks((prev) => prev.filter((task) => task.id !== taskId));
+    setEvents((prev) => unlinkDailyTaskFromEvents(prev, taskId));
   }
 
   function handleReorderTask(sourceTaskId: string, targetTaskId: string) {

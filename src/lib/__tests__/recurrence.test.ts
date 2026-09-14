@@ -3,6 +3,7 @@ import {
   expandScheduleEvents,
   getLinkedDailyTaskIdsForEventUpdate,
   moveRecurrenceOccurrence,
+  unlinkDailyTaskFromEvents,
   updateEventsLinkedToDailyTask,
   type ExpandableScheduleEvent,
 } from "../recurrence";
@@ -130,6 +131,27 @@ describe("moveRecurrenceOccurrence", () => {
 });
 
 describe("daily task links", () => {
+  it("removes stale links from normal events and recurring overrides when a task is deleted", () => {
+    const result = unlinkDailyTaskFromEvents(
+      [
+        event({ linkedDailyTaskId: "deleted-task" }),
+        event({
+          id: "recurring-event",
+          recurrence: { kind: "daily" },
+          recurrenceOverrides: {
+            "2026-05-02": { linkedDailyTaskId: "deleted-task", isCompleted: true },
+            "2026-05-03": { linkedDailyTaskId: "kept-task" },
+          },
+        }),
+      ],
+      "deleted-task",
+    );
+
+    expect(result[0].linkedDailyTaskId).toBeUndefined();
+    expect(result[1].recurrenceOverrides?.["2026-05-02"]).toEqual({ isCompleted: true });
+    expect(result[1].recurrenceOverrides?.["2026-05-03"]?.linkedDailyTaskId).toBe("kept-task");
+  });
+
   it("updates normal events and only matching recurring overrides", () => {
     const result = updateEventsLinkedToDailyTask(
       [
