@@ -1396,6 +1396,10 @@ export function TaskDashboard({
         onAddTask={(name, dueDate, taskType) => onAddTask(name, dueDate, taskType)}
         onToggleTask={onToggleTask}
         onUpdateTask={onUpdateTask}
+        onRequestDeleteTask={(taskId) => {
+          setPendingDeleteTaskId(taskId);
+          setConfirmDeleteOpen(true);
+        }}
         onCreateTimeBlock={onCreateDailyTaskTimeBlock}
         archivedSectionOpen={uiPreferences.dailyArchiveSectionOpen}
         onArchivedSectionOpenChange={(open) => patchUiPreferences({ dailyArchiveSectionOpen: open })}

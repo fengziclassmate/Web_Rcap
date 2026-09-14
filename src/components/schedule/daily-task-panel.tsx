@@ -16,6 +16,7 @@ type DailyTaskPanelProps = {
   onAddTask: (name: string, dueDate: string, taskType: TaskType) => void;
   onToggleTask: (taskId: string) => void;
   onUpdateTask: (taskId: string, patch: Partial<LongTask>) => void;
+  onRequestDeleteTask: (taskId: string) => void;
   onCreateTimeBlock: (task: LongTask, date: string, startHour: number, durationMinutes: number) => void;
   archivedSectionOpen: boolean;
   onArchivedSectionOpenChange: (open: boolean) => void;
@@ -84,6 +85,7 @@ export function DailyTaskPanel({
   onAddTask,
   onToggleTask,
   onUpdateTask,
+  onRequestDeleteTask,
   onCreateTimeBlock,
   archivedSectionOpen,
   onArchivedSectionOpenChange,
@@ -245,7 +247,7 @@ export function DailyTaskPanel({
     event.preventDefault();
     event.stopPropagation();
     const menuWidth = 224;
-    const menuHeight = 332;
+    const menuHeight = 372;
     const padding = 12;
     setContextMenu({
       taskId: task.id,
@@ -441,6 +443,14 @@ export function DailyTaskPanel({
                 onClick={() => runContextAction(() => abandonDailyTask(contextMenuTask))}
               >
                 标记放弃
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
+                onClick={() => runContextAction(() => onRequestDeleteTask(contextMenuTask.id))}
+              >
+                删除任务
               </button>
             </div>,
             document.body,

@@ -53,6 +53,7 @@ describe("DailyTaskPanel completion archive", () => {
         onAddTask={vi.fn()}
         onToggleTask={vi.fn()}
         onUpdateTask={onUpdateTask}
+        onRequestDeleteTask={vi.fn()}
         onCreateTimeBlock={vi.fn()}
         archivedSectionOpen={false}
         onArchivedSectionOpenChange={vi.fn()}
@@ -82,6 +83,7 @@ describe("DailyTaskPanel completion archive", () => {
         onAddTask={vi.fn()}
         onToggleTask={vi.fn()}
         onUpdateTask={vi.fn()}
+        onRequestDeleteTask={vi.fn()}
         onCreateTimeBlock={vi.fn()}
         archivedSectionOpen={false}
         onArchivedSectionOpenChange={vi.fn()}
@@ -94,6 +96,33 @@ describe("DailyTaskPanel completion archive", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "排入日程" }));
 
     expect(screen.getByRole("dialog", { name: "排入日程" })).toBeTruthy();
+  });
+
+  it("requests deletion from the daily task context menu", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 27, 15, 0));
+    const onRequestDeleteTask = vi.fn();
+
+    render(
+      <DailyTaskPanel
+        tasks={[task({ name: "待删除日常任务" })]}
+        events={[]}
+        onAddTask={vi.fn()}
+        onToggleTask={vi.fn()}
+        onUpdateTask={vi.fn()}
+        onRequestDeleteTask={onRequestDeleteTask}
+        onCreateTimeBlock={vi.fn()}
+        archivedSectionOpen={false}
+        onArchivedSectionOpenChange={vi.fn()}
+      />,
+    );
+
+    const taskRow = screen.getByText("待删除日常任务").closest("article");
+    expect(taskRow).toBeTruthy();
+    fireEvent.contextMenu(taskRow!, { clientX: 120, clientY: 120 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "删除任务" }));
+
+    expect(onRequestDeleteTask).toHaveBeenCalledWith("task");
   });
 
   it("shows only today's completions in the panel and groups older records in history", () => {
@@ -128,6 +157,7 @@ describe("DailyTaskPanel completion archive", () => {
         onAddTask={vi.fn()}
         onToggleTask={vi.fn()}
         onUpdateTask={vi.fn()}
+        onRequestDeleteTask={vi.fn()}
         onCreateTimeBlock={vi.fn()}
         archivedSectionOpen
         onArchivedSectionOpenChange={vi.fn()}
