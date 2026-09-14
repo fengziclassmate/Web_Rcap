@@ -233,7 +233,6 @@ const minimumDurationHour = 1 / minutesPerHour;
 const contextMenuWidth = 208;
 const contextMenuHeight = 280;
 const contextMenuViewportPadding = 12;
-const recurrenceEditScopeStorageKey = "recurrence-edit-scope";
 const hourOptions = Array.from({ length: 24 }, (_, hour) => hour);
 const endHourOptions = Array.from({ length: 25 }, (_, hour) => hour);
 const minuteOptions = Array.from({ length: 60 }, (_, minute) => minute);
@@ -511,11 +510,8 @@ export function WeeklyTimeGrid({
   const [createForm, setCreateForm] = useState<EventFormState>(defaultForm);
   const [createDetailsOpen, setCreateDetailsOpen] = useState(false);
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
-  const [editScope, setEditScope] = useState<"occurrence" | "future">(() => {
-    if (typeof window === "undefined") return "occurrence";
-    const stored = window.localStorage.getItem(recurrenceEditScopeStorageKey);
-    return stored === "future" || stored === "series" ? "future" : "occurrence";
-  });
+  const [editDetailsOpen, setEditDetailsOpen] = useState(false);
+  const [editScope, setEditScope] = useState<"occurrence" | "future">("occurrence");
   const draggingEventIdRef = useRef<string | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
@@ -1118,15 +1114,9 @@ export function WeeklyTimeGrid({
 
   function handleOpenEdit(event: ScheduleEvent) {
     setEditingEventId(event.id);
+    setEditDetailsOpen(false);
     setEditRecurrenceOpen(false);
-    const savedScope =
-      typeof window === "undefined" ? null : window.localStorage.getItem(recurrenceEditScopeStorageKey);
-    setEditScope(
-      (parseSyntheticEventId(event.id) || event.recurrence)
-      && (savedScope === "future" || savedScope === "series")
-        ? "future"
-        : "occurrence",
-    );
+    setEditScope("occurrence");
     setEditForm({
       title: event.title,
       startHour: event.startHour,
@@ -1217,9 +1207,6 @@ export function WeeklyTimeGrid({
 
     const parsed = parseSyntheticEventId(selectedEvent.id);
     if (parsed) {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(recurrenceEditScopeStorageKey, editScope);
-      }
       onUpdateEvent(selectedEvent.id, patch, {
         scope: editScope,
       });
@@ -2578,7 +2565,7 @@ export function WeeklyTimeGrid({
           <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => !open && setEditingEventId(null)}>
             {selectedEvent ? (
               <DialogContent
-                className="rounded-lg border-gray-200 shadow-lg sm:max-w-lg"
+                className="max-h-[92vh] overflow-y-auto rounded-lg border-gray-200 shadow-lg sm:max-w-lg"
                 onKeyDown={(event) => {
                   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                     event.preventDefault();
@@ -2662,24 +2649,45 @@ export function WeeklyTimeGrid({
                     onStartHourChange={(value) => setEditForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setEditForm((prev) => ({ ...prev, endHour: value }))}
                   />
-                  <div className="space-y-3">
-                    <Label htmlFor="edit-notes">备注</Label>
-                    <Textarea
-                      id="edit-notes"
-                      value={editForm.notes}
-                      onChange={(event) => setEditForm((prev) => ({ ...prev, notes: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="edit-requirements">所需物品/准备事项</Label>
-                    <Textarea
-                      id="edit-requirements"
-                      value={editForm.requirements}
-                      onChange={(event) =>
-                        setEditForm((prev) => ({ ...prev, requirements: event.target.value }))
-                      }
-                    />
-                  </div>
+                  <Collapsible
+                    open={editDetailsOpen}
+                    onOpenChange={setEditDetailsOpen}
+                    className="overflow-hidden rounded-lg border border-stone-200 bg-stone-50/70"
+                  >
+                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400">
+                      <span className="min-w-0 text-sm font-semibold text-stone-800">补充信息</span>
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${editDetailsOpen ? "rotate-180" : ""}`}
+                        aria-hidden
+                      />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid gap-3 border-t border-stone-200 bg-white p-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="edit-notes">备注</Label>
+                          <Textarea
+                            id="edit-notes"
+                            value={editForm.notes}
+                            onChange={(event) => setEditForm((prev) => ({ ...prev, notes: event.target.value }))}
+                            placeholder="输入备注信息"
+                            className="min-h-20"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="edit-requirements">所需物品/准备事项</Label>
+                          <Textarea
+                            id="edit-requirements"
+                            value={editForm.requirements}
+                            onChange={(event) =>
+                              setEditForm((prev) => ({ ...prev, requirements: event.target.value }))
+                            }
+                            placeholder="每行一项"
+                            className="min-h-20"
+                          />
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                   <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-4">
                     <Switch
                       id="edit-completed"
@@ -2728,12 +2736,7 @@ export function WeeklyTimeGrid({
                             type="button"
                             size="sm"
                             variant={editScope === "occurrence" ? "default" : "outline"}
-                            onClick={() => {
-                              setEditScope("occurrence");
-                              if (typeof window !== "undefined") {
-                                window.localStorage.setItem(recurrenceEditScopeStorageKey, "occurrence");
-                              }
-                            }}
+                            onClick={() => setEditScope("occurrence")}
                           >
                             仅此日
                           </Button>
@@ -2741,12 +2744,7 @@ export function WeeklyTimeGrid({
                             type="button"
                             size="sm"
                             variant={editScope === "future" ? "default" : "outline"}
-                            onClick={() => {
-                              setEditScope("future");
-                              if (typeof window !== "undefined") {
-                                window.localStorage.setItem(recurrenceEditScopeStorageKey, "future");
-                              }
-                            }}
+                            onClick={() => setEditScope("future")}
                           >
                             当天及未来
                           </Button>

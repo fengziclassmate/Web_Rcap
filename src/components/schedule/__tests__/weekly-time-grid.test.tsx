@@ -368,6 +368,45 @@ describe("WeeklyTimeGrid interactions", () => {
     );
   });
 
+  it("folds edit details and defaults every recurring edit to the selected day", () => {
+    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
+    window.localStorage.setItem("recurrence-edit-scope", "future");
+    renderGrid({
+      events: [
+        {
+          ...scheduleEvent,
+          id: "recurring-default-scope-event",
+          date: "2026-07-27",
+          title: "默认仅此日",
+          notes: "已有备注",
+          requirements: ["已有物品"],
+          isCompleted: false,
+          recurrence: { kind: "daily" },
+          exceptionDates: [],
+          recurrenceOverrides: {},
+        },
+      ],
+      onUpdateEvent,
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "打开 默认仅此日 编辑窗口" })[0]);
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).queryByLabelText("备注")).toBeNull();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "补充信息" }));
+    expect((within(dialog).getByLabelText("备注") as HTMLTextAreaElement).value).toBe("已有备注");
+    expect((within(dialog).getByLabelText("所需物品/准备事项") as HTMLTextAreaElement).value).toBe("已有物品");
+
+    fireEvent.change(within(dialog).getByLabelText("标题"), { target: { value: "仅修改今天" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存修改" }));
+
+    expect(onUpdateEvent).toHaveBeenCalledWith(
+      "recurring-default-scope-event__2026-07-27",
+      expect.objectContaining({ title: "仅修改今天" }),
+      { scope: "occurrence" },
+    );
+  });
+
   it("drops a short event onto an occupied card and places it in the next free interval", () => {
     const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
     renderGrid({
