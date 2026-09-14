@@ -469,6 +469,31 @@ describe("WeeklyTimeGrid interactions", () => {
     );
   });
 
+  it("renames a linked event without resubmitting an unchanged completion state", () => {
+    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
+    renderGrid({
+      events: [
+        {
+          ...scheduleEvent,
+          title: "原日程名称",
+          linkedDailyTaskId: "task-1",
+          isCompleted: false,
+        },
+      ],
+      onUpdateEvent,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "打开 原日程名称 编辑窗口" }));
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "修改后的日程名称" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+
+    expect(onUpdateEvent).toHaveBeenCalledWith(
+      "event-1",
+      expect.objectContaining({ title: "修改后的日程名称" }),
+    );
+    expect(onUpdateEvent.mock.calls[0][1]).not.toHaveProperty("isCompleted");
+  });
+
   it("shows the recurrence switch directly and offers compact minute shortcuts", () => {
     const { container } = renderGrid();
     const emptySlot = Array.from(container.querySelectorAll("button")).find(

@@ -5,6 +5,7 @@ import {
   moveRecurrenceOccurrence,
   unlinkDailyTaskFromEvents,
   updateEventsLinkedToDailyTask,
+  updateTasksLinkedToScheduleEvent,
   type ExpandableScheduleEvent,
 } from "../recurrence";
 
@@ -131,6 +132,27 @@ describe("moveRecurrenceOccurrence", () => {
 });
 
 describe("daily task links", () => {
+  it("renames a completed linked task without reopening it", () => {
+    const completedAt = "2026-05-01T10:00:00.000Z";
+    const result = updateTasksLinkedToScheduleEvent(
+      [
+        { id: "task-1", name: "原任务名称", done: true, completedAt },
+        { id: "task-2", name: "其他任务", done: false, completedAt: null },
+      ],
+      new Set(["task-1"]),
+      { title: "修改后的任务名称" },
+      "2026-05-01T11:00:00.000Z",
+    );
+
+    expect(result[0]).toEqual({
+      id: "task-1",
+      name: "修改后的任务名称",
+      done: true,
+      completedAt,
+    });
+    expect(result[1].name).toBe("其他任务");
+  });
+
   it("removes stale links from normal events and recurring overrides when a task is deleted", () => {
     const result = unlinkDailyTaskFromEvents(
       [

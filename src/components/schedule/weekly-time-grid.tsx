@@ -1197,7 +1197,9 @@ export function WeeklyTimeGrid({
       endHour,
       notes: editForm.notes.trim(),
       requirements: buildRequirementLines(editForm.requirements),
-      isCompleted: editForm.isCompleted,
+      ...(selectedEvent && editForm.isCompleted !== selectedEvent.isCompleted
+        ? { isCompleted: editForm.isCompleted }
+        : {}),
       category: editForm.category,
       tag: editForm.tag,
     };

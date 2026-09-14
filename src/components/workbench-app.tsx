@@ -27,6 +27,7 @@ import {
   pickRecurrenceOverridePatch,
   unlinkDailyTaskFromEvents,
   updateEventsLinkedToDailyTask,
+  updateTasksLinkedToScheduleEvent,
 } from "@/lib/recurrence";
 import {
   ROUTINE_CHECKIN_PROJECT_ID,
@@ -1232,7 +1233,8 @@ export function WorkbenchApp() {
     options?: { scope?: "occurrence" | "series" },
   ) {
     const isCompleted = patch.isCompleted;
-    if (typeof isCompleted === "boolean") {
+    const title = patch.title;
+    if (typeof isCompleted === "boolean" || typeof title === "string") {
       const linkedTaskIds = new Set(
         getLinkedDailyTaskIdsForEventUpdate(
           events,
@@ -1242,18 +1244,12 @@ export function WorkbenchApp() {
       );
       if (patch.linkedDailyTaskId) linkedTaskIds.add(patch.linkedDailyTaskId);
       if (linkedTaskIds.size > 0) {
-        const completedAt = new Date().toISOString();
         setTasks((prev) =>
-          prev.map((task) =>
-            linkedTaskIds.has(task.id)
-              ? {
-                  ...task,
-                  done: isCompleted,
-                  completedAt: isCompleted
-                    ? task.completedAt ?? completedAt
-                    : null,
-                }
-              : task,
+          updateTasksLinkedToScheduleEvent(
+            prev,
+            linkedTaskIds,
+            { title, isCompleted },
+            new Date().toISOString(),
           ),
         );
       }
