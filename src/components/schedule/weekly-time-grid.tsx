@@ -170,7 +170,7 @@ type WeeklyTimeGridProps = {
   onUpdateEvent: (
     eventId: string,
     patch: Partial<ScheduleEvent>,
-    options?: { scope?: "occurrence" | "series" },
+    options?: { scope?: "occurrence" | "future" },
   ) => void;
   onDeleteEvent: (eventId: string, options?: { mode?: "single" | "future" | "all" }) => void;
   onPrevWeek: () => void;
@@ -511,10 +511,10 @@ export function WeeklyTimeGrid({
   const [createForm, setCreateForm] = useState<EventFormState>(defaultForm);
   const [createDetailsOpen, setCreateDetailsOpen] = useState(false);
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
-  const [editScope, setEditScope] = useState<"occurrence" | "series">(() => {
+  const [editScope, setEditScope] = useState<"occurrence" | "future">(() => {
     if (typeof window === "undefined") return "occurrence";
     const stored = window.localStorage.getItem(recurrenceEditScopeStorageKey);
-    return stored === "series" || stored === "occurrence" ? stored : "occurrence";
+    return stored === "future" || stored === "series" ? "future" : "occurrence";
   });
   const draggingEventIdRef = useRef<string | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
@@ -1121,7 +1121,12 @@ export function WeeklyTimeGrid({
     setEditRecurrenceOpen(false);
     const savedScope =
       typeof window === "undefined" ? null : window.localStorage.getItem(recurrenceEditScopeStorageKey);
-    setEditScope((parseSyntheticEventId(event.id) || event.recurrence) && savedScope === "series" ? "series" : "occurrence");
+    setEditScope(
+      (parseSyntheticEventId(event.id) || event.recurrence)
+      && (savedScope === "future" || savedScope === "series")
+        ? "future"
+        : "occurrence",
+    );
     setEditForm({
       title: event.title,
       startHour: event.startHour,
@@ -1216,7 +1221,7 @@ export function WeeklyTimeGrid({
         window.localStorage.setItem(recurrenceEditScopeStorageKey, editScope);
       }
       onUpdateEvent(selectedEvent.id, patch, {
-        scope: editScope === "series" ? "series" : "occurrence",
+        scope: editScope,
       });
     } else {
       onUpdateEvent(selectedEvent.id, patch);
@@ -2707,12 +2712,7 @@ export function WeeklyTimeGrid({
                       <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
                         <span className="flex min-w-0 items-center gap-2">
                           <Repeat className="h-4 w-4 shrink-0 text-amber-700" aria-hidden />
-                          <span>
-                            <span className="block text-sm font-semibold text-gray-800">循环行程设置</span>
-                            <span className="block text-xs text-gray-600">
-                              当前日期 {selectedEvent.date} · {editScope === "series" ? "保存整个系列" : "仅保存此日"}
-                            </span>
-                          </span>
+                          <span className="text-sm font-semibold text-gray-800">循环行程设置</span>
                         </span>
                         <ChevronDown
                           className={`h-4 w-4 shrink-0 text-amber-700 transition-transform ${editRecurrenceOpen ? "rotate-180" : ""}`}
@@ -2740,20 +2740,17 @@ export function WeeklyTimeGrid({
                           <Button
                             type="button"
                             size="sm"
-                            variant={editScope === "series" ? "default" : "outline"}
+                            variant={editScope === "future" ? "default" : "outline"}
                             onClick={() => {
-                              setEditScope("series");
+                              setEditScope("future");
                               if (typeof window !== "undefined") {
-                                window.localStorage.setItem(recurrenceEditScopeStorageKey, "series");
+                                window.localStorage.setItem(recurrenceEditScopeStorageKey, "future");
                               }
                             }}
                           >
-                            整个系列
+                            当天及未来
                           </Button>
                         </div>
-                        <p className="text-xs text-gray-600">
-                          修改时间、标题等时：选“仅此日”只影响当天；选“整个系列”会更新该循环规则下所有日期。
-                        </p>
                           </div>
                           <div className="space-y-2 border-t border-amber-200/80 pt-3">
                         <Label className="text-xs font-medium uppercase tracking-wide text-gray-600">删除</Label>

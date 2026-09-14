@@ -334,6 +334,40 @@ describe("WeeklyTimeGrid interactions", () => {
     );
   });
 
+  it("edits the selected recurring day forward with a compact scope control", () => {
+    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
+    renderGrid({
+      events: [
+        {
+          ...scheduleEvent,
+          id: "recurring-edit-event",
+          date: "2026-07-27",
+          title: "循环编辑",
+          isCompleted: false,
+          recurrence: { kind: "daily" },
+          exceptionDates: [],
+          recurrenceOverrides: {},
+        },
+      ],
+      onUpdateEvent,
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "打开 循环编辑 编辑窗口" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /循环行程设置/ }));
+
+    expect(screen.queryByText(/当前日期/)).toBeNull();
+    expect(screen.queryByText(/修改时间、标题等时/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "当天及未来" }));
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "未来循环编辑" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+
+    expect(onUpdateEvent).toHaveBeenCalledWith(
+      "recurring-edit-event__2026-07-27",
+      expect.objectContaining({ title: "未来循环编辑" }),
+      { scope: "future" },
+    );
+  });
+
   it("drops a short event onto an occupied card and places it in the next free interval", () => {
     const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
     renderGrid({

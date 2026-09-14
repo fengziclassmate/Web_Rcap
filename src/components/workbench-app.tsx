@@ -27,6 +27,7 @@ import {
   pickRecurrenceOverridePatch,
   unlinkDailyTaskFromEvents,
   updateEventsLinkedToDailyTask,
+  updateRecurrenceFuture,
   updateTasksLinkedToScheduleEvent,
 } from "@/lib/recurrence";
 import {
@@ -1230,7 +1231,7 @@ export function WorkbenchApp() {
   function handleUpdateEvent(
     eventId: string,
     patch: Partial<ScheduleEvent>,
-    options?: { scope?: "occurrence" | "series" },
+    options?: { scope?: "occurrence" | "future" },
   ) {
     const isCompleted = patch.isCompleted;
     const title = patch.title;
@@ -1258,13 +1259,9 @@ export function WorkbenchApp() {
     const parsed = parseSyntheticEventId(eventId);
     if (parsed) {
       const scope = options?.scope ?? "occurrence";
-      if (scope === "series") {
-        setEvents((prev) =>
-          prev.map((event) => {
-            if (event.id !== parsed.masterId) return event;
-            return { ...event, ...patch, id: event.id };
-          }),
-        );
+      if (scope === "future") {
+        const futureSeriesId = createId("event");
+        setEvents((prev) => updateRecurrenceFuture(prev, eventId, patch, futureSeriesId));
         return;
       }
       if (patch.date && patch.date !== parsed.occurrenceDate) {

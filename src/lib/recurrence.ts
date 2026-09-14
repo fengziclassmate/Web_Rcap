@@ -97,6 +97,63 @@ export function moveRecurrenceOccurrence<T extends ExpandableScheduleEvent>(
   return detachedEvent ? [...nextEvents, detachedEvent] : events;
 }
 
+export function updateRecurrenceFuture<T extends ExpandableScheduleEvent>(
+  events: T[],
+  occurrenceId: string,
+  patch: Partial<T>,
+  futureSeriesId: string,
+): T[] {
+  const parsed = parseSyntheticEventId(occurrenceId);
+  if (!parsed) return events;
+
+  let futureSeries: T | null = null;
+  const nextEvents = events.map((event) => {
+    if (event.id !== parsed.masterId || !event.recurrence?.kind) return event;
+
+    const splitDate = parsed.occurrenceDate;
+    const selectedOverride = event.recurrenceOverrides?.[splitDate] ?? {};
+    const appliedPatch = pickRecurrenceOverridePatch(patch);
+    const selectedRemainder = { ...selectedOverride };
+    for (const key of Object.keys(appliedPatch) as Array<keyof RecurrenceInstanceOverride>) {
+      delete selectedRemainder[key];
+    }
+
+    const pastOverrides: Record<string, RecurrenceInstanceOverride> = {};
+    const futureOverrides: Record<string, RecurrenceInstanceOverride> = {};
+    for (const [date, override] of Object.entries(event.recurrenceOverrides ?? {})) {
+      if (date < splitDate) pastOverrides[date] = override;
+      if (date > splitDate) futureOverrides[date] = override;
+    }
+    if (Object.keys(selectedRemainder).length > 0) {
+      futureOverrides[splitDate] = selectedRemainder;
+    }
+
+    const pastExceptions = (event.exceptionDates ?? []).filter((date) => date < splitDate);
+    const futureExceptions = (event.exceptionDates ?? []).filter((date) => date >= splitDate);
+    const nextFutureSeries = {
+      ...event,
+      ...patch,
+      id: splitDate === event.date ? event.id : futureSeriesId,
+      date: splitDate,
+      recurrence: event.recurrence,
+      exceptionDates: futureExceptions,
+      recurrenceOverrides: futureOverrides,
+      recurrenceEndExclusive: event.recurrenceEndExclusive,
+    } as T;
+
+    if (splitDate === event.date) return nextFutureSeries;
+    futureSeries = nextFutureSeries;
+    return {
+      ...event,
+      exceptionDates: pastExceptions,
+      recurrenceOverrides: pastOverrides,
+      recurrenceEndExclusive: splitDate,
+    } as T;
+  });
+
+  return futureSeries ? [...nextEvents, futureSeries] : nextEvents;
+}
+
 function parseISODateLocal(iso: string): Date {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d);
@@ -209,7 +266,7 @@ export function pickRecurrenceOverridePatch(
 export function getLinkedDailyTaskIdsForEventUpdate(
   events: ExpandableScheduleEvent[],
   eventId: string,
-  scope: "occurrence" | "series" = "occurrence",
+  scope: "occurrence" | "future" = "occurrence",
 ): string[] {
   const parsed = parseSyntheticEventId(eventId);
   if (!parsed) {
@@ -219,13 +276,13 @@ export function getLinkedDailyTaskIdsForEventUpdate(
 
   const master = events.find((event) => event.id === parsed.masterId);
   if (!master) return [];
-  if (scope === "series") {
+  if (scope === "future") {
     return [
       ...new Set([
         master.linkedDailyTaskId,
-        ...Object.values(master.recurrenceOverrides ?? {}).map(
-          (override) => override.linkedDailyTaskId,
-        ),
+        ...Object.entries(master.recurrenceOverrides ?? {})
+          .filter(([date]) => date >= parsed.occurrenceDate)
+          .map(([, override]) => override.linkedDailyTaskId),
       ].filter((taskId): taskId is string => Boolean(taskId))),
     ];
   }

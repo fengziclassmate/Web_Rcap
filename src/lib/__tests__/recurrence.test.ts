@@ -5,6 +5,7 @@ import {
   moveRecurrenceOccurrence,
   unlinkDailyTaskFromEvents,
   updateEventsLinkedToDailyTask,
+  updateRecurrenceFuture,
   updateTasksLinkedToScheduleEvent,
   type ExpandableScheduleEvent,
 } from "../recurrence";
@@ -131,6 +132,40 @@ describe("moveRecurrenceOccurrence", () => {
   });
 });
 
+describe("updateRecurrenceFuture", () => {
+  it("keeps past completed occurrences unchanged and updates the selected day forward", () => {
+    const result = updateRecurrenceFuture(
+      [
+        event({
+          recurrence: { kind: "daily" },
+          recurrenceOverrides: {
+            "2026-05-02": { title: "已完成旧行程", isCompleted: true },
+          },
+        }),
+      ],
+      "evt-1__2026-05-04",
+      { title: "新的未来行程", startHour: 11, endHour: 12 },
+      "evt-future",
+    );
+
+    const expanded = expandScheduleEvents(result, "2026-05-02", "2026-05-05");
+    expect(expanded.map(({ date, title, startHour, isCompleted }) => ({
+      date,
+      title,
+      startHour,
+      isCompleted,
+    }))).toEqual([
+      { date: "2026-05-02", title: "已完成旧行程", startHour: 9, isCompleted: true },
+      { date: "2026-05-03", title: "Base event", startHour: 9, isCompleted: false },
+      { date: "2026-05-04", title: "新的未来行程", startHour: 11, isCompleted: false },
+      { date: "2026-05-05", title: "新的未来行程", startHour: 11, isCompleted: false },
+    ]);
+    expect(result).toHaveLength(2);
+    expect(result[0].recurrenceEndExclusive).toBe("2026-05-04");
+    expect(result[1]).toMatchObject({ id: "evt-future", date: "2026-05-04" });
+  });
+});
+
 describe("daily task links", () => {
   it("renames a completed linked task without reopening it", () => {
     const completedAt = "2026-05-01T10:00:00.000Z";
@@ -214,5 +249,26 @@ describe("daily task links", () => {
         "occurrence",
       ),
     ).toEqual(["occurrence-task"]);
+  });
+
+  it("finds only current and future task links for a future series update", () => {
+    const events = [
+      event({
+        recurrence: { kind: "daily" },
+        recurrenceOverrides: {
+          "2026-05-02": { linkedDailyTaskId: "past-task" },
+          "2026-05-04": { linkedDailyTaskId: "current-task" },
+          "2026-05-05": { linkedDailyTaskId: "future-task" },
+        },
+      }),
+    ];
+
+    expect(
+      getLinkedDailyTaskIdsForEventUpdate(
+        events,
+        "evt-1__2026-05-04",
+        "future",
+      ),
+    ).toEqual(["current-task", "future-task"]);
   });
 });
