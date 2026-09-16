@@ -41,7 +41,6 @@ import {
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -410,11 +409,13 @@ export function TaskDashboard({
           : uiPreferences.footprintSectionOpen
             ? "footprint"
             : null;
-  const activePlanningPanel: "annual" | "shopping" | null = annualSectionOpen
-    ? "annual"
-    : shoppingSectionOpen
-      ? "shopping"
-      : null;
+  const activeTaskListPanel: "long" | "annual" | "shopping" | null = longTaskSectionOpen
+    ? "long"
+    : annualSectionOpen
+      ? "annual"
+      : shoppingSectionOpen
+        ? "shopping"
+        : null;
   const expandedProjects = useMemo(
     () => new Set(uiPreferences.expandedProjects),
     [uiPreferences.expandedProjects],
@@ -1133,19 +1134,24 @@ export function TaskDashboard({
     });
   }
 
-  function setPlanningPanel(panel: "annual" | "shopping", open: boolean) {
+  function setTaskListPanel(panel: "long" | "annual" | "shopping", open: boolean) {
     patchUiPreferences({
+      longTaskSectionOpen: open && panel === "long",
       annualSectionOpen: open && panel === "annual",
       shoppingSectionOpen: open && panel === "shopping",
     });
   }
 
-  function handleAddPlanningItem() {
-    if (activePlanningPanel === "shopping") {
+  function handleAddTaskListItem() {
+    if (activeTaskListPanel === "shopping") {
       setShoppingAddDialogOpen(true);
       return;
     }
-    setShowAddAnnualDialog(true);
+    if (activeTaskListPanel === "annual") {
+      setShowAddAnnualDialog(true);
+      return;
+    }
+    setShowAddTaskDialog(true);
   }
 
   function handleAddUtilityItem() {
@@ -1412,35 +1418,77 @@ export function TaskDashboard({
 
       <Separator />
 
-      <div className="task-dashboard-section">
-        <Collapsible
-          open={longTaskSectionOpen}
-          onOpenChange={(open) => patchUiPreferences({ longTaskSectionOpen: open })}
-        >
-          <div className="mb-3 flex items-center gap-2">
-            <CollapsibleTrigger
-              className="section-trigger flex min-w-0 flex-1 items-center justify-between rounded-xl px-3 py-2.5 text-left"
-              aria-label={longTaskSectionOpen ? "折叠长期任务" : "展开长期任务"}
+      <div className="task-dashboard-section utility-panel-grid" data-testid="task-list-panel-group">
+        <div className="utility-panel-controls">
+          <div className="utility-panel-tabs task-list-panel-tabs" role="tablist" aria-label="任务与清单">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTaskListPanel === "long"}
+              className={`utility-panel-tab ${activeTaskListPanel === "long" ? "utility-panel-tab-active" : ""}`}
+              onClick={() => setTaskListPanel("long", activeTaskListPanel !== "long")}
             >
-              <span className="truncate text-sm font-semibold text-gray-700">
-                长期任务 / 未完成任务
-              </span>
-              <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${longTaskSectionOpen ? "" : "-rotate-90"}`} />
-            </CollapsibleTrigger>
+              <ListTodo className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="truncate">长期任务</span>
+              <span className="text-[10px] tabular-nums opacity-70">{orderedIncompleteTasks.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTaskListPanel === "annual"}
+              className={`utility-panel-tab ${activeTaskListPanel === "annual" ? "utility-panel-tab-active" : ""}`}
+              onClick={() => setTaskListPanel("annual", activeTaskListPanel !== "annual")}
+            >
+              <CalendarRange className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="truncate">年度任务</span>
+              <span className="text-[10px] tabular-nums opacity-70">{annualTasks.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTaskListPanel === "shopping"}
+              className={`utility-panel-tab ${activeTaskListPanel === "shopping" ? "utility-panel-tab-active" : ""}`}
+              onClick={() => setTaskListPanel("shopping", activeTaskListPanel !== "shopping")}
+            >
+              <ShoppingBasket className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="truncate">购物清单</span>
+              <span className="text-[10px] tabular-nums opacity-70">{shoppingItems.length}</span>
+            </button>
+          </div>
+          {activeTaskListPanel ? (
             <Button
               type="button"
-              size="sm"
+              size="icon"
+              className="utility-panel-add shrink-0"
+              onClick={handleAddTaskListItem}
+              aria-label={activeTaskListPanel === "long" ? "添加长期任务" : activeTaskListPanel === "annual" ? "添加年度任务" : "添加购物项"}
+              title={activeTaskListPanel === "long" ? "添加长期任务" : activeTaskListPanel === "annual" ? "添加年度任务" : "添加购物项"}
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+            </Button>
+          ) : null}
+          {activeTaskListPanel === "long" ? (
+            <Button
+              type="button"
+              size="icon"
               variant="outline"
-              className="h-8 shrink-0 gap-1 rounded-full border-emerald-200 bg-emerald-50 px-2.5 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100"
+              className="h-8 w-8 shrink-0 rounded-full border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
               onClick={() => setCompletedLibraryOpen(true)}
               aria-label={`查看已完成任务，共 ${completedTaskInsights.total} 项`}
+              title={`已完成任务 · ${completedTaskInsights.total} 项`}
             >
               <CheckCircle className="h-3.5 w-3.5" aria-hidden />
-              已完成任务
-              <span className="tabular-nums text-emerald-600">{completedTaskInsights.total}</span>
             </Button>
-          </div>
-          <CollapsibleContent>
+          ) : null}
+        </div>
+
+        <section className="utility-panel utility-panel-long-task">
+        <Collapsible
+          className="utility-panel-root"
+          open={activeTaskListPanel === "long"}
+          onOpenChange={(open) => setTaskListPanel("long", open)}
+        >
+          <CollapsibleContent className="utility-panel-content mt-3">
             <div className="mb-3 flex items-center gap-1.5">
               <Button
                 type="button"
@@ -1457,9 +1505,6 @@ export function TaskDashboard({
                 onClick={() => setTaskViewMode("priority")}
               >
                 按优先级分组
-              </Button>
-              <Button type="button" size="icon-sm" onClick={() => setShowAddTaskDialog(true)} aria-label="添加长期任务" title="添加长期任务">
-                <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
 
@@ -1608,6 +1653,94 @@ export function TaskDashboard({
             )}
           </CollapsibleContent>
         </Collapsible>
+        </section>
+
+        <section className="utility-panel utility-panel-annual">
+          <Collapsible
+            className="utility-panel-root"
+            open={activeTaskListPanel === "annual"}
+            onOpenChange={(open) => setTaskListPanel("annual", open)}
+          >
+            <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
+              {annualTasks.length > 0 ? (
+                <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">
+                  {annualTasks.map((item) => (
+                    <li
+                      key={item.id}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => handleAnnualTaskDrop(item.id)}
+                      className="annual-task-row"
+                    >
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={() => setDraggingAnnualTaskId(item.id)}
+                        onDragEnd={() => setDraggingAnnualTaskId(null)}
+                        className="mt-0.5 shrink-0 rounded p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                        aria-label={`拖动排序年度任务 ${item.name}`}
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </button>
+                      <Checkbox
+                        checked={item.done}
+                        onCheckedChange={() => onToggleAnnualTask(item.id)}
+                        className="mt-0.5"
+                        aria-label={`年度任务 ${item.name} 完成状态`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openEditAnnualTask(item)}
+                        className={`min-w-0 flex-1 leading-snug [overflow-wrap:anywhere] break-words ${
+                          item.done ? "text-left text-gray-500 line-through" : "text-left text-gray-900"
+                        }`}
+                      >
+                        {item.name}
+                      </button>
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        className="mt-0.5 shrink-0 rounded-md text-stone-500 hover:bg-stone-100"
+                        onClick={() => openEditAnnualTask(item)}
+                        aria-label={`编辑年度任务 ${item.name}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="mt-0.5 h-7 w-7 shrink-0 rounded-md hover:bg-red-50 hover:text-red-500"
+                        onClick={() => {
+                          onDeleteAnnualTask(item.id);
+                          toast.success("已从年度清单移除");
+                        }}
+                        aria-label={`删除年度任务 ${item.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-center text-sm text-gray-500">尚未添加年度任务。</p>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </section>
+
+        <ShoppingList
+          variant="panel"
+          items={shoppingItems}
+          open={activeTaskListPanel === "shopping"}
+          onOpenChange={(open) => setTaskListPanel("shopping", open)}
+          addDialogOpen={shoppingAddDialogOpen}
+          onAddDialogOpenChange={setShoppingAddDialogOpen}
+          onAddItem={onAddShoppingItem}
+          onToggleItem={onToggleShoppingItem}
+          onDeleteItem={onDeleteShoppingItem}
+          onReorderItem={onReorderShoppingItem}
+        />
       </div>
 
       <Separator />
@@ -2170,136 +2303,6 @@ export function TaskDashboard({
           </CollapsibleContent>
         </Collapsible>
       </section>
-      </div>
-
-      <Separator />
-
-      <div className="task-dashboard-section utility-panel-grid" data-testid="annual-shopping-panel-group">
-        <div className="utility-panel-controls">
-          <div className="utility-panel-tabs planning-panel-tabs" role="tablist" aria-label="年度任务与购物清单">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activePlanningPanel === "annual"}
-              className={`utility-panel-tab ${activePlanningPanel === "annual" ? "utility-panel-tab-active" : ""}`}
-              onClick={() => setPlanningPanel("annual", activePlanningPanel !== "annual")}
-            >
-              <CalendarRange className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="truncate">年度任务</span>
-              <span className="text-[10px] tabular-nums opacity-70">{annualTasks.length}</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activePlanningPanel === "shopping"}
-              className={`utility-panel-tab ${activePlanningPanel === "shopping" ? "utility-panel-tab-active" : ""}`}
-              onClick={() => setPlanningPanel("shopping", activePlanningPanel !== "shopping")}
-            >
-              <ShoppingBasket className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="truncate">购物清单</span>
-              <span className="text-[10px] tabular-nums opacity-70">{shoppingItems.length}</span>
-            </button>
-          </div>
-          {activePlanningPanel ? (
-            <Button
-              type="button"
-              size="icon"
-              className="utility-panel-add shrink-0"
-              onClick={handleAddPlanningItem}
-              aria-label={activePlanningPanel === "annual" ? "添加年度任务" : "添加购物项"}
-              title={activePlanningPanel === "annual" ? "添加年度任务" : "添加购物项"}
-            >
-              <Plus className="h-4 w-4" aria-hidden />
-            </Button>
-          ) : null}
-        </div>
-
-        <section className="utility-panel utility-panel-annual">
-          <Collapsible
-            className="utility-panel-root"
-            open={activePlanningPanel === "annual"}
-            onOpenChange={(open) => setPlanningPanel("annual", open)}
-          >
-            <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
-              {annualTasks.length > 0 ? (
-                <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">
-                {annualTasks.map((item) => (
-                  <li
-                    key={item.id}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => handleAnnualTaskDrop(item.id)}
-                    className="annual-task-row"
-                  >
-                    <button
-                      type="button"
-                      draggable
-                      onDragStart={() => setDraggingAnnualTaskId(item.id)}
-                      onDragEnd={() => setDraggingAnnualTaskId(null)}
-                      className="mt-0.5 shrink-0 rounded p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
-                      aria-label={`拖动排序年度任务 ${item.name}`}
-                    >
-                      <GripVertical className="h-4 w-4" />
-                    </button>
-                    <Checkbox
-                      checked={item.done}
-                      onCheckedChange={() => onToggleAnnualTask(item.id)}
-                      className="mt-0.5"
-                      aria-label={`年度任务 ${item.name} 完成状态`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => openEditAnnualTask(item)}
-                      className={`min-w-0 flex-1 leading-snug [overflow-wrap:anywhere] break-words ${
-                        item.done ? "text-left text-gray-500 line-through" : "text-left text-gray-900"
-                      }`}
-                    >
-                      {item.name}
-                    </button>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      className="mt-0.5 shrink-0 rounded-md text-stone-500 hover:bg-stone-100"
-                      onClick={() => openEditAnnualTask(item)}
-                      aria-label={`编辑年度任务 ${item.name}`}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="mt-0.5 h-7 w-7 shrink-0 rounded-md hover:bg-red-50 hover:text-red-500"
-                      onClick={() => {
-                        onDeleteAnnualTask(item.id);
-                        toast.success("已从年度清单移除");
-                      }}
-                      aria-label={`删除年度任务 ${item.name}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </li>
-                ))}
-                </ul>
-              ) : (
-                <p className="text-center text-sm text-gray-500">尚未添加年度任务。</p>
-              )}
-            </CollapsibleContent>
-          </Collapsible>
-        </section>
-
-        <ShoppingList
-          variant="panel"
-          items={shoppingItems}
-          open={activePlanningPanel === "shopping"}
-          onOpenChange={(open) => setPlanningPanel("shopping", open)}
-          addDialogOpen={shoppingAddDialogOpen}
-          onAddDialogOpenChange={setShoppingAddDialogOpen}
-          onAddItem={onAddShoppingItem}
-          onToggleItem={onToggleShoppingItem}
-          onDeleteItem={onDeleteShoppingItem}
-          onReorderItem={onReorderShoppingItem}
-        />
       </div>
 
       <Separator />

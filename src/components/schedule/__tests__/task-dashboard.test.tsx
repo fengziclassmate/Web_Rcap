@@ -93,8 +93,8 @@ function ControlledProjectDashboard({ today }: { today: string }) {
   );
 }
 
-describe("TaskDashboard annual section", () => {
-  it("groups annual and shopping lists and places completed tasks beside long tasks", () => {
+describe("TaskDashboard task list sections", () => {
+  it("groups long, annual, and shopping lists with an icon-only completed-task action", () => {
     const noop = vi.fn();
     const onUiPreferencesChange = vi.fn();
     render(
@@ -141,28 +141,30 @@ describe("TaskDashboard annual section", () => {
         onDeleteFootprint={noop}
         onUpdateFootprint={noop}
         confirmDangerousActions={false}
-        uiPreferences={{ ...defaultDashboardUiPreferences, annualSectionOpen: true }}
+        uiPreferences={defaultDashboardUiPreferences}
         onUiPreferencesChange={onUiPreferencesChange}
       />,
     );
 
-    const planningGroup = screen.getByTestId("annual-shopping-panel-group");
-    const planningTabs = within(planningGroup).getByRole("tablist", { name: "年度任务与购物清单" });
-    expect(within(planningTabs).getByRole("tab", { name: /年度任务/ }).getAttribute("aria-selected")).toBe("true");
-    expect(within(planningTabs).getByRole("tab", { name: /购物清单/ }).getAttribute("aria-selected")).toBe("false");
+    const taskListGroup = screen.getByTestId("task-list-panel-group");
+    const taskListTabs = within(taskListGroup).getByRole("tablist", { name: "任务与清单" });
+    expect(within(taskListTabs).getByRole("tab", { name: /长期任务/ }).getAttribute("aria-selected")).toBe("true");
+    expect(within(taskListTabs).getByRole("tab", { name: /年度任务/ }).getAttribute("aria-selected")).toBe("false");
+    expect(within(taskListTabs).getByRole("tab", { name: /购物清单/ }).getAttribute("aria-selected")).toBe("false");
+    expect(screen.queryByText("长期任务 / 未完成任务")).toBeNull();
 
-    const addButton = screen.getByRole("button", { name: "添加年度任务" });
-    expect(planningGroup.contains(addButton)).toBe(true);
-    fireEvent.click(within(planningTabs).getByRole("tab", { name: /购物清单/ }));
+    const addButton = screen.getByRole("button", { name: "添加长期任务" });
+    expect(taskListGroup.contains(addButton)).toBe(true);
+    fireEvent.click(within(taskListTabs).getByRole("tab", { name: /年度任务/ }));
     expect(onUiPreferencesChange).toHaveBeenCalledWith(
-      expect.objectContaining({ annualSectionOpen: false, shoppingSectionOpen: true }),
+      expect.objectContaining({ longTaskSectionOpen: false, annualSectionOpen: true, shoppingSectionOpen: false }),
     );
 
-    const longTaskTrigger = screen.getByRole("button", { name: "折叠长期任务" });
     const completedTaskButton = screen.getByRole("button", { name: /查看已完成任务/ });
-    expect(completedTaskButton.parentElement).toBe(longTaskTrigger.parentElement);
+    expect(completedTaskButton.parentElement).toBe(taskListTabs.parentElement);
+    expect(completedTaskButton.textContent?.trim()).toBe("");
     expect(
-      planningGroup.compareDocumentPosition(
+      taskListGroup.compareDocumentPosition(
         screen.getByTestId("research-progress-panel"),
       ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
@@ -219,6 +221,7 @@ describe("TaskDashboard annual section", () => {
         confirmDangerousActions={false}
         uiPreferences={{
           ...defaultDashboardUiPreferences,
+          longTaskSectionOpen: false,
           annualSectionOpen: false,
           shoppingSectionOpen: true,
         }}

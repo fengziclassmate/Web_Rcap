@@ -324,8 +324,8 @@
     gap: 0.35rem;
   }
 
-  .planning-panel-tabs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .task-list-panel-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .utility-panel-tab {
