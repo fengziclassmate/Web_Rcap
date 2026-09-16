@@ -17,6 +17,7 @@ import {
   KanbanSquare,
   GripVertical,
   Pencil,
+  ShoppingBasket,
   Trophy,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -369,6 +370,7 @@ export function TaskDashboard({
   const [newFootprintName, setNewFootprintName] = useState("");
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
   const [showAddAnnualDialog, setShowAddAnnualDialog] = useState(false);
+  const [shoppingAddDialogOpen, setShoppingAddDialogOpen] = useState(false);
   const [editingAnnualTaskId, setEditingAnnualTaskId] = useState<string | null>(null);
   const [editingAnnualTaskName, setEditingAnnualTaskName] = useState("");
   const [draggingAnnualTaskId, setDraggingAnnualTaskId] = useState<string | null>(null);
@@ -408,6 +410,11 @@ export function TaskDashboard({
           : uiPreferences.footprintSectionOpen
             ? "footprint"
             : null;
+  const activePlanningPanel: "annual" | "shopping" | null = annualSectionOpen
+    ? "annual"
+    : shoppingSectionOpen
+      ? "shopping"
+      : null;
   const expandedProjects = useMemo(
     () => new Set(uiPreferences.expandedProjects),
     [uiPreferences.expandedProjects],
@@ -1126,6 +1133,21 @@ export function TaskDashboard({
     });
   }
 
+  function setPlanningPanel(panel: "annual" | "shopping", open: boolean) {
+    patchUiPreferences({
+      annualSectionOpen: open && panel === "annual",
+      shoppingSectionOpen: open && panel === "shopping",
+    });
+  }
+
+  function handleAddPlanningItem() {
+    if (activePlanningPanel === "shopping") {
+      setShoppingAddDialogOpen(true);
+      return;
+    }
+    setShowAddAnnualDialog(true);
+  }
+
   function handleAddUtilityItem() {
     if (activeUtilityPanel === "routine") {
       setShowRoutineCheckinForm(true);
@@ -1155,30 +1177,6 @@ export function TaskDashboard({
       </div>
 
       <Separator />
-
-      <section className="task-dashboard-section">
-        <div className="completed-library-trigger">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <CheckCircle className="h-4 w-4" aria-hidden />
-            </span>
-            <p className="truncate text-sm font-semibold text-stone-900">{"\u5df2\u5b8c\u6210\u4efb\u52a1\u5e93"}</p>
-            <span className="text-xs tabular-nums text-stone-500">
-              {completedTaskInsights.total} {"\u9879"}
-            </span>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="shrink-0 rounded-lg px-2 text-emerald-800 hover:bg-emerald-100 hover:text-emerald-950"
-            onClick={() => setCompletedLibraryOpen(true)}
-          >
-            {"\u67e5\u770b"}
-            <ChevronDown className="h-3.5 w-3.5 -rotate-90" aria-hidden />
-          </Button>
-        </div>
-      </section>
 
       <Dialog open={completedLibraryOpen} onOpenChange={setCompletedLibraryOpen}>
         <DialogContent className="h-[calc(100dvh-1rem)] max-h-[860px] w-[calc(100%-1rem)] max-w-6xl grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:w-full sm:!max-w-6xl">
@@ -1404,6 +1402,10 @@ export function TaskDashboard({
         sortMode={uiPreferences.dailyTaskSortMode}
         onSortModeChange={(dailyTaskSortMode) => patchUiPreferences({ dailyTaskSortMode })}
         onCreateTimeBlock={onCreateDailyTaskTimeBlock}
+        sectionOpen={uiPreferences.dailyTaskSectionOpen}
+        onSectionOpenChange={(dailyTaskSectionOpen) => patchUiPreferences({ dailyTaskSectionOpen })}
+        deadlineRadarOpen={uiPreferences.deadlineRadarSectionOpen}
+        onDeadlineRadarOpenChange={(deadlineRadarSectionOpen) => patchUiPreferences({ deadlineRadarSectionOpen })}
         archivedSectionOpen={uiPreferences.dailyArchiveSectionOpen}
         onArchivedSectionOpenChange={(open) => patchUiPreferences({ dailyArchiveSectionOpen: open })}
       />
@@ -1415,12 +1417,29 @@ export function TaskDashboard({
           open={longTaskSectionOpen}
           onOpenChange={(open) => patchUiPreferences({ longTaskSectionOpen: open })}
         >
-          <CollapsibleTrigger className="section-trigger mb-3 flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left">
-            <span className="text-sm font-semibold text-gray-700">
-              长期任务 / 未完成任务
-            </span>
-            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${longTaskSectionOpen ? "" : "-rotate-90"}`} />
-          </CollapsibleTrigger>
+          <div className="mb-3 flex items-center gap-2">
+            <CollapsibleTrigger
+              className="section-trigger flex min-w-0 flex-1 items-center justify-between rounded-xl px-3 py-2.5 text-left"
+              aria-label={longTaskSectionOpen ? "折叠长期任务" : "展开长期任务"}
+            >
+              <span className="truncate text-sm font-semibold text-gray-700">
+                长期任务 / 未完成任务
+              </span>
+              <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${longTaskSectionOpen ? "" : "-rotate-90"}`} />
+            </CollapsibleTrigger>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 shrink-0 gap-1 rounded-full border-emerald-200 bg-emerald-50 px-2.5 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100"
+              onClick={() => setCompletedLibraryOpen(true)}
+              aria-label={`查看已完成任务，共 ${completedTaskInsights.total} 项`}
+            >
+              <CheckCircle className="h-3.5 w-3.5" aria-hidden />
+              已完成任务
+              <span className="tabular-nums text-emerald-600">{completedTaskInsights.total}</span>
+            </Button>
+          </div>
           <CollapsibleContent>
             <div className="mb-3 flex items-center gap-1.5">
               <Button
@@ -2155,34 +2174,53 @@ export function TaskDashboard({
 
       <Separator />
 
-      <div className="task-dashboard-section">
-        <Collapsible
-          open={annualSectionOpen}
-          onOpenChange={(open) => patchUiPreferences({ annualSectionOpen: open })}
-        >
-          <div className="relative mb-3">
-            <CollapsibleTrigger
-              className="section-trigger relative flex w-full items-center rounded-xl py-2.5 pl-3 pr-20 text-left"
-              aria-label={annualSectionOpen ? "折叠年度任务清单" : "展开年度任务清单"}
+      <div className="task-dashboard-section utility-panel-grid" data-testid="annual-shopping-panel-group">
+        <div className="utility-panel-controls">
+          <div className="utility-panel-tabs planning-panel-tabs" role="tablist" aria-label="年度任务与购物清单">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePlanningPanel === "annual"}
+              className={`utility-panel-tab ${activePlanningPanel === "annual" ? "utility-panel-tab-active" : ""}`}
+              onClick={() => setPlanningPanel("annual", activePlanningPanel !== "annual")}
             >
-              <span className="text-sm font-semibold text-gray-700">年度任务清单</span>
-              <ChevronDown
-                className={`absolute right-3 h-4 w-4 text-gray-500 transition-transform ${annualSectionOpen ? "" : "-rotate-90"}`}
-              />
-            </CollapsibleTrigger>
+              <CalendarRange className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="truncate">年度任务</span>
+              <span className="text-[10px] tabular-nums opacity-70">{annualTasks.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePlanningPanel === "shopping"}
+              className={`utility-panel-tab ${activePlanningPanel === "shopping" ? "utility-panel-tab-active" : ""}`}
+              onClick={() => setPlanningPanel("shopping", activePlanningPanel !== "shopping")}
+            >
+              <ShoppingBasket className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="truncate">购物清单</span>
+              <span className="text-[10px] tabular-nums opacity-70">{shoppingItems.length}</span>
+            </button>
+          </div>
+          {activePlanningPanel ? (
             <Button
               type="button"
-              size="icon-sm"
-              className="absolute right-9 top-1/2 z-10 -translate-y-1/2"
-              onClick={() => setShowAddAnnualDialog(true)}
-              aria-label="添加年度任务"
-              title="添加年度任务"
+              size="icon"
+              className="utility-panel-add shrink-0"
+              onClick={handleAddPlanningItem}
+              aria-label={activePlanningPanel === "annual" ? "添加年度任务" : "添加购物项"}
+              title={activePlanningPanel === "annual" ? "添加年度任务" : "添加购物项"}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" aria-hidden />
             </Button>
-          </div>
-          <CollapsibleContent>
-            <div className="space-y-3 rounded-2xl subtle-card p-3">
+          ) : null}
+        </div>
+
+        <section className="utility-panel utility-panel-annual">
+          <Collapsible
+            className="utility-panel-root"
+            open={activePlanningPanel === "annual"}
+            onOpenChange={(open) => setPlanningPanel("annual", open)}
+          >
+            <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
               {annualTasks.length > 0 ? (
                 <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">
                 {annualTasks.map((item) => (
@@ -2246,22 +2284,23 @@ export function TaskDashboard({
               ) : (
                 <p className="text-center text-sm text-gray-500">尚未添加年度任务。</p>
               )}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+            </CollapsibleContent>
+          </Collapsible>
+        </section>
+
+        <ShoppingList
+          variant="panel"
+          items={shoppingItems}
+          open={activePlanningPanel === "shopping"}
+          onOpenChange={(open) => setPlanningPanel("shopping", open)}
+          addDialogOpen={shoppingAddDialogOpen}
+          onAddDialogOpenChange={setShoppingAddDialogOpen}
+          onAddItem={onAddShoppingItem}
+          onToggleItem={onToggleShoppingItem}
+          onDeleteItem={onDeleteShoppingItem}
+          onReorderItem={onReorderShoppingItem}
+        />
       </div>
-
-      <Separator />
-
-      <ShoppingList
-        items={shoppingItems}
-        open={shoppingSectionOpen}
-        onOpenChange={(open) => patchUiPreferences({ shoppingSectionOpen: open })}
-        onAddItem={onAddShoppingItem}
-        onToggleItem={onToggleShoppingItem}
-        onDeleteItem={onDeleteShoppingItem}
-        onReorderItem={onReorderShoppingItem}
-      />
 
       <Separator />
 

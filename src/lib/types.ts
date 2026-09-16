@@ -141,6 +141,8 @@ export type DashboardUiPreferences = {
   shoppingSectionOpen: boolean;
   longTaskSectionOpen: boolean;
   completedSectionOpen: boolean;
+  dailyTaskSectionOpen: boolean;
+  deadlineRadarSectionOpen: boolean;
   dailyArchiveSectionOpen: boolean;
   projectSectionOpen: boolean;
   routineCheckinSectionOpen: boolean;

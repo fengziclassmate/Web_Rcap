@@ -233,17 +233,6 @@
     background: color-mix(in oklch, white 58%, transparent);
   }
 
-  .completed-library-trigger {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    border: 1px solid color-mix(in oklch, #5aa681 26%, white);
-    border-radius: 0.9rem;
-    background: linear-gradient(105deg, color-mix(in oklch, #e4f6e9 84%, white), color-mix(in oklch, white 74%, transparent));
-    padding: 0.55rem 0.65rem 0.55rem 0.75rem;
-  }
-
   .task-dashboard-section,
   .daily-task-panel {
     padding: 1.25rem 1.5rem;
@@ -333,6 +322,10 @@
     flex: 1;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.35rem;
+  }
+
+  .planning-panel-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .utility-panel-tab {

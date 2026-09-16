@@ -25,6 +25,8 @@ export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   shoppingSectionOpen: true,
   longTaskSectionOpen: true,
   completedSectionOpen: true,
+  dailyTaskSectionOpen: true,
+  deadlineRadarSectionOpen: true,
   dailyArchiveSectionOpen: false,
   projectSectionOpen: true,
   routineCheckinSectionOpen: true,
@@ -272,6 +274,10 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
       typeof value.longTaskSectionOpen === "boolean" ? value.longTaskSectionOpen : true,
     completedSectionOpen:
       typeof value.completedSectionOpen === "boolean" ? value.completedSectionOpen : true,
+    dailyTaskSectionOpen:
+      typeof value.dailyTaskSectionOpen === "boolean" ? value.dailyTaskSectionOpen : true,
+    deadlineRadarSectionOpen:
+      typeof value.deadlineRadarSectionOpen === "boolean" ? value.deadlineRadarSectionOpen : true,
     dailyArchiveSectionOpen:
       typeof value.dailyArchiveSectionOpen === "boolean" ? value.dailyArchiveSectionOpen : false,
     projectSectionOpen:

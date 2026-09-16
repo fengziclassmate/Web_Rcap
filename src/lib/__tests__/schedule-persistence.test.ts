@@ -20,6 +20,8 @@ describe("schedule UI preference persistence", () => {
       annualSectionOpen: false,
       shoppingSectionOpen: false,
       longTaskSectionOpen: false,
+      dailyTaskSectionOpen: false,
+      deadlineRadarSectionOpen: false,
       dailyArchiveSectionOpen: true,
       projectSectionOpen: false,
       routineCheckinSectionOpen: false,

@@ -131,6 +131,8 @@ describe("normalizers", () => {
     expect(normalizeDashboardUiPreferences({
       timeGranularity: "45-15",
       dailyTaskSortMode: "custom",
+      dailyTaskSectionOpen: false,
+      deadlineRadarSectionOpen: false,
       dailyArchiveSectionOpen: true,
       expandedTasks: ["a", 1],
     })).toMatchObject({
@@ -139,12 +141,16 @@ describe("normalizers", () => {
       annualSectionOpen: true,
       longTaskSectionOpen: true,
       completedSectionOpen: true,
+      dailyTaskSectionOpen: false,
+      deadlineRadarSectionOpen: false,
       dailyArchiveSectionOpen: true,
       expandedTasks: ["a"],
     });
     expect(normalizeDashboardUiPreferences({ timeGranularity: "invalid" })).toMatchObject({
       timeGranularity: 60,
       dailyTaskSortMode: "time",
+      dailyTaskSectionOpen: true,
+      deadlineRadarSectionOpen: true,
       dailyArchiveSectionOpen: false,
     });
   });

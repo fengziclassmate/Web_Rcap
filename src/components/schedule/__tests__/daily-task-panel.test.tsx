@@ -25,6 +25,55 @@ afterEach(() => {
 });
 
 describe("DailyTaskPanel completion archive", () => {
+  it("collapses daily tasks and deadline radar while keeping a scrollable task list", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 27, 15, 0));
+    const onSectionOpenChange = vi.fn();
+    const onDeadlineRadarOpenChange = vi.fn();
+
+    render(
+      <DailyTaskPanel
+        tasks={[
+          ...Array.from({ length: 8 }, (_, index) => task({
+            id: `daily-${index}`,
+            name: `日常任务 ${index + 1}`,
+          })),
+          task({
+            id: "long-deadline",
+            name: "即将截止的长期任务",
+            dueDate: "2026-07-30",
+            taskType: "long",
+          }),
+        ]}
+        events={[]}
+        onAddTask={vi.fn()}
+        onToggleTask={vi.fn()}
+        onUpdateTask={vi.fn()}
+        onRequestDeleteTask={vi.fn()}
+        onReorderTask={vi.fn()}
+        sortMode="time"
+        onSortModeChange={vi.fn()}
+        onCreateTimeBlock={vi.fn()}
+        sectionOpen
+        onSectionOpenChange={onSectionOpenChange}
+        deadlineRadarOpen={false}
+        onDeadlineRadarOpenChange={onDeadlineRadarOpenChange}
+        archivedSectionOpen={false}
+        onArchivedSectionOpenChange={vi.fn()}
+      />,
+    );
+
+    const scrollList = screen.getByTestId("daily-task-scroll-list");
+    expect(scrollList.className).toContain("max-h-72");
+    expect(scrollList.className).toContain("overflow-y-auto");
+    expect(screen.queryByText("即将截止的长期任务")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "折叠日常任务" }));
+    expect(onSectionOpenChange.mock.calls[0][0]).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "展开截止日期雷达" }));
+    expect(onDeadlineRadarOpenChange.mock.calls[0][0]).toBe(true);
+  });
+
   it("moves task actions into the context menu and recognizes recurring event links", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 6, 27, 15, 0));

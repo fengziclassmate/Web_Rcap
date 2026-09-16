@@ -2,10 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CalendarDays, CheckCircle, GripVertical, ListTodo, Plus, RotateCcw } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle, ChevronDown, GripVertical, ListTodo, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { DailyTaskSortMode, LongTask, ScheduleEvent, TaskType } from "@/lib/types";
@@ -21,6 +26,10 @@ type DailyTaskPanelProps = {
   sortMode: DailyTaskSortMode;
   onSortModeChange: (mode: DailyTaskSortMode) => void;
   onCreateTimeBlock: (task: LongTask, date: string, startHour: number, durationMinutes: number) => void;
+  sectionOpen?: boolean;
+  onSectionOpenChange?: (open: boolean) => void;
+  deadlineRadarOpen?: boolean;
+  onDeadlineRadarOpenChange?: (open: boolean) => void;
   archivedSectionOpen: boolean;
   onArchivedSectionOpenChange: (open: boolean) => void;
 };
@@ -93,6 +102,10 @@ export function DailyTaskPanel({
   sortMode,
   onSortModeChange,
   onCreateTimeBlock,
+  sectionOpen = true,
+  onSectionOpenChange = () => undefined,
+  deadlineRadarOpen = true,
+  onDeadlineRadarOpenChange = () => undefined,
   archivedSectionOpen,
   onArchivedSectionOpenChange,
 }: DailyTaskPanelProps) {
@@ -336,14 +349,19 @@ export function DailyTaskPanel({
 
   return (
     <section className="daily-task-panel">
+      <Collapsible open={sectionOpen} onOpenChange={onSectionOpenChange}>
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+        <CollapsibleTrigger
+          className="flex min-w-0 items-center gap-2 rounded-lg px-1 py-1 text-left"
+          aria-label={sectionOpen ? "折叠日常任务" : "展开日常任务"}
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-stone-900">
             <ListTodo className="h-4 w-4 text-emerald-700" aria-hidden />
             日常任务
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5">
+          </span>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${sectionOpen ? "" : "-rotate-90"}`} aria-hidden />
+        </CollapsibleTrigger>
+        {sectionOpen ? <div className="flex items-center gap-1.5">
           <div
             role="group"
             aria-label="日常任务排序方式"
@@ -380,9 +398,10 @@ export function DailyTaskPanel({
             <RotateCcw className="h-3.5 w-3.5" />
             每日收尾
           </Button>
-        </div>
+        </div> : null}
       </div>
 
+      <CollapsibleContent>
       <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_132px_auto]">
         <Input
           value={name}
@@ -417,7 +436,7 @@ export function DailyTaskPanel({
         ) : null}
       </div>
 
-      <div className="mt-3 space-y-2">
+      <div className="mt-3 max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1" data-testid="daily-task-scroll-list">
         {dailyTasks.length > 0 ? (
           dailyTasks.map((task) => (
             <article
@@ -496,6 +515,8 @@ export function DailyTaskPanel({
           </div>
         ) : null}
       </div>
+      </CollapsibleContent>
+      </Collapsible>
 
       {contextMenu && contextMenuTask && typeof document !== "undefined"
         ? createPortal(
@@ -582,14 +603,22 @@ export function DailyTaskPanel({
           )
         : null}
 
+      <Collapsible open={deadlineRadarOpen} onOpenChange={onDeadlineRadarOpenChange}>
       <div className="deadline-radar mt-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-950">
+        <CollapsibleTrigger
+          className="flex w-full items-center justify-between gap-2 rounded-md text-left"
+          aria-label={deadlineRadarOpen ? "折叠截止日期雷达" : "展开截止日期雷达"}
+        >
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-950">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-700" aria-hidden />
             截止日期雷达
-          </p>
-          <span className="text-[11px] text-amber-800">7 天内</span>
-        </div>
+          </span>
+          <span className="flex items-center gap-1.5 text-[11px] text-amber-800">
+            7 天内
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${deadlineRadarOpen ? "" : "-rotate-90"}`} aria-hidden />
+          </span>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
         {radarTasks.length > 0 ? (
           <div className="mt-2 space-y-1.5">
             {radarTasks.map(({ task, days }) => (
@@ -604,7 +633,9 @@ export function DailyTaskPanel({
         ) : (
           <p className="mt-2 text-xs text-amber-800">未来 7 天没有待处理的长期任务截止日。</p>
         )}
+        </CollapsibleContent>
       </div>
+      </Collapsible>
 
       <Dialog open={Boolean(taskForSchedule)} onOpenChange={(open) => !open && setTaskForSchedule(null)}>
         <DialogContent>

@@ -94,8 +94,9 @@ function ControlledProjectDashboard({ today }: { today: string }) {
 }
 
 describe("TaskDashboard annual section", () => {
-  it("keeps the add action in the title row before the collapse affordance", () => {
+  it("groups annual and shopping lists and places completed tasks beside long tasks", () => {
     const noop = vi.fn();
+    const onUiPreferencesChange = vi.fn();
     render(
       <TaskDashboard
         tasks={[]}
@@ -141,28 +142,92 @@ describe("TaskDashboard annual section", () => {
         onUpdateFootprint={noop}
         confirmDangerousActions={false}
         uiPreferences={{ ...defaultDashboardUiPreferences, annualSectionOpen: true }}
-        onUiPreferencesChange={noop}
+        onUiPreferencesChange={onUiPreferencesChange}
       />,
     );
 
-    const collapseTrigger = screen.getByRole("button", { name: "折叠年度任务清单" });
-    const addButton = screen.getByRole("button", { name: "添加年度任务" });
+    const planningGroup = screen.getByTestId("annual-shopping-panel-group");
+    const planningTabs = within(planningGroup).getByRole("tablist", { name: "年度任务与购物清单" });
+    expect(within(planningTabs).getByRole("tab", { name: /年度任务/ }).getAttribute("aria-selected")).toBe("true");
+    expect(within(planningTabs).getByRole("tab", { name: /购物清单/ }).getAttribute("aria-selected")).toBe("false");
 
-    expect(addButton.parentElement).toBe(collapseTrigger.parentElement);
-    expect(addButton.className).toContain("right-9");
-    expect(collapseTrigger.querySelector("svg")?.className.baseVal).toContain("right-3");
+    const addButton = screen.getByRole("button", { name: "添加年度任务" });
+    expect(planningGroup.contains(addButton)).toBe(true);
+    fireEvent.click(within(planningTabs).getByRole("tab", { name: /购物清单/ }));
+    expect(onUiPreferencesChange).toHaveBeenCalledWith(
+      expect.objectContaining({ annualSectionOpen: false, shoppingSectionOpen: true }),
+    );
+
+    const longTaskTrigger = screen.getByRole("button", { name: "折叠长期任务" });
+    const completedTaskButton = screen.getByRole("button", { name: /查看已完成任务/ });
+    expect(completedTaskButton.parentElement).toBe(longTaskTrigger.parentElement);
     expect(
-      collapseTrigger.compareDocumentPosition(screen.getByTestId("shopping-list")) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
-    expect(
-      screen.getByTestId("shopping-list").compareDocumentPosition(
+      planningGroup.compareDocumentPosition(
         screen.getByTestId("research-progress-panel"),
       ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
 
     fireEvent.click(addButton);
     expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("opens the shopping add dialog from the shared planning controls", () => {
+    const noop = vi.fn();
+    render(
+      <TaskDashboard
+        tasks={[]}
+        events={[]}
+        onToggleTask={noop}
+        onAddTask={noop}
+        onUpdateTask={noop}
+        onDeleteTask={noop}
+        onReorderTask={noop}
+        annualTasks={[]}
+        onAddAnnualTask={noop}
+        onToggleAnnualTask={noop}
+        onDeleteAnnualTask={noop}
+        onUpdateAnnualTask={noop}
+        onReorderAnnualTask={noop}
+        shoppingItems={[]}
+        onAddShoppingItem={noop}
+        onToggleShoppingItem={noop}
+        onDeleteShoppingItem={noop}
+        onReorderShoppingItem={noop}
+        logPosts={[]}
+        onCreateLogPost={vi.fn(async () => true)}
+        onOpenLogs={noop}
+        onCreateDailyTaskTimeBlock={noop}
+        projectCheckins={[]}
+        onAddProjectCheckin={noop}
+        onCheckinProject={noop}
+        onReorderProjectCheckin={noop}
+        onArchiveProjectCheckin={noop}
+        onDeleteProjectCheckin={noop}
+        onUpdateProjectCheckin={noop}
+        onUpdateRoutineCheckins={noop}
+        onUpdateProjectCheckinEntry={noop}
+        onDeleteProjectCheckinEntry={noop}
+        achievements={[]}
+        onAddAchievement={noop}
+        onUpdateAchievement={noop}
+        onDeleteAchievement={noop}
+        footprints={[]}
+        onAddFootprint={noop}
+        onResetFootprint={noop}
+        onDeleteFootprint={noop}
+        onUpdateFootprint={noop}
+        confirmDangerousActions={false}
+        uiPreferences={{
+          ...defaultDashboardUiPreferences,
+          annualSectionOpen: false,
+          shoppingSectionOpen: true,
+        }}
+        onUiPreferencesChange={noop}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "添加购物项" }));
+    expect(screen.getByRole("dialog", { name: "添加购物项" })).toBeTruthy();
   });
 
   it("prioritizes unchecked projects, collapses today's check-in, and reorders pending projects", async () => {
