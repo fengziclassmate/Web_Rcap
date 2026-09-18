@@ -34,6 +34,8 @@ export type ScheduleCategoryDef = {
   id: string;
   name: string;
   color: string;
+  hex?: string;
+  icon?: ScheduleCategoryIcon;
   sortOrder: number;
 };
 
@@ -283,11 +285,12 @@ function createDefaultCategoryDefs(): ScheduleCategoryDef[] {
   }));
 }
 
-function normalizeCategoryDefList(value: unknown): ScheduleCategoryDef[] {
+export function normalizeCategoryDefList(value: unknown): ScheduleCategoryDef[] {
   if (!Array.isArray(value) || value.length === 0) return createDefaultCategoryDefs();
   const defaults = createDefaultCategoryDefs();
   const custom = value
     .map((item, index) => {
+      if (!item || typeof item !== "object") return null;
       const raw = item as Partial<ScheduleCategoryDef>;
       const rawName = typeof raw.name === "string" ? raw.name.trim() : "";
       const name = normalizeScheduleCategory(rawName);
@@ -297,11 +300,12 @@ function normalizeCategoryDefList(value: unknown): ScheduleCategoryDef[] {
         id: typeof raw.id === "string" ? raw.id : createCategoryId(),
         name,
         color: visual.twClass,
+        ...(typeof raw.hex === "string" && /^#[0-9a-f]{6}$/i.test(raw.hex) ? { hex: raw.hex } : {}),
+        ...(CATEGORY_VISUALS.some((item) => item.icon === raw.icon) ? { icon: raw.icon } : {}),
         sortOrder: typeof raw.sortOrder === "number" ? raw.sortOrder : defaults.length + index,
       } satisfies ScheduleCategoryDef;
     })
-    .filter((item): item is ScheduleCategoryDef => Boolean(item))
-    .filter((item) => !item.id.startsWith(DEFAULT_CATEGORY_ID_PREFIX));
+    .filter((item): item is ScheduleCategoryDef => Boolean(item));
 
   const merged: ScheduleCategoryDef[] = [];
   for (const item of custom) {
@@ -376,6 +380,18 @@ export function getCategoryVisualByName(name: string) {
 
 export function getScheduleCategoryVisual(category: string) {
   return getCategoryVisualByName(category);
+}
+
+export function resolveCategoryVisual(def: Pick<ScheduleCategoryDef, "name" | "color" | "hex" | "icon">): ScheduleCategoryVisual {
+  return { ...getCategoryVisualByName(def.name), hex: def.hex ?? getCategoryVisualByClass(def.color).hex, icon: def.icon ?? getCategoryVisualByName(def.name).icon };
+}
+
+export function categoryCardStyle(hex: string) {
+  return {
+    backgroundColor: `color-mix(in srgb, ${hex} 18%, white)`,
+    borderColor: `color-mix(in srgb, ${hex} 55%, white)`,
+    color: `color-mix(in srgb, ${hex} 28%, black)`,
+  };
 }
 
 export function getScheduleCategoryColor(category: string) {

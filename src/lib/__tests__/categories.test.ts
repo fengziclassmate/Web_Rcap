@@ -8,9 +8,18 @@ import {
   getScheduleCategoryVisual,
   loadCategoryDefs,
   normalizeScheduleCategory,
+  normalizeCategoryDefList,
+  resolveCategoryVisual,
 } from "../categories";
 
 describe("schedule categories", () => {
+  it("preserves built-in appearance overrides through persistence normalization", () => {
+    const defs = normalizeCategoryDefList([{ id: "__default__0", name: "睡眠", color: CATEGORY_COLORS[0], hex: "#123456", icon: "coffee", sortOrder: 0 }]);
+    const restored = normalizeCategoryDefList(JSON.parse(JSON.stringify(defs)));
+    expect(resolveCategoryVisual(restored.find((item) => item.name === "睡眠")!)).toMatchObject({ hex: "#123456", icon: "coffee" });
+    expect(restored.filter((item) => item.name === "睡眠")).toHaveLength(1);
+  });
+
   it("keeps category visuals and color options aligned", () => {
     expect(CATEGORY_COLORS).toHaveLength(CATEGORY_VISUALS.length);
     expect(CATEGORY_COLORS[0]).toBe(CATEGORY_VISUALS[0].color);

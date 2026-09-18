@@ -167,6 +167,21 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("edits and restores the appearance of the built-in sleep category", () => {
+    renderGrid();
+    fireEvent.click(screen.getByRole("button", { name: "分类管理" }));
+    fireEvent.click(screen.getAllByTitle("编辑分类")[0]);
+    fireEvent.change(screen.getByLabelText("分类 HEX 颜色"), { target: { value: "#123456" } });
+    fireEvent.click(screen.getByRole("button", { name: "图标 coffee" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存", exact: true }));
+    const stored = JSON.parse(localStorage.getItem("schedule-user-categories")!);
+    expect(stored.find((item: { name: string }) => item.name === "睡眠")).toMatchObject({ hex: "#123456", icon: "coffee" });
+    fireEvent.click(screen.getAllByTitle("编辑分类")[0]);
+    fireEvent.click(screen.getByRole("button", { name: "恢复默认" }));
+    expect((screen.getByLabelText("分类 HEX 颜色") as HTMLInputElement).value).toBe("#6366f1");
+    expect(screen.getByRole("button", { name: "图标 moon" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("keeps the context menu focused and can link an event to a daily task", () => {
     const onCreateDailyTask = vi.fn<WeeklyTimeGridProps["onCreateDailyTask"]>(() => "task-1");
     const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();

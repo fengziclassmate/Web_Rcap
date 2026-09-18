@@ -135,6 +135,7 @@ export type FootprintItem = {
 };
 
 export type DashboardUiPreferences = {
+  categoryDefs?: import("./categories").ScheduleCategoryDef[];
   timeGranularity: 5 | 15 | 30 | 60 | "45-15" | "50-10";
   dailyTaskSortMode: DailyTaskSortMode;
   annualSectionOpen: boolean;

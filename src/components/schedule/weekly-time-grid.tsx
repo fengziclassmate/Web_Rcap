@@ -76,7 +76,8 @@ import {
   SCHEDULE_CATEGORY_GROUP_ORDER,
   UNCATEGORIZED_SCHEDULE_CATEGORY,
   createCategoryId,
-  getCategoryVisualByClass,
+  resolveCategoryVisual,
+  categoryCardStyle,
   getCategoryVisualByName,
   getScheduleCategoryAccentColor,
   getScheduleCategoryColor,
@@ -108,6 +109,8 @@ import {
 } from "@/lib/schedule-templates";
 
 type Category = {
+  hex?: string;
+  icon?: ScheduleCategoryIcon;
   id: string;
   name: string;
   color: string;
@@ -161,6 +164,8 @@ type SelectionDrag = {
 };
 
 type WeeklyTimeGridProps = {
+  savedCategoryDefs?: ScheduleCategoryDef[];
+  onCategoryDefsChange?: (defs: ScheduleCategoryDef[]) => void;
   currentWeekStart: Date;
   weekRange: string;
   events: ScheduleEvent[];
@@ -414,7 +419,7 @@ function ColorSwatch({
 }
 
 function CategorySelectLabel({ category }: { category: Category }) {
-  const visual = getCategoryVisualByName(category.name);
+  const visual = resolveCategoryVisual(category);
   return (
     <span className="flex items-center gap-2">
       <span
@@ -484,6 +489,8 @@ function buildRequirementLines(value: string) {
 }
 
 export function WeeklyTimeGrid({
+  savedCategoryDefs,
+  onCategoryDefsChange,
   currentWeekStart,
   weekRange,
   events,
@@ -542,13 +549,19 @@ export function WeeklyTimeGrid({
   const [templateWeekdays, setTemplateWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [templateStartHour, setTemplateStartHour] = useState(9);
   const [templateEndHour, setTemplateEndHour] = useState(18);
-  const [categoryDefs, setCategoryDefs] = useState<ScheduleCategoryDef[]>(() => loadCategoryDefs());
+  const [localCategoryDefs, setLocalCategoryDefs] = useState<ScheduleCategoryDef[]>(() => loadCategoryDefs());
+  const categoryDefs = savedCategoryDefs ?? localCategoryDefs;
+  function setCategoryDefs(update: (previous: ScheduleCategoryDef[]) => ScheduleCategoryDef[]) {
+    const next = update(categoryDefs);
+    setLocalCategoryDefs(next);
+    onCategoryDefsChange?.(next);
+  }
   const categories = useMemo<Category[]>(
     () =>
       categoryDefs
         .slice()
         .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((item) => ({ id: item.id, name: item.name, color: item.color })),
+        .map((item) => ({ ...item })),
     [categoryDefs],
   );
   const groupedCategories = useMemo(() => groupCategoriesByScheduleGroup(categories), [categories]);
@@ -580,6 +593,8 @@ export function WeeklyTimeGrid({
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingCategoryColor, setEditingCategoryColor] = useState(CATEGORY_VISUALS[0].twClass);
+  const [editingCategoryHex, setEditingCategoryHex] = useState("#6366f1");
+  const [editingCategoryIcon, setEditingCategoryIcon] = useState<ScheduleCategoryIcon>("moon");
   const [confirmDeleteCategoryId, setConfirmDeleteCategoryId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [createRecurrence, setCreateRecurrence] = useState<{
@@ -1364,13 +1379,19 @@ export function WeeklyTimeGrid({
   }
 
   function handleStartEditCategory(category: ScheduleCategoryDef) {
-    if (isBuiltInCategory(category)) return;
+    const visual = resolveCategoryVisual(category);
+    setEditingCategoryHex(visual.hex);
+    setEditingCategoryIcon(visual.icon);
     setEditingCategoryId(category.id);
     setEditingCategoryName(category.name);
     setEditingCategoryColor(category.color);
   }
 
   function handleSaveEditCategory(categoryId: string) {
+    if (!/^#[0-9a-f]{6}$/i.test(editingCategoryHex)) {
+      toast.error("请输入有效的 HEX 颜色，例如 #6366f1");
+      return;
+    }
     const name = normalizeCategoryName(editingCategoryName.trim());
     if (!name) {
       toast.error("分类名称不能为空");
@@ -1383,7 +1404,7 @@ export function WeeklyTimeGrid({
     const previous = categoryDefs.find((category) => category.id === categoryId);
     setCategoryDefs((prev) =>
       prev.map((category) =>
-        category.id === categoryId ? { ...category, name, color: editingCategoryColor } : category,
+        category.id === categoryId ? { ...category, name, color: editingCategoryColor, hex: editingCategoryHex, icon: editingCategoryIcon } : category,
       ),
     );
     if (previous && previous.name !== name) {
@@ -1842,7 +1863,7 @@ export function WeeklyTimeGrid({
                           const showDetails = durationHour >= 2 && !denseCard;
                           const timeLabel = formatTimelineSegmentTimeRange(visualEvent);
                           const fullTimeLabel = formatEventTimeRange(visualSourceEvent);
-                          const categoryVisual = getCategoryVisualByName(event.category);
+                          const categoryVisual = resolveCategoryVisual(categories.find((item) => item.name === normalizeCategoryName(event.category)) ?? { name: event.category, color: getScheduleCategoryColor(event.category) });
                           const segmentLabel =
                             event.segmentRole === "starts"
                               ? "跨日"
@@ -1853,7 +1874,7 @@ export function WeeklyTimeGrid({
                             <div
                               key={event.segmentId}
                               className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden border text-left text-sm shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${microCard ? "rounded-[5px]" : "rounded-lg"} ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""} ${selectedEventIds.has(event.id) ? "z-50 ring-2 ring-sky-500 shadow-[0_8px_20px_rgba(14,165,233,0.2)]" : ""}`}
-                              style={getEventStyle(visualEvent)}
+                              style={{ ...getEventStyle(visualEvent), ...categoryCardStyle(categoryVisual.hex) }}
                               data-density={microCard ? "micro" : compactCard ? "compact" : "regular"}
                               data-schedule-card
                               data-schedule-event-id={event.id}
@@ -1878,6 +1899,7 @@ export function WeeklyTimeGrid({
                               onContextMenu={(mouseEvent) => handleContextMenu(mouseEvent, event.id)}
                             >
                               <div
+                                style={{ backgroundColor: categoryVisual.hex }}
                                 className={`pointer-events-none absolute rounded-full ${microCard ? "inset-y-0.5 left-0.5 w-0.5" : "inset-y-1 left-1 w-1"} ${getCategoryAccentColor(event.category)} ${event.isCompleted ? "opacity-80" : "opacity-95"}`}
                               />
                               {event.isCompleted ? (
@@ -2159,6 +2181,7 @@ export function WeeklyTimeGrid({
                             const sourceEvent = toSourceScheduleEvent(event);
                             const timeLabel = formatTimelineSegmentTimeRange(event);
                             const fullTimeLabel = formatEventTimeRange(sourceEvent);
+                            const monthVisual = resolveCategoryVisual(categories.find((item) => item.name === normalizeCategoryName(event.category)) ?? { name: event.category, color: getScheduleCategoryColor(event.category) });
                             const segmentLabel =
                               event.segmentRole === "starts"
                                 ? "跨日"
@@ -2171,12 +2194,14 @@ export function WeeklyTimeGrid({
                                 key={event.segmentId}
                                 className={`relative cursor-pointer overflow-hidden rounded border px-2 py-1 text-xs ${getCategoryColor(categories, event.category)}`}
                                 title={`${event.title} (${fullTimeLabel})`}
+                                style={categoryCardStyle(monthVisual.hex)}
                                 onClick={() => handleOpenEdit(sourceEvent)}
                               >
                                 {event.isCompleted ? (
                                   <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent_0px,transparent_6px,rgba(68,64,60,0.18)_6px,rgba(68,64,60,0.18)_7px)]" />
                                 ) : null}
                                 <div className="relative z-10 flex min-w-0 items-center gap-1">
+                                  <CategoryIcon visual={monthVisual} className="h-3 w-3 shrink-0" />
                                   {event.isCompleted ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> : null}
                                   <span className="shrink-0 text-[10px] font-semibold text-gray-600">{timeLabel}</span>
                                   {segmentLabel ? (
@@ -3133,7 +3158,7 @@ export function WeeklyTimeGrid({
                           {SCHEDULE_CATEGORY_GROUP_LABELS[group]}
                         </p>
                         {groupItems.map((category) => {
-                        const visual = getCategoryVisualByClass(category.color);
+                        const visual = resolveCategoryVisual(category);
                         const builtIn = isBuiltInCategory(category);
                         const eventCount = getCategoryUsageCount(category.name);
                         const isEditing = editingCategoryId === category.id;
@@ -3150,6 +3175,7 @@ export function WeeklyTimeGrid({
                             {isEditing ? (
                               <div className="space-y-3">
                                 <Input
+                                  disabled={builtIn}
                                   value={editingCategoryName}
                                   onChange={(event) => setEditingCategoryName(event.target.value)}
                                   onKeyDown={(event) => {
@@ -3162,13 +3188,27 @@ export function WeeklyTimeGrid({
                                     <ColorSwatch
                                       key={item.hex}
                                       visual={item}
-                                      selected={editingCategoryColor === item.twClass}
-                                      onClick={() => setEditingCategoryColor(item.twClass)}
+                                      selected={editingCategoryHex === item.hex}
+                                      onClick={() => { setEditingCategoryColor(item.twClass); setEditingCategoryHex(item.hex); }}
                                       size="sm"
                                     />
                                   ))}
                                 </div>
+                                <div className="flex items-center gap-2">
+                                  <input aria-label="自选分类颜色" type="color" value={/^#[0-9a-f]{6}$/i.test(editingCategoryHex) ? editingCategoryHex : "#6366f1"} onChange={(event) => setEditingCategoryHex(event.target.value)} className="h-9 w-12 cursor-pointer" />
+                                  <Input aria-label="分类 HEX 颜色" value={editingCategoryHex} onChange={(event) => setEditingCategoryHex(event.target.value)} maxLength={7} />
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {(Object.entries(categoryIconMap) as [ScheduleCategoryIcon, LucideIcon][]).map(([key, Icon]) => (
+                                    <button key={key} type="button" aria-label={`图标 ${key}`} aria-pressed={editingCategoryIcon === key} onClick={() => setEditingCategoryIcon(key)} className={`rounded-lg border p-2 ${editingCategoryIcon === key ? "border-stone-800 bg-stone-200" : "border-stone-200 bg-white"}`}><Icon className="h-4 w-4" /></button>
+                                  ))}
+                                </div>
+                                <div className="flex items-center gap-2 rounded-lg border border-l-4 p-3" style={{ ...categoryCardStyle(/^#[0-9a-f]{6}$/i.test(editingCategoryHex) ? editingCategoryHex : visual.hex), borderLeftColor: editingCategoryHex }}>
+                                  <CategoryIcon visual={{ ...visual, icon: editingCategoryIcon }} className="h-4 w-4" />
+                                  <span className="text-sm font-medium">{editingCategoryName}</span><span className="ml-auto text-xs">09:00–10:00</span>
+                                </div>
                                 <div className="flex justify-end gap-2">
+                                  <Button type="button" size="sm" variant="ghost" onClick={() => { const defaults = getCategoryVisualByName(category.name); setEditingCategoryHex(defaults.hex); setEditingCategoryColor(defaults.twClass); setEditingCategoryIcon(defaults.icon); }}>恢复默认</Button>
                                   <Button type="button" size="sm" variant="outline" onClick={() => setEditingCategoryId(null)}>
                                     取消
                                   </Button>
@@ -3195,7 +3235,7 @@ export function WeeklyTimeGrid({
                                   </div>
                                   <p className="mt-0.5 text-xs text-stone-500">{eventCount} 个行程正在使用</p>
                                 </div>
-                                {builtIn ? null : (
+                                {(
                                   <div className="flex shrink-0 gap-1">
                                     <Button
                                       type="button"
@@ -3210,6 +3250,7 @@ export function WeeklyTimeGrid({
                                       type="button"
                                       size="icon-sm"
                                       variant="ghost"
+                                      disabled={builtIn}
                                       className="text-red-600 hover:bg-red-50"
                                       onClick={() => setConfirmDeleteCategoryId(category.id)}
                                       title="删除分类"

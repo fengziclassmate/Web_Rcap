@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { normalizeCategoryDefList } from "./categories";
 import type { RecurrenceConfig, RecurrenceInstanceOverride } from "@/lib/recurrence";
 import type {
   AnnualTask,
@@ -262,6 +263,7 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
   if (!payload || typeof payload !== "object") return defaultDashboardUiPreferences;
   const value = payload as Partial<DashboardUiPreferences>;
   return {
+    ...(Array.isArray(value.categoryDefs) ? { categoryDefs: normalizeCategoryDefList(value.categoryDefs) } : {}),
     timeGranularity: validTimeGranularities.has(value.timeGranularity as DashboardUiPreferences["timeGranularity"])
       ? value.timeGranularity as DashboardUiPreferences["timeGranularity"]
       : 60,

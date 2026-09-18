@@ -1432,6 +1432,8 @@ export function WorkbenchApp() {
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(340px,380px)] gap-4">
               <section className="min-h-0">
                 <WeeklyTimeGrid
+                  savedCategoryDefs={dashboardUiPreferences.categoryDefs}
+                  onCategoryDefsChange={(categoryDefs) => setDashboardUiPreferences((previous) => ({ ...previous, categoryDefs }))}
                   currentWeekStart={currentWeekStart}
                   weekRange={displayRangeLabel}
                   events={events}
