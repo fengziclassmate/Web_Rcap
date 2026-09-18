@@ -167,12 +167,51 @@ describe("updateRecurrenceFuture", () => {
 });
 
 describe("daily task links", () => {
+  it("moves a linked daily task to the rescheduled event date", () => {
+    const result = updateTasksLinkedToScheduleEvent(
+      [
+        {
+          id: "task-1",
+          name: "原日常任务",
+          dueDate: "2026-05-01",
+          done: false,
+          completedAt: null,
+        },
+        {
+          id: "task-2",
+          name: "其他任务",
+          dueDate: "2026-05-01",
+          done: false,
+          completedAt: null,
+        },
+      ],
+      new Set(["task-1"]),
+      { date: "2026-05-03" },
+      "2026-05-01T11:00:00.000Z",
+    );
+
+    expect(result[0].dueDate).toBe("2026-05-03");
+    expect(result[1].dueDate).toBe("2026-05-01");
+  });
+
   it("renames a completed linked task without reopening it", () => {
     const completedAt = "2026-05-01T10:00:00.000Z";
     const result = updateTasksLinkedToScheduleEvent(
       [
-        { id: "task-1", name: "原任务名称", done: true, completedAt },
-        { id: "task-2", name: "其他任务", done: false, completedAt: null },
+        {
+          id: "task-1",
+          name: "原任务名称",
+          dueDate: "2026-05-01",
+          done: true,
+          completedAt,
+        },
+        {
+          id: "task-2",
+          name: "其他任务",
+          dueDate: "2026-05-02",
+          done: false,
+          completedAt: null,
+        },
       ],
       new Set(["task-1"]),
       { title: "修改后的任务名称" },
@@ -182,6 +221,7 @@ describe("daily task links", () => {
     expect(result[0]).toEqual({
       id: "task-1",
       name: "修改后的任务名称",
+      dueDate: "2026-05-01",
       done: true,
       completedAt,
     });

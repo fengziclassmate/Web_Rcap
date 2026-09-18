@@ -1235,7 +1235,12 @@ export function WorkbenchApp() {
   ) {
     const isCompleted = patch.isCompleted;
     const title = patch.title;
-    if (typeof isCompleted === "boolean" || typeof title === "string") {
+    const date = patch.date;
+    if (
+      typeof isCompleted === "boolean"
+      || typeof title === "string"
+      || typeof date === "string"
+    ) {
       const linkedTaskIds = new Set(
         getLinkedDailyTaskIdsForEventUpdate(
           events,
@@ -1249,7 +1254,7 @@ export function WorkbenchApp() {
           updateTasksLinkedToScheduleEvent(
             prev,
             linkedTaskIds,
-            { title, isCompleted },
+            { title, date, isCompleted },
             new Date().toISOString(),
           ),
         );

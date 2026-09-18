@@ -323,6 +323,7 @@ export function unlinkDailyTaskFromEvents<T extends ExpandableScheduleEvent>(
 type LinkedScheduleTask = {
   id: string;
   name: string;
+  dueDate: string;
   done: boolean;
   completedAt?: string | null;
 };
@@ -330,18 +331,20 @@ type LinkedScheduleTask = {
 export function updateTasksLinkedToScheduleEvent<T extends LinkedScheduleTask>(
   tasks: T[],
   linkedTaskIds: ReadonlySet<string>,
-  patch: Partial<Pick<ExpandableScheduleEvent, "title" | "isCompleted">>,
+  patch: Partial<Pick<ExpandableScheduleEvent, "title" | "date" | "isCompleted">>,
   completedAt: string,
 ): T[] {
   const hasTitleUpdate = typeof patch.title === "string";
+  const hasDateUpdate = typeof patch.date === "string";
   const hasCompletionUpdate = typeof patch.isCompleted === "boolean";
-  if (!hasTitleUpdate && !hasCompletionUpdate) return tasks;
+  if (!hasTitleUpdate && !hasDateUpdate && !hasCompletionUpdate) return tasks;
 
   return tasks.map((task) => {
     if (!linkedTaskIds.has(task.id)) return task;
     return {
       ...task,
       ...(hasTitleUpdate ? { name: patch.title } : {}),
+      ...(hasDateUpdate ? { dueDate: patch.date } : {}),
       ...(hasCompletionUpdate
         ? {
             done: patch.isCompleted,
