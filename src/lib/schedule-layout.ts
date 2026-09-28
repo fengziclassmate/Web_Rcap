@@ -178,7 +178,7 @@ export function splitScheduleEventByDay<TEvent extends ScheduleEvent>(
       segments.push({ ...event, ...segmentBase, startHour, endHour,
         segmentId: `${event.id}::${date}::${date === event.date ? "starts" : "continues"}`,
         displayDate: date, segmentRole: date === event.date ? "starts" : "continues",
-        continuesFromPreviousDay: date !== event.date, continuesToNextDay: date < event.endDate,
+        continuesFromPreviousDay: date !== event.date, continuesToNextDay: date < event.endDate && !(event.endHour === 0 && addDaysToIsoDate(date, 1) === event.endDate),
       });
     }
     return segments;

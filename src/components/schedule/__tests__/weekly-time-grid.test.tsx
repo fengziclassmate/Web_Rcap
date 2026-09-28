@@ -167,6 +167,25 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("moves a multi-day event without requiring an empty multi-day slot", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, endDate: "2026-07-30", startHour: 9, endHour: 10 }], onUpdateEvent });
+    const card = container.querySelector("[data-schedule-card]");
+    const slot = Array.from(container.querySelectorAll("button")).find((button) => !button.textContent?.trim() && !button.getAttribute("aria-label"));
+    fireEvent.dragStart(card!);
+    fireEvent.drop(slot!);
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, { date: "2026-07-27", endDate: "2026-07-30", startHour: 0, endHour: 1 });
+  });
+  it("resizes only the outer boundaries of a multi-day event", () => {
+    const onUpdateEvent = vi.fn();
+    renderGrid({ events: [{ ...scheduleEvent, endDate: "2026-07-30", startHour: 9, endHour: 10 }], onUpdateEvent });
+    expect(screen.getAllByRole("button", { name: `调整 ${scheduleEvent.title} 的开始时间` })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: `调整 ${scheduleEvent.title} 的结束时间` })).toHaveLength(1);
+    fireEvent.mouseDown(screen.getByRole("button", { name: `调整 ${scheduleEvent.title} 的结束时间` }), { clientY: 100 });
+    fireEvent.mouseMove(window, { clientY: 136 });
+    fireEvent.mouseUp(window);
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, { startHour: 9, endHour: 10.5, endDate: "2026-07-30" }, undefined);
+  });
   it("creates a multi-day event at the occupied card time without shifting it", () => {
     const { rerenderGrid } = renderGrid({ events: [scheduleEvent] });
     const onCreateEvent = vi.fn();

@@ -133,6 +133,8 @@ type EventFormState = {
 };
 
 type ResizeState = {
+  endDate?: string;
+  multiDay: boolean;
   eventId: string;
   startY: number;
   initialHour: number;
@@ -143,6 +145,7 @@ type ResizeState = {
 };
 
 type ResizePreview = {
+  endDate?: string;
   eventId: string;
   startHour: number;
   endHour: number;
@@ -523,6 +526,7 @@ export function WeeklyTimeGrid({
   const [editDetailsOpen, setEditDetailsOpen] = useState(false);
   const [editScope, setEditScope] = useState<"occurrence" | "future">("occurrence");
   const draggingEventIdRef = useRef<string | null>(null);
+  const draggingSegmentDateRef = useRef<string | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
   const resizePreviewRef = useRef<ResizePreview | null>(null);
@@ -1283,6 +1287,18 @@ export function WeeklyTimeGrid({
     if (!source || !dragCollisionSearchThroughDate) return;
 
     const duration = getScheduleEventDurationHour(source);
+    if (source.endDate && source.endDate > source.date) {
+      const dayOffset = Math.round((Date.parse(targetDate) - Date.parse(draggingSegmentDateRef.current ?? source.date)) / 86400000);
+      const hourOffset = targetHour - (draggingSegmentDateRef.current && draggingSegmentDateRef.current !== source.date ? 0 : source.startHour);
+      const start = addDays(parse(source.date, "yyyy-MM-dd", new Date()), dayOffset);
+      start.setMinutes(Math.round((source.startHour + hourOffset) * 60));
+      const end = new Date(start);
+      end.setMinutes(end.getMinutes() + Math.round(duration * 60));
+      onUpdateEvent(source.id, { date: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd"), startHour: start.getHours() + start.getMinutes() / 60, endHour: end.getHours() + end.getMinutes() / 60 });
+      draggingEventIdRef.current = null;
+      draggingSegmentDateRef.current = null;
+      return;
+    }
     const nextSlot = findNextAvailableScheduleSlot({
       events: expandedEvents,
       excludeEventId: source.id,
@@ -1450,12 +1466,15 @@ export function WeeklyTimeGrid({
     const initialHour = direction === "start" ? event.startHour : event.endHour;
     const preview = {
       eventId: event.id,
+      ...(event.endDate ? { endDate: event.endDate } : {}),
       startHour: event.startHour,
       endHour: event.endHour,
     };
     resizePreviewRef.current = preview;
     setResizePreview(preview);
     setResizeState({
+      endDate: event.endDate,
+      multiDay: Boolean(event.endDate && event.endDate > event.date),
       eventId: event.id,
       startY: mouseEvent.clientY,
       initialHour,
@@ -1576,6 +1595,13 @@ export function WeeklyTimeGrid({
     function handleMouseMove(event: MouseEvent) {
       const deltaHour = (event.clientY - activeResize.startY) / hourCellHeight;
       const snap = (value: number) => Math.round(value / resizeStepHour) * resizeStepHour;
+      if (activeResize.multiDay) {
+        const hour = Math.max(0, Math.min(activeResize.direction === "start" ? 24 - resizeStepHour : 24, snap(activeResize.initialHour + deltaHour)));
+        const preview = { eventId: activeResize.eventId, endDate: activeResize.endDate, startHour: activeResize.direction === "start" ? hour : activeResize.startHour, endHour: activeResize.direction === "end" ? hour : activeResize.endHour };
+        resizePreviewRef.current = preview;
+        setResizePreview(preview);
+        return;
+      }
       if (activeResize.direction === "end") {
         const nextEndHour = activeResize.crossesMidnight
           ? Math.max(
@@ -1594,6 +1620,7 @@ export function WeeklyTimeGrid({
             );
         const preview = {
           eventId: activeResize.eventId,
+          ...(activeResize.endDate ? { endDate: activeResize.endDate } : {}),
           startHour: activeResize.startHour,
           endHour: nextEndHour,
         };
@@ -1619,6 +1646,7 @@ export function WeeklyTimeGrid({
           );
       const preview = {
         eventId: activeResize.eventId,
+        ...(activeResize.endDate ? { endDate: activeResize.endDate } : {}),
         startHour: nextStartHour,
         endHour: activeResize.endHour,
       };
@@ -1631,7 +1659,7 @@ export function WeeklyTimeGrid({
       if (preview) {
         onUpdateEvent(
           preview.eventId,
-          { startHour: preview.startHour, endHour: preview.endHour },
+          { startHour: preview.startHour, endHour: preview.endHour, ...(preview.endDate ? { endDate: preview.endDate } : {}) },
           parseSyntheticEventId(preview.eventId) ? { scope: "occurrence" } : undefined,
         );
       }
@@ -1858,7 +1886,9 @@ export function WeeklyTimeGrid({
                             resizePreview?.eventId === event.id ? resizePreview : null;
                           const visualEvent =
                             activePreview
-                              ? event.segmentRole === "starts"
+                              ? sourceEvent.endDate
+                                ? { ...event, startHour: event.continuesFromPreviousDay ? event.startHour : activePreview.startHour, endHour: event.continuesToNextDay ? event.endHour : activePreview.endHour }
+                                : event.segmentRole === "starts"
                                 ? { ...event, startHour: activePreview.startHour }
                                 : event.segmentRole === "continues"
                                   ? { ...event, endHour: activePreview.endHour }
@@ -1875,7 +1905,7 @@ export function WeeklyTimeGrid({
                                 endHour: activePreview.endHour,
                               }
                             : sourceEvent;
-                          const durationHour = getScheduleEventDurationHour(visualEvent);
+                          const durationHour = visualEvent.endHour - visualEvent.startHour;
                           const denseCard = event.laneCount > 1;
                           const microCard = durationHour <= 0.25 + Number.EPSILON;
                           const compactCard = durationHour < 0.55;
@@ -1901,6 +1931,7 @@ export function WeeklyTimeGrid({
                               draggable={resizeState?.eventId !== event.id}
                               onDragStart={() => {
                                 draggingEventIdRef.current = event.id;
+                                draggingSegmentDateRef.current = event.displayDate;
                               }}
                               onDragEnd={() => {
                                 draggingEventIdRef.current = null;
@@ -2090,7 +2121,7 @@ export function WeeklyTimeGrid({
                                 </div>
                               </button>
 
-                              {sourceEvent.endDate || event.segmentRole === "continues" ? null : (
+                              {event.continuesFromPreviousDay ? null : (
                                   <button
                                     type="button"
                                     data-resize-handle
@@ -2108,7 +2139,7 @@ export function WeeklyTimeGrid({
                                     <span className={`absolute left-1/2 top-0.5 h-0.5 -translate-x-1/2 rounded-full bg-stone-700/45 ${microCard ? "w-4" : "w-8"}`} />
                                   </button>
                               )}
-                              {sourceEvent.endDate || event.segmentRole === "starts" ? null : (
+                              {event.continuesToNextDay ? null : (
                                   <button
                                     type="button"
                                     data-resize-handle
@@ -2119,7 +2150,7 @@ export function WeeklyTimeGrid({
                                           ? "bottom-0 right-2 h-1.5 w-1/3 max-w-10"
                                           : "inset-x-4 bottom-0 h-2"
                                     }`}
-                                    onMouseDown={(mouseEvent) => startEventResize(mouseEvent, sourceEvent, "end")}
+                                    onMouseDown={(mouseEvent) => startEventResize(mouseEvent, sourceEvent.endDate && sourceEvent.endHour === 0 ? { ...sourceEvent, endDate: event.displayDate, endHour: 24 } : sourceEvent, "end")}
                                     aria-label={`调整 ${event.title} 的结束时间`}
                                     title="拖动调整结束时间"
                                   >
