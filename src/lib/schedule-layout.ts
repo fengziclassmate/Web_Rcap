@@ -53,8 +53,9 @@ function isCrossDayScheduleEvent(event: Pick<ScheduleEvent, "startHour" | "endHo
 }
 
 export function getScheduleEventDurationHour(
-  event: Pick<ScheduleEvent, "startHour" | "endHour">,
+  event: Pick<ScheduleEvent, "startHour" | "endHour"> & Partial<Pick<ScheduleEvent, "date" | "endDate">>,
 ) {
+  if (event.date && event.endDate) return (isoDateToDayNumber(event.endDate) - isoDateToDayNumber(event.date)) * 24 + event.endHour - event.startHour;
   if (event.endHour > event.startHour) return event.endHour - event.startHour;
   if (event.endHour < event.startHour) return dayHourCount - event.startHour + event.endHour;
   return 0;
@@ -123,9 +124,10 @@ export function findNextAvailableScheduleSlot({
 
   return {
     date: dayNumberToIsoDate(startDayNumber),
+    ...(durationHour >= 24 ? { endDate: dayNumberToIsoDate(Math.floor(candidateEnd / minutesPerDay)) } : {}),
     startHour: startMinuteOfDay / minutesPerHour,
     endHour:
-      endMinuteOfDay <= minutesPerDay
+      durationHour >= 24 ? (candidateEnd % minutesPerDay) / minutesPerHour : endMinuteOfDay <= minutesPerDay
         ? endMinuteOfDay / minutesPerHour
         : (endMinuteOfDay - minutesPerDay) / minutesPerHour,
   };
@@ -167,6 +169,20 @@ export function splitScheduleEventByDay<TEvent extends ScheduleEvent>(
   event: TEvent,
 ): ScheduleEventSegment<TEvent>[] {
   const segmentBase = getSegmentBase(event);
+  if (event.endDate && event.endDate > event.date) {
+    const segments: ScheduleEventSegment<TEvent>[] = [];
+    for (let date = event.date; date <= event.endDate; date = addDaysToIsoDate(date, 1)) {
+      const startHour = date === event.date ? event.startHour : 0;
+      const endHour = date === event.endDate ? event.endHour : 24;
+      if (endHour <= startHour) continue;
+      segments.push({ ...event, ...segmentBase, startHour, endHour,
+        segmentId: `${event.id}::${date}::${date === event.date ? "starts" : "continues"}`,
+        displayDate: date, segmentRole: date === event.date ? "starts" : "continues",
+        continuesFromPreviousDay: date !== event.date, continuesToNextDay: date < event.endDate,
+      });
+    }
+    return segments;
+  }
   if (!isCrossDayScheduleEvent(event)) {
     return [
       {

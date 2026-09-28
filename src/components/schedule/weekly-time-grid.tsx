@@ -296,7 +296,8 @@ function formatHour(hour: number) {
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 }
 
-function formatEventTimeRange(event: Pick<ScheduleEvent, "startHour" | "endHour">) {
+function formatEventTimeRange(event: Pick<ScheduleEvent, "startHour" | "endHour"> & Partial<Pick<ScheduleEvent, "date" | "endDate">>) {
+  if (event.endDate && event.endDate !== event.date) return `${event.date} ${formatHour(event.startHour)} – ${event.endDate} ${formatHour(event.endHour)}`;
   const endLabel =
     event.endHour < event.startHour ? `次日 ${formatHour(event.endHour)}` : formatHour(event.endHour);
   return `${formatHour(event.startHour)}-${endLabel}`;
@@ -514,6 +515,8 @@ export function WeeklyTimeGrid({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [selectedCell, setSelectedCell] = useState<GridCell | null>(null);
+  const [createEndDate, setCreateEndDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState("");
   const [createForm, setCreateForm] = useState<EventFormState>(defaultForm);
   const [createDetailsOpen, setCreateDetailsOpen] = useState(false);
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
@@ -960,8 +963,11 @@ export function WeeklyTimeGrid({
     return resolveFormTimeRange(startHour, endHour);
   }
 
-  function resetCreateDialog(cell: GridCell) {
-    const { startHour, endHour } = getDefaultCreateTimeRange(cell);
+  function resetCreateDialog(cell: GridCell, allowOverlap = false) {
+    setCreateEndDate("");
+    const { startHour, endHour } = allowOverlap
+      ? resolveFormTimeRange(cell.startHour, Math.min(24, cell.startHour + (timeGridSlots.find((slot) => Math.abs(slot.startHour - cell.startHour) < 0.0001)?.durationMinutes ?? 60) / 60))
+      : getDefaultCreateTimeRange(cell);
     setSelectedCell({ ...cell, startHour });
     const day = parse(cell.date, "yyyy-MM-dd", new Date());
     setCreateForm({
@@ -1128,6 +1134,7 @@ export function WeeklyTimeGrid({
   }
 
   function handleOpenEdit(event: ScheduleEvent) {
+    setEditEndDate(event.endDate ?? "");
     setEditingEventId(event.id);
     setEditDetailsOpen(false);
     setEditRecurrenceOpen(false);
@@ -1146,6 +1153,12 @@ export function WeeklyTimeGrid({
 
   function handleCreateEvent(alsoCreateDailyTask = false) {
     if (!selectedCell || !createForm.title.trim()) return;
+    if (createEndDate && (createEndDate < selectedCell.date || (createEndDate === selectedCell.date && createForm.endHour <= createForm.startHour))) {
+      toast.error("结束时间必须晚于开始时间"); return;
+    }
+    if (createEndDate > selectedCell.date && createRecurrence.enabled) {
+      toast.error("连续多日行程请先关闭循环行程"); return;
+    }
 
     const { startHour, endHour } = resolveFormTimeRange(createForm.startHour, createForm.endHour);
 
@@ -1161,8 +1174,9 @@ export function WeeklyTimeGrid({
     const baseEvent: ScheduleEvent = {
       id: createId("event"),
       date: selectedCell.date,
+      ...(createEndDate > selectedCell.date ? { endDate: createEndDate } : {}),
       startHour,
-      endHour,
+      endHour: createEndDate > selectedCell.date ? createForm.endHour : endHour,
       title: createForm.title.trim(),
       notes: createForm.notes.trim(),
       requirements: buildRequirementLines(createForm.requirements),
@@ -1202,9 +1216,10 @@ export function WeeklyTimeGrid({
   function buildEditPatch(): Partial<ScheduleEvent> {
     const { startHour, endHour } = resolveFormTimeRange(editForm.startHour, editForm.endHour);
     return {
+      ...(!parseSyntheticEventId(selectedEvent?.id ?? "") ? { endDate: selectedEvent && editEndDate > selectedEvent.date ? editEndDate : undefined } : {}),
       title: editForm.title.trim(),
       startHour,
-      endHour,
+      endHour: editEndDate && selectedEvent && editEndDate > selectedEvent.date ? editForm.endHour : endHour,
       notes: editForm.notes.trim(),
       requirements: buildRequirementLines(editForm.requirements),
       ...(selectedEvent && editForm.isCompleted !== selectedEvent.isCompleted
@@ -1217,6 +1232,9 @@ export function WeeklyTimeGrid({
 
   function handleSaveEdit() {
     if (!selectedEvent || !editForm.title.trim()) return;
+    if (editEndDate && (editEndDate < selectedEvent.date || (editEndDate === selectedEvent.date && editForm.endHour <= editForm.startHour))) {
+      toast.error("结束时间必须晚于开始时间"); return;
+    }
 
     const patch = buildEditPatch();
 
@@ -1284,6 +1302,7 @@ export function WeeklyTimeGrid({
       source.id,
       {
         date: nextSlot.date,
+        ...(source.endDate || nextSlot.endDate ? { endDate: nextSlot.endDate ?? format(addDays(parse(nextSlot.date, "yyyy-MM-dd", new Date()), nextSlot.endHour < nextSlot.startHour ? 1 : 0), "yyyy-MM-dd") } : {}),
         startHour: nextSlot.startHour,
         endHour: nextSlot.endHour,
       },
@@ -1320,7 +1339,8 @@ export function WeeklyTimeGrid({
     if (target) {
       const duration = getScheduleEventDurationHour(target);
       onUpdateEvent(eventId, {
-        endHour: getEndHourFromStartAndDuration(target.startHour, duration + 1),
+        ...(target.endDate ? { endDate: format(addDays(parse(target.endDate, "yyyy-MM-dd", new Date()), Math.floor((target.endHour + 1) / 24)), "yyyy-MM-dd") } : {}),
+        endHour: target.endDate ? (target.endHour + 1) % 24 : getEndHourFromStartAndDuration(target.startHour, duration + 1),
       });
     }
     closeContextMenu();
@@ -2070,7 +2090,7 @@ export function WeeklyTimeGrid({
                                 </div>
                               </button>
 
-                              {event.segmentRole === "continues" ? null : (
+                              {sourceEvent.endDate || event.segmentRole === "continues" ? null : (
                                   <button
                                     type="button"
                                     data-resize-handle
@@ -2088,7 +2108,7 @@ export function WeeklyTimeGrid({
                                     <span className={`absolute left-1/2 top-0.5 h-0.5 -translate-x-1/2 rounded-full bg-stone-700/45 ${microCard ? "w-4" : "w-8"}`} />
                                   </button>
                               )}
-                              {event.segmentRole === "starts" ? null : (
+                              {sourceEvent.endDate || event.segmentRole === "starts" ? null : (
                                   <button
                                     type="button"
                                     data-resize-handle
@@ -2114,7 +2134,7 @@ export function WeeklyTimeGrid({
                                   onClick={(mouseEvent) => {
                                     mouseEvent.stopPropagation();
                                     setSelectedExpenseDateIso(event.displayDate);
-                                    resetCreateDialog({ date: event.displayDate, startHour: event.startHour });
+                                    resetCreateDialog({ date: event.displayDate, startHour: event.startHour }, true);
                                   }}
                                   aria-label={`在 ${event.title} 同时段新建行程`}
                                 >
@@ -2520,6 +2540,7 @@ export function WeeklyTimeGrid({
                     onStartHourChange={(value) => setCreateForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setCreateForm((prev) => ({ ...prev, endHour: value }))}
                   />
+                  <label className="flex items-center gap-3 text-sm">结束日期<Input aria-label="新建行程结束日期" type="date" min={selectedCell.date} value={createEndDate || selectedCell.date} onChange={(event) => setCreateEndDate(event.target.value)} /></label>
                   <Collapsible
                     open={createDetailsOpen}
                     onOpenChange={setCreateDetailsOpen}
@@ -2674,6 +2695,7 @@ export function WeeklyTimeGrid({
                     onStartHourChange={(value) => setEditForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setEditForm((prev) => ({ ...prev, endHour: value }))}
                   />
+                  {!parseSyntheticEventId(selectedEvent.id) && !selectedEvent.recurrence ? <label className="flex items-center gap-3 text-sm">结束日期<Input aria-label="编辑行程结束日期" type="date" min={selectedEvent.date} value={editEndDate || selectedEvent.date} onChange={(event) => setEditEndDate(event.target.value)} /></label> : null}
                   <Collapsible
                     open={editDetailsOpen}
                     onOpenChange={setEditDetailsOpen}

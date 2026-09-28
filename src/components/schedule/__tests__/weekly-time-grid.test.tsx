@@ -167,13 +167,23 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("creates a multi-day event at the occupied card time without shifting it", () => {
+    const { rerenderGrid } = renderGrid({ events: [scheduleEvent] });
+    const onCreateEvent = vi.fn();
+    rerenderGrid({ onCreateEvent });
+    fireEvent.click(screen.getByRole("button", { name: `在 ${scheduleEvent.title} 同时段新建行程` }));
+    fireEvent.change(screen.getByPlaceholderText("输入行程标题"), { target: { value: "连续出差" } });
+    fireEvent.change(screen.getByLabelText("新建行程结束日期"), { target: { value: "2026-07-30" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建行程" }));
+    expect(onCreateEvent).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-07-27", endDate: "2026-07-30", startHour: 9, title: "连续出差" }));
+  });
   it("edits and restores the appearance of the built-in sleep category", () => {
     renderGrid();
     fireEvent.click(screen.getByRole("button", { name: "分类管理" }));
     fireEvent.click(screen.getAllByTitle("编辑分类")[0]);
     fireEvent.change(screen.getByLabelText("分类 HEX 颜色"), { target: { value: "#123456" } });
     fireEvent.click(screen.getByRole("button", { name: "图标 coffee" }));
-    fireEvent.click(screen.getByRole("button", { name: "保存", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
     const stored = JSON.parse(localStorage.getItem("schedule-user-categories")!);
     expect(stored.find((item: { name: string }) => item.name === "睡眠")).toMatchObject({ hex: "#123456", icon: "coffee" });
     fireEvent.click(screen.getAllByTitle("编辑分类")[0]);

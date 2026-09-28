@@ -370,6 +370,7 @@ export function normalizeEvents(payload: unknown): ScheduleEvent[] {
     return {
       id: value.id ?? `event-restored-${index}`,
       date: value.date ?? format(new Date(), "yyyy-MM-dd"),
+      ...(typeof value.endDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.endDate) && value.endDate >= (value.date ?? "") ? { endDate: value.endDate } : {}),
       startHour: typeof value.startHour === "number" ? value.startHour : 9,
       endHour: typeof value.endHour === "number" ? value.endHour : 10,
       title: value.title ?? "\u672a\u547d\u540d\u884c\u7a0b",

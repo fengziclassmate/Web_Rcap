@@ -27,6 +27,11 @@ function event(patch: Partial<ExpandableScheduleEvent> = {}): ExpandableSchedule
 }
 
 describe("expandScheduleEvents", () => {
+  it("includes a multi-day event that started before the visible week", () => {
+    const source = event({ date: "2026-05-01", endDate: "2026-05-10" });
+    expect(expandScheduleEvents([source], "2026-05-04", "2026-05-08")).toEqual([source]);
+    expect(expandScheduleEvents([source], "2026-05-11", "2026-05-17")).toEqual([]);
+  });
   it("returns non-recurring events inside the range", () => {
     const result = expandScheduleEvents([event()], "2026-05-01", "2026-05-07");
     expect(result).toHaveLength(1);

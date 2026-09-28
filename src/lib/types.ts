@@ -5,6 +5,7 @@ export const ROUTINE_CHECKIN_PROJECT_ID = "routine-checkin-task";
 export type EventTag = "\u5f85\u5b9a" | "\u4e0d\u7740\u6025" | "\u4e0d\u53ef\u540e\u9000" | null;
 
 export type ScheduleEvent = {
+  endDate?: string;
   id: string;
   date: string;
   startHour: number;

@@ -22,6 +22,7 @@ export type RecurrenceInstanceOverride = Partial<{
 
 /** 与 page 中 ScheduleEvent 对齐，供展开逻辑使用（避免引用 app） */
 export type ExpandableScheduleEvent = {
+  endDate?: string;
   id: string;
   date: string;
   startHour: number;
@@ -215,7 +216,7 @@ export function expandScheduleEvents(
   const out: ExpandableScheduleEvent[] = [];
   for (const e of events) {
     if (!e.recurrence?.kind) {
-      if (e.date >= rangeStartStr && e.date <= rangeEndStr) {
+      if ((e.endDate ?? e.date) >= rangeStartStr && e.date <= rangeEndStr) {
         out.push(e);
       }
       continue;

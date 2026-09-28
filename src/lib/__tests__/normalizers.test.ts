@@ -8,6 +8,9 @@ import {
 } from "../normalizers";
 
 describe("normalizers", () => {
+  it("preserves the end date when restoring a multi-day event", () => {
+    expect(normalizeEvents([{ date: "2026-09-28", endDate: "2026-10-02", startHour: 9, endHour: 18 }])[0]).toMatchObject({ date: "2026-09-28", endDate: "2026-10-02", startHour: 9, endHour: 18 });
+  });
   it("returns empty arrays for invalid task and event payloads", () => {
     expect(normalizeTasks(undefined)).toEqual([]);
     expect(normalizeTasks({})).toEqual([]);

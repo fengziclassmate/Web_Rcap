@@ -28,6 +28,15 @@ function event(patch: Partial<ScheduleEvent> = {}): ScheduleEvent {
 }
 
 describe("schedule event layout", () => {
+  it("splits one continuous multi-day event and retains its original identity", () => {
+    const source = event({ date: "2026-06-11", endDate: "2026-06-14", startHour: 9, endHour: 10 });
+    const segments = splitScheduleEventByDay(source);
+    expect(segments.map((item) => [item.displayDate, item.startHour, item.endHour])).toEqual([
+      ["2026-06-11", 9, 24], ["2026-06-12", 0, 24], ["2026-06-13", 0, 24], ["2026-06-14", 0, 10],
+    ]);
+    expect(toSourceScheduleEvent(segments[2])).toEqual(source);
+    expect(getScheduleEventDurationHour(source)).toBe(73);
+  });
   it("calculates the selected time position within its own dropdown", () => {
     expect(
       getCenteredScrollTop({
