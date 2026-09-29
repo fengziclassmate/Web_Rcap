@@ -41,6 +41,8 @@ export function ResearchProgressPanel({
   onCreatePost,
   onOpenLogs,
 }: ResearchProgressPanelProps) {
+  const [open, setOpen] = useState(true);
+  useEffect(() => { try { setOpen(localStorage.getItem("research-progress-open") !== "closed"); } catch {} }, []);
   const [completed, setCompleted] = useState("");
   const [insight, setInsight] = useState("");
   const [nextPlan, setNextPlan] = useState("");
@@ -91,6 +93,7 @@ export function ResearchProgressPanel({
         <div className="mb-3 flex items-center gap-2">
           <FlaskConical className="h-4 w-4 shrink-0 text-sky-800" aria-hidden />
           <h3 className="text-sm font-semibold text-stone-800">今日科研进展</h3>
+          <Button type="button" size="icon-sm" variant="ghost" aria-label={open ? "折叠今日科研进展" : "展开今日科研进展"} aria-expanded={open} onClick={() => { setOpen(!open); try { localStorage.setItem("research-progress-open", open ? "closed" : "open"); } catch {} }}>{open ? "⌄" : "›"}</Button>
           <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium tabular-nums text-sky-800">
             今日 {todayEntryCount} 条
           </span>
@@ -112,7 +115,7 @@ export function ResearchProgressPanel({
           </Button>
         </div>
 
-        <div className="space-y-2.5">
+        <div className="space-y-2.5" hidden={!open}>
           <label className="block space-y-1">
             <span className="text-[11px] font-semibold text-stone-600">今日完成</span>
             <Textarea

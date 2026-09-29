@@ -139,6 +139,21 @@ describe("DailyReflectionPanel", () => {
     expect(screen.getByRole("group", { name: "选择日志日期" }).className).toContain("grid-cols-1");
   });
 
+  it("preserves image drafts on failure and sends images to the log uploader", async () => {
+    const createUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:preview");
+    const revokeUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const onCreatePost = vi.fn(async () => false);
+    const { unmount } = render(<DailyReflectionPanel days={days} posts={[]} onCreatePost={onCreatePost} onOpenLogs={vi.fn()} />);
+    const file = new File(["image"], "journal.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("添加日志图片"), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "记入动态" }));
+    await waitFor(() => expect(onCreatePost).toHaveBeenCalledWith(expect.objectContaining({ images: [file], content: "图片日志" })));
+    expect(screen.getByRole("button", { name: "移除图片 1" })).toBeTruthy();
+    unmount();
+    expect(revokeUrl).toHaveBeenCalledWith("blob:preview");
+    createUrl.mockRestore(); revokeUrl.mockRestore();
+  });
+
   it("writes a journal entry for the selected day into the dynamic log source", async () => {
     const onCreatePost = vi.fn(async () => true);
     const onOpenLogs = vi.fn();
@@ -152,6 +167,7 @@ describe("DailyReflectionPanel", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "2026-08-25 日志：尚未记录" }));
+    fireEvent.click(screen.getByRole("button", { name: "选择表情" }));
     fireEvent.click(screen.getByRole("button", { name: "心情：平静" }));
     fireEvent.change(screen.getByLabelText("2026-08-25 日志内容"), {
       target: { value: "今天的实验进展很稳。" },

@@ -1925,7 +1925,7 @@ export function TaskDashboard({
                         </Badge>
                       ) : null}
                     </div>
-                    <div className="grid gap-2 rounded-lg border border-gray-200 bg-gray-50/70 p-2 sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-end">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-lg border border-gray-200 bg-gray-50/70 p-2 items-end">
                       <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-gray-600">打卡日期</Label>
                         <Input
@@ -1940,15 +1940,15 @@ export function TaskDashboard({
                           className="h-9 bg-white"
                         />
                       </div>
-                      <div className="space-y-1">
+                      <div className="col-span-2 row-start-2 space-y-1">
                         <Label className="text-[11px] font-medium text-gray-600">打卡描述</Label>
-                        <Input
+                        <Textarea
                           value={projectNoteDraft[project.id] ?? ""}
                           onChange={(event) =>
                             setProjectNoteDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
                           }
                           placeholder="可选"
-                          className="h-9 bg-white"
+                          className="min-h-24 resize-y bg-white text-sm leading-6"
                         />
                       </div>
                       <Button type="button" size="sm" className="h-9" onClick={() => handleProjectCheckin(project.id)}>
@@ -1966,7 +1966,7 @@ export function TaskDashboard({
                             <li key={`${project.id}-${entry.date}`} className="text-xs text-gray-700">
                               <span className="font-medium">{entry.date}</span>
                               <span className="mx-1">·</span>
-                              <span className="inline-block max-w-[220px] truncate align-bottom" title={entry.note || "（无描述）"}>
+                              <span className="block whitespace-pre-wrap break-words leading-5" title={entry.note || "（无描述）"}>
                                 {entry.note || "（无描述）"}
                               </span>
                             </li>
@@ -2072,7 +2072,7 @@ export function TaskDashboard({
               ) : null}
 
               {dailyCheckinEntries.length > 0 ? (
-                <div className="mt-3 space-y-2">
+                <div className="mt-3 grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
                   {dailyCheckinEntries.map(({ project, slot }) => {
                     const checked = (project.dailyCompletions ?? []).some(
                       (completion) => completion.date === todayDate && completion.slotId === slot.id,
@@ -2498,7 +2498,7 @@ export function TaskDashboard({
                   >
                     <p className="text-xs font-medium text-gray-700">{entry.date}</p>
                     <div className="mt-1 flex gap-2">
-                      <Input
+                      <Textarea
                         value={checkinDrafts[`${historyProject.id}__${entry.date}`] ?? entry.note}
                         onChange={(event) =>
                           setCheckinDrafts((prev) => ({
@@ -2507,7 +2507,7 @@ export function TaskDashboard({
                           }))
                         }
                         placeholder="打卡描述"
-                        className="h-8 text-xs"
+                        className="min-h-24 resize-y text-xs leading-5"
                       />
                       <Button
                         type="button"

@@ -686,8 +686,8 @@ export function DailyExpensePanel({
         ? "text-rose-600"
         : "text-emerald-700";
   return (
-    <section className="border-t border-gray-200 bg-stone-50/80 px-4 py-4 sm:px-6">
-      <Collapsible open={panelOpen} onOpenChange={setPanelOpen}>
+    <section className="border-t border-stone-200 bg-[linear-gradient(120deg,rgba(236,253,245,0.72),rgba(255,251,235,0.64))] px-4 py-4 sm:px-6">
+      <Collapsible className="rounded-xl border border-emerald-900/10 bg-white/85 p-3 shadow-[0_10px_30px_rgba(28,25,23,0.05)]" open={panelOpen} onOpenChange={setPanelOpen}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CollapsibleTrigger
             className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"

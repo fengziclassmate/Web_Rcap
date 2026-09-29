@@ -619,15 +619,9 @@ export function WeeklyTimeGrid({
 
   const quickEventTemplates = useMemo(() => {
     const restTemplate = defaultScheduleTemplates[0];
-    return [
-      restTemplate,
-      ...scheduleTemplates.filter(
-        (template) =>
-          template.id !== restTemplate.id &&
-          !(template.title === restTemplate.title && template.category === restTemplate.category),
-      ),
-    ];
+    return scheduleTemplates.some((item) => item.id === restTemplate.id) ? scheduleTemplates : [restTemplate, ...scheduleTemplates];
   }, [scheduleTemplates]);
+  const draggingTemplateRef = useRef<string | null>(null);
 
   const timeGridSlots = useMemo(() => getTimeGridSlots(timeGranularity), [timeGranularity]);
 
@@ -2550,6 +2544,20 @@ export function WeeklyTimeGrid({
                         {quickEventTemplates.map((template) => (
                           <Button
                             key={template.id}
+                            draggable
+                            onDragStart={() => { draggingTemplateRef.current = template.id; }}
+                            onDragEnd={() => { draggingTemplateRef.current = null; }}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => {
+                              event.preventDefault();
+                              const from = quickEventTemplates.findIndex((item) => item.id === draggingTemplateRef.current);
+                              const to = quickEventTemplates.findIndex((item) => item.id === template.id);
+                              if (from < 0 || to < 0 || from === to) return;
+                              const next = [...quickEventTemplates];
+                              next.splice(to, 0, next.splice(from, 1)[0]);
+                              setScheduleTemplates(next);
+                              draggingTemplateRef.current = null;
+                            }}
                             type="button"
                             size="sm"
                             variant="outline"
@@ -2571,7 +2579,7 @@ export function WeeklyTimeGrid({
                     onStartHourChange={(value) => setCreateForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setCreateForm((prev) => ({ ...prev, endHour: value }))}
                   />
-                  <label className="flex items-center gap-3 text-sm">结束日期<Input aria-label="新建行程结束日期" type="date" min={selectedCell.date} value={createEndDate || selectedCell.date} onChange={(event) => setCreateEndDate(event.target.value)} /></label>
+                  <label className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 whitespace-nowrap text-xs">结束日期<Input aria-label="新建行程结束日期" type="date" min={selectedCell.date} value={createEndDate || selectedCell.date} onChange={(event) => setCreateEndDate(event.target.value)} /></label>
                   <Collapsible
                     open={createDetailsOpen}
                     onOpenChange={setCreateDetailsOpen}
@@ -3568,17 +3576,14 @@ function TimeRangeEditor({
   const crossesMidnight = endHour < startHour;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3">
+    <div className="grid grid-cols-2 gap-2 [&_[data-slot=select-trigger]]:h-7">
+      <div className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
         <div className="flex items-center justify-between gap-3">
           <Label className="text-xs font-semibold uppercase tracking-wide text-stone-600">
             开始时间
           </Label>
-          <span className="rounded-md bg-white px-2.5 py-1 font-mono text-lg font-semibold leading-none text-stone-950 shadow-sm">
-            {formatHour(startHour)}
-          </span>
         </div>
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
+        <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-1 [&_label]:hidden">
           <CenteredTimePartSelect
             value={startParts.hours}
             options={hourOptions}
@@ -3606,7 +3611,7 @@ function TimeRangeEditor({
         />
       </div>
 
-      <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-3">
+      <div className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
         <div className="flex items-center justify-between gap-3">
           <Label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-600">
             结束时间
@@ -3616,11 +3621,8 @@ function TimeRangeEditor({
               </span>
             ) : null}
           </Label>
-          <span className="rounded-md bg-white px-2.5 py-1 font-mono text-lg font-semibold leading-none text-stone-950 shadow-sm">
-            {formatHour(endHour)}
-          </span>
         </div>
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
+        <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-1 [&_label]:hidden">
           <CenteredTimePartSelect
             value={endParts.hours}
             options={endHourOptions}

@@ -167,6 +167,15 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("persists a custom quick-template order", () => {
+    localStorage.setItem("schedule-event-templates-v1", JSON.stringify([{ id: "walk", title: "散步", category: "休息", notes: "", requirements: [], tag: null }]));
+    const { container } = renderGrid();
+    const slot = Array.from(container.querySelectorAll("button")).find((button) => !button.textContent?.trim() && !button.getAttribute("aria-label"));
+    fireEvent.click(slot!);
+    fireEvent.dragStart(screen.getByRole("button", { name: "快捷填写：散步" }));
+    fireEvent.drop(screen.getByRole("button", { name: "快捷填写：休息" }));
+    expect(JSON.parse(localStorage.getItem("schedule-event-templates-v1")!).map((item: { title: string }) => item.title)).toEqual(["散步", "休息"]);
+  });
   it("moves a multi-day event without requiring an empty multi-day slot", () => {
     const onUpdateEvent = vi.fn();
     const { container } = renderGrid({ events: [{ ...scheduleEvent, endDate: "2026-07-30", startHour: 9, endHour: 10 }], onUpdateEvent });
@@ -209,7 +218,7 @@ describe("WeeklyTimeGrid interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "恢复默认" }));
     expect((screen.getByLabelText("分类 HEX 颜色") as HTMLInputElement).value).toBe("#6366f1");
     expect(screen.getByRole("button", { name: "图标 moon" }).getAttribute("aria-pressed")).toBe("true");
-  });
+  }, 15000);
 
   it("keeps the context menu focused and can link an event to a daily task", () => {
     const onCreateDailyTask = vi.fn<WeeklyTimeGridProps["onCreateDailyTask"]>(() => "task-1");

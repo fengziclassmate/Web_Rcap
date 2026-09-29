@@ -2,6 +2,14 @@ import type { ProjectCheckin, ProjectCheckinArchive } from "@/lib/types";
 
 type ProjectCheckinWithArchives = ProjectCheckin & { archives: ProjectCheckinArchive[] };
 
+export function appendProjectCheckin(project: ProjectCheckin, date: string, note: string, time: string): ProjectCheckin {
+  const entry = `${time} · ${note.trim() || "已打卡"}`;
+  const exists = project.checkins.some((item) => item.date === date);
+  return { ...project, checkins: exists
+    ? project.checkins.map((item) => item.date === date ? { ...item, note: [item.note, entry].filter(Boolean).join("\n\n") } : item)
+    : [...project.checkins, { date, note: entry }] };
+}
+
 export function isProjectCheckinDateInCurrentCycle(project: ProjectCheckin, date: string) {
   return date >= project.startDate;
 }

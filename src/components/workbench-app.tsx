@@ -19,6 +19,7 @@ import { createId } from "@/lib/id";
 import {
   archiveProjectCheckinCycle,
   isProjectCheckinDateInCurrentCycle,
+  appendProjectCheckin,
 } from "@/lib/project-checkins";
 import {
   getLinkedDailyTaskIdsForEventUpdate,
@@ -556,6 +557,8 @@ export function WorkbenchApp() {
 
   async function uploadLogImages(currentUser: User, postId: string, files: File[]) {
     const rows: Array<Record<string, unknown>> = [];
+    const uploadedPaths: string[] = [];
+    try {
     for (const [index, file] of files.entries()) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
       const storagePath = `${currentUser.id}/${postId}/${Date.now()}-${index}-${safeName}`;
@@ -563,6 +566,7 @@ export function WorkbenchApp() {
         .from("log-images")
         .upload(storagePath, file, { upsert: false });
       if (uploadError) throw uploadError;
+      uploadedPaths.push(storagePath);
       const { data } = await supabase.storage.from("log-images").createSignedUrl(storagePath, 60 * 60 * 24 * 30);
       rows.push({
         post_id: postId,
@@ -575,6 +579,10 @@ export function WorkbenchApp() {
     if (rows.length > 0) {
       const { error } = await supabase.from("log_post_images").insert(rows);
       if (error) throw error;
+    }
+    } catch (error) {
+      if (uploadedPaths.length) await supabase.storage.from("log-images").remove(uploadedPaths);
+      throw error;
     }
   }
 
@@ -649,7 +657,18 @@ export function WorkbenchApp() {
       if (error) throw error;
       const post = fromLogPostRow(data);
       basePostCreated = true;
-      await uploadLogImages(currentUser, post.id, input.images.slice(0, 9));
+      try {
+        await uploadLogImages(currentUser, post.id, input.images.slice(0, 9));
+      } catch (error) {
+        const { error: deleteError } = await supabase.from("log_posts").delete().eq("id", post.id).eq("user_id", currentUser.id);
+        basePostCreated = Boolean(deleteError);
+        if (deleteError) {
+          await refreshLogs(currentUser);
+          toast.error("图片上传失败，正文已保留在动态日志；图片草稿仍在，请从该日志编辑补传图片");
+          return false;
+        }
+        throw error;
+      }
       await syncLogPostTags(currentUser, post.id, input.tagNames);
       await syncLogPostLinks(currentUser, post.id, input.links);
       await refreshLogs(currentUser);
@@ -1060,13 +1079,7 @@ export function WorkbenchApp() {
     setProjectCheckins((prev) =>
       prev.map((project) => {
         if (project.id !== projectId) return project;
-        const exists = project.checkins.find((c) => c.date === targetDate);
-        const nextCheckins = exists
-          ? project.checkins.map((c) =>
-              c.date === targetDate ? { ...c, note: note.trim() } : c,
-            )
-          : [...project.checkins, { date: targetDate, note: note.trim() }];
-        return { ...project, checkins: nextCheckins };
+        return appendProjectCheckin(project, targetDate, note, format(new Date(), "HH:mm"));
       }),
     );
   }
