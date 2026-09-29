@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { EventTag, ScheduleEvent } from "@/lib/types";
+import { eventTagOptions, getEventTagInfo as getTagInfo, normalizeEventTag } from "@/lib/event-tags";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -60,7 +61,6 @@ import { createId } from "@/lib/id";
 import type { LogComposerInput, LogPostRecord } from "@/lib/logs";
 import { supabase } from "@/lib/supabase";
 import {
-  findNextAvailableScheduleSlot,
   getCenteredScrollTop,
   getScheduleEventDurationHour,
   getScheduleEventVisualMetrics,
@@ -476,35 +476,22 @@ function CategorySelectLabel({ category }: { category: Category }) {
   );
 }
 
-function getTagInfo(tag: EventTag) {
-  switch (tag) {
-    case "待定":
-      return { label: "待确认", icon: "?", color: "text-amber-700" };
-    case "不着急":
-      return { label: "可调整", icon: "↔", color: "text-sky-700" };
-    case "不可后退":
-      return { label: "固定时间", icon: "●", color: "text-rose-700" };
-    default:
-      return { label: "无标记", icon: "", color: "text-stone-500" };
-  }
-}
-
 function EventTagSelect({ value, onChange }: { value: EventTag; onChange: (tag: EventTag) => void }) {
   const selected = getTagInfo(value);
   return <Select value={value ?? "none"} onValueChange={(next) => {
-    if (next === "none") onChange(null);
-    else if (next === "待定" || next === "不着急" || next === "不可后退") onChange(next);
+    onChange(normalizeEventTag(next));
   }}>
     <SelectTrigger aria-label="标记" className="w-full min-w-0 justify-between">
       <SelectValue><span className={`min-w-0 truncate ${selected.color}`}>{selected.label}</span></SelectValue>
     </SelectTrigger>
     <SelectContent align="end" alignItemWithTrigger={false} sideOffset={6}>
-      {([null, "待定", "不着急", "不可后退"] as const).map((tag) => {
-        const info = getTagInfo(tag);
-        return <SelectItem key={tag ?? "none"} value={tag ?? "none"}>
+      <SelectItem value="none">无标记</SelectItem>
+      {(["时间安排", "生活与状态"] as const).map((group) => <SelectGroup key={group}>
+        <SelectLabel>{group}</SelectLabel>
+        {eventTagOptions.filter((info) => info.group === group).map((info) => <SelectItem key={info.value} value={info.value}>
           <span className={`flex items-center gap-2 ${info.color}`}><span aria-hidden className="w-3 text-center">{info.icon || "—"}</span>{info.label}</span>
-        </SelectItem>;
-      })}
+        </SelectItem>)}
+      </SelectGroup>)}
     </SelectContent>
   </Select>;
 }
@@ -805,14 +792,6 @@ export function WeeklyTimeGrid({
     const last = format(addDays(displayDates[displayDates.length - 1], 1), "yyyy-MM-dd");
     return expandScheduleEvents(events, first, last) as ScheduleEvent[];
   }, [displayDates, events]);
-
-  const dragCollisionSearchThroughDate = useMemo(
-    () =>
-      displayDates.length > 0
-        ? format(addDays(displayDates[displayDates.length - 1], 1), "yyyy-MM-dd")
-        : null,
-    [displayDates],
-  );
 
   const displayDateKeys = useMemo(
     () => new Set(displayDates.map((date) => format(date, "yyyy-MM-dd"))),
@@ -1367,7 +1346,8 @@ export function WeeklyTimeGrid({
     const draggingEventId = draggingEventIdRef.current;
     if (!draggingEventId) return;
     const source = expandedEvents.find((event) => event.id === draggingEventId);
-    if (!source || !dragCollisionSearchThroughDate) return;
+    draggingEventIdRef.current = null;
+    if (!source) return;
 
     const duration = getScheduleEventDurationHour(source);
     if (source.endDate && source.endDate > source.date) {
@@ -1382,32 +1362,23 @@ export function WeeklyTimeGrid({
       draggingSegmentDateRef.current = null;
       return;
     }
-    const nextSlot = findNextAvailableScheduleSlot({
-      events: expandedEvents,
-      excludeEventId: source.id,
-      targetDate,
-      targetStartHour: normalizeStartTimeValue(targetHour),
-      durationHour: duration,
-      searchThroughDate: dragCollisionSearchThroughDate,
-    });
-    if (!nextSlot) {
-      draggingEventIdRef.current = null;
-      toast.error("后续日期暂无足够的连续空闲时间");
-      return;
-    }
+    const startHour = normalizeStartTimeValue(targetHour);
+    const endMinutes = Math.round((startHour + duration) * 60);
+    const endHour = endMinutes <= minutesPerDay ? endMinutes / 60 : (endMinutes % minutesPerDay) / 60;
     const occurrence = parseSyntheticEventId(source.id);
 
     onUpdateEvent(
       source.id,
       {
-        date: nextSlot.date,
-        ...(source.endDate || nextSlot.endDate ? { endDate: nextSlot.endDate ?? format(addDays(parse(nextSlot.date, "yyyy-MM-dd", new Date()), nextSlot.endHour < nextSlot.startHour ? 1 : 0), "yyyy-MM-dd") } : {}),
-        startHour: nextSlot.startHour,
-        endHour: nextSlot.endHour,
+        date: targetDate,
+        ...(source.endDate || duration >= 24 ? { endDate: format(addDays(parse(targetDate, "yyyy-MM-dd", new Date()), endMinutes > minutesPerDay ? 1 : 0), "yyyy-MM-dd") } : {}),
+        startHour,
+        endHour,
       },
       occurrence ? { scope: "occurrence" } : undefined,
     );
     draggingEventIdRef.current = null;
+    draggingSegmentDateRef.current = null;
   }
 
   function handleContextMenu(event: React.MouseEvent, eventId: string) {
@@ -1975,7 +1946,12 @@ export function WeeklyTimeGrid({
                                 resetCreateDialog({ date: dayLayout.dateIso, startHour: slot.startHour });
                               }}
                               onDragOver={(event) => event.preventDefault()}
-                              onDrop={() => handleDropEvent(dayLayout.dateIso, slot.startHour)}
+                              onDrop={(event) => {
+                                event.preventDefault();
+                                const column = event.currentTarget.closest<HTMLElement>("[data-timeline-date]")!;
+                                const pointerHour = (event.clientY - column.getBoundingClientRect().top) / hourCellHeight;
+                                handleDropEvent(dayLayout.dateIso, normalizeStartTimeValue(Math.round(pointerHour * 12) / 12));
+                              }}
                             />
                           );
                         })}
@@ -2048,6 +2024,7 @@ export function WeeklyTimeGrid({
                               }}
                               onDragEnd={() => {
                                 draggingEventIdRef.current = null;
+                                draggingSegmentDateRef.current = null;
                               }}
                               onDragOver={(dragEvent) => {
                                 if (draggingEventIdRef.current) {
@@ -2058,10 +2035,9 @@ export function WeeklyTimeGrid({
                               onDrop={(dragEvent) => {
                                 dragEvent.preventDefault();
                                 dragEvent.stopPropagation();
-                                const movingSource = expandedEvents.find((item) => item.id === draggingEventIdRef.current);
-                                const isMultiDayMove = movingSource?.endDate && movingSource.endDate > movingSource.date;
-                                const pointerHour = event.startHour + (dragEvent.clientY - dragEvent.currentTarget.getBoundingClientRect().top) / hourCellHeight;
-                                handleDropEvent(event.displayDate, isMultiDayMove ? normalizeStartTimeValue(Math.round(pointerHour * 12) / 12) : event.startHour);
+                                const column = dragEvent.currentTarget.closest<HTMLElement>("[data-timeline-date]")!;
+                                const pointerHour = (dragEvent.clientY - column.getBoundingClientRect().top) / hourCellHeight;
+                                handleDropEvent(event.displayDate, normalizeStartTimeValue(Math.round(pointerHour * 12) / 12));
                               }}
                               onContextMenu={(mouseEvent) => handleContextMenu(mouseEvent, event.id)}
                             >

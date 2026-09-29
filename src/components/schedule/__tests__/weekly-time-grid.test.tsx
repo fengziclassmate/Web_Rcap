@@ -167,6 +167,16 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("drops inside a 45-minute grid slot at the pointer time rather than the slot start", () => {
+    const onUpdateEvent = vi.fn();
+    const { container, rerenderGrid } = renderGrid({ events: [{ ...scheduleEvent, startHour: 6.75, endHour: 7 }], onUpdateEvent });
+    rerenderGrid({ timeGranularity: "45-15" });
+    const slot = container.querySelector('[data-timeline-date="2026-07-27"] > .grid')!.children[12] as HTMLElement;
+    Object.defineProperty(slot.closest('[data-timeline-date]')!, "getBoundingClientRect", { value: () => ({ top: 100 - 6 * 72 }) });
+    fireEvent.dragStart(container.querySelector('[data-schedule-card]')!);
+    fireEvent(slot, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 136 }));
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, expect.objectContaining({ date: "2026-07-27", startHour: 6.5, endHour: 6.75 }), undefined);
+  });
   it("displays and edits event buffers without moving the event time", () => {
     const onUpdateEvent = vi.fn();
     const { container } = renderGrid({ events: [{ ...scheduleEvent, bufferBeforeMinutes: 20, bufferAfterMinutes: 15, bufferBeforeName: "去羽毛球场", bufferAfterName: "回实验室" }], onUpdateEvent });
@@ -244,7 +254,7 @@ describe("WeeklyTimeGrid interactions", () => {
     const card = container.querySelector("[data-schedule-card]");
     const slot = Array.from(container.querySelectorAll("button")).find((button) => !button.textContent?.trim() && !button.getAttribute("aria-label"));
     fireEvent.dragStart(card!);
-    fireEvent.drop(slot!);
+    fireEvent(slot!, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 0 }));
     expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, { date: "2026-07-27", endDate: "2026-07-30", startHour: 0, endHour: 1 });
   });
   it("resizes only the outer boundaries of a multi-day event", () => {
@@ -436,7 +446,7 @@ describe("WeeklyTimeGrid interactions", () => {
     expect(card!.draggable).toBe(true);
 
     fireEvent.dragStart(card!);
-    fireEvent.drop(targetSlot!);
+    fireEvent(targetSlot!, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 0 }));
 
     expect(onUpdateEvent).toHaveBeenCalledWith(
       "recurring-event__2026-07-27",
@@ -523,7 +533,7 @@ describe("WeeklyTimeGrid interactions", () => {
     );
   });
 
-  it("drops a short event onto an occupied card and places it in the next free interval", () => {
+  it("drops a short event at the pointer time inside an occupied card", () => {
     const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
     renderGrid({
       events: [
@@ -531,8 +541,8 @@ describe("WeeklyTimeGrid interactions", () => {
           ...scheduleEvent,
           id: "occupied-event",
           title: "九点事项",
-          startHour: 9,
-          endHour: 9.25,
+          startHour: 6,
+          endHour: 6.75,
           isCompleted: false,
         },
         {
@@ -555,20 +565,70 @@ describe("WeeklyTimeGrid interactions", () => {
       .closest<HTMLElement>("[data-schedule-card]");
     expect(draggedCard).toBeTruthy();
     expect(occupiedCard).toBeTruthy();
+    Object.defineProperty(occupiedCard!, "getBoundingClientRect", { value: () => ({ top: 100, height: 54 }) });
+    Object.defineProperty(occupiedCard!.closest('[data-timeline-date]')!, "getBoundingClientRect", { value: () => ({ top: 100 - 6 * 72 }) });
 
     fireEvent.dragStart(draggedCard!);
     fireEvent.dragOver(occupiedCard!);
-    fireEvent.drop(occupiedCard!);
+    fireEvent(occupiedCard!, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 136 }));
 
     expect(onUpdateEvent).toHaveBeenCalledWith(
       "dragged-event",
       {
         date: "2026-07-27",
-        startHour: 9.25,
-        endHour: 9.5,
+        startHour: 6.5,
+        endHour: 6.75,
       },
       undefined,
     );
+  });
+
+  it("keeps the selected date even when the rest of the day is occupied", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [
+      { ...scheduleEvent, id: "blocked", startHour: 6, endHour: 24 },
+      { ...scheduleEvent, id: "dragged", startHour: 1, endHour: 2 },
+    ], onUpdateEvent });
+    const cards = container.querySelectorAll("[data-schedule-card]");
+    const target = Array.from(cards).find((card) => card.getAttribute("data-schedule-event-id") === "blocked")!;
+    const source = Array.from(cards).find((card) => card.getAttribute("data-schedule-event-id") === "dragged")!;
+    Object.defineProperty(target.closest('[data-timeline-date]')!, "getBoundingClientRect", { value: () => ({ top: 100 - 6 * 72 }) });
+    fireEvent.dragStart(source);
+    fireEvent(target, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 172 }));
+    expect(onUpdateEvent).toHaveBeenCalledWith("dragged", { date: "2026-07-27", startHour: 7, endHour: 8 }, undefined);
+  });
+
+  it("snaps occupied-card drops against the timeline rather than the inset card edge", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [
+      { ...scheduleEvent, id: "occupied", startHour: 6, endHour: 7 },
+      { ...scheduleEvent, id: "rest", startHour: 8, endHour: 8.25 },
+    ], onUpdateEvent });
+    const target = container.querySelector('[data-schedule-event-id="occupied"]')!;
+    Object.defineProperty(target, "getBoundingClientRect", { value: () => ({ top: 103 }) });
+    Object.defineProperty(target.closest('[data-timeline-date]')!, "getBoundingClientRect", { value: () => ({ top: 100 - 6 * 72 }) });
+    fireEvent.dragStart(container.querySelector('[data-schedule-event-id="rest"]')!);
+    fireEvent(target, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 139.6 }));
+    expect(onUpdateEvent).toHaveBeenCalledWith("rest", { date: "2026-07-27", startHour: 6 + 35 / 60, endHour: 6 + 50 / 60 }, undefined);
+  });
+
+  it("moves a full-day recurring instance with an explicit next-day end", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, startHour: 0, endHour: 24, recurrence: { kind: "daily" } }], onUpdateEvent });
+    const source = container.querySelector('[data-schedule-card]')!;
+    fireEvent.dragStart(source);
+    fireEvent(source, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 432 }));
+    expect(onUpdateEvent).toHaveBeenCalledWith(`${scheduleEvent.id}__2026-07-27`, { date: "2026-07-27", endDate: "2026-07-28", startHour: 6, endHour: 6 }, { scope: "occurrence" });
+  });
+
+  it("preserves a full-day duration when the new start crosses midnight", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, startHour: 0, endHour: 24 }], onUpdateEvent });
+    const target = container.querySelector('[data-timeline-date="2026-07-28"] > .grid')!.children[6];
+    Object.defineProperty(target.closest('[data-timeline-date]')!, "getBoundingClientRect", { value: () => ({ top: 100 - 6 * 72 }) });
+    fireEvent.dragStart(container.querySelector('[data-schedule-card]')!);
+    fireEvent(target, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 100 }));
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, { date: "2026-07-28", endDate: "2026-07-29", startHour: 6, endHour: 6 }, undefined);
   });
 
   it("keeps resize handles available for short and cross-midnight cards", () => {

@@ -61,7 +61,7 @@ export function parseSyntheticEventId(id: string): { masterId: string; occurrenc
 }
 
 /**
- * 将被拖到其他日期的单次循环实例从系列中拆出。
+ * 将移动到其他日期或需要明确跨日结束日期的单次循环实例从系列中拆出。
  * 原日期加入例外列表，实例已有覆盖内容会继承到新的普通行程中。
  */
 export function moveRecurrenceOccurrence<T extends ExpandableScheduleEvent>(
@@ -72,7 +72,7 @@ export function moveRecurrenceOccurrence<T extends ExpandableScheduleEvent>(
 ): T[] {
   const parsed = parseSyntheticEventId(occurrenceId);
   const targetDate = patch.date;
-  if (!parsed || !targetDate || targetDate === parsed.occurrenceDate) return events;
+  if (!parsed || !targetDate || (targetDate === parsed.occurrenceDate && !(patch.endDate && patch.endDate > targetDate))) return events;
 
   let detachedEvent: T | null = null;
   const nextEvents = events.map((event) => {

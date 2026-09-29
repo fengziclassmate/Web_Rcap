@@ -6,6 +6,10 @@ import {
 } from "../schedule-templates";
 
 describe("schedule templates", () => {
+  it("retains lifestyle tags when loading saved templates", () => {
+    const tags = ["深度专注", "充电一下", "小挑战", "期待已久", "顺路办", "一起完成"];
+    expect(normalizeScheduleTemplates(tags.map((tag) => ({ title: "活动", tag }))).map((template) => template.tag)).toEqual(tags);
+  });
   it("uses a ready-to-apply rest template when storage is empty", () => {
     expect(normalizeScheduleTemplates(null)).toEqual([
       expect.objectContaining({ title: "休息", category: "休息" }),

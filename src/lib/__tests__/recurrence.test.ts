@@ -102,6 +102,18 @@ describe("expandScheduleEvents", () => {
 });
 
 describe("moveRecurrenceOccurrence", () => {
+  it("preserves a full-day occurrence moved later on the same date", () => {
+    const result = moveRecurrenceOccurrence(
+      [event({ startHour: 0, endHour: 24, recurrence: { kind: "daily" } })],
+      "evt-1__2026-05-02",
+      { date: "2026-05-02", endDate: "2026-05-03", startHour: 6, endHour: 6 },
+      "detached",
+    );
+    const expanded = expandScheduleEvents(result, "2026-05-01", "2026-05-03");
+    expect(expanded.map((item) => item.id)).toEqual(["evt-1__2026-05-01", "evt-1__2026-05-03", "detached"]);
+    expect(expanded[2]).toMatchObject({ date: "2026-05-02", endDate: "2026-05-03", startHour: 6, endHour: 6, recurrence: null });
+  });
+
   it("detaches one occurrence when it is moved to another date", () => {
     const result = moveRecurrenceOccurrence(
       [

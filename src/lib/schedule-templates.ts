@@ -1,4 +1,5 @@
 import type { EventTag } from "@/lib/types";
+import { normalizeEventTag } from "@/lib/event-tags";
 
 export type SplitScheduleGranularity = "45-15" | "50-10";
 
@@ -41,10 +42,6 @@ export const defaultScheduleTemplates: ScheduleTemplate[] = [
   },
 ];
 
-function normalizeTag(value: unknown): EventTag {
-  return value === "待定" || value === "不着急" || value === "不可后退" ? value : null;
-}
-
 export function normalizeScheduleTemplates(value: unknown): ScheduleTemplate[] {
   if (!Array.isArray(value)) return defaultScheduleTemplates.map((template) => ({ ...template }));
 
@@ -65,7 +62,7 @@ export function normalizeScheduleTemplates(value: unknown): ScheduleTemplate[] {
           typeof candidate.category === "string" && candidate.category.trim()
             ? candidate.category.trim()
             : "其他",
-        tag: normalizeTag(candidate.tag),
+        tag: normalizeEventTag(candidate.tag),
         notes: typeof candidate.notes === "string" ? candidate.notes : "",
         requirements: Array.isArray(candidate.requirements)
           ? candidate.requirements.filter((item): item is string => typeof item === "string")

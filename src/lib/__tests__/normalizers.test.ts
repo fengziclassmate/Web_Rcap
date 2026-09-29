@@ -8,6 +8,10 @@ import {
 } from "../normalizers";
 
 describe("normalizers", () => {
+  it("restores new and legacy event tags and discards invalid values", () => {
+    const tags = ["待定", "不着急", "不可后退", "深度专注", "充电一下", "小挑战", "期待已久", "顺路办", "一起完成", "invalid"];
+    expect(normalizeEvents(tags.map((tag) => ({ tag }))).map((event) => event.tag)).toEqual([...tags.slice(0, -1), null]);
+  });
   it("preserves the end date when restoring a multi-day event", () => {
     expect(normalizeEvents([{ date: "2026-09-28", endDate: "2026-10-02", startHour: 9, endHour: 18 }])[0]).toMatchObject({ date: "2026-09-28", endDate: "2026-10-02", startHour: 9, endHour: 18 });
   });

@@ -1339,7 +1339,7 @@ export function WorkbenchApp() {
         setEvents((prev) => updateRecurrenceFuture(prev, eventId, patch, futureSeriesId));
         return;
       }
-      if (patch.date && patch.date !== parsed.occurrenceDate) {
+      if (patch.date && (patch.date !== parsed.occurrenceDate || (patch.endDate && patch.endDate > patch.date))) {
         const detachedEventId = createId("event");
         setEvents((prev) =>
           moveRecurrenceOccurrence(prev, eventId, patch, detachedEventId),

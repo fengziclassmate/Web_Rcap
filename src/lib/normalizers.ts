@@ -1,11 +1,11 @@
 import { normalizeBufferMinutes, normalizeBufferName } from "@/lib/event-timing";
+import { normalizeEventTag } from "@/lib/event-tags";
 import { format } from "date-fns";
 import { normalizeCategoryDefList } from "./categories";
 import type { RecurrenceConfig, RecurrenceInstanceOverride } from "@/lib/recurrence";
 import type {
   AnnualTask,
   DashboardUiPreferences,
-  EventTag,
   FootprintItem,
   LongTask,
   KnowledgeWorkType,
@@ -396,7 +396,7 @@ export function normalizeEvents(payload: unknown): ScheduleEvent[] {
         : [],
       isCompleted: Boolean(value.isCompleted),
       category: normalizeScheduleCategory(value.category ?? DEFAULT_SCHEDULE_CATEGORY),
-      tag: (value.tag as EventTag) ?? null,
+      tag: normalizeEventTag(value.tag),
       linkedDailyTaskId:
         typeof value.linkedDailyTaskId === "string" && value.linkedDailyTaskId.length > 0
           ? value.linkedDailyTaskId
