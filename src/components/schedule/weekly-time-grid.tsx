@@ -291,17 +291,23 @@ function isWholeHour(value: number) {
 }
 
 function EventBufferEditor({ value, onChange }: { value: EventFormState; onChange: (patch: Partial<EventFormState>) => void }) {
-  return <div className="grid gap-3 sm:grid-cols-2">
-    {([['bufferBeforeMinutes', 'bufferBeforeName', '事件前缓冲', '提前准备', '通勤 · 去羽毛球场'], ['bufferAfterMinutes', 'bufferAfterName', '事件后缓冲', '结束后缓冲', '通勤 · 回实验室']] as const).map(([minutesField, nameField, heading, label, example]) => <div key={minutesField} className="min-w-0 space-y-2.5 rounded-lg border border-stone-200 bg-stone-50/70 p-3">
-      <p className="text-xs font-semibold text-stone-700">{heading}</p>
-      <label className="block space-y-1 text-xs text-stone-600"><span>名称</span>
-        <Input aria-label={`${heading}名称`} maxLength={80} placeholder={`如：${example}`} value={value[nameField]} onChange={(event) => onChange({ [nameField]: event.target.value })} className="bg-white" />
-      </label>
-      <label className="block space-y-1 text-xs text-stone-600"><span>时长（分钟）</span>
-        <Input type="number" min={0} max={180} step={5} aria-label={label} value={value[minutesField]} onChange={(event) => onChange({ [minutesField]: normalizeBufferMinutes(Number(event.target.value)) })} className="bg-white" />
-      </label>
-    </div>)}
-  </div>;
+  const [open, setOpen] = useState(true);
+  return <Collapsible open={open} onOpenChange={setOpen} className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
+    <CollapsibleTrigger aria-label={open ? "折叠缓冲设置" : "展开缓冲设置"} className="flex w-full items-center justify-between gap-2 rounded text-xs font-medium text-stone-600 focus-visible:outline-2 focus-visible:outline-primary">
+      <span>缓冲</span><ChevronDown className={`size-3.5 transition-transform ${open ? "" : "-rotate-90"}`} />
+    </CollapsibleTrigger>
+    <CollapsibleContent>
+      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1fr)_3.5rem] items-center gap-1.5" data-testid="event-buffer-fields">
+        {([['bufferBeforeMinutes', 'bufferBeforeName', '事件前缓冲名称', '提前准备'], ['bufferAfterMinutes', 'bufferAfterName', '事件后缓冲名称', '结束后缓冲']] as const).map(([minutesField, nameField, nameLabel, durationLabel]) => <React.Fragment key={minutesField}>
+          <Input aria-label={nameLabel} title={value[nameField] || nameLabel} maxLength={80} placeholder="名称" value={value[nameField]} onChange={(event) => onChange({ [nameField]: event.target.value })} className="h-8 bg-white px-2 text-xs md:text-xs" />
+          <div className="relative min-w-0">
+            <Input type="number" min={0} max={180} step={5} aria-label={durationLabel} title={`${durationLabel}（分钟）`} value={value[minutesField]} onChange={(event) => onChange({ [minutesField]: normalizeBufferMinutes(Number(event.target.value)) })} className="h-8 bg-white py-1 pr-5 pl-1.5 text-xs tabular-nums md:text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+            <span aria-hidden className="pointer-events-none absolute inset-y-0 right-1.5 flex items-center text-[10px] text-stone-500">分</span>
+          </div>
+        </React.Fragment>)}
+      </div>
+    </CollapsibleContent>
+  </Collapsible>;
 }
 
 const defaultForm: EventFormState = {
@@ -2465,7 +2471,7 @@ export function WeeklyTimeGrid({
                     />
                   </div>
                   <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] items-end gap-3">
-                    <div className="min-w-0 space-y-2">
+                    <div className="flex min-w-0 flex-col gap-2">
                       <Label>分类</Label>
                       <Select
                         value={createForm.category}
@@ -2474,7 +2480,7 @@ export function WeeklyTimeGrid({
                           setCreateForm((prev) => ({ ...prev, category: value }));
                         }}
                       >
-                        <SelectTrigger className="w-full justify-between rounded-md border-gray-300">
+                        <SelectTrigger aria-label="分类" className="w-full justify-between rounded-md border-gray-300">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent
@@ -2498,7 +2504,7 @@ export function WeeklyTimeGrid({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="min-w-0 space-y-2">
+                    <div className="flex min-w-0 flex-col gap-2">
                       <Label>标记</Label>
                       <Select
                         value={createForm.tag ?? "none"}
@@ -2509,8 +2515,8 @@ export function WeeklyTimeGrid({
                           }))
                         }
                       >
-                        <SelectTrigger className="w-full justify-between">
-                          <SelectValue />
+                        <SelectTrigger aria-label="标记" className="w-full justify-between">
+                          <SelectValue>{createForm.tag ?? "无标记"}</SelectValue>
                         </SelectTrigger>
                         <SelectContent align="end">
                           <SelectItem value="none">无标记</SelectItem>
@@ -2524,7 +2530,7 @@ export function WeeklyTimeGrid({
                       aria-label="循环行程设置"
                       className="contents"
                     >
-                      <div className="space-y-2">
+                      <div className="flex flex-col gap-2">
                         <Label htmlFor="create-recurring" className="whitespace-nowrap">循环行程</Label>
                         <div className="flex h-8 items-center justify-center rounded-md border border-stone-200 bg-stone-50/80 px-3">
                         <Switch
@@ -3674,7 +3680,7 @@ function TimeRangeEditor({
   const crossesMidnight = endHour < startHour;
 
   return (
-    <div className="grid grid-cols-2 gap-2 [&_[data-slot=select-trigger]]:h-7">
+    <div className="grid grid-cols-1 gap-2 min-[440px]:grid-cols-2 [&_[data-slot=select-trigger]]:h-7">
       <div className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
         <div className="flex min-h-6 items-center justify-between gap-1">
           <Label className="shrink-0 whitespace-nowrap text-xs font-semibold text-stone-600">
