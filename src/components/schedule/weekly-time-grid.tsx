@@ -479,14 +479,34 @@ function CategorySelectLabel({ category }: { category: Category }) {
 function getTagInfo(tag: EventTag) {
   switch (tag) {
     case "待定":
-      return { icon: "?", color: "text-amber-600" };
+      return { label: "待确认", icon: "?", color: "text-amber-700" };
     case "不着急":
-      return { icon: "⌛", color: "text-sky-600" };
+      return { label: "可调整", icon: "↔", color: "text-sky-700" };
     case "不可后退":
-      return { icon: "⚠", color: "text-rose-600" };
+      return { label: "固定时间", icon: "●", color: "text-rose-700" };
     default:
-      return { icon: "", color: "" };
+      return { label: "无标记", icon: "", color: "text-stone-500" };
   }
+}
+
+function EventTagSelect({ value, onChange }: { value: EventTag; onChange: (tag: EventTag) => void }) {
+  const selected = getTagInfo(value);
+  return <Select value={value ?? "none"} onValueChange={(next) => {
+    if (next === "none") onChange(null);
+    else if (next === "待定" || next === "不着急" || next === "不可后退") onChange(next);
+  }}>
+    <SelectTrigger aria-label="标记" className="w-full min-w-0 justify-between">
+      <SelectValue><span className={`min-w-0 truncate ${selected.color}`}>{selected.label}</span></SelectValue>
+    </SelectTrigger>
+    <SelectContent align="end" alignItemWithTrigger={false} sideOffset={6}>
+      {([null, "待定", "不着急", "不可后退"] as const).map((tag) => {
+        const info = getTagInfo(tag);
+        return <SelectItem key={tag ?? "none"} value={tag ?? "none"}>
+          <span className={`flex items-center gap-2 ${info.color}`}><span aria-hidden className="w-3 text-center">{info.icon || "—"}</span>{info.label}</span>
+        </SelectItem>;
+      })}
+    </SelectContent>
+  </Select>;
 }
 
 function getTimeSelectParts(value: number, allowEndBoundary = false) {
@@ -2095,7 +2115,7 @@ export function WeeklyTimeGrid({
                                         {event.title}
                                       </p>
                                       {event.tag ? (
-                                        <span className={`shrink-0 text-[10px] font-bold leading-none ${getTagInfo(event.tag).color}`}>
+                                        <span title={getTagInfo(event.tag).label} aria-label={getTagInfo(event.tag).label} className={`shrink-0 text-[10px] font-bold leading-none ${getTagInfo(event.tag).color}`}>
                                           {getTagInfo(event.tag).icon}
                                         </span>
                                       ) : null}
@@ -2120,7 +2140,7 @@ export function WeeklyTimeGrid({
                                         </span>
                                       ) : null}
                                       {event.tag ? (
-                                        <span className={`mt-0.5 shrink-0 text-xs font-bold leading-none ${getTagInfo(event.tag).color}`}>
+                                        <span title={getTagInfo(event.tag).label} aria-label={getTagInfo(event.tag).label} className={`mt-0.5 shrink-0 text-xs font-bold leading-none ${getTagInfo(event.tag).color}`}>
                                           {getTagInfo(event.tag).icon}
                                         </span>
                                       ) : null}
@@ -2164,7 +2184,7 @@ export function WeeklyTimeGrid({
                                           </span>
                                         ) : null}
                                         {event.tag ? (
-                                          <span className={`shrink-0 text-xs font-bold leading-none ${getTagInfo(event.tag).color}`}>
+                                          <span title={getTagInfo(event.tag).label} aria-label={getTagInfo(event.tag).label} className={`shrink-0 text-xs font-bold leading-none ${getTagInfo(event.tag).color}`}>
                                             {getTagInfo(event.tag).icon}
                                           </span>
                                         ) : null}
@@ -2512,25 +2532,7 @@ export function WeeklyTimeGrid({
                     </div>
                     <div className="flex min-w-0 flex-col gap-2">
                       <Label>标记</Label>
-                      <Select
-                        value={createForm.tag ?? "none"}
-                        onValueChange={(value) =>
-                          setCreateForm((prev) => ({
-                            ...prev,
-                            tag: value === "none" ? null : (value as EventTag),
-                          }))
-                        }
-                      >
-                        <SelectTrigger aria-label="标记" className="w-full justify-between">
-                          <SelectValue>{createForm.tag ?? "无标记"}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent align="end">
-                          <SelectItem value="none">无标记</SelectItem>
-                          <SelectItem value="待定">待定</SelectItem>
-                          <SelectItem value="不着急">不着急</SelectItem>
-                          <SelectItem value="不可后退">不可后退</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <EventTagSelect value={createForm.tag} onChange={(tag) => setCreateForm((previous) => ({ ...previous, tag }))} />
                     </div>
                     <section
                       aria-label="循环行程设置"
@@ -2691,7 +2693,7 @@ export function WeeklyTimeGrid({
                     <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400">
                       <span className="min-w-0 text-sm font-semibold text-stone-800">补充信息</span>
                       <ChevronDown
-                        className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${createDetailsOpen ? "rotate-180" : ""}`}
+                        className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${createDetailsOpen ? "" : "-rotate-90"}`}
                         aria-hidden
                       />
                     </CollapsibleTrigger>
@@ -2810,25 +2812,7 @@ export function WeeklyTimeGrid({
                     </div>
                     <div className="min-w-0 space-y-2">
                       <Label>标记</Label>
-                      <Select
-                        value={editForm.tag ?? "none"}
-                        onValueChange={(value) =>
-                          setEditForm((prev) => ({
-                            ...prev,
-                            tag: value === "none" ? null : (value as EventTag),
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="w-full justify-between">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent align="end">
-                          <SelectItem value="none">无标记</SelectItem>
-                          <SelectItem value="待定">待定</SelectItem>
-                          <SelectItem value="不着急">不着急</SelectItem>
-                          <SelectItem value="不可后退">不可后退</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <EventTagSelect value={editForm.tag} onChange={(tag) => setEditForm((previous) => ({ ...previous, tag }))} />
                     </div>
                   </div>
                   <TimeRangeEditor
@@ -2848,7 +2832,7 @@ export function WeeklyTimeGrid({
                     <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400">
                       <span className="min-w-0 text-sm font-semibold text-stone-800">补充信息</span>
                       <ChevronDown
-                        className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${editDetailsOpen ? "rotate-180" : ""}`}
+                        className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${editDetailsOpen ? "" : "-rotate-90"}`}
                         aria-hidden
                       />
                     </CollapsibleTrigger>
@@ -3089,25 +3073,7 @@ export function WeeklyTimeGrid({
                     </div>
                     <div className="space-y-2">
                       <Label>标记</Label>
-                      <Select
-                        value={templateForm.tag ?? "none"}
-                        onValueChange={(value) =>
-                          setTemplateForm((previous) => ({
-                            ...previous,
-                            tag: value === "none" ? null : (value as EventTag),
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="w-full justify-between">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent align="end">
-                          <SelectItem value="none">无标记</SelectItem>
-                          <SelectItem value="待定">待定</SelectItem>
-                          <SelectItem value="不着急">不着急</SelectItem>
-                          <SelectItem value="不可后退">不可后退</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <EventTagSelect value={templateForm.tag} onChange={(tag) => setTemplateForm((previous) => ({ ...previous, tag }))} />
                     </div>
                   </div>
 
