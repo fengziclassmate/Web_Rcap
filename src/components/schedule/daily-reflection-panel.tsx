@@ -167,9 +167,9 @@ export function DailyReflectionPanel({
   }
 
   return (
-    <section className="border-t border-stone-200 bg-[linear-gradient(120deg,rgba(236,253,245,0.72),rgba(255,251,235,0.64))] px-4 py-4 sm:px-6">
+    <section className="border-t border-gray-200 bg-stone-50/80 px-4 py-3 sm:px-6">
       <Collapsible open={panelOpen} onOpenChange={setPanelOpen}>
-        <div className="rounded-xl border border-emerald-900/10 bg-white/85 p-3 shadow-[0_10px_30px_rgba(28,25,23,0.05)]">
+        <div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <NotebookPen className="h-4 w-4 shrink-0 text-stone-700" aria-hidden />

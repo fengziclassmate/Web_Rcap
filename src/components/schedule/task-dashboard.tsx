@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ProjectCheckinCalendar } from "./project-checkin-calendar";
 import {
   Archive,
   CalendarRange,
@@ -1911,6 +1912,7 @@ export function TaskDashboard({
                     </Button>
                   </div>
                 </div>
+                <ProjectCheckinCalendar project={project} today={todayDate} />
                 {projectExpanded ? (
                   <>
                     {project.description ? <p className="mb-2 text-xs text-gray-500">{project.description}</p> : null}

@@ -686,8 +686,8 @@ export function DailyExpensePanel({
         ? "text-rose-600"
         : "text-emerald-700";
   return (
-    <section className="border-t border-stone-200 bg-[linear-gradient(120deg,rgba(236,253,245,0.72),rgba(255,251,235,0.64))] px-4 py-4 sm:px-6">
-      <Collapsible className="rounded-xl border border-emerald-900/10 bg-white/85 p-3 shadow-[0_10px_30px_rgba(28,25,23,0.05)]" open={panelOpen} onOpenChange={setPanelOpen}>
+    <section className="border-t border-gray-200 bg-stone-50/80 px-4 py-3 sm:px-6 [&_input]:h-8 [&_[data-slot=select-trigger]]:h-8">
+      <Collapsible open={panelOpen} onOpenChange={setPanelOpen}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CollapsibleTrigger
             className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
@@ -712,9 +712,9 @@ export function DailyExpensePanel({
           </Button>
         </div>
 
-        <CollapsibleContent className="mt-4 flex flex-col gap-4">
+        <CollapsibleContent className="mt-2 flex flex-col gap-2">
           {contentHeader}
-          <div className="grid gap-3 lg:grid-cols-3">
+          <div className="grid gap-2 lg:grid-cols-3 [&>div]:py-2 [&_.text-xl]:text-base">
           <div className="rounded-lg border border-stone-200 bg-white px-3 py-3">
             <p className="flex items-center gap-1.5 text-xs font-medium text-stone-500">
               <ReceiptText className="h-3.5 w-3.5" aria-hidden />
@@ -763,7 +763,7 @@ export function DailyExpensePanel({
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
+        <div className="grid items-start gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(280px,1fr)]">
           <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-3">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-semibold text-stone-900">当天支出列表</h4>
@@ -873,7 +873,7 @@ export function DailyExpensePanel({
                                 </span>
                               ) : null}
                             </div>
-                            {expense.note ? <p className="mt-1 truncate text-xs text-stone-500">{expense.note}</p> : null}
+                            {expense.note ? <p className="mt-1 whitespace-pre-wrap break-words text-xs text-stone-500">{expense.note}</p> : null}
                           </div>
                           <div className="flex items-center gap-1">
                             <Button
@@ -906,10 +906,10 @@ export function DailyExpensePanel({
             )}
           </div>
 
-          <div className="space-y-3">
+          <div className="contents">
             <div className="rounded-lg border border-stone-200 bg-white p-3">
               <h4 className="text-sm font-semibold text-stone-900">添加支出</h4>
-              <div className="mt-3 space-y-3">
+              <div className="mt-2 space-y-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="expense-amount">金额</Label>
                   <Input
@@ -983,9 +983,9 @@ export function DailyExpensePanel({
               </div>
             </div>
 
-            <div className="rounded-lg border border-stone-200 bg-white p-3">
+            <div className="rounded-lg border border-stone-200 bg-white p-2 lg:col-span-2">
               <h4 className="text-sm font-semibold text-stone-900">预算</h4>
-              <div className="mt-3 space-y-3">
+              <div className="mt-2 grid gap-3 lg:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="daily-budget-amount">每日预算</Label>
                   <div className="flex gap-2">
