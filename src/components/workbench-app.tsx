@@ -6,6 +6,7 @@ import { Undo2, Redo2 } from "lucide-react";
 import { parseISO } from "date-fns";
 import { GlobalSearch, type SearchResult } from "@/components/schedule/global-search";
 import { ExecutionPanel } from "@/components/schedule/execution-panel";
+import { UpNextCard } from "@/components/schedule/up-next-card";
 import { useUndoHistory } from "@/hooks/useUndoHistory";
 import { expandScheduleEvents } from "@/lib/recurrence";
 
@@ -1537,6 +1538,11 @@ export function WorkbenchApp() {
               </section>
               <section className="min-h-0 space-y-4">
                 <ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />
+                <UpNextCard events={events} onOpenEvent={(event) => {
+                  setViewMode("day");
+                  setCurrentWeekStart(parseISO(event.date));
+                  setOpenEventRequest({ id: event.id, token: Date.now() });
+                }} />
                 <TaskDashboard
                   userId={user.id}
                   logsReady={logReady && logHistoryAvailable}

@@ -167,6 +167,18 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("displays and edits event buffers without moving the event time", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, bufferBeforeMinutes: 20, bufferAfterMinutes: 15 }], onUpdateEvent });
+    expect(container.querySelectorAll('[data-testid="event-buffer"]')).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole("button", { name: `打开 ${scheduleEvent.title} 编辑窗口` })[0]);
+    const editor = within(screen.getByRole("dialog"));
+    expect((editor.getByLabelText("提前准备") as HTMLInputElement).value).toBe("20");
+    fireEvent.change(editor.getByLabelText("提前准备"), { target: { value: "30" } });
+    fireEvent.change(editor.getByLabelText("结束后缓冲"), { target: { value: "10" } });
+    fireEvent.click(editor.getByRole("button", { name: "保存修改" }));
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, expect.objectContaining({ bufferBeforeMinutes: 30, bufferAfterMinutes: 10, startHour: scheduleEvent.startHour, endHour: scheduleEvent.endHour }));
+  });
   it("edits a multi-day start date while keeping its end fixed", () => {
     const onUpdateEvent = vi.fn();
     renderGrid({ events: [{ ...scheduleEvent, endDate: "2026-07-30", startHour: 9, endHour: 10 }], onUpdateEvent });

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffectEvent, useEffect, useMemo, useRef, useState } from "react";
+import { eventTiming, normalizeBufferMinutes } from "@/lib/event-timing";
 import { createPortal } from "react-dom";
 import { addDays, format, parse } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -122,6 +123,8 @@ type GridCell = {
 };
 
 type EventFormState = {
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
   title: string;
   startHour: number;
   endHour: number;
@@ -285,7 +288,18 @@ function isWholeHour(value: number) {
   return Math.abs(value - Math.round(value)) < 0.0001;
 }
 
+function EventBufferEditor({ before, after, onChange }: { before: number; after: number; onChange: (patch: Partial<Pick<EventFormState, "bufferBeforeMinutes" | "bufferAfterMinutes">>) => void }) {
+  return <div className="grid grid-cols-2 gap-3 rounded-lg border border-stone-200 bg-stone-50/70 p-3">
+    {([['bufferBeforeMinutes', '提前准备', before], ['bufferAfterMinutes', '结束后缓冲', after]] as const).map(([field, label, value]) => <label key={field} className="space-y-1.5 text-xs font-medium text-stone-600">
+      <span>{label}（分钟）</span>
+      <Input type="number" min={0} max={180} step={5} aria-label={label} value={value} onChange={(event) => onChange({ [field]: normalizeBufferMinutes(Number(event.target.value)) })} className="bg-white" />
+    </label>)}
+  </div>;
+}
+
 const defaultForm: EventFormState = {
+  bufferBeforeMinutes: 0,
+  bufferAfterMinutes: 0,
   title: "",
   startHour: 8,
   endHour: 9,
@@ -746,7 +760,7 @@ export function WeeklyTimeGrid({
 
   const expandedEvents = useMemo(() => {
     if (displayDates.length === 0) return [] as ScheduleEvent[];
-    const first = format(addDays(displayDates[0], -1), "yyyy-MM-dd");
+    const first = format(addDays(displayDates[0], -2), "yyyy-MM-dd");
     const last = format(addDays(displayDates[displayDates.length - 1], 1), "yyyy-MM-dd");
     return expandScheduleEvents(events, first, last) as ScheduleEvent[];
   }, [displayDates, events]);
@@ -1150,6 +1164,8 @@ export function WeeklyTimeGrid({
     setEditRecurrenceOpen(false);
     setEditScope("occurrence");
     setEditForm({
+      bufferBeforeMinutes: normalizeBufferMinutes(event.bufferBeforeMinutes),
+      bufferAfterMinutes: normalizeBufferMinutes(event.bufferAfterMinutes),
       title: event.title,
       startHour: event.startHour,
       endHour: event.endHour,
@@ -1197,6 +1213,8 @@ export function WeeklyTimeGrid({
       title: createForm.title.trim(),
       notes: createForm.notes.trim(),
       requirements: buildRequirementLines(createForm.requirements),
+      bufferBeforeMinutes: createForm.bufferBeforeMinutes,
+      bufferAfterMinutes: createForm.bufferAfterMinutes,
       isCompleted: createForm.isCompleted,
       category: createForm.category,
       tag: createForm.tag,
@@ -1239,6 +1257,8 @@ export function WeeklyTimeGrid({
       endHour: editEndDate > editStartDate ? editForm.endHour : endHour,
       notes: editForm.notes.trim(),
       requirements: buildRequirementLines(editForm.requirements),
+      bufferBeforeMinutes: editForm.bufferBeforeMinutes,
+      bufferAfterMinutes: editForm.bufferAfterMinutes,
       ...(selectedEvent && editForm.isCompleted !== selectedEvent.isCompleted
         ? { isCompleted: editForm.isCompleted }
         : {}),
@@ -1915,6 +1935,16 @@ export function WeeklyTimeGrid({
                       </div>
 
                       <div className="pointer-events-none absolute inset-0 p-1">
+                        {expandedEvents.flatMap((event) => {
+                          const timing = eventTiming(event);
+                          const midnight = parse(dayLayout.dateIso, "yyyy-MM-dd", new Date()).getTime();
+                          return ([[timing.prepareAt, timing.start, "准备"], [timing.end, timing.freeAt, "缓冲"]] as const).map(([from, to, label]) => {
+                            const start = Math.max(0, (+from - midnight) / 3600000);
+                            const end = Math.min(24, (+to - midnight) / 3600000);
+                            if (end <= start) return null;
+                            return <div key={`${event.id}-${label}`} data-testid="event-buffer" aria-label={`${event.title} ${label} ${formatHour(start)}—${formatHour(end)}`} className="absolute inset-x-1 overflow-hidden rounded border border-dashed border-stone-300 px-1 text-[10px] text-stone-500" style={{ top: start * hourCellHeight, height: (end - start) * hourCellHeight, background: "repeating-linear-gradient(135deg, rgba(120,113,108,.06), rgba(120,113,108,.06) 4px, transparent 4px, transparent 8px)" }}>{label} · {event.title}</div>;
+                          });
+                        })}
                         {dayLayout.events.map((event) => {
                           const sourceEvent = toSourceScheduleEvent(event);
                           const activePreview =
@@ -2624,6 +2654,7 @@ export function WeeklyTimeGrid({
                     onStartHourChange={(value) => setCreateForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setCreateForm((prev) => ({ ...prev, endHour: value }))}
                   />
+                  <EventBufferEditor before={createForm.bufferBeforeMinutes} after={createForm.bufferAfterMinutes} onChange={(patch) => setCreateForm((previous) => ({ ...previous, ...patch }))} />
                   <Collapsible
                     open={createDetailsOpen}
                     onOpenChange={setCreateDetailsOpen}
@@ -2780,6 +2811,7 @@ export function WeeklyTimeGrid({
                     onStartHourChange={(value) => setEditForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setEditForm((prev) => ({ ...prev, endHour: value }))}
                   />
+                  <EventBufferEditor before={editForm.bufferBeforeMinutes} after={editForm.bufferAfterMinutes} onChange={(patch) => setEditForm((previous) => ({ ...previous, ...patch }))} />
                   <Collapsible
                     open={editDetailsOpen}
                     onOpenChange={setEditDetailsOpen}

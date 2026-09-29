@@ -11,11 +11,11 @@ describe("ResearchProgressPanel", () => {
     render(<ResearchProgressPanel userId="alice" date="2026-09-05" posts={[]} onCreatePost={vi.fn()} onOpenLogs={vi.fn()} />);
     const external = { drafts: { "2026-09-05": { completed: "另一页的草稿", insight: "", nextPlan: "" } }, restDays: ["2026-09-03"], selectedDate: "2026-09-05" };
     localStorage.setItem(researchStorageKey("alice"), JSON.stringify(external));
-    fireEvent.click(screen.getByRole("button", { name: "昨天", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "昨天" }));
     const stored = JSON.parse(localStorage.getItem(researchStorageKey("alice"))!);
     expect(stored.drafts["2026-09-05"].completed).toBe("另一页的草稿");
     expect(stored.restDays).toEqual(["2026-09-03"]);
-    fireEvent.click(screen.getByRole("button", { name: "今天", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "今天" }));
     expect((screen.getByLabelText("今日完成") as HTMLTextAreaElement).value).toBe("另一页的草稿");
     external.drafts["2026-09-05"].completed = "外部更新";
     localStorage.setItem(researchStorageKey("alice"), JSON.stringify(external));
@@ -42,7 +42,7 @@ describe("ResearchProgressPanel", () => {
     const props = { userId: "alice", date: "2026-09-05", posts: [], onCreatePost: vi.fn(async () => true), onOpenLogs: vi.fn() };
     const first = render(<ResearchProgressPanel {...props} />);
     fireEvent.change(screen.getByLabelText("今日完成"), { target: { value: "今天未完成" } });
-    fireEvent.click(screen.getByRole("button", { name: "昨天", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "昨天" }));
     fireEvent.change(screen.getByLabelText("次日计划"), { target: { value: "昨天未完成" } });
     expect(screen.getByText("草稿已自动保存到本机")).toBeTruthy();
     first.unmount();
@@ -56,7 +56,7 @@ describe("ResearchProgressPanel", () => {
 
     render(<ResearchProgressPanel {...props} />);
     expect((screen.getByLabelText("次日计划") as HTMLTextAreaElement).value).toBe("");
-    fireEvent.click(screen.getByRole("button", { name: "今天", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "今天" }));
     expect((screen.getByLabelText("今日完成") as HTMLTextAreaElement).value).toBe("今天未完成");
   });
 
@@ -64,14 +64,14 @@ describe("ResearchProgressPanel", () => {
     const props = { date: "2026-09-05", posts: [], onCreatePost: vi.fn(), onOpenLogs: vi.fn() };
     const { rerender } = render(<ResearchProgressPanel {...props} userId="alice" />);
     fireEvent.change(screen.getByLabelText("今日完成"), { target: { value: "Alice 的草稿" } });
-    fireEvent.click(screen.getByRole("button", { name: "昨天", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "昨天" }));
     fireEvent.click(screen.getByRole("button", { name: "标记休息日" }));
     rerender(<ResearchProgressPanel {...props} userId="bob" />);
     expect((screen.getByLabelText("今日完成") as HTMLTextAreaElement).value).toBe("");
     expect(screen.getByRole("button", { name: "2026-09-04 待补记" })).toBeTruthy();
     rerender(<ResearchProgressPanel {...props} userId="alice" />);
     expect(screen.getByRole("button", { name: "2026-09-04 休息日" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "今天", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "今天" }));
     expect((screen.getByLabelText("今日完成") as HTMLTextAreaElement).value).toBe("Alice 的草稿");
   });
 

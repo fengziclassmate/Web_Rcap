@@ -1,3 +1,4 @@
+import { normalizeBufferMinutes } from "@/lib/event-timing";
 import { format } from "date-fns";
 import { normalizeCategoryDefList } from "./categories";
 import type { RecurrenceConfig, RecurrenceInstanceOverride } from "@/lib/recurrence";
@@ -380,6 +381,8 @@ export function normalizeEvents(payload: unknown): ScheduleEvent[] {
       ...(typeof value.endDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.endDate) && value.endDate >= (value.date ?? "") ? { endDate: value.endDate } : {}),
       startHour: typeof value.startHour === "number" ? value.startHour : 9,
       endHour: typeof value.endHour === "number" ? value.endHour : 10,
+      bufferBeforeMinutes: normalizeBufferMinutes(value.bufferBeforeMinutes),
+      bufferAfterMinutes: normalizeBufferMinutes(value.bufferAfterMinutes),
       title: value.title ?? "\u672a\u547d\u540d\u884c\u7a0b",
       notes: value.notes ?? "",
       requirements: Array.isArray(value.requirements)

@@ -1,6 +1,7 @@
 import { addDays, format, parseISO, startOfWeek } from "date-fns";
 import { expandScheduleEvents } from "@/lib/recurrence";
 import { splitScheduleEventByDay } from "@/lib/schedule-layout";
+import { eventTimingsInRange } from "@/lib/event-timing";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
 
 export type FocusTarget = { id: string; title: string; category: string };
@@ -63,7 +64,8 @@ export function dailyCapacity(events: ScheduleEvent[], tasks: LongTask[], now: D
   const start = Math.max(startHour * 60, now.getHours() * 60 + now.getMinutes());
   const end = endHour * 60;
   const remainingEvents = eventsInDays(events, date, date).filter((event) => event.endHour * 60 > start && event.startHour * 60 < end);
-  const occupied = occupiedMinutes(remainingEvents.map((event) => [Math.max(start, event.startHour * 60), Math.min(end, event.endHour * 60)]));
+  const midnight = parseISO(date).getTime();
+  const occupied = occupiedMinutes(eventTimingsInRange(events, date, date).map((item) => [Math.max(start, (item.prepareAt.getTime() - midnight) / 60000), Math.min(end, (item.freeAt.getTime() - midnight) / 60000)]));
   const free = Math.max(0, end - start - occupied);
   const scheduledIntervals = new Map<string, Array<[number, number]>>();
   for (const event of remainingEvents) {
