@@ -132,6 +132,7 @@ export function WorkbenchApp() {
   const [logPosts, setLogPosts] = useState<LogPostRecord[]>([]);
   const [logTags, setLogTags] = useState<LogTag[]>([]);
   const [logReady, setLogReady] = useState(false);
+  const [logHistoryAvailable, setLogHistoryAvailable] = useState(false);
   const [logUploading, setLogUploading] = useState(false);
   const [dashboardUiPreferences, setDashboardUiPreferences] = useState<DashboardUiPreferences>(
     defaultDashboardUiPreferences,
@@ -246,6 +247,7 @@ export function WorkbenchApp() {
 
     setLogTags(tags);
     setLogPosts(composeLogPostRecords(posts, signedImages, tags, tagLinks, links));
+    setLogHistoryAvailable(true);
   }
 
   useEffect(() => {
@@ -285,6 +287,7 @@ export function WorkbenchApp() {
       setLogPosts([]);
       setLogTags([]);
       setLogReady(false);
+      setLogHistoryAvailable(false);
       setDashboardUiPreferences(defaultDashboardUiPreferences);
       setDataReady(false);
       return;
@@ -1535,6 +1538,8 @@ export function WorkbenchApp() {
               <section className="min-h-0 space-y-4">
                 <ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />
                 <TaskDashboard
+                  userId={user.id}
+                  logsReady={logReady && logHistoryAvailable}
                   openCollectionRequest={openCollectionRequest}
                   onCollectionRequestHandled={() => setOpenCollectionRequest(undefined)}
                   openTaskRequest={openTaskRequest}

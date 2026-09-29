@@ -59,6 +59,8 @@ import type { LogComposerInput, LogPostRecord } from "@/lib/logs";
 import { cn } from "@/lib/utils";
 
 type TaskDashboardProps = {
+  userId?: string;
+  logsReady?: boolean;
   openCollectionRequest?: { id: string; kind: "annual" | "project" | "shopping"; token: number };
   onCollectionRequestHandled?: () => void;
   openTaskRequest?: { id: string; token: number };
@@ -304,6 +306,8 @@ function isValidTime(value: string) {
 }
 
 export function TaskDashboard({
+  userId,
+  logsReady,
   openCollectionRequest,
   onCollectionRequestHandled,
   openTaskRequest,
@@ -2323,6 +2327,8 @@ export function TaskDashboard({
 
       <div hidden={group !== "today"}>
       <ResearchProgressPanel
+        userId={userId}
+        logsReady={logsReady}
         date={todayDate}
         posts={logPosts}
         saving={logSaving}
