@@ -167,6 +167,50 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("edits a multi-day start date while keeping its end fixed", () => {
+    const onUpdateEvent = vi.fn();
+    renderGrid({ events: [{ ...scheduleEvent, endDate: "2026-07-30", startHour: 9, endHour: 10 }], onUpdateEvent });
+    fireEvent.click(screen.getAllByRole("button", { name: `打开 ${scheduleEvent.title} 编辑窗口` })[0]);
+    fireEvent.change(screen.getByLabelText("编辑行程开始日期"), { target: { value: "2026-07-29" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, expect.objectContaining({ date: "2026-07-29", endDate: "2026-07-30", startHour: 9, endHour: 10 }));
+  });
+  it("accepts moving a multi-day event onto its own later segment at the pointer time", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, endDate: "2026-07-30", startHour: 9, endHour: 10 }], onUpdateEvent });
+    const cards = container.querySelectorAll("[data-schedule-card]");
+    Object.defineProperty(cards[1], "getBoundingClientRect", { value: () => ({ top: 0, height: 1728 }) });
+    fireEvent.dragStart(cards[0]);
+    expect(fireEvent.dragOver(cards[1], { clientY: 720 })).toBe(false);
+    fireEvent(cards[1], new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 720 }));
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, expect.objectContaining({ date: "2026-07-28", startHour: 10, endDate: "2026-07-31", endHour: 11 }));
+  });
+  it("can shorten a multi-day event to its final day and rejects a start after its end", () => {
+    const onUpdateEvent = vi.fn();
+    renderGrid({ events: [{ ...scheduleEvent, endDate: "2026-07-30", startHour: 9, endHour: 10 }], onUpdateEvent });
+    fireEvent.click(screen.getAllByRole("button", { name: `打开 ${scheduleEvent.title} 编辑窗口` })[0]);
+    fireEvent.change(screen.getByLabelText("编辑行程开始日期"), { target: { value: "2026-07-31" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    expect(onUpdateEvent).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("编辑行程开始日期"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("编辑行程结束日期"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    expect(onUpdateEvent).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("编辑行程结束日期"), { target: { value: "2026-07-30" } });
+    fireEvent.change(screen.getByLabelText("编辑行程开始日期"), { target: { value: "2026-07-30" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, expect.objectContaining({ date: "2026-07-30", endDate: undefined, startHour: 9, endHour: 10 }));
+  });
+  it("resizes a multi-day start into a later date without moving its end", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, endDate: "2026-07-30", startHour: 9, endHour: 10 }], onUpdateEvent });
+    const columns = container.querySelectorAll("[data-timeline-date]");
+    columns.forEach((column, i) => Object.defineProperty(column, "getBoundingClientRect", { value: () => ({ left: i * 100, right: (i + 1) * 100, top: 0, width: 100 }) }));
+    fireEvent.mouseDown(screen.getByRole("button", { name: `调整 ${scheduleEvent.title} 的开始时间` }), { clientX: 50, clientY: 648 });
+    fireEvent.mouseMove(window, { clientX: 250, clientY: 720 });
+    fireEvent.mouseUp(window);
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, { date: "2026-07-29", startHour: 10, endDate: "2026-07-30", endHour: 10 }, undefined);
+  });
   it("persists a custom quick-template order", () => {
     localStorage.setItem("schedule-event-templates-v1", JSON.stringify([{ id: "walk", title: "散步", category: "休息", notes: "", requirements: [], tag: null }]));
     const { container } = renderGrid();

@@ -693,7 +693,7 @@ export function DailyExpensePanel({
             className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
             aria-label={panelOpen ? `折叠${title}` : `展开${title}`}
           >
-            <h3 className="flex items-center gap-2 text-base font-semibold text-stone-950">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-950">
               <WalletCards className="h-4 w-4 text-stone-700" aria-hidden />
               {title}
             </h3>
@@ -714,7 +714,7 @@ export function DailyExpensePanel({
 
         <CollapsibleContent className="mt-2 flex w-full flex-col gap-2">
           {contentHeader}
-          <div className="grid gap-2 lg:grid-cols-3 [&>div]:py-2 [&_.text-xl]:text-base">
+          <div className="grid overflow-hidden rounded-lg border border-stone-200 bg-white lg:grid-cols-3 [&>div]:rounded-none [&>div]:border-0 [&>div]:border-b [&>div]:py-2 [&>div:last-child]:border-b-0 lg:[&>div]:border-b-0 lg:[&>div]:border-r lg:[&>div:last-child]:border-r-0 [&_.text-xl]:text-base">
           <div className="rounded-lg border border-stone-200 bg-white px-3 py-3">
             <p className="flex items-center gap-1.5 text-xs font-medium text-stone-500">
               <ReceiptText className="h-3.5 w-3.5" aria-hidden />
@@ -764,7 +764,7 @@ export function DailyExpensePanel({
         </div>
 
         <div className="grid items-start gap-2 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-          <div className="min-w-0 space-y-3 rounded-lg border border-stone-200 bg-white p-3">
+          <div className="min-w-0 space-y-2 border-t border-stone-200 px-2 py-2">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-semibold text-stone-900">当天支出列表</h4>
               <span className="text-xs text-stone-500">{summary.expenses.length} 条</span>
@@ -907,7 +907,7 @@ export function DailyExpensePanel({
           </div>
 
           <div className="contents">
-            <div className="min-w-0 rounded-lg border border-stone-200 bg-white p-2">
+            <div className="min-w-0 border-t border-stone-200 p-2">
               <h4 className="text-sm font-semibold text-stone-900">添加支出</h4>
               <div className="mt-1 grid grid-cols-2 items-end gap-2 sm:grid-cols-4 [&_label]:text-xs">
                 <div className="min-w-0 space-y-1">
@@ -982,7 +982,7 @@ export function DailyExpensePanel({
               </div>
             </div>
 
-            <div className="rounded-lg border border-stone-200 bg-white p-2 lg:col-span-2">
+            <div className="border-t border-stone-200 p-2 lg:col-span-2">
               <div className="grid gap-3 lg:grid-cols-3 [&>div]:grid [&>div]:grid-cols-[auto_minmax(0,1fr)] [&>div]:items-center [&>div]:gap-x-2 [&>div>p]:col-start-2 [&_label]:text-xs">
                 <div>
                   <Label htmlFor="daily-budget-amount">每日预算</Label>

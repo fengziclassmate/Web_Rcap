@@ -205,7 +205,7 @@ export function DailyReflectionPanel({
             <div
               role="group"
               aria-label="选择日志日期"
-              className={`mt-3 grid overflow-hidden rounded-xl border border-stone-200 bg-stone-200 shadow-inner ${days.length === 1 ? "grid-cols-1" : "grid-cols-7"}`}
+              className={`mt-2 grid overflow-hidden rounded-lg border border-stone-200 bg-white ${days.length === 1 ? "grid-cols-1" : "grid-cols-7"}`}
             >
           {days.map((day) => {
             const dayPosts = postsByDate.get(day.date) ?? [];
@@ -223,7 +223,7 @@ export function DailyReflectionPanel({
                 aria-pressed={selected}
                 disabled={submitting || saving}
                 onClick={() => selectDay(day.date)}
-                className={`group relative min-h-28 min-w-0 border-r border-stone-200 bg-white p-2.5 text-left transition last:border-r-0 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700 disabled:cursor-wait disabled:opacity-70 ${
+                className={`group relative min-h-24 min-w-0 border-r border-stone-200 bg-white p-2 text-left transition last:border-r-0 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700 disabled:cursor-wait disabled:opacity-70 ${
                   selected ? "z-[1] bg-emerald-50/80 ring-2 ring-inset ring-emerald-800" : "hover:bg-emerald-50/40"
                 }`}
               >

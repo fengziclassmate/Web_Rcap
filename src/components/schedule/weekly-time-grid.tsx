@@ -133,6 +133,7 @@ type EventFormState = {
 };
 
 type ResizeState = {
+  date: string;
   endDate?: string;
   multiDay: boolean;
   eventId: string;
@@ -145,6 +146,7 @@ type ResizeState = {
 };
 
 type ResizePreview = {
+  date?: string;
   endDate?: string;
   eventId: string;
   startHour: number;
@@ -520,6 +522,7 @@ export function WeeklyTimeGrid({
   const [selectedCell, setSelectedCell] = useState<GridCell | null>(null);
   const [createEndDate, setCreateEndDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
+  const [editStartDate, setEditStartDate] = useState("");
   const [createForm, setCreateForm] = useState<EventFormState>(defaultForm);
   const [createDetailsOpen, setCreateDetailsOpen] = useState(false);
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
@@ -801,7 +804,11 @@ export function WeeklyTimeGrid({
     if (viewMode === "month") return [];
 
     const eventsByDate = new Map<string, TimelineEventSegment[]>();
-    displayEventSegments.forEach((event) => {
+    const resizingSource = resizePreview?.endDate ? expandedEvents.find((event) => event.id === resizePreview.eventId) : undefined;
+    const visibleSegments = resizingSource && resizePreview
+      ? [...displayEventSegments.filter((event) => event.id !== resizingSource.id), ...splitScheduleEventByDay({ ...resizingSource, ...resizePreview }).filter((event) => displayDateKeys.has(event.displayDate))]
+      : displayEventSegments;
+    visibleSegments.forEach((event) => {
       const dayEvents = eventsByDate.get(event.displayDate) ?? [];
       dayEvents.push(event);
       eventsByDate.set(event.displayDate, dayEvents);
@@ -822,7 +829,7 @@ export function WeeklyTimeGrid({
         laneCount,
       };
     });
-  }, [displayDates, displayEventSegments, viewMode]);
+  }, [displayDates, displayDateKeys, displayEventSegments, expandedEvents, resizePreview, viewMode]);
 
   const timelineGridTemplateColumns = useMemo(
     () => `${viewMode === "day" ? 72 : 56}px repeat(${timelineDayLayouts.length}, minmax(0, 1fr))`,
@@ -1132,7 +1139,8 @@ export function WeeklyTimeGrid({
   }
 
   function handleOpenEdit(event: ScheduleEvent) {
-    setEditEndDate(event.endDate ?? "");
+    setEditStartDate(event.date);
+    setEditEndDate(event.endDate ?? (parseSyntheticEventId(event.id) || event.recurrence ? "" : format(addDays(parse(event.date, "yyyy-MM-dd", new Date()), event.endHour < event.startHour ? 1 : 0), "yyyy-MM-dd")));
     setEditingEventId(event.id);
     setEditDetailsOpen(false);
     setEditRecurrenceOpen(false);
@@ -1214,10 +1222,10 @@ export function WeeklyTimeGrid({
   function buildEditPatch(): Partial<ScheduleEvent> {
     const { startHour, endHour } = resolveFormTimeRange(editForm.startHour, editForm.endHour);
     return {
-      ...(!parseSyntheticEventId(selectedEvent?.id ?? "") ? { endDate: selectedEvent && editEndDate > selectedEvent.date ? editEndDate : undefined } : {}),
+      ...(!parseSyntheticEventId(selectedEvent?.id ?? "") ? { endDate: editEndDate > editStartDate ? editEndDate : undefined, ...(selectedEvent && editStartDate !== selectedEvent.date ? { date: editStartDate } : {}) } : {}),
       title: editForm.title.trim(),
       startHour,
-      endHour: editEndDate && selectedEvent && editEndDate > selectedEvent.date ? editForm.endHour : endHour,
+      endHour: editEndDate > editStartDate ? editForm.endHour : endHour,
       notes: editForm.notes.trim(),
       requirements: buildRequirementLines(editForm.requirements),
       ...(selectedEvent && editForm.isCompleted !== selectedEvent.isCompleted
@@ -1230,7 +1238,10 @@ export function WeeklyTimeGrid({
 
   function handleSaveEdit() {
     if (!selectedEvent || !editForm.title.trim()) return;
-    if (editEndDate && (editEndDate < selectedEvent.date || (editEndDate === selectedEvent.date && editForm.endHour <= editForm.startHour))) {
+    if (!parseSyntheticEventId(selectedEvent.id) && !selectedEvent.recurrence && (!editStartDate || !editEndDate)) {
+      toast.error("请选择开始日期和结束日期"); return;
+    }
+    if (editEndDate && (!editStartDate || editEndDate < editStartDate || (editEndDate === editStartDate && editForm.endHour <= editForm.startHour))) {
       toast.error("结束时间必须晚于开始时间"); return;
     }
 
@@ -1467,6 +1478,7 @@ export function WeeklyTimeGrid({
     resizePreviewRef.current = preview;
     setResizePreview(preview);
     setResizeState({
+      date: event.date,
       endDate: event.endDate,
       multiDay: Boolean(event.endDate && event.endDate > event.date),
       eventId: event.id,
@@ -1590,6 +1602,23 @@ export function WeeklyTimeGrid({
       const deltaHour = (event.clientY - activeResize.startY) / hourCellHeight;
       const snap = (value: number) => Math.round(value / resizeStepHour) * resizeStepHour;
       if (activeResize.multiDay) {
+        const targetColumn = Array.from(timelineBodyRef.current?.querySelectorAll<HTMLElement>("[data-timeline-date]") ?? []).find((column) => {
+          const bounds = column.getBoundingClientRect();
+          return bounds.width > 0 && event.clientX >= bounds.left && event.clientX < bounds.right;
+        });
+        if (targetColumn) {
+          const targetDate = targetColumn.dataset.timelineDate!;
+          const targetHour = Math.max(0, Math.min(activeResize.direction === "start" ? 24 - resizeStepHour : 24, snap((event.clientY - targetColumn.getBoundingClientRect().top) / hourCellHeight)));
+          const date = activeResize.direction === "start" ? targetDate : activeResize.date;
+          const endDate = activeResize.direction === "end" ? targetDate : activeResize.endDate!;
+          const startHour = activeResize.direction === "start" ? targetHour : activeResize.startHour;
+          const endHour = activeResize.direction === "end" ? targetHour : activeResize.endHour;
+          if (date > endDate || (date === endDate && endHour - startHour < resizeStepHour - 0.000001)) return;
+          const preview = { eventId: activeResize.eventId, ...(date !== activeResize.date ? { date } : {}), endDate, startHour, endHour };
+          resizePreviewRef.current = preview;
+          setResizePreview(preview);
+          return;
+        }
         const hour = Math.max(0, Math.min(activeResize.direction === "start" ? 24 - resizeStepHour : 24, snap(activeResize.initialHour + deltaHour)));
         const preview = { eventId: activeResize.eventId, endDate: activeResize.endDate, startHour: activeResize.direction === "start" ? hour : activeResize.startHour, endHour: activeResize.direction === "end" ? hour : activeResize.endHour };
         resizePreviewRef.current = preview;
@@ -1653,7 +1682,7 @@ export function WeeklyTimeGrid({
       if (preview) {
         onUpdateEvent(
           preview.eventId,
-          { startHour: preview.startHour, endHour: preview.endHour, ...(preview.endDate ? { endDate: preview.endDate } : {}) },
+          { startHour: preview.startHour, endHour: preview.endHour, ...(preview.date ? { date: preview.date } : {}), ...(preview.endDate ? { endDate: preview.endDate } : {}) },
           parseSyntheticEventId(preview.eventId) ? { scope: "occurrence" } : undefined,
         );
       }
@@ -1795,9 +1824,10 @@ export function WeeklyTimeGrid({
                 {timelineDayLayouts.map((day) => (
                   <div
                     key={day.dateIso}
-                    className="border-r border-gray-200 bg-gray-50 px-3 py-2 text-center text-xs font-medium text-gray-700 last:border-r-0"
+                    aria-current={day.dateIso === todayIso ? "date" : undefined}
+                    className={`border-r border-gray-200 px-3 py-2 text-center text-xs font-medium last:border-r-0 ${day.dateIso === todayIso ? "bg-emerald-50 text-emerald-900 shadow-[inset_0_-2px_0_#047857]" : "bg-stone-50 text-stone-600"}`}
                   >
-                    <div>{dayTitle(day.date)}</div>
+                    <div className="flex flex-wrap items-center justify-center gap-1"><span>{dayTitle(day.date)}</span>{day.dateIso === todayIso ? <span className="inline-flex shrink-0 whitespace-nowrap rounded bg-emerald-800 px-1 py-0.5 text-[9px] text-white">今天</span> : null}</div>
                     {day.laneCount > 1 ? (
                       <div className="mt-0.5 text-[10px] font-medium text-gray-500">
                         {day.laneCount} 个并行
@@ -1840,7 +1870,7 @@ export function WeeklyTimeGrid({
 
                 {timelineDayLayouts.map((dayLayout) => {
                   return (
-                    <div key={dayLayout.dateIso} className="relative border-r border-gray-200 last:border-r-0">
+                    <div key={dayLayout.dateIso} data-timeline-date={dayLayout.dateIso} className="relative border-r border-gray-200 last:border-r-0">
                       <div
                         className="grid"
                         style={{ gridTemplateRows }}
@@ -1931,7 +1961,7 @@ export function WeeklyTimeGrid({
                                 draggingEventIdRef.current = null;
                               }}
                               onDragOver={(dragEvent) => {
-                                if (draggingEventIdRef.current !== event.id) {
+                                if (draggingEventIdRef.current) {
                                   dragEvent.preventDefault();
                                   dragEvent.stopPropagation();
                                 }
@@ -1939,7 +1969,10 @@ export function WeeklyTimeGrid({
                               onDrop={(dragEvent) => {
                                 dragEvent.preventDefault();
                                 dragEvent.stopPropagation();
-                                handleDropEvent(event.displayDate, event.startHour);
+                                const movingSource = expandedEvents.find((item) => item.id === draggingEventIdRef.current);
+                                const isMultiDayMove = movingSource?.endDate && movingSource.endDate > movingSource.date;
+                                const pointerHour = event.startHour + (dragEvent.clientY - dragEvent.currentTarget.getBoundingClientRect().top) / hourCellHeight;
+                                handleDropEvent(event.displayDate, isMultiDayMove ? normalizeStartTimeValue(Math.round(pointerHour * 12) / 12) : event.startHour);
                               }}
                               onContextMenu={(mouseEvent) => handleContextMenu(mouseEvent, event.id)}
                             >
@@ -2364,7 +2397,7 @@ export function WeeklyTimeGrid({
                     新建行程 - {selectedCell.date} {formatHour(selectedCell.startHour)}
                   </DialogTitle>
                 </DialogHeader>
-                <div className="mt-4 space-y-5">
+                <div className="mt-3 space-y-3">
                   <div className="space-y-3">
                     <Label htmlFor="create-title">标题</Label>
                     <Input
@@ -2519,7 +2552,7 @@ export function WeeklyTimeGrid({
                   <div className="space-y-3">
                     <section
                       aria-label="快捷事件"
-                      className="rounded-xl border border-amber-200/80 bg-amber-50/55 p-3"
+                      className="rounded-lg border border-stone-200 bg-stone-50/60 p-2.5"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <p className="min-w-0 text-xs font-semibold text-stone-800">快捷事件</p>
@@ -2619,7 +2652,7 @@ export function WeeklyTimeGrid({
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
-                  <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-4">
+                  <div className="flex items-center gap-3 rounded-lg bg-stone-50 px-3 py-2">
                     <Switch
                       id="create-completed"
                       checked={createForm.isCompleted}
@@ -2661,7 +2694,7 @@ export function WeeklyTimeGrid({
                 <DialogHeader>
                   <DialogTitle className="text-lg font-semibold text-gray-900">编辑行程详情</DialogTitle>
                 </DialogHeader>
-                <div className="mt-4 space-y-5">
+                <div className="mt-3 space-y-3">
                   <div className="space-y-3">
                     <Label htmlFor="edit-title">标题</Label>
                     <Input
@@ -2731,10 +2764,11 @@ export function WeeklyTimeGrid({
                   <TimeRangeEditor
                     startHour={editForm.startHour}
                     endHour={editForm.endHour}
+                    startDateControl={!parseSyntheticEventId(selectedEvent.id) && !selectedEvent.recurrence ? <Input aria-label="编辑行程开始日期" title="开始日期" type="date" value={editStartDate} onChange={(event) => setEditStartDate(event.target.value)} className="h-6 w-[112px] min-w-0 shrink-0 px-1 py-0 text-[10px] md:text-[10px]" /> : undefined}
+                    endDateControl={!parseSyntheticEventId(selectedEvent.id) && !selectedEvent.recurrence ? <Input aria-label="编辑行程结束日期" title="结束日期" type="date" min={editStartDate} value={editEndDate || editStartDate} onChange={(event) => setEditEndDate(event.target.value)} className="h-6 w-[112px] min-w-0 shrink-0 px-1 py-0 text-[10px] md:text-[10px]" /> : undefined}
                     onStartHourChange={(value) => setEditForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setEditForm((prev) => ({ ...prev, endHour: value }))}
                   />
-                  {!parseSyntheticEventId(selectedEvent.id) && !selectedEvent.recurrence ? <label className="flex items-center gap-3 text-sm">结束日期<Input aria-label="编辑行程结束日期" type="date" min={selectedEvent.date} value={editEndDate || selectedEvent.date} onChange={(event) => setEditEndDate(event.target.value)} /></label> : null}
                   <Collapsible
                     open={editDetailsOpen}
                     onOpenChange={setEditDetailsOpen}
@@ -2774,7 +2808,7 @@ export function WeeklyTimeGrid({
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
-                  <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-4">
+                  <div className="flex items-center gap-3 rounded-lg bg-stone-50 px-3 py-2">
                     <Switch
                       id="edit-completed"
                       checked={editForm.isCompleted}
@@ -2880,7 +2914,8 @@ export function WeeklyTimeGrid({
                     {parseSyntheticEventId(selectedEvent.id) ? null : (
                       <Button
                         type="button"
-                        className="flex-1 bg-red-600 text-white hover:bg-red-700"
+                        variant="destructive"
+                        className="flex-1"
                         onClick={() => {
                           onDeleteEvent(selectedEvent.id, { mode: "all" });
                           setEditingEventId(null);
@@ -3562,12 +3597,14 @@ function MinuteQuickPick({
 function TimeRangeEditor({
   startHour,
   endHour,
+  startDateControl,
   endDateControl,
   onStartHourChange,
   onEndHourChange,
 }: {
   startHour: number;
   endHour: number;
+  startDateControl?: React.ReactNode;
   endDateControl?: React.ReactNode;
   onStartHourChange: (value: number) => void;
   onEndHourChange: (value: number) => void;
@@ -3581,9 +3618,10 @@ function TimeRangeEditor({
     <div className="grid grid-cols-2 gap-2 [&_[data-slot=select-trigger]]:h-7">
       <div className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
         <div className="flex min-h-6 items-center justify-between gap-1">
-          <Label className="text-xs font-semibold uppercase tracking-wide text-stone-600">
+          <Label className="shrink-0 whitespace-nowrap text-xs font-semibold text-stone-600">
             开始时间
           </Label>
+          {startDateControl}
         </div>
         <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-1 [&_label]:hidden">
           <CenteredTimePartSelect

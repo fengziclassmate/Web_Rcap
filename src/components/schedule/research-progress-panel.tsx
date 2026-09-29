@@ -89,8 +89,8 @@ export function ResearchProgressPanel({
 
   return (
     <section className="task-dashboard-section" data-testid="research-progress-panel">
-      <div className="rounded-2xl border border-sky-900/10 bg-[linear-gradient(145deg,rgba(240,249,255,0.94),rgba(248,250,252,0.82))] p-3 shadow-[0_10px_26px_rgba(15,23,42,0.05)]">
-        <div className="mb-3 flex items-center gap-2">
+      <div className="border-t border-stone-200 pt-3">
+        <div className="mb-2 flex items-center gap-2">
           <FlaskConical className="h-4 w-4 shrink-0 text-sky-800" aria-hidden />
           <h3 className="text-sm font-semibold text-stone-800">今日科研进展</h3>
           <Button type="button" size="icon-sm" variant="ghost" aria-label={open ? "折叠今日科研进展" : "展开今日科研进展"} aria-expanded={open} onClick={() => { setOpen(!open); try { localStorage.setItem("research-progress-open", open ? "closed" : "open"); } catch {} }}>{open ? "⌄" : "›"}</Button>

@@ -1616,7 +1616,7 @@ export function TaskDashboard({
             ) : (
           <div className="space-y-3">
             {groupedIncompleteTasks.map((group) => (
-              <div key={group.priority} className="rounded-xl border border-stone-200/80 bg-white/55 p-3">
+              <div key={group.priority} className="border-t border-stone-200/80 py-2">
                 <p className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
                   {getPriorityIcon(group.priority)}
                   {group.priority}
@@ -1824,10 +1824,10 @@ export function TaskDashboard({
                 key={project.id}
                 data-testid="project-checkin-card"
                 data-project-checkin-id={project.id}
-                className={`rounded-lg border p-3 transition-[border-color,background-color,transform] ${
+                className={`rounded-lg border border-l-[3px] p-2.5 transition-colors ${
                   checkedInToday
-                    ? "border-emerald-100 bg-emerald-50/30"
-                    : "border-gray-200 bg-white/35"
+                    ? "border-stone-100 bg-stone-50/70"
+                    : "border-stone-200 border-l-emerald-700 bg-white"
                 }`}
                 onDragOver={(event) => {
                   const source = visibleProjectCheckins.find(
@@ -1927,7 +1927,7 @@ export function TaskDashboard({
                         </Badge>
                       ) : null}
                     </div>
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-lg border border-gray-200 bg-gray-50/70 p-2 items-end">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-t border-stone-100 pt-2 items-end">
                       <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-gray-600">打卡日期</Label>
                         <Input
