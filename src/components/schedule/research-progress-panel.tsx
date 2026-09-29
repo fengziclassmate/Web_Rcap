@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { format, parseISO } from "date-fns";
+import { addDays, format, isValid, parseISO } from "date-fns";
 import { ArrowUpRight, FlaskConical, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 import {
   getDailyLogKind,
   type LogComposerInput,
@@ -18,6 +20,9 @@ type ResearchProgressPanelProps = {
   onCreatePost: (input: LogComposerInput) => Promise<boolean>;
   onOpenLogs: () => void;
 };
+
+type ResearchDraft = { completed: string; insight: string; nextPlan: string };
+const emptyDraft: ResearchDraft = { completed: "", insight: "", nextPlan: "" };
 
 function getPostDate(post: LogPostRecord) {
   return format(parseISO(post.createdAt), "yyyy-MM-dd");
@@ -43,25 +48,38 @@ export function ResearchProgressPanel({
 }: ResearchProgressPanelProps) {
   const [open, setOpen] = useState(true);
   useEffect(() => { try { setOpen(localStorage.getItem("research-progress-open") !== "closed"); } catch {} }, []);
-  const [completed, setCompleted] = useState("");
-  const [insight, setInsight] = useState("");
-  const [nextPlan, setNextPlan] = useState("");
   const [draftDate, setDraftDate] = useState(date);
+  const [followToday, setFollowToday] = useState(true);
+  const [drafts, setDrafts] = useState<Record<string, ResearchDraft>>({});
   const [submitting, setSubmitting] = useState(false);
+  const { completed, insight, nextPlan } = drafts[draftDate] ?? emptyDraft;
 
-  const todayEntryCount = useMemo(
+  const selectedEntryCount = useMemo(
     () =>
       posts.filter(
-        (post) => getDailyLogKind(post) === "research" && getPostDate(post) === date,
+        (post) => getDailyLogKind(post) === "research" && getPostDate(post) === draftDate,
       ).length,
-    [date, posts],
+    [draftDate, posts],
   );
   const canSubmit = Boolean(completed.trim() || insight.trim() || nextPlan.trim());
   const disabled = submitting || saving;
 
   useEffect(() => {
-    if (!canSubmit) setDraftDate(date);
-  }, [canSubmit, date]);
+    if (followToday && !canSubmit) setDraftDate(date);
+  }, [canSubmit, date, followToday]);
+
+  function selectDate(value: string) {
+    if (disabled || !/^\d{4}-\d{2}-\d{2}$/.test(value) || !isValid(parseISO(value)) || value > date) return;
+    setFollowToday(value === date);
+    setDraftDate(value);
+  }
+
+  function updateDraft(patch: Partial<ResearchDraft>) {
+    setDrafts((previous) => ({
+      ...previous,
+      [draftDate]: { ...emptyDraft, ...previous[draftDate], ...patch },
+    }));
+  }
 
   async function handleSubmit() {
     if (!canSubmit || disabled) return;
@@ -78,10 +96,14 @@ export function ResearchProgressPanel({
         links: [],
       });
       if (!saved) return;
-      setCompleted("");
-      setInsight("");
-      setNextPlan("");
-      setDraftDate(date);
+      setDrafts((previous) => {
+        const next = { ...previous };
+        delete next[draftDate];
+        return next;
+      });
+      if (followToday) setDraftDate(date);
+    } catch {
+      toast.error("保存科研日志失败，请重试");
     } finally {
       setSubmitting(false);
     }
@@ -95,7 +117,7 @@ export function ResearchProgressPanel({
           <h3 className="text-sm font-semibold text-stone-800">今日科研进展</h3>
           <Button type="button" size="icon-sm" variant="ghost" aria-label={open ? "折叠今日科研进展" : "展开今日科研进展"} aria-expanded={open} onClick={() => { setOpen(!open); try { localStorage.setItem("research-progress-open", open ? "closed" : "open"); } catch {} }}>{open ? "⌄" : "›"}</Button>
           <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium tabular-nums text-sky-800">
-            今日 {todayEntryCount} 条
+            {draftDate === date ? "今日" : "当日"} {selectedEntryCount} 条
           </span>
           {canSubmit && draftDate !== date ? (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium tabular-nums text-amber-800">
@@ -116,13 +138,29 @@ export function ResearchProgressPanel({
         </div>
 
         <div className="space-y-2.5" hidden={!open}>
+          <div className="flex items-end gap-1.5">
+            <label className="min-w-0 flex-1 space-y-1">
+              <span className="text-xs font-semibold text-stone-600">日志日期</span>
+              <Input
+                type="date"
+                aria-label="科研日志日期"
+                value={draftDate}
+                max={date}
+                disabled={disabled}
+                onChange={(event) => selectDate(event.target.value)}
+                className="bg-white/90"
+              />
+            </label>
+            <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => selectDate(format(addDays(parseISO(date), -1), "yyyy-MM-dd"))}>昨天</Button>
+            <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => selectDate(date)}>今天</Button>
+          </div>
           <label className="block space-y-1">
-            <span className="text-xs font-semibold text-stone-600">今日完成</span>
+            <span className="text-xs font-semibold text-stone-600">{draftDate === date ? "今日完成" : "当日完成"}</span>
             <Textarea
               value={completed}
-              onChange={(event) => setCompleted(event.target.value)}
+              onChange={(event) => updateDraft({ completed: event.target.value })}
               disabled={disabled}
-              aria-label="今日完成"
+              aria-label={draftDate === date ? "今日完成" : "当日完成"}
               placeholder="实验、阅读、写作或分析进展"
               className="min-h-16 resize-y border-sky-900/10 bg-white/90 text-xs leading-5"
             />
@@ -131,7 +169,7 @@ export function ResearchProgressPanel({
             <span className="text-xs font-semibold text-stone-600">关键进展 / 卡点</span>
             <Textarea
               value={insight}
-              onChange={(event) => setInsight(event.target.value)}
+              onChange={(event) => updateDraft({ insight: event.target.value })}
               disabled={disabled}
               aria-label="关键进展或卡点"
               placeholder="新发现、待验证判断或当前阻碍"
@@ -139,12 +177,12 @@ export function ResearchProgressPanel({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-semibold text-stone-600">明日计划</span>
+            <span className="text-xs font-semibold text-stone-600">{draftDate === date ? "明日计划" : "次日计划"}</span>
             <Textarea
               value={nextPlan}
-              onChange={(event) => setNextPlan(event.target.value)}
+              onChange={(event) => updateDraft({ nextPlan: event.target.value })}
               disabled={disabled}
-              aria-label="明日计划"
+              aria-label={draftDate === date ? "明日计划" : "次日计划"}
               placeholder="下一步最小且明确的行动"
               className="min-h-14 resize-y border-sky-900/10 bg-white/90 text-xs leading-5"
             />
