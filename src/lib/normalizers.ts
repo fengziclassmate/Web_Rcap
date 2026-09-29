@@ -1,4 +1,4 @@
-import { normalizeBufferMinutes } from "@/lib/event-timing";
+import { normalizeBufferMinutes, normalizeBufferName } from "@/lib/event-timing";
 import { format } from "date-fns";
 import { normalizeCategoryDefList } from "./categories";
 import type { RecurrenceConfig, RecurrenceInstanceOverride } from "@/lib/recurrence";
@@ -21,6 +21,8 @@ import type { Achievement } from "@/lib/achievements";
 import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/categories";
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
+  upNextSectionOpen: true,
+  executionSectionOpen: true,
   dashboardGroup: "today",
   capacityStartHour: 9,
   capacityEndHour: 22,
@@ -269,6 +271,8 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
   const capacityStartHour = Number.isInteger(value.capacityStartHour) && value.capacityStartHour! >= 0 && value.capacityStartHour! < 24 ? value.capacityStartHour! : 9;
   return {
     dashboardGroup: value.dashboardGroup === "goals" || value.dashboardGroup === "life" ? value.dashboardGroup : "today",
+    upNextSectionOpen: value.upNextSectionOpen !== false,
+    executionSectionOpen: value.executionSectionOpen !== false,
     capacityStartHour,
     capacityEndHour: Number.isInteger(value.capacityEndHour) && value.capacityEndHour! > capacityStartHour && value.capacityEndHour! <= 24 ? value.capacityEndHour : Math.max(22, capacityStartHour + 1),
     ...(Array.isArray(value.categoryDefs) ? { categoryDefs: normalizeCategoryDefList(value.categoryDefs) } : {}),
@@ -383,6 +387,8 @@ export function normalizeEvents(payload: unknown): ScheduleEvent[] {
       endHour: typeof value.endHour === "number" ? value.endHour : 10,
       bufferBeforeMinutes: normalizeBufferMinutes(value.bufferBeforeMinutes),
       bufferAfterMinutes: normalizeBufferMinutes(value.bufferAfterMinutes),
+      bufferBeforeName: normalizeBufferName(value.bufferBeforeName),
+      bufferAfterName: normalizeBufferName(value.bufferAfterName),
       title: value.title ?? "\u672a\u547d\u540d\u884c\u7a0b",
       notes: value.notes ?? "",
       requirements: Array.isArray(value.requirements)

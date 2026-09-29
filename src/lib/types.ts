@@ -7,6 +7,8 @@ export type EventTag = "\u5f85\u5b9a" | "\u4e0d\u7740\u6025" | "\u4e0d\u53ef\u54
 export type ScheduleEvent = {
   bufferBeforeMinutes?: number;
   bufferAfterMinutes?: number;
+  bufferBeforeName?: string;
+  bufferAfterName?: string;
   endDate?: string;
   id: string;
   date: string;
@@ -139,6 +141,8 @@ export type FootprintItem = {
 
 export type DashboardUiPreferences = {
   dashboardGroup?: "today" | "goals" | "life";
+  upNextSectionOpen?: boolean;
+  executionSectionOpen?: boolean;
   capacityStartHour?: number;
   capacityEndHour?: number;
   categoryDefs?: import("./categories").ScheduleCategoryDef[];

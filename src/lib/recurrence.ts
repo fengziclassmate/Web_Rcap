@@ -11,6 +11,8 @@ export type RecurrenceConfig = {
 export type RecurrenceInstanceOverride = Partial<{
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
+  bufferBeforeName: string;
+  bufferAfterName: string;
   title: string;
   startHour: number;
   endHour: number;
@@ -26,6 +28,8 @@ export type RecurrenceInstanceOverride = Partial<{
 export type ExpandableScheduleEvent = {
   bufferBeforeMinutes?: number;
   bufferAfterMinutes?: number;
+  bufferBeforeName?: string;
+  bufferAfterName?: string;
   endDate?: string;
   id: string;
   date: string;
@@ -246,6 +250,8 @@ export function expandScheduleEvents(
 const RECURRENCE_INSTANCE_OVERRIDE_KEYS = [
   "bufferBeforeMinutes",
   "bufferAfterMinutes",
+  "bufferBeforeName",
+  "bufferAfterName",
   "title",
   "startHour",
   "endHour",

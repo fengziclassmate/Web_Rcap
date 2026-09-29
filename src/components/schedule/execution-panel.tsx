@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { addDays, format, startOfWeek } from "date-fns";
-import { BarChart3, Pause, Play, Square, Timer } from "lucide-react";
+import { BarChart3, ChevronDown, Pause, Play, Square, Timer } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useFocusTimer } from "@/hooks/useFocusTimer";
@@ -14,6 +15,7 @@ export function ExecutionPanel({ userId, events, tasks, preferences, onPreferenc
   preferences: DashboardUiPreferences; onPreferencesChange: (value: DashboardUiPreferences) => void;
 }) {
   const timer = useFocusTimer(userId);
+  const open = preferences.executionSectionOpen !== false;
   const [now, setNow] = useState(() => new Date());
   const [targetId, setTargetId] = useState("");
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -40,10 +42,12 @@ export function ExecutionPanel({ userId, events, tasks, preferences, onPreferenc
 
   return (
     <section className="execution-panel" aria-label="时间与专注">
+      <Collapsible open={open} onOpenChange={(executionSectionOpen) => onPreferencesChange({ ...preferences, executionSectionOpen })}>
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-sm font-semibold"><Timer className="size-4 text-primary" />时间与专注</span>
+        <h3 className="min-w-0 flex-1"><CollapsibleTrigger aria-label={open ? "折叠时间与专注" : "展开时间与专注"} className="flex w-full items-center gap-2 rounded text-left text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary"><Timer className="size-4 text-primary" />时间与专注<ChevronDown className={`ml-auto size-4 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`} /></CollapsibleTrigger></h3>
         <Button variant="ghost" size="sm" onClick={() => setReviewOpen(true)}><BarChart3 className="size-4" />复盘统计</Button>
       </div>
+      <CollapsibleContent>
       <div className="mt-3 flex items-baseline justify-between">
         <span className="text-xs text-muted-foreground">今日剩余空闲</span>
         <strong className="text-xl font-semibold tabular-nums text-primary">{formatMinutes(capacity.free)}</strong>
@@ -83,6 +87,8 @@ export function ExecutionPanel({ userId, events, tasks, preferences, onPreferenc
         </div>
         {timer.state.active && <p className="mt-2 text-xs text-muted-foreground">{timer.state.active.startedAt === null ? "已暂停" : "计时中"}</p>}
       </div>
+      </CollapsibleContent>
+      </Collapsible>
       <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader><DialogTitle>每周复盘</DialogTitle></DialogHeader>

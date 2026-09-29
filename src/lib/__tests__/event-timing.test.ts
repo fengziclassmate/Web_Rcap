@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { eventTiming, nextEventTiming, normalizeBufferMinutes } from "@/lib/event-timing";
-import { normalizeEvents } from "@/lib/normalizers";
+import { eventBufferName, eventTiming, nextEventTiming, normalizeBufferMinutes } from "@/lib/event-timing";
+import { normalizeDashboardUiPreferences, normalizeEvents } from "@/lib/normalizers";
 import { dailyCapacity } from "@/lib/execution-insights";
 import { pickRecurrenceOverridePatch } from "@/lib/recurrence";
 
@@ -12,7 +12,14 @@ describe("event buffers and next event", () => {
     expect(normalizeBufferMinutes(Infinity)).toBe(0);
     expect(normalizeBufferMinutes(500)).toBe(180);
     expect(event({ bufferBeforeMinutes: 10.4 }).bufferBeforeMinutes).toBe(10);
-    expect(pickRecurrenceOverridePatch({ bufferBeforeMinutes: 30, bufferAfterMinutes: 10 })).toEqual({ bufferBeforeMinutes: 30, bufferAfterMinutes: 10 });
+    expect(event({ bufferBeforeName: "  通勤 · 去球场  ", bufferAfterName: 12 })).toMatchObject({ bufferBeforeName: "通勤 · 去球场", bufferAfterName: "" });
+    expect(eventBufferName(event(), "before")).toBe("提前准备");
+    expect(eventBufferName(event({ bufferAfterName: "回实验室" }), "after")).toBe("回实验室");
+    expect(pickRecurrenceOverridePatch({ bufferBeforeMinutes: 30, bufferAfterMinutes: 10, bufferBeforeName: "去球场", bufferAfterName: "回实验室" })).toEqual({ bufferBeforeMinutes: 30, bufferAfterMinutes: 10, bufferBeforeName: "去球场", bufferAfterName: "回实验室" });
+  });
+  it("restores independent panel visibility while keeping older preferences expanded", () => {
+    expect(normalizeDashboardUiPreferences({})).toMatchObject({ upNextSectionOpen: true, executionSectionOpen: true });
+    expect(normalizeDashboardUiPreferences({ upNextSectionOpen: false, executionSectionOpen: true })).toMatchObject({ upNextSectionOpen: false, executionSectionOpen: true });
   });
   it("reserves buffers once without changing the actual event duration", () => {
     const timing = eventTiming(event());
@@ -43,10 +50,11 @@ describe("event buffers and next event", () => {
     expect(dailyCapacity([overnight], [], now, 0, 3)).toMatchObject({ free: 60, occupied: 90 });
   });
   it("respects recurrence exceptions, overrides and completed instances", () => {
-    const recurring = event({ recurrence: { kind: "daily" }, exceptionDates: ["2026-10-01"], recurrenceOverrides: { "2026-09-30": { isCompleted: true }, "2026-10-02": { bufferBeforeMinutes: 60 } } });
+    const recurring = event({ recurrence: { kind: "daily" }, exceptionDates: ["2026-10-01"], recurrenceOverrides: { "2026-09-30": { isCompleted: true }, "2026-10-02": { bufferBeforeMinutes: 60, bufferBeforeName: "提前去球场" } } });
     const next = nextEventTiming([recurring], new Date(2026, 8, 30, 9));
     expect(next?.event.id).toBe("event__2026-10-02");
     expect(next?.prepareAt).toEqual(new Date(2026, 9, 2, 9));
+    expect(next?.event.bufferBeforeName).toBe("提前去球场");
   });
   it("handles overnight and multi-day events and counts buffer overlaps", () => {
     const overnight = event({ date: "2026-09-29", startHour: 23, endHour: 2 });

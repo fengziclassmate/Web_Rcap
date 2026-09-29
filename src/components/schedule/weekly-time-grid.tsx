@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffectEvent, useEffect, useMemo, useRef, useState } from "react";
-import { eventTiming, normalizeBufferMinutes } from "@/lib/event-timing";
+import { eventTiming, eventBufferName, normalizeBufferName, normalizeBufferMinutes } from "@/lib/event-timing";
 import { createPortal } from "react-dom";
 import { addDays, format, parse } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -123,6 +123,8 @@ type GridCell = {
 };
 
 type EventFormState = {
+  bufferBeforeName: string;
+  bufferAfterName: string;
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
   title: string;
@@ -288,16 +290,23 @@ function isWholeHour(value: number) {
   return Math.abs(value - Math.round(value)) < 0.0001;
 }
 
-function EventBufferEditor({ before, after, onChange }: { before: number; after: number; onChange: (patch: Partial<Pick<EventFormState, "bufferBeforeMinutes" | "bufferAfterMinutes">>) => void }) {
-  return <div className="grid grid-cols-2 gap-3 rounded-lg border border-stone-200 bg-stone-50/70 p-3">
-    {([['bufferBeforeMinutes', '提前准备', before], ['bufferAfterMinutes', '结束后缓冲', after]] as const).map(([field, label, value]) => <label key={field} className="space-y-1.5 text-xs font-medium text-stone-600">
-      <span>{label}（分钟）</span>
-      <Input type="number" min={0} max={180} step={5} aria-label={label} value={value} onChange={(event) => onChange({ [field]: normalizeBufferMinutes(Number(event.target.value)) })} className="bg-white" />
-    </label>)}
+function EventBufferEditor({ value, onChange }: { value: EventFormState; onChange: (patch: Partial<EventFormState>) => void }) {
+  return <div className="grid gap-3 sm:grid-cols-2">
+    {([['bufferBeforeMinutes', 'bufferBeforeName', '事件前缓冲', '提前准备', '通勤 · 去羽毛球场'], ['bufferAfterMinutes', 'bufferAfterName', '事件后缓冲', '结束后缓冲', '通勤 · 回实验室']] as const).map(([minutesField, nameField, heading, label, example]) => <div key={minutesField} className="min-w-0 space-y-2.5 rounded-lg border border-stone-200 bg-stone-50/70 p-3">
+      <p className="text-xs font-semibold text-stone-700">{heading}</p>
+      <label className="block space-y-1 text-xs text-stone-600"><span>名称</span>
+        <Input aria-label={`${heading}名称`} maxLength={80} placeholder={`如：${example}`} value={value[nameField]} onChange={(event) => onChange({ [nameField]: event.target.value })} className="bg-white" />
+      </label>
+      <label className="block space-y-1 text-xs text-stone-600"><span>时长（分钟）</span>
+        <Input type="number" min={0} max={180} step={5} aria-label={label} value={value[minutesField]} onChange={(event) => onChange({ [minutesField]: normalizeBufferMinutes(Number(event.target.value)) })} className="bg-white" />
+      </label>
+    </div>)}
   </div>;
 }
 
 const defaultForm: EventFormState = {
+  bufferBeforeName: "",
+  bufferAfterName: "",
   bufferBeforeMinutes: 0,
   bufferAfterMinutes: 0,
   title: "",
@@ -1164,6 +1173,8 @@ export function WeeklyTimeGrid({
     setEditRecurrenceOpen(false);
     setEditScope("occurrence");
     setEditForm({
+      bufferBeforeName: normalizeBufferName(event.bufferBeforeName),
+      bufferAfterName: normalizeBufferName(event.bufferAfterName),
       bufferBeforeMinutes: normalizeBufferMinutes(event.bufferBeforeMinutes),
       bufferAfterMinutes: normalizeBufferMinutes(event.bufferAfterMinutes),
       title: event.title,
@@ -1215,6 +1226,8 @@ export function WeeklyTimeGrid({
       requirements: buildRequirementLines(createForm.requirements),
       bufferBeforeMinutes: createForm.bufferBeforeMinutes,
       bufferAfterMinutes: createForm.bufferAfterMinutes,
+      bufferBeforeName: normalizeBufferName(createForm.bufferBeforeName),
+      bufferAfterName: normalizeBufferName(createForm.bufferAfterName),
       isCompleted: createForm.isCompleted,
       category: createForm.category,
       tag: createForm.tag,
@@ -1259,6 +1272,8 @@ export function WeeklyTimeGrid({
       requirements: buildRequirementLines(editForm.requirements),
       bufferBeforeMinutes: editForm.bufferBeforeMinutes,
       bufferAfterMinutes: editForm.bufferAfterMinutes,
+      bufferBeforeName: normalizeBufferName(editForm.bufferBeforeName),
+      bufferAfterName: normalizeBufferName(editForm.bufferAfterName),
       ...(selectedEvent && editForm.isCompleted !== selectedEvent.isCompleted
         ? { isCompleted: editForm.isCompleted }
         : {}),
@@ -1938,11 +1953,12 @@ export function WeeklyTimeGrid({
                         {expandedEvents.flatMap((event) => {
                           const timing = eventTiming(event);
                           const midnight = parse(dayLayout.dateIso, "yyyy-MM-dd", new Date()).getTime();
-                          return ([[timing.prepareAt, timing.start, "准备"], [timing.end, timing.freeAt, "缓冲"]] as const).map(([from, to, label]) => {
+                          return ([[timing.prepareAt, timing.start, "before"], [timing.end, timing.freeAt, "after"]] as const).map(([from, to, side]) => {
+                            const label = eventBufferName(event, side);
                             const start = Math.max(0, (+from - midnight) / 3600000);
                             const end = Math.min(24, (+to - midnight) / 3600000);
                             if (end <= start) return null;
-                            return <div key={`${event.id}-${label}`} data-testid="event-buffer" aria-label={`${event.title} ${label} ${formatHour(start)}—${formatHour(end)}`} className="absolute inset-x-1 overflow-hidden rounded border border-dashed border-stone-300 px-1 text-[10px] text-stone-500" style={{ top: start * hourCellHeight, height: (end - start) * hourCellHeight, background: "repeating-linear-gradient(135deg, rgba(120,113,108,.06), rgba(120,113,108,.06) 4px, transparent 4px, transparent 8px)" }}>{label} · {event.title}</div>;
+                            return <div key={`${event.id}-${side}`} data-testid="event-buffer" aria-label={`${event.title} ${label} ${formatHour(start)}—${formatHour(end)}`} className="absolute inset-x-1 overflow-hidden rounded border border-dashed border-stone-300 px-1 text-[10px] text-stone-500" style={{ top: start * hourCellHeight, height: (end - start) * hourCellHeight, background: "repeating-linear-gradient(135deg, rgba(120,113,108,.06), rgba(120,113,108,.06) 4px, transparent 4px, transparent 8px)" }}>{label} · {event.title}</div>;
                           });
                         })}
                         {dayLayout.events.map((event) => {
@@ -2654,7 +2670,7 @@ export function WeeklyTimeGrid({
                     onStartHourChange={(value) => setCreateForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setCreateForm((prev) => ({ ...prev, endHour: value }))}
                   />
-                  <EventBufferEditor before={createForm.bufferBeforeMinutes} after={createForm.bufferAfterMinutes} onChange={(patch) => setCreateForm((previous) => ({ ...previous, ...patch }))} />
+                  <EventBufferEditor value={createForm} onChange={(patch) => setCreateForm((previous) => ({ ...previous, ...patch }))} />
                   <Collapsible
                     open={createDetailsOpen}
                     onOpenChange={setCreateDetailsOpen}
@@ -2811,7 +2827,7 @@ export function WeeklyTimeGrid({
                     onStartHourChange={(value) => setEditForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setEditForm((prev) => ({ ...prev, endHour: value }))}
                   />
-                  <EventBufferEditor before={editForm.bufferBeforeMinutes} after={editForm.bufferAfterMinutes} onChange={(patch) => setEditForm((previous) => ({ ...previous, ...patch }))} />
+                  <EventBufferEditor value={editForm} onChange={(patch) => setEditForm((previous) => ({ ...previous, ...patch }))} />
                   <Collapsible
                     open={editDetailsOpen}
                     onOpenChange={setEditDetailsOpen}

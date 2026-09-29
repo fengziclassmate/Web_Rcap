@@ -3,6 +3,8 @@ import { expandScheduleEvents } from "@/lib/recurrence";
 import type { ScheduleEvent } from "@/lib/types";
 
 export const normalizeBufferMinutes = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(180, Math.round(value))) : 0;
+export const normalizeBufferName = (value: unknown) => typeof value === "string" ? value.trim().slice(0, 80) : "";
+export const eventBufferName = (event: ScheduleEvent, side: "before" | "after") => normalizeBufferName(side === "before" ? event.bufferBeforeName : event.bufferAfterName) || (side === "before" ? "提前准备" : "结束后缓冲");
 
 export function eventTiming(event: ScheduleEvent) {
   const day = parseISO(event.date);

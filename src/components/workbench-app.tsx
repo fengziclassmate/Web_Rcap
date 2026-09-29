@@ -1537,12 +1537,12 @@ export function WorkbenchApp() {
                 />
               </section>
               <section className="min-h-0 space-y-4">
-                <ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />
-                <UpNextCard events={events} onOpenEvent={(event) => {
+                <UpNextCard events={events} open={dashboardUiPreferences.upNextSectionOpen !== false} onOpenChange={(upNextSectionOpen) => setDashboardUiPreferences((previous) => ({ ...previous, upNextSectionOpen }))} onOpenEvent={(event) => {
                   setViewMode("day");
                   setCurrentWeekStart(parseISO(event.date));
                   setOpenEventRequest({ id: event.id, token: Date.now() });
                 }} />
+                <ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />
                 <TaskDashboard
                   userId={user.id}
                   logsReady={logReady && logHistoryAvailable}

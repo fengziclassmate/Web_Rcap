@@ -169,15 +169,20 @@ function marqueeSelectAll(container: HTMLElement) {
 describe("WeeklyTimeGrid interactions", () => {
   it("displays and edits event buffers without moving the event time", () => {
     const onUpdateEvent = vi.fn();
-    const { container } = renderGrid({ events: [{ ...scheduleEvent, bufferBeforeMinutes: 20, bufferAfterMinutes: 15 }], onUpdateEvent });
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, bufferBeforeMinutes: 20, bufferAfterMinutes: 15, bufferBeforeName: "去羽毛球场", bufferAfterName: "回实验室" }], onUpdateEvent });
     expect(container.querySelectorAll('[data-testid="event-buffer"]')).toHaveLength(2);
+    expect(container.querySelector('[data-testid="event-buffer"]')?.textContent).toContain("去羽毛球场");
     fireEvent.click(screen.getAllByRole("button", { name: `打开 ${scheduleEvent.title} 编辑窗口` })[0]);
     const editor = within(screen.getByRole("dialog"));
     expect((editor.getByLabelText("提前准备") as HTMLInputElement).value).toBe("20");
+    expect((editor.getByLabelText("事件前缓冲名称") as HTMLInputElement).value).toBe("去羽毛球场");
+    expect((editor.getByLabelText("事件后缓冲名称") as HTMLInputElement).value).toBe("回实验室");
+    fireEvent.change(editor.getByLabelText("事件前缓冲名称"), { target: { value: " 通勤 · 去球场 " } });
+    fireEvent.change(editor.getByLabelText("事件后缓冲名称"), { target: { value: "通勤 · 回实验室" } });
     fireEvent.change(editor.getByLabelText("提前准备"), { target: { value: "30" } });
     fireEvent.change(editor.getByLabelText("结束后缓冲"), { target: { value: "10" } });
     fireEvent.click(editor.getByRole("button", { name: "保存修改" }));
-    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, expect.objectContaining({ bufferBeforeMinutes: 30, bufferAfterMinutes: 10, startHour: scheduleEvent.startHour, endHour: scheduleEvent.endHour }));
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, expect.objectContaining({ bufferBeforeMinutes: 30, bufferAfterMinutes: 10, bufferBeforeName: "通勤 · 去球场", bufferAfterName: "通勤 · 回实验室", startHour: scheduleEvent.startHour, endHour: scheduleEvent.endHour }));
   });
   it("edits a multi-day start date while keeping its end fixed", () => {
     const onUpdateEvent = vi.fn();
