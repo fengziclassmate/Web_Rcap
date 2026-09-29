@@ -312,8 +312,14 @@
     gap: 0.35rem;
   }
 
+  .task-list-panel-controls {
+    flex-wrap: wrap;
+  }
+
   .task-list-panel-tabs {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex: 1 0 15rem;
+    min-width: max-content;
+    grid-template-columns: repeat(2, minmax(max-content, 1fr));
   }
 
   .utility-panel-tab {

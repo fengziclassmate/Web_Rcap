@@ -1451,7 +1451,7 @@ export function TaskDashboard({
 
 
       <div hidden={group !== "goals"} className="task-dashboard-section utility-panel-grid" data-testid="task-list-panel-group">
-        <div className="utility-panel-controls">
+        <div className="utility-panel-controls task-list-panel-controls">
           <div className="utility-panel-tabs task-list-panel-tabs" role="tablist" aria-label="任务与清单">
             <button
               type="button"
@@ -1461,8 +1461,8 @@ export function TaskDashboard({
               onClick={() => setTaskListPanel("long", activeTaskListPanel !== "long")}
             >
               <ListTodo className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="truncate">长期任务</span>
-              <span className="text-xs tabular-nums opacity-70">{orderedIncompleteTasks.length}</span>
+              <span className="shrink-0 whitespace-nowrap">长期任务</span>
+              <span className="shrink-0 text-xs tabular-nums opacity-70">{orderedIncompleteTasks.length}</span>
             </button>
             <button
               type="button"
@@ -1472,11 +1472,12 @@ export function TaskDashboard({
               onClick={() => setTaskListPanel("annual", activeTaskListPanel !== "annual")}
             >
               <CalendarRange className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="truncate">年度任务</span>
-              <span className="text-xs tabular-nums opacity-70">{annualTasks.length}</span>
+              <span className="shrink-0 whitespace-nowrap">年度任务</span>
+              <span className="shrink-0 text-xs tabular-nums opacity-70">{annualTasks.length}</span>
             </button>
 
           </div>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
           {activeTaskListPanel ? (
             <Button
               type="button"
@@ -1502,6 +1503,7 @@ export function TaskDashboard({
               <CheckCircle className="h-3.5 w-3.5" aria-hidden />
             </Button>
           ) : null}
+          </div>
         </div>
 
         <section className="utility-panel utility-panel-long-task">
@@ -1959,7 +1961,9 @@ export function TaskDashboard({
                             setProjectNoteDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
                           }
                           placeholder="可选"
-                          className="min-h-24 resize-y bg-white text-sm leading-6"
+                          rows={2}
+                          aria-label={`${project.name} 打卡描述`}
+                          className="min-h-[60px] field-sizing-fixed resize-y bg-white text-sm leading-5"
                         />
                       </div>
                       <Button type="button" size="sm" className="h-9" onClick={() => handleProjectCheckin(project.id)}>
@@ -2533,7 +2537,8 @@ export function TaskDashboard({
                           }))
                         }
                         placeholder="打卡描述"
-                        className="min-h-24 resize-y text-xs leading-5"
+                        rows={2}
+                        className="min-h-[60px] field-sizing-fixed resize-y text-xs leading-5"
                       />
                       <Button
                         type="button"

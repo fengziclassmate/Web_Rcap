@@ -173,7 +173,7 @@ describe("TaskDashboard task list sections", () => {
     );
 
     const completedTaskButton = screen.getByRole("button", { name: /查看已完成任务/ });
-    expect(completedTaskButton.parentElement).toBe(taskListTabs.parentElement);
+    expect(completedTaskButton.parentElement?.parentElement).toBe(taskListTabs.parentElement);
     expect(completedTaskButton.textContent?.trim()).toBe("");
     expect(
       taskListGroup.compareDocumentPosition(

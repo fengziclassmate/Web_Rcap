@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { addDays, format, startOfWeek } from "date-fns";
 import { BarChart3, Pause, Play, Square, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useFocusTimer } from "@/hooks/useFocusTimer";
 import { dailyCapacity, elapsedFocusMs, eventsInDays, formatMinutes, weeklyInsights } from "@/lib/execution-insights";
 import type { DashboardUiPreferences, LongTask, ScheduleEvent } from "@/lib/types";
@@ -56,7 +56,7 @@ export function ExecutionPanel({ userId, events, tasks, preferences, onPreferenc
         {capacity.unknown > 0 ? `另有 ${capacity.unknown} 项未估时。` : ""}
       </p>
       <details className="mt-2 text-xs text-muted-foreground">
-        <summary className="cursor-pointer py-1">可安排时段与计算说明</summary>
+        <summary className="cursor-pointer py-1">可安排时段</summary>
         <div className="mt-2 flex items-center gap-2">
           <select aria-label="可安排开始时间" value={startHour} onChange={(event) => onPreferencesChange({ ...preferences, capacityStartHour: Number(event.target.value) })} className="rounded border bg-white p-1.5">
             {Array.from({ length: endHour }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00</option>)}
@@ -65,7 +65,6 @@ export function ExecutionPanel({ userId, events, tasks, preferences, onPreferenc
             {Array.from({ length: 24 - startHour }, (_, i) => startHour + i + 1).map((hour) => <option key={hour} value={hour}>{hour}:00</option>)}
           </select>
         </div>
-        <p className="mt-2 leading-relaxed">从当前时间计算，合并重叠日程。待办包含今日及逾期日常任务，采用估时上限并扣除其剩余已排时段；未估时任务不计入需求。</p>
       </details>
       <div className="mt-4 border-t border-border pt-4">
         {timer.state.active ? <p className="truncate text-sm font-medium" title={timer.state.active.title}>{timer.state.active.title}</p> : (
@@ -82,12 +81,11 @@ export function ExecutionPanel({ userId, events, tasks, preferences, onPreferenc
             </>}
           </div>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">{timer.state.active ? timer.state.active.startedAt === null ? "已暂停 · 暂停时间不计入投入" : "计时中 · 刷新或关闭页面后继续计时" : "选择任务或日程，记录真实投入"}</p>
-        <p className="mt-1 text-xs text-muted-foreground">专注记录仅保存在此浏览器，按账号区分。</p>
+        {timer.state.active && <p className="mt-2 text-xs text-muted-foreground">{timer.state.active.startedAt === null ? "已暂停" : "计时中"}</p>}
       </div>
       <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
-          <DialogHeader><DialogTitle>每周复盘</DialogTitle><DialogDescription>计划来自日程，实际来自已暂停或已结束的专注片段；勾选完成不会生成实际耗时。</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>每周复盘</DialogTitle></DialogHeader>
           <div className="flex items-center justify-between gap-3">
             <Button variant="outline" size="sm" onClick={() => setWeek(addDays(week, -7))}>上一周</Button>
             <span className="text-sm tabular-nums">{report.from} — {report.to}</span>
@@ -107,7 +105,6 @@ export function ExecutionPanel({ userId, events, tasks, preferences, onPreferenc
           </div>
           <table className="w-full text-left text-sm"><caption className="mb-2 text-left font-medium">分类时间分布</caption><thead><tr className="border-b border-border text-muted-foreground"><th className="py-2 font-normal">分类</th><th className="font-normal">计划</th><th className="font-normal">实际专注</th></tr></thead><tbody>{report.categories.map((category) => <tr key={category.name} className="border-b border-border/60"><td className="py-2">{category.name}</td><td>{formatMinutes(category.planned)}</td><td>{formatMinutes(category.actual)}</td></tr>)}</tbody></table>
           {report.categories.length === 0 && <p className="py-4 text-center text-muted-foreground">本周暂无日程或专注记录。</p>}
-          <p className="text-xs leading-relaxed text-muted-foreground">重叠日程分别计入计划时长；实际专注为此浏览器记录，不代表全部工作时间。任务完成按完成日期统计，逾期按当前日期判断。</p>
         </DialogContent>
       </Dialog>
     </section>
