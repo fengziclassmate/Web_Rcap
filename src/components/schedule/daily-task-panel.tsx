@@ -371,7 +371,7 @@ export function DailyTaskPanel({
               type="button"
               aria-label="按时间排序"
               aria-pressed={sortMode === "time"}
-              className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
+              className={`rounded-md px-2 py-1 text-xs font-medium transition ${
                 sortMode === "time"
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-500 hover:text-stone-800"
@@ -384,7 +384,7 @@ export function DailyTaskPanel({
               type="button"
               aria-label="自定义排序"
               aria-pressed={sortMode === "custom"}
-              className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
+              className={`rounded-md px-2 py-1 text-xs font-medium transition ${
                 sortMode === "custom"
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-500 hover:text-stone-800"
@@ -426,7 +426,7 @@ export function DailyTaskPanel({
           <ol className="mt-2 grid gap-1.5">
             {focusTasks.map((task, index) => (
               <li key={task.id} className="flex items-center gap-2 text-sm text-emerald-950">
-                <span className="grid size-5 place-items-center rounded-full bg-emerald-700 text-[11px] font-bold text-white">
+                <span className="grid size-5 place-items-center rounded-full bg-emerald-700 text-xs font-bold text-white">
                   {index + 1}
                 </span>
                 <span className="min-w-0 flex-1 truncate">{task.name}</span>
@@ -613,7 +613,7 @@ export function DailyTaskPanel({
             <AlertTriangle className="h-3.5 w-3.5 text-amber-700" aria-hidden />
             截止日期雷达
           </span>
-          <span className="flex items-center gap-1.5 text-[11px] text-amber-800">
+          <span className="flex items-center gap-1.5 text-xs text-amber-800">
             7 天内
             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${deadlineRadarOpen ? "" : "-rotate-90"}`} aria-hidden />
           </span>

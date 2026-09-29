@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useMemo, useState, type ReactNode } from "react";
 import { Archive, BarChart3, Image as ImageIcon, MapPin, Pencil, Pin, Plus, Search, Trash2, X } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,8 @@ import {
 } from "@/lib/logs";
 
 type LogPageProps = {
+  openLogRequest?: { id: string; token: number };
+  onOpenRequestHandled?: () => void;
   posts: LogPostRecord[];
   tags: LogTag[];
   uploading: boolean;
@@ -64,6 +66,8 @@ const defaultComposerDraft: ComposerDraft = {
 };
 
 export function LogPage({
+  openLogRequest,
+  onOpenRequestHandled,
   posts,
   tags,
   uploading,
@@ -77,6 +81,13 @@ export function LogPage({
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [editingPost, setEditingPost] = useState<LogPostRecord | null>(null);
+
+  const openRequestedLog = useEffectEvent(() => {
+    const post = posts.find((item) => item.id === openLogRequest?.id);
+    if (post) setEditingPost(post);
+    onOpenRequestHandled?.();
+  });
+  useEffect(() => { if (openLogRequest) openRequestedLog(); }, [openLogRequest]);
 
   const visiblePosts = useMemo(() => sortLogPosts(filterLogPosts(posts, filters)), [posts, filters]);
   const groups = useMemo(() => groupLogsByDate(visiblePosts), [visiblePosts]);

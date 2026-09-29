@@ -30,6 +30,7 @@ function ControlledProjectDashboard({ today }: { today: string }) {
   ]);
   const [preferences, setPreferences] = useState<DashboardUiPreferences>({
     ...defaultDashboardUiPreferences,
+    dashboardGroup: "goals",
     projectSectionOpen: true,
     expandedProjects: ["first"],
   });
@@ -94,7 +95,18 @@ function ControlledProjectDashboard({ today }: { today: string }) {
 }
 
 describe("TaskDashboard task list sections", () => {
-  it("groups long, annual, and shopping lists with an icon-only completed-task action", () => {
+  it("switches between execution, goals, and life without mixing their controls", () => {
+    render(<ControlledProjectDashboard today="2026-09-29" />);
+    expect(screen.getByRole("button", { name: "目标与项目" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "今日执行" }));
+    expect(screen.getByPlaceholderText("添加日常任务")).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: /长期任务/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "生活记录" }));
+    expect(screen.getByRole("button", { name: "添加购物项" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: /长期任务/ })).toBeNull();
+  });
+
+  it("groups long and annual goals separately from life lists", () => {
     const noop = vi.fn();
     const onUiPreferencesChange = vi.fn();
     render(
@@ -141,7 +153,7 @@ describe("TaskDashboard task list sections", () => {
         onDeleteFootprint={noop}
         onUpdateFootprint={noop}
         confirmDangerousActions={false}
-        uiPreferences={defaultDashboardUiPreferences}
+        uiPreferences={{ ...defaultDashboardUiPreferences, dashboardGroup: "goals" }}
         onUiPreferencesChange={onUiPreferencesChange}
       />,
     );
@@ -150,14 +162,14 @@ describe("TaskDashboard task list sections", () => {
     const taskListTabs = within(taskListGroup).getByRole("tablist", { name: "任务与清单" });
     expect(within(taskListTabs).getByRole("tab", { name: /长期任务/ }).getAttribute("aria-selected")).toBe("true");
     expect(within(taskListTabs).getByRole("tab", { name: /年度任务/ }).getAttribute("aria-selected")).toBe("false");
-    expect(within(taskListTabs).getByRole("tab", { name: /购物清单/ }).getAttribute("aria-selected")).toBe("false");
+    expect(within(taskListTabs).queryByRole("tab", { name: /购物清单/ })).toBeNull();
     expect(screen.queryByText("长期任务 / 未完成任务")).toBeNull();
 
     const addButton = screen.getByRole("button", { name: "添加长期任务" });
     expect(taskListGroup.contains(addButton)).toBe(true);
     fireEvent.click(within(taskListTabs).getByRole("tab", { name: /年度任务/ }));
     expect(onUiPreferencesChange).toHaveBeenCalledWith(
-      expect.objectContaining({ longTaskSectionOpen: false, annualSectionOpen: true, shoppingSectionOpen: false }),
+      expect.objectContaining({ longTaskSectionOpen: false, annualSectionOpen: true }),
     );
 
     const completedTaskButton = screen.getByRole("button", { name: /查看已完成任务/ });
@@ -173,7 +185,7 @@ describe("TaskDashboard task list sections", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
-  it("opens the shopping add dialog from the shared planning controls", () => {
+  it("opens the shopping add dialog in the life group", () => {
     const noop = vi.fn();
     render(
       <TaskDashboard
@@ -224,6 +236,7 @@ describe("TaskDashboard task list sections", () => {
           longTaskSectionOpen: false,
           annualSectionOpen: false,
           shoppingSectionOpen: true,
+          dashboardGroup: "life",
         }}
         onUiPreferencesChange={noop}
       />,
@@ -302,7 +315,8 @@ describe("TaskDashboard task list sections", () => {
         confirmDangerousActions={false}
         uiPreferences={{
           ...defaultDashboardUiPreferences,
-          projectSectionOpen: true,
+          dashboardGroup: "goals",
+    projectSectionOpen: true,
           expandedProjects: ["first"],
         }}
         onUiPreferencesChange={onUiPreferencesChange}

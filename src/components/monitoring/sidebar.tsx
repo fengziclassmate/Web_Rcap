@@ -52,7 +52,7 @@ export function MonitoringSidebar({
 
   return (
     <section className="glass-panel overflow-hidden rounded-[1.35rem]">
-      <div className="grid gap-4 px-4 py-4 xl:grid-cols-[max-content_minmax(18rem,1fr)_max-content] xl:items-center">
+      <div className="grid gap-4 px-4 py-4 grid-cols-[max-content_minmax(12rem,1fr)_max-content] items-center">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-8 shrink-0 items-center justify-center">
             <LayoutDashboard className="h-5 w-5 text-stone-700" aria-hidden />
@@ -73,8 +73,8 @@ export function MonitoringSidebar({
           />
         </div>
 
-        <nav className="-mx-1 overflow-x-auto pb-1 xl:mx-0 xl:pb-0" aria-label="模块切换">
-          <div className="flex min-w-max items-center gap-2 px-1 xl:justify-end">
+        <nav className="-mx-1 overflow-x-auto pb-1 mx-0 pb-0" aria-label="模块切换">
+          <div className="flex min-w-max items-center gap-2 px-1 justify-end">
             {items.map((item) => {
               const selected = item.id === active;
               return (
@@ -99,7 +99,7 @@ export function MonitoringSidebar({
                   </span>
                   <span className="flex flex-col items-start leading-none">
                     <span>{item.label}</span>
-                    <span className={cn("mt-1 text-[10px] uppercase tracking-[0.18em]", selected ? "text-white/55" : "text-stone-400")}>
+                    <span className={cn("mt-1 text-xs uppercase tracking-[0.18em]", selected ? "text-white/55" : "text-stone-400")}>
                       {item.group}
                     </span>
                   </span>

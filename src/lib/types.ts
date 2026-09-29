@@ -136,6 +136,9 @@ export type FootprintItem = {
 };
 
 export type DashboardUiPreferences = {
+  dashboardGroup?: "today" | "goals" | "life";
+  capacityStartHour?: number;
+  capacityEndHour?: number;
   categoryDefs?: import("./categories").ScheduleCategoryDef[];
   timeGranularity: 5 | 15 | 30 | 60 | "45-15" | "50-10";
   dailyTaskSortMode: DailyTaskSortMode;

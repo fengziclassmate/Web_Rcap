@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffectEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ProjectCheckinCalendar } from "./project-checkin-calendar";
 import {
   Archive,
@@ -18,7 +18,6 @@ import {
   KanbanSquare,
   GripVertical,
   Pencil,
-  ShoppingBasket,
   Trophy,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +45,6 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -61,6 +59,10 @@ import type { LogComposerInput, LogPostRecord } from "@/lib/logs";
 import { cn } from "@/lib/utils";
 
 type TaskDashboardProps = {
+  openCollectionRequest?: { id: string; kind: "annual" | "project" | "shopping"; token: number };
+  onCollectionRequestHandled?: () => void;
+  openTaskRequest?: { id: string; token: number };
+  onOpenRequestHandled?: () => void;
   tasks: LongTask[];
   events: ScheduleEvent[];
   onToggleTask: (taskId: string) => void;
@@ -302,6 +304,10 @@ function isValidTime(value: string) {
 }
 
 export function TaskDashboard({
+  openCollectionRequest,
+  onCollectionRequestHandled,
+  openTaskRequest,
+  onOpenRequestHandled,
   tasks,
   events,
   onToggleTask,
@@ -392,6 +398,7 @@ export function TaskDashboard({
   const [editingFootprintId, setEditingFootprintId] = useState<string | null>(null);
   const [editingFootprintName, setEditingFootprintName] = useState("");
   const [editingFootprintDate, setEditingFootprintDate] = useState(getTodayISODate);
+  const group = uiPreferences.dashboardGroup ?? "today";
   const longTaskSectionOpen = uiPreferences.longTaskSectionOpen;
   const annualSectionOpen = uiPreferences.annualSectionOpen;
   const shoppingSectionOpen = uiPreferences.shoppingSectionOpen;
@@ -401,7 +408,7 @@ export function TaskDashboard({
   );
   const [completedLibraryOpen, setCompletedLibraryOpen] = useState(false);
   const activeUtilityPanel: "project" | "routine" | "achievement" | "footprint" | null =
-    uiPreferences.projectSectionOpen
+    group === "goals"
       ? "project"
       : uiPreferences.routineCheckinSectionOpen
         ? "routine"
@@ -409,14 +416,12 @@ export function TaskDashboard({
           ? "achievement"
           : uiPreferences.footprintSectionOpen
             ? "footprint"
-            : null;
+            : "routine";
   const activeTaskListPanel: "long" | "annual" | "shopping" | null = longTaskSectionOpen
     ? "long"
     : annualSectionOpen
       ? "annual"
-      : shoppingSectionOpen
-        ? "shopping"
-        : null;
+      : null;
   const expandedProjects = useMemo(
     () => new Set(uiPreferences.expandedProjects),
     [uiPreferences.expandedProjects],
@@ -700,6 +705,13 @@ export function TaskDashboard({
     });
   }
 
+  const openRequestedTask = useEffectEvent(() => {
+    const task = tasks.find((item) => item.id === openTaskRequest?.id);
+    if (task) handleOpenEdit(task);
+    onOpenRequestHandled?.();
+  });
+  useEffect(() => { if (openTaskRequest) openRequestedTask(); }, [openTaskRequest]);
+
   function handleSaveTask() {
     if (!taskDraft || !taskDraft.name.trim()) return;
     const parseDraftMinutes = (input: string) => {
@@ -790,7 +802,7 @@ export function TaskDashboard({
       case "不紧急重要":
         return <Star className="h-4 w-4 text-blue-500" />;
       case "不紧急不重要":
-        return <CheckCircle className="h-4 w-4 text-gray-500" />;
+        return <CheckCircle className="h-4 w-4 text-stone-500" />;
       default:
         return null;
     }
@@ -822,7 +834,7 @@ export function TaskDashboard({
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/task-id", taskId);
     const ghost = document.createElement("div");
-    ghost.className = "rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700";
+    ghost.className = "rounded border border-stone-300 bg-white px-2 py-1 text-xs text-stone-700";
     ghost.textContent = "移动任务";
     document.body.appendChild(ghost);
     event.dataTransfer.setDragImage(ghost, 24, 12);
@@ -1111,6 +1123,21 @@ export function TaskDashboard({
     setEditingAnnualTaskName(task.name);
   }
 
+  const openRequestedCollection = useEffectEvent(() => {
+    if (!openCollectionRequest) return;
+    if (openCollectionRequest.kind === "annual") {
+      const task = annualTasks.find((item) => item.id === openCollectionRequest.id);
+      if (task) openEditAnnualTask(task);
+    } else {
+      const attribute = openCollectionRequest.kind === "shopping" ? "data-shopping-item-id" : "data-project-checkin-id";
+      const element = document.querySelector<HTMLElement>(`[${attribute}="${CSS.escape(openCollectionRequest.id)}"]`);
+      element?.scrollIntoView({ block: "center" });
+      element?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+    }
+    onCollectionRequestHandled?.();
+  });
+  useEffect(() => { if (openCollectionRequest) openRequestedCollection(); }, [openCollectionRequest]);
+
   function saveAnnualTaskName() {
     if (!editingAnnualTaskId || !editingAnnualTaskName.trim()) return;
     onUpdateAnnualTask(editingAnnualTaskId, editingAnnualTaskName);
@@ -1139,7 +1166,6 @@ export function TaskDashboard({
     patchUiPreferences({
       longTaskSectionOpen: open && panel === "long",
       annualSectionOpen: open && panel === "annual",
-      shoppingSectionOpen: open && panel === "shopping",
     });
   }
 
@@ -1177,13 +1203,17 @@ export function TaskDashboard({
   return (
     <aside className="module-shell">
       <div className="module-header px-6 py-5">
-        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-900">
+        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-stone-900">
           <ListTodo className="h-5 w-5 text-primary" />
           任务控制台
         </h2>
+        <div className="dashboard-groups mt-4" aria-label="工作台内容分组">
+          {([['today', '今日执行'], ['goals', '目标与项目'], ['life', '生活记录']] as const).map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={group === value} onClick={() => patchUiPreferences({ dashboardGroup: value })}>{label}</button>
+          ))}
+        </div>
       </div>
 
-      <Separator />
 
       <Dialog open={completedLibraryOpen} onOpenChange={setCompletedLibraryOpen}>
         <DialogContent className="h-[calc(100dvh-1rem)] max-h-[860px] w-[calc(100%-1rem)] max-w-6xl grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:w-full sm:!max-w-6xl">
@@ -1200,21 +1230,21 @@ export function TaskDashboard({
                 <aside className="space-y-4 xl:sticky xl:top-0">
                   <div className="grid grid-cols-2 gap-2">
                     <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
-                      <p className="text-[11px] font-medium text-emerald-700">{"\u5f52\u6863\u4efb\u52a1"}</p>
+                      <p className="text-xs font-medium text-emerald-700">{"\u5f52\u6863\u4efb\u52a1"}</p>
                       <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-950">{completedTaskInsights.total}</p>
                     </div>
                     <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
-                      <p className="text-[11px] font-medium text-blue-700">{"\u672c\u5468\u5b8c\u6210"}</p>
+                      <p className="text-xs font-medium text-blue-700">{"\u672c\u5468\u5b8c\u6210"}</p>
                       <p className="mt-1 text-2xl font-semibold tabular-nums text-blue-950">{completedTaskInsights.thisWeekCount}</p>
                     </div>
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-                      <p className="text-[11px] font-medium text-amber-700">{"\u5e73\u5747\u5b8c\u6210\u65f6\u957f"}</p>
+                      <p className="text-xs font-medium text-amber-700">{"\u5e73\u5747\u5b8c\u6210\u65f6\u957f"}</p>
                       <p className="mt-1 text-base font-semibold text-amber-950">
                         {formatDurationLabel(completedTaskInsights.averageDurationHours)}
                       </p>
                     </div>
                     <div className="rounded-lg border border-stone-200 bg-white px-3 py-2.5">
-                      <p className="text-[11px] font-medium text-stone-600">{"\u65f6\u957f\u6837\u672c"}</p>
+                      <p className="text-xs font-medium text-stone-600">{"\u65f6\u957f\u6837\u672c"}</p>
                       <p className="mt-1 text-2xl font-semibold tabular-nums text-stone-950">
                         {completedTaskInsights.durationSampleCount}
                       </p>
@@ -1227,12 +1257,12 @@ export function TaskDashboard({
                         <CalendarRange className="h-4 w-4 text-emerald-600" />
                         {"\u6bcf\u5468\u5b8c\u6210"}
                       </h4>
-                      <span className="text-[11px] text-stone-500">{"\u6700\u8fd1 8 \u5468"}</span>
+                      <span className="text-xs text-stone-500">{"\u6700\u8fd1 8 \u5468"}</span>
                     </div>
                     <div className="space-y-2.5">
                       {completedTaskInsights.weeklyStats.map((week) => (
                         <div key={week.weekStart}>
-                          <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
+                          <div className="mb-1 flex items-center justify-between gap-3 text-xs">
                             <span className="truncate text-stone-500" title={formatWeekRangeLabel(week.weekStart)}>
                               {formatWeekRangeLabel(week.weekStart)}
                             </span>
@@ -1259,7 +1289,7 @@ export function TaskDashboard({
                     <div className="space-y-2.5">
                       {completedTaskInsights.priorityStats.map((stat) => (
                         <div key={stat.priority}>
-                          <div className="mb-1 flex items-center justify-between gap-2 text-[11px]">
+                          <div className="mb-1 flex items-center justify-between gap-2 text-xs">
                             <span className="flex min-w-0 items-center gap-1.5 text-stone-700">
                               {getPriorityIcon(stat.priority)}
                               <span className="truncate">{stat.priority}</span>
@@ -1312,7 +1342,7 @@ export function TaskDashboard({
                               />
                               <div className="min-w-0 flex-1">
                                 <p className="break-words font-medium text-stone-900 line-through">{task.name}</p>
-                                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-stone-500">
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-stone-500">
                                   <Badge className={`rounded-md border ${getPriorityVisualStyle(task.priority).badgeClassName}`}>
                                     {task.priority}
                                   </Badge>
@@ -1358,7 +1388,7 @@ export function TaskDashboard({
                                   <span className="ml-1">{"\u65e0\u5b50\u4efb\u52a1"}</span>
                                 ) : (
                                   <div className="mt-1 space-y-2">
-                                    <span className="inline-flex rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] text-stone-500">
+                                    <span className="inline-flex rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-500">
                                       {completedSubtasks} / {task.subtasks.length}
                                     </span>
                                     <ul className="space-y-1">
@@ -1395,6 +1425,7 @@ export function TaskDashboard({
         </DialogContent>
       </Dialog>
 
+      <div hidden={group !== "today"}>
       <DailyTaskPanel
         tasks={tasks}
         events={events}
@@ -1416,10 +1447,10 @@ export function TaskDashboard({
         archivedSectionOpen={uiPreferences.dailyArchiveSectionOpen}
         onArchivedSectionOpenChange={(open) => patchUiPreferences({ dailyArchiveSectionOpen: open })}
       />
+      </div>
 
-      <Separator />
 
-      <div className="task-dashboard-section utility-panel-grid" data-testid="task-list-panel-group">
+      <div hidden={group !== "goals"} className="task-dashboard-section utility-panel-grid" data-testid="task-list-panel-group">
         <div className="utility-panel-controls">
           <div className="utility-panel-tabs task-list-panel-tabs" role="tablist" aria-label="任务与清单">
             <button
@@ -1431,7 +1462,7 @@ export function TaskDashboard({
             >
               <ListTodo className="h-4 w-4 shrink-0" aria-hidden />
               <span className="truncate">长期任务</span>
-              <span className="text-[10px] tabular-nums opacity-70">{orderedIncompleteTasks.length}</span>
+              <span className="text-xs tabular-nums opacity-70">{orderedIncompleteTasks.length}</span>
             </button>
             <button
               type="button"
@@ -1442,19 +1473,9 @@ export function TaskDashboard({
             >
               <CalendarRange className="h-4 w-4 shrink-0" aria-hidden />
               <span className="truncate">年度任务</span>
-              <span className="text-[10px] tabular-nums opacity-70">{annualTasks.length}</span>
+              <span className="text-xs tabular-nums opacity-70">{annualTasks.length}</span>
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTaskListPanel === "shopping"}
-              className={`utility-panel-tab ${activeTaskListPanel === "shopping" ? "utility-panel-tab-active" : ""}`}
-              onClick={() => setTaskListPanel("shopping", activeTaskListPanel !== "shopping")}
-            >
-              <ShoppingBasket className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="truncate">购物清单</span>
-              <span className="text-[10px] tabular-nums opacity-70">{shoppingItems.length}</span>
-            </button>
+
           </div>
           {activeTaskListPanel ? (
             <Button
@@ -1524,7 +1545,7 @@ export function TaskDashboard({
                     draggable
                     onDragStart={(event) => handleTaskDragStart(task.id, event)}
                     onDragEnd={() => setDraggingTaskId(null)}
-                    className="mt-0.5 rounded-md p-0.5 text-gray-400 hover:bg-stone-100 hover:text-gray-600"
+                    className="mt-0.5 rounded-md p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
                     aria-label={`拖动排序 ${task.name}`}
                   >
                     <GripVertical className="h-4 w-4" />
@@ -1544,12 +1565,12 @@ export function TaskDashboard({
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(task)}
-                        className="min-w-0 flex-1 break-words text-left text-sm font-semibold leading-5 text-gray-900 hover:text-emerald-800"
+                        className="min-w-0 flex-1 break-words text-left text-sm font-semibold leading-5 text-stone-900 hover:text-emerald-800"
                       >
                         {task.name}
                       </button>
                     </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-stone-500">
                       <span className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-1.5 py-1 tabular-nums">
                         <Clock className="h-3 w-3" aria-hidden />
                         {task.dueDate}
@@ -1559,7 +1580,7 @@ export function TaskDashboard({
                       </Badge>
                       {task.uncertainty ? (
                         <span className={cn(
-                          "rounded-md border px-1.5 py-1 text-[11px] font-medium",
+                          "rounded-md border px-1.5 py-1 text-xs font-medium",
                           task.uncertainty.level === "high"
                             ? "border-amber-200 bg-amber-50 text-amber-800"
                             : "border-teal-200 bg-teal-50 text-teal-800",
@@ -1570,7 +1591,7 @@ export function TaskDashboard({
                       {task.subtasks.length > 0 ? (
                         <button
                           type="button"
-                          className="rounded-md px-1.5 py-1 text-[11px] font-medium text-stone-600 hover:bg-stone-100"
+                          className="rounded-md px-1.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100"
                           onClick={() => patchUiPreferences({
                             expandedTasks: toggleStoredId(uiPreferences.expandedTasks, task.id),
                           })}
@@ -1603,7 +1624,7 @@ export function TaskDashboard({
                           onCheckedChange={() => handleToggleTaskSubtask(task.id, subtask.id)}
                           className="h-3.5 w-3.5"
                         />
-                        <span className={subtask.done ? "line-through text-gray-500" : "text-gray-700"}>
+                        <span className={subtask.done ? "line-through text-stone-500" : "text-stone-700"}>
                           {subtask.name}
                         </span>
                       </li>
@@ -1617,12 +1638,12 @@ export function TaskDashboard({
           <div className="space-y-3">
             {groupedIncompleteTasks.map((group) => (
               <div key={group.priority} className="border-t border-stone-200/80 py-2">
-                <p className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
+                <p className="mb-2 flex items-center gap-2 text-sm font-medium text-stone-700">
                   {getPriorityIcon(group.priority)}
                   {group.priority}
                 </p>
                 {group.items.length === 0 ? (
-                  <p className="text-xs text-gray-500">暂无任务</p>
+                  <p className="text-xs text-stone-500">暂无任务</p>
                 ) : (
                   <ul className="space-y-1.5">
                     {group.items.map((task) => (
@@ -1636,11 +1657,11 @@ export function TaskDashboard({
                           {task.name}
                         </button>
                         {task.uncertainty ? (
-                          <span className="shrink-0 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] text-teal-800">
+                          <span className="shrink-0 rounded-full bg-teal-50 px-2 py-0.5 text-xs text-teal-800">
                             {workTypeLabels[task.uncertainty.workType]}
                           </span>
                         ) : null}
-                        <span className="shrink-0 text-xs tabular-nums text-gray-500">{task.dueDate}</span>
+                        <span className="shrink-0 text-xs tabular-nums text-stone-500">{task.dueDate}</span>
                       </li>
                     ))}
                   </ul>
@@ -1650,7 +1671,7 @@ export function TaskDashboard({
           </div>
             )}
             {orderedIncompleteTasks.length === 0 && (
-              <p className="mt-4 border border-gray-200 rounded-lg p-4 text-sm text-gray-500 text-center">当前没有未完成长期任务</p>
+              <p className="mt-4 border border-stone-200 rounded-lg p-4 text-sm text-stone-500 text-center">当前没有未完成长期任务</p>
             )}
           </CollapsibleContent>
         </Collapsible>
@@ -1692,7 +1713,7 @@ export function TaskDashboard({
                         type="button"
                         onClick={() => openEditAnnualTask(item)}
                         className={`min-w-0 flex-1 leading-snug [overflow-wrap:anywhere] break-words ${
-                          item.done ? "text-left text-gray-500 line-through" : "text-left text-gray-900"
+                          item.done ? "text-left text-stone-500 line-through" : "text-left text-stone-900"
                         }`}
                       >
                         {item.name}
@@ -1724,32 +1745,20 @@ export function TaskDashboard({
                   ))}
                 </ul>
               ) : (
-                <p className="text-center text-sm text-gray-500">尚未添加年度任务。</p>
+                <p className="text-center text-sm text-stone-500">尚未添加年度任务。</p>
               )}
             </CollapsibleContent>
           </Collapsible>
         </section>
 
-        <ShoppingList
-          variant="panel"
-          items={shoppingItems}
-          open={activeTaskListPanel === "shopping"}
-          onOpenChange={(open) => setTaskListPanel("shopping", open)}
-          addDialogOpen={shoppingAddDialogOpen}
-          onAddDialogOpenChange={setShoppingAddDialogOpen}
-          onAddItem={onAddShoppingItem}
-          onToggleItem={onToggleShoppingItem}
-          onDeleteItem={onDeleteShoppingItem}
-          onReorderItem={onReorderShoppingItem}
-        />
+
       </div>
 
-      <Separator />
 
-      <div className="task-dashboard-section utility-panel-grid">
+      <div hidden={group === "today"} className="task-dashboard-section utility-panel-grid">
       <div className="utility-panel-controls">
         <div className="utility-panel-tabs" role="tablist" aria-label="打卡、成就与足迹栏目">
-          <button
+          <button hidden={group !== "goals"}
             type="button"
             role="tab"
             aria-selected={activeUtilityPanel === "project"}
@@ -1759,7 +1768,7 @@ export function TaskDashboard({
             <KanbanSquare className="h-4 w-4 shrink-0" />
             <span className="truncate">项目</span>
           </button>
-          <button
+          <button hidden={group !== "life"}
             type="button"
             role="tab"
             aria-selected={activeUtilityPanel === "routine"}
@@ -1769,7 +1778,7 @@ export function TaskDashboard({
             <Clock className="h-4 w-4 shrink-0" />
             <span className="truncate">日常</span>
           </button>
-          <button
+          <button hidden={group !== "life"}
             type="button"
             role="tab"
             aria-selected={activeUtilityPanel === "achievement"}
@@ -1779,7 +1788,7 @@ export function TaskDashboard({
             <Trophy className="h-4 w-4 shrink-0" />
             <span className="truncate">成就</span>
           </button>
-          <button
+          <button hidden={group !== "life"}
             type="button"
             role="tab"
             aria-selected={activeUtilityPanel === "footprint"}
@@ -1884,12 +1893,12 @@ export function TaskDashboard({
                       expandedProjects: toggleStoredId(uiPreferences.expandedProjects, project.id),
                     })}
                   >
-                    <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${projectExpanded ? "" : "-rotate-90"}`} />
+                    <ChevronDown className={`h-4 w-4 text-stone-500 transition-transform ${projectExpanded ? "" : "-rotate-90"}`} />
                     <p className="truncate text-sm font-medium" title={project.name}>
                       {project.name}
                     </p>
                     {checkedInToday ? (
-                      <Badge className="shrink-0 border border-emerald-100 bg-emerald-50 text-[10px] font-normal text-emerald-700">
+                      <Badge className="shrink-0 border border-emerald-100 bg-emerald-50 text-xs font-normal text-emerald-700">
                         今日已打卡
                       </Badge>
                     ) : null}
@@ -1915,21 +1924,21 @@ export function TaskDashboard({
                 {projectExpanded ? (
                   <>
                     <ProjectCheckinCalendar project={project} today={todayDate} />
-                    {project.description ? <p className="mb-2 text-xs text-gray-500">{project.description}</p> : null}
-                    <div className="mb-2 h-2 rounded bg-gray-100">
+                    {project.description ? <p className="mb-2 text-xs text-stone-500">{project.description}</p> : null}
+                    <div className="mb-2 h-2 rounded bg-stone-100">
                       <div className="h-2 rounded bg-black" style={{ width: `${percent}%` }} />
                     </div>
-                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-stone-600">
                       <span>本阶段：{doneCount}/{totalDays}（{percent}%）</span>
                       {archivedCycles.length > 0 ? (
-                        <Badge variant="outline" className="h-5 bg-white text-[10px] font-normal text-stone-600">
+                        <Badge variant="outline" className="h-5 bg-white text-xs font-normal text-stone-600">
                           已存档 {archivedCycles.length} 期
                         </Badge>
                       ) : null}
                     </div>
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-t border-stone-100 pt-2 items-end">
                       <div className="space-y-1">
-                        <Label className="text-[11px] font-medium text-gray-600">打卡日期</Label>
+                        <Label className="text-xs font-medium text-stone-600">打卡日期</Label>
                         <Input
                           type="date"
                           value={projectDateDraft[project.id] ?? todayDate}
@@ -1943,7 +1952,7 @@ export function TaskDashboard({
                         />
                       </div>
                       <div className="col-span-2 row-start-2 space-y-1">
-                        <Label className="text-[11px] font-medium text-gray-600">打卡描述</Label>
+                        <Label className="text-xs font-medium text-stone-600">打卡描述</Label>
                         <Textarea
                           value={projectNoteDraft[project.id] ?? ""}
                           onChange={(event) =>
@@ -1958,14 +1967,14 @@ export function TaskDashboard({
                       </Button>
                     </div>
 
-                    <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2">
-                      <p className="mb-1 text-xs font-medium text-gray-600">最近打卡记录</p>
+                    <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-2">
+                      <p className="mb-1 text-xs font-medium text-stone-600">最近打卡记录</p>
                       {recentCheckins.length === 0 ? (
-                        <p className="text-xs text-gray-500">暂无记录</p>
+                        <p className="text-xs text-stone-500">暂无记录</p>
                       ) : (
                         <ul className="space-y-1">
                           {recentCheckins.map((entry) => (
-                            <li key={`${project.id}-${entry.date}`} className="text-xs text-gray-700">
+                            <li key={`${project.id}-${entry.date}`} className="text-xs text-stone-700">
                               <span className="font-medium">{entry.date}</span>
                               <span className="mx-1">·</span>
                               <span className="block whitespace-pre-wrap break-words leading-5" title={entry.note || "（无描述）"}>
@@ -2007,7 +2016,7 @@ export function TaskDashboard({
               </div>
             );
               })}
-              {visibleProjectCheckins.length === 0 ? <p className="text-xs text-gray-500">暂无项目打卡项</p> : null}
+              {visibleProjectCheckins.length === 0 ? <p className="text-xs text-stone-500">暂无项目打卡项</p> : null}
               <p
                 className="sr-only"
                 role="status"
@@ -2021,7 +2030,7 @@ export function TaskDashboard({
         </Collapsible>
       </section>
 
-      <section className="utility-panel utility-panel-routine">
+      <section className="utility-panel utility-panel-routine" data-project-checkin-id={ROUTINE_CHECKIN_PROJECT_ID}>
         <Collapsible
           className="utility-panel-root"
           open={activeUtilityPanel === "routine"}
@@ -2033,7 +2042,7 @@ export function TaskDashboard({
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
                   今日打卡
                 </p>
-                <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-emerald-700">
+                <span className="rounded-full bg-white px-2 py-1 text-xs font-medium text-emerald-700">
                   {completedDailyCheckinCount}/{dailyCheckinEntries.length}
                 </span>
               </div>
@@ -2093,8 +2102,8 @@ export function TaskDashboard({
                           aria-label={`${slot.time} ${slot.label} 打卡状态`}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-gray-900">{slot.label}</p>
-                          <p className="text-xs tabular-nums text-gray-500">
+                          <p className="truncate text-sm font-medium text-stone-900">{slot.label}</p>
+                          <p className="text-xs tabular-nums text-stone-500">
                             {slot.time}
                             {fromProject ? ` · 来自 ${project.name}` : ""}
                           </p>
@@ -2103,7 +2112,7 @@ export function TaskDashboard({
                           type="button"
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8 shrink-0 rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          className="h-8 w-8 shrink-0 rounded-md text-stone-400 hover:bg-red-50 hover:text-red-600"
                           onClick={() =>
                             withOptionalConfirm("确认删除这个日常打卡时间点吗？", () =>
                               handleDeleteDailyCheckin(project, slot.id),
@@ -2124,22 +2133,22 @@ export function TaskDashboard({
               )}
             </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white/80 p-3">
+            <div className="rounded-xl border border-stone-200 bg-white/80 p-3">
               <div className="flex items-center justify-between gap-2">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-700">
-                  <CalendarRange className="h-4 w-4 text-gray-500" />
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-700">
+                  <CalendarRange className="h-4 w-4 text-stone-500" />
                   历史归档
                 </p>
-                <span className="text-[11px] text-gray-500">按日期自动整理</span>
+                <span className="text-xs text-stone-500">按日期自动整理</span>
               </div>
 
               {dailyCheckinArchive.length > 0 ? (
                 <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
                   {dailyCheckinArchive.map((day) => (
-                    <div key={day.date} className="rounded-lg border border-gray-200 bg-gray-50/70 p-2">
+                    <div key={day.date} className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-medium text-gray-800">{day.date}</p>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                        <p className="text-xs font-medium text-stone-800">{day.date}</p>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-stone-600">
                           {day.completedCount}/{day.totalCount}
                         </span>
                       </div>
@@ -2150,17 +2159,17 @@ export function TaskDashboard({
                             className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1.5"
                           >
                             <div className="min-w-0">
-                              <p className="truncate text-xs font-medium text-gray-800">{entry.label}</p>
-                              <p className="text-[11px] tabular-nums text-gray-500">
+                              <p className="truncate text-xs font-medium text-stone-800">{entry.label}</p>
+                              <p className="text-xs tabular-nums text-stone-500">
                                 {entry.time}
                                 {entry.projectName ? ` · 来自 ${entry.projectName}` : ""}
                               </p>
                             </div>
                             <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
                                 entry.completed
                                   ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-gray-100 text-gray-400"
+                                  : "bg-stone-100 text-stone-400"
                               }`}
                             >
                               {entry.completed ? "已打卡" : "未打卡"}
@@ -2172,7 +2181,7 @@ export function TaskDashboard({
                   ))}
                 </div>
               ) : (
-                <p className="mt-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">
+                <p className="mt-3 rounded-lg border border-dashed border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-500">
                   还没有过往归档。今天完成的勾选会按日期保存，明天会在这里看到今天的记录。
                 </p>
               )}
@@ -2189,25 +2198,25 @@ export function TaskDashboard({
         >
           <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
             {groupedAchievements.length === 0 ? (
-              <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-500">
+              <p className="rounded-lg border border-stone-200 p-4 text-sm text-stone-500">
                 暂无成就记录。可以把今天完成的重要进展记下来。
               </p>
             ) : (
               <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
                 {groupedAchievements.map(([date, items]) => (
-                  <div key={date} className="rounded-lg border border-gray-200 bg-white/70">
-                    <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700">
+                  <div key={date} className="rounded-lg border border-stone-200 bg-white/70">
+                    <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-xs font-medium text-stone-700">
                       {date}
                     </div>
                     <ul className="divide-y divide-gray-100">
                       {items.map((item) => (
                         <li key={item.id} className="flex items-start justify-between gap-2 px-3 py-3">
                           <div className="min-w-0 flex-1">
-                            <p className="break-words text-sm font-medium text-gray-900">
+                            <p className="break-words text-sm font-medium text-stone-900">
                               {item.title}
                             </p>
                             {item.note ? (
-                              <p className="mt-1 whitespace-pre-wrap break-words text-xs text-gray-600">
+                              <p className="mt-1 whitespace-pre-wrap break-words text-xs text-stone-600">
                                 {item.note}
                               </p>
                             ) : null}
@@ -2217,7 +2226,7 @@ export function TaskDashboard({
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8 rounded-md hover:bg-gray-100"
+                              className="h-8 w-8 rounded-md hover:bg-stone-100"
                               onClick={() => openEditAchievement(item)}
                               aria-label={`编辑成就 ${item.title}`}
                             >
@@ -2257,7 +2266,7 @@ export function TaskDashboard({
         >
           <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
             {footprints.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-gray-200 bg-white/70 px-3 py-4 text-sm text-gray-500">
+              <p className="rounded-lg border border-dashed border-stone-200 bg-white/70 px-3 py-4 text-sm text-stone-500">
                 暂无足迹项目，点击添加开始跟踪。
               </p>
             ) : (
@@ -2267,7 +2276,7 @@ export function TaskDashboard({
                   const days = daysSince(item.lastDate);
                   const dayLabel = days === 0 ? "今天" : `${days} 天`;
                   return (
-                    <div key={item.id} className="rounded-xl border border-gray-200 bg-white/80 p-3 text-center">
+                    <div key={item.id} className="rounded-xl border border-stone-200 bg-white/80 p-3 text-center">
                       <button
                         type="button"
                         className="flex w-full items-center justify-between gap-2 text-left"
@@ -2276,12 +2285,12 @@ export function TaskDashboard({
                         })}
                       >
                         <p className="truncate text-sm font-medium" title={item.name}>{item.name}</p>
-                        <ChevronDown className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${itemExpanded ? "" : "-rotate-90"}`} />
+                        <ChevronDown className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${itemExpanded ? "" : "-rotate-90"}`} />
                       </button>
                       {itemExpanded ? (
                         <div className="mt-3 space-y-2">
                           <p className="text-lg font-semibold">{dayLabel}</p>
-                          <p className="text-xs text-gray-500">距上次记录</p>
+                          <p className="text-xs text-stone-500">距上次记录</p>
                           <div className="flex flex-wrap justify-center gap-1">
                             <Button type="button" size="sm" variant="outline" onClick={() => handleResetFootprint(item.id)}>今天重置</Button>
                             <Button type="button" size="sm" variant="ghost" onClick={() => openEditFootprint(item)}>编辑</Button>
@@ -2307,8 +2316,8 @@ export function TaskDashboard({
       </section>
       </div>
 
-      <Separator />
 
+      <div hidden={group !== "today"}>
       <ResearchProgressPanel
         date={todayDate}
         posts={logPosts}
@@ -2316,9 +2325,24 @@ export function TaskDashboard({
         onCreatePost={onCreateLogPost}
         onOpenLogs={onOpenLogs}
       />
+      </div>
+      <div hidden={group !== "life"} className="task-dashboard-section">
+        <ShoppingList
+          variant="section"
+          items={shoppingItems}
+          open={shoppingSectionOpen}
+          onOpenChange={(open) => patchUiPreferences({ shoppingSectionOpen: open })}
+          addDialogOpen={shoppingAddDialogOpen}
+          onAddDialogOpenChange={setShoppingAddDialogOpen}
+          onAddItem={onAddShoppingItem}
+          onToggleItem={onToggleShoppingItem}
+          onDeleteItem={onDeleteShoppingItem}
+          onReorderItem={onReorderShoppingItem}
+        />
+      </div>
 
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
-        <DialogContent className="rounded-sm border-gray-200">
+        <DialogContent className="rounded-sm border-stone-200">
           <DialogHeader>
             <DialogTitle className="text-sm">新增长期任务</DialogTitle>
           </DialogHeader>
@@ -2337,7 +2361,7 @@ export function TaskDashboard({
       </Dialog>
 
       <Dialog open={showAddAnnualDialog} onOpenChange={setShowAddAnnualDialog}>
-        <DialogContent className="rounded-sm border-gray-200">
+        <DialogContent className="rounded-sm border-stone-200">
           <DialogHeader>
             <DialogTitle className="text-sm">新增年度任务</DialogTitle>
           </DialogHeader>
@@ -2381,7 +2405,7 @@ export function TaskDashboard({
       </Dialog>
 
       <Dialog open={showAddProjectDialog} onOpenChange={setShowAddProjectDialog}>
-        <DialogContent className="rounded-sm border-gray-200">
+        <DialogContent className="rounded-sm border-stone-200">
           <DialogHeader>
             <DialogTitle className="text-sm">新增项目打卡项</DialogTitle>
           </DialogHeader>
@@ -2411,7 +2435,7 @@ export function TaskDashboard({
           if (!open) setEditingAchievementId(null);
         }}
       >
-        <DialogContent className="rounded-sm border-gray-200">
+        <DialogContent className="rounded-sm border-stone-200">
           <DialogHeader>
             <DialogTitle className="text-sm">
               {editingAchievement ? "编辑成就" : "新增成就"}
@@ -2460,7 +2484,7 @@ export function TaskDashboard({
       </Dialog>
 
       <Dialog open={showAddFootprintDialog} onOpenChange={setShowAddFootprintDialog}>
-        <DialogContent className="rounded-sm border-gray-200">
+        <DialogContent className="rounded-sm border-stone-200">
           <DialogHeader>
             <DialogTitle className="text-sm">新增足迹项</DialogTitle>
           </DialogHeader>
@@ -2479,7 +2503,7 @@ export function TaskDashboard({
 
       <Dialog open={Boolean(historyProject)} onOpenChange={(open) => !open && setHistoryProjectId(null)}>
         {historyProject ? (
-          <DialogContent className="rounded-sm border-gray-200">
+          <DialogContent className="rounded-sm border-stone-200">
             <DialogHeader>
               <DialogTitle className="text-sm">
                 {historyProject.name} · 记录与存档
@@ -2489,16 +2513,16 @@ export function TaskDashboard({
               <section className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-stone-800">当前阶段</p>
-                  <span className="text-[11px] text-stone-500">{historyProject.startDate} 至今</span>
+                  <span className="text-xs text-stone-500">{historyProject.startDate} 至今</span>
                 </div>
               {[...historyProject.checkins]
                 .sort((a, b) => b.date.localeCompare(a.date))
                 .map((entry, index) => (
                   <div
                     key={`${historyProject.id}-${entry.date}-${index}`}
-                    className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                    className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2"
                   >
-                    <p className="text-xs font-medium text-gray-700">{entry.date}</p>
+                    <p className="text-xs font-medium text-stone-700">{entry.date}</p>
                     <div className="mt-1 flex gap-2">
                       <Textarea
                         value={checkinDrafts[`${historyProject.id}__${entry.date}`] ?? entry.note}
@@ -2541,7 +2565,7 @@ export function TaskDashboard({
                   </div>
                 ))}
               {historyProject.checkins.length === 0 ? (
-                <p className="rounded-md border border-gray-200 p-3 text-sm text-gray-500">
+                <p className="rounded-md border border-stone-200 p-3 text-sm text-stone-500">
                   当前阶段暂无打卡记录
                 </p>
               ) : null}
@@ -2550,13 +2574,13 @@ export function TaskDashboard({
               <section className="space-y-2 border-t border-stone-200 pt-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-stone-800">历史阶段</p>
-                  <span className="text-[11px] text-stone-500">{(historyProject.archives ?? []).length} 期</span>
+                  <span className="text-xs text-stone-500">{(historyProject.archives ?? []).length} 期</span>
                 </div>
                 {(historyProject.archives ?? []).map((archive, index) => (
                   <details key={archive.id} className="group rounded-lg border border-amber-100 bg-amber-50/45 px-3 py-2">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs text-stone-700">
                       <span className="font-medium">第 {(historyProject.archives ?? []).length - index} 期 · {archive.checkins.length} 次打卡</span>
-                      <span className="shrink-0 text-[11px] text-stone-500">{archive.startDate} 至 {archive.endDate}</span>
+                      <span className="shrink-0 text-xs text-stone-500">{archive.startDate} 至 {archive.endDate}</span>
                     </summary>
                     <ul className="mt-2 space-y-1.5 border-t border-amber-100 pt-2">
                       {[...archive.checkins].sort((a, b) => b.date.localeCompare(a.date)).map((entry, entryIndex) => (
@@ -2580,7 +2604,7 @@ export function TaskDashboard({
       </Dialog>
 
       <Dialog open={Boolean(editingProjectId)} onOpenChange={(open) => !open && setEditingProjectId(null)}>
-        <DialogContent className="rounded-sm border-gray-200">
+        <DialogContent className="rounded-sm border-stone-200">
           <DialogHeader>
             <DialogTitle className="text-sm">编辑项目</DialogTitle>
           </DialogHeader>
@@ -2607,7 +2631,7 @@ export function TaskDashboard({
         open={Boolean(editingFootprint)}
         onOpenChange={(open) => !open && setEditingFootprintId(null)}
       >
-        <DialogContent className="rounded-sm border-gray-200">
+        <DialogContent className="rounded-sm border-stone-200">
           <DialogHeader>
             <DialogTitle className="text-sm">编辑足迹</DialogTitle>
           </DialogHeader>
@@ -2639,9 +2663,9 @@ export function TaskDashboard({
         }}
       >
         {editingTask && taskDraft && (
-          <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-sm border-gray-200 p-0 sm:max-w-xl">
-            <DialogHeader className="shrink-0 border-b border-gray-200 bg-white px-5 py-4 pr-12">
-              <DialogTitle className="text-sm">编辑长期任务详情</DialogTitle>
+          <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-sm border-stone-200 p-0 sm:max-w-xl">
+            <DialogHeader className="shrink-0 border-b border-stone-200 bg-white px-5 py-4 pr-12">
+              <DialogTitle className="text-sm">{editingTask.taskType === "daily" ? "编辑日常任务详情" : "编辑长期任务详情"}</DialogTitle>
             </DialogHeader>
             <div className="min-h-0 space-y-3 overflow-y-auto px-5 py-4">
               <div className="flex justify-end">
@@ -2664,7 +2688,7 @@ export function TaskDashboard({
                   onChange={(event) =>
                     setTaskDraft((prev) => (prev ? { ...prev, name: event.target.value } : prev))
                   }
-                  className="rounded-sm border-gray-200"
+                  className="rounded-sm border-stone-200"
                 />
               </div>
               <div className="space-y-1">
@@ -2676,7 +2700,7 @@ export function TaskDashboard({
                   onChange={(event) =>
                     setTaskDraft((prev) => (prev ? { ...prev, dueDate: event.target.value } : prev))
                   }
-                  className="rounded-sm border-gray-200"
+                  className="rounded-sm border-stone-200"
                 />
               </div>
               <div className="space-y-1">
@@ -2692,7 +2716,7 @@ export function TaskDashboard({
                       key={option.value}
                       type="button"
                       variant={taskDraft.priority === option.value ? "default" : "outline"}
-                      className={`rounded-sm ${taskDraft.priority === option.value ? "bg-black text-white" : "border-gray-300"}`}
+                      className={`rounded-sm ${taskDraft.priority === option.value ? "bg-black text-white" : "border-stone-300"}`}
                       onClick={() =>
                         setTaskDraft((prev) => (prev ? { ...prev, priority: option.value } : prev))
                       }
@@ -2798,7 +2822,7 @@ export function TaskDashboard({
                     }
                   />
                 </div>
-                <div className="space-y-2 border border-gray-200 p-3 rounded-sm">
+                <div className="space-y-2 border border-stone-200 p-3 rounded-sm">
                   {taskDraft.subtasks.map((subtask) => (
                     <div key={subtask.id} className="flex items-center gap-2">
                       <Checkbox
@@ -2806,7 +2830,7 @@ export function TaskDashboard({
                         onCheckedChange={() => handleToggleSubtask(subtask.id)}
                         className="h-3.5 w-3.5"
                       />
-                      <span className={subtask.done ? "text-gray-500 line-through text-sm" : "text-black text-sm"}>
+                      <span className={subtask.done ? "text-stone-500 line-through text-sm" : "text-black text-sm"}>
                         {subtask.name}
                       </span>
                       <Button
@@ -2827,7 +2851,7 @@ export function TaskDashboard({
                         setTaskDraft((prev) => (prev ? { ...prev, newSubtaskName: event.target.value } : prev))
                       }
                       placeholder="输入子任务名称"
-                      className="rounded-sm border-gray-200 text-sm"
+                      className="rounded-sm border-stone-200 text-sm"
                     />
                     <Button
                       type="button"
@@ -2847,7 +2871,7 @@ export function TaskDashboard({
                   onChange={(event) =>
                     setTaskDraft((prev) => (prev ? { ...prev, notes: event.target.value } : prev))
                   }
-                  className="min-h-20 rounded-sm border-gray-200"
+                  className="min-h-20 rounded-sm border-stone-200"
                 />
               </div>
               <div className="space-y-1">
@@ -2858,7 +2882,7 @@ export function TaskDashboard({
                   onChange={(event) =>
                     setTaskDraft((prev) => (prev ? { ...prev, precautionsText: event.target.value } : prev))
                   }
-                  className="min-h-20 rounded-sm border-gray-200"
+                  className="min-h-20 rounded-sm border-stone-200"
                 />
               </div>
               <div className="space-y-1">
@@ -2869,10 +2893,10 @@ export function TaskDashboard({
                   onChange={(event) =>
                     setTaskDraft((prev) => (prev ? { ...prev, completionLog: event.target.value } : prev))
                   }
-                  className="min-h-20 rounded-sm border-gray-200"
+                  className="min-h-20 rounded-sm border-stone-200"
                 />
               </div>
-              <div className="flex items-center justify-between rounded-sm border border-gray-200 px-3 py-2">
+              <div className="flex items-center justify-between rounded-sm border border-stone-200 px-3 py-2">
                 <span className="text-sm">标记为完成</span>
                 <Switch
                   checked={taskDraft.done}
@@ -2891,7 +2915,7 @@ export function TaskDashboard({
               <Button
                 type="button"
                 variant="outline"
-                className="w-full rounded-sm border-gray-300"
+                className="w-full rounded-sm border-stone-300"
                 onClick={() => {
                   setPendingDeleteTaskId(editingTask.id);
                   setConfirmDeleteOpen(true);
@@ -2905,16 +2929,16 @@ export function TaskDashboard({
       </Dialog>
 
       <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-        <DialogContent className="rounded-sm border-gray-200">
+        <DialogContent className="rounded-sm border-stone-200">
           <DialogHeader>
             <DialogTitle className="text-sm">确认删除任务？</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-gray-600">删除后将无法恢复，请确认是否继续。</p>
+          <p className="text-sm text-stone-600">删除后将无法恢复，请确认是否继续。</p>
           <div className="mt-2 flex gap-2">
             <Button
               type="button"
               variant="outline"
-              className="flex-1 rounded-sm border-gray-300"
+              className="flex-1 rounded-sm border-stone-300"
               onClick={() => setConfirmDeleteOpen(false)}
             >
               取消

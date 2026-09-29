@@ -1,7 +1,13 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { Undo2, Redo2 } from "lucide-react";
+import { parseISO } from "date-fns";
+import { GlobalSearch, type SearchResult } from "@/components/schedule/global-search";
+import { ExecutionPanel } from "@/components/schedule/execution-panel";
+import { useUndoHistory } from "@/hooks/useUndoHistory";
+import { expandScheduleEvents } from "@/lib/recurrence";
 
 /**
  * 日程管理应用的工作台主组件
@@ -106,6 +112,11 @@ function getCurrentWeekStart() {
 }
 
 export function WorkbenchApp() {
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const [openCollectionRequest, setOpenCollectionRequest] = useState<{ id: string; kind: "annual" | "project" | "shopping"; token: number }>();
+  const [openTaskRequest, setOpenTaskRequest] = useState<{ id: string; token: number }>();
+  const [openEventRequest, setOpenEventRequest] = useState<{ id: string; token: number }>();
+  const [openLogRequest, setOpenLogRequest] = useState<{ id: string; token: number }>();
   const canSaveRemoteRef = useRef(false);
   const lastLoadedSnapshotRef = useRef<string | null>(null);
   const [isBooted, setIsBooted] = useState(false);
@@ -165,6 +176,43 @@ export function WorkbenchApp() {
     ],
   );
   const persistedPayloadJson = useMemo(() => JSON.stringify(persistedPayload), [persistedPayload]);
+
+  const undoSnapshot = useMemo(() => ({ events, tasks, annualTasks, shoppingItems, projectCheckins, footprints, achievements }), [events, tasks, annualTasks, shoppingItems, projectCheckins, footprints, achievements]);
+  const restoreSnapshot = useCallback((snapshot: typeof undoSnapshot) => {
+    setEvents(snapshot.events); setTasks(snapshot.tasks); setAnnualTasks(snapshot.annualTasks);
+    setShoppingItems(snapshot.shoppingItems); setProjectCheckins(snapshot.projectCheckins);
+    setFootprints(snapshot.footprints); setAchievements(snapshot.achievements);
+  }, []);
+  const history = useUndoHistory(undoSnapshot, restoreSnapshot, dataReady && user ? user.id : null);
+
+  function locateSearchResult(result: SearchResult) {
+    const token = Date.now();
+    if (result.task) {
+      setActiveModule("schedule");
+      setDashboardUiPreferences((previous) => ({ ...previous, dashboardGroup: result.task!.taskType === "daily" ? "today" : "goals" }));
+      setOpenTaskRequest({ id: result.id, token });
+    } else if (result.event) {
+      const event = result.event;
+      const next = event.recurrence ? expandScheduleEvents([event], todayISO(), format(addDays(new Date(), 366), "yyyy-MM-dd"))[0] : event;
+      const target = next ?? expandScheduleEvents([event], event.date, event.recurrenceEndExclusive ?? todayISO()).at(-1);
+      if (!target) { toast.info("此重复日程当前没有可打开的实例"); return; }
+      setActiveModule("schedule"); setViewMode("day"); setCurrentWeekStart(parseISO(target.date));
+      setOpenEventRequest({ id: target.id, token });
+    } else if (result.collection) {
+      setActiveModule("schedule");
+      const kind = result.collection;
+      setDashboardUiPreferences((previous) => ({ ...previous,
+        dashboardGroup: kind === "shopping" || result.id === ROUTINE_CHECKIN_PROJECT_ID ? "life" : "goals",
+        ...(kind === "annual" ? { annualSectionOpen: true, longTaskSectionOpen: false } : {}),
+        ...(kind === "shopping" ? { shoppingSectionOpen: true } : {}),
+        ...(kind === "project" ? { projectSectionOpen: true, expandedProjects: [...new Set([...previous.expandedProjects, result.id])] } : {}),
+        ...(result.id === ROUTINE_CHECKIN_PROJECT_ID ? { projectSectionOpen: false, routineCheckinSectionOpen: true, achievementSectionOpen: false, footprintSectionOpen: false } : {}),
+      }));
+      setOpenCollectionRequest({ id: result.id, kind, token });
+    } else if (result.log) {
+      setActiveModule("logs"); setOpenLogRequest({ id: result.id, token });
+    }
+  }
 
   async function refreshLogs(currentUser: User) {
     const results = await Promise.all([
@@ -422,10 +470,11 @@ export function WorkbenchApp() {
   useEffect(() => {
     if (!user || !dataReady) return;
     if (!canSaveRemoteRef.current) return;
-    if (lastLoadedSnapshotRef.current === persistedPayloadJson) return;
+    let cancelled = false;
     const currentUser = user;
 
     async function saveUserData() {
+      if (cancelled || lastLoadedSnapshotRef.current === persistedPayloadJson) return;
       const payload = {
         user_id: currentUser.id,
         ...persistedPayload,
@@ -475,7 +524,11 @@ export function WorkbenchApp() {
       toast.error("Failed to save remote data: " + withPreferences.error.message);
     }
 
-    saveUserData();
+    saveQueueRef.current = saveQueueRef.current.then(saveUserData).catch((error: unknown) => {
+      console.error("Schedule save failed", error);
+      toast.error("同步失败，数据已保留在本机");
+    });
+    return () => { cancelled = true; };
   }, [persistedPayload, persistedPayloadJson, user, dataReady]);
 
   useEffect(() => {
@@ -1403,6 +1456,9 @@ export function WorkbenchApp() {
           <p className="mt-0.5 min-w-0 truncate text-sm font-medium text-stone-900">{user.email}</p>
         </div>
         <div className="flex items-center gap-2">
+          <GlobalSearch events={events} tasks={tasks} logs={logPosts} annualTasks={annualTasks} projects={projectCheckins} shopping={shoppingItems} logsReady={logReady} onLocate={locateSearchResult} />
+          <Button variant="outline" size="icon-sm" disabled={!history.canUndo} onClick={history.undo} aria-label="撤销上一步" title="撤销任务、日程与清单操作（Ctrl+Z）"><Undo2 /></Button>
+          <Button variant="outline" size="icon-sm" disabled={!history.canRedo} onClick={history.redo} aria-label="重做上一步" title="重做（Ctrl+Shift+Z）"><Redo2 /></Button>
           <WeeklyReportDialog
             currentWeekStart={currentWeekStart}
             events={events}
@@ -1445,6 +1501,8 @@ export function WorkbenchApp() {
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(340px,380px)] gap-4">
               <section className="min-h-0">
                 <WeeklyTimeGrid
+                  openEventRequest={openEventRequest}
+                  onOpenRequestHandled={() => setOpenEventRequest(undefined)}
                   savedCategoryDefs={dashboardUiPreferences.categoryDefs}
                   onCategoryDefsChange={(categoryDefs) => setDashboardUiPreferences((previous) => ({ ...previous, categoryDefs }))}
                   currentWeekStart={currentWeekStart}
@@ -1475,7 +1533,12 @@ export function WorkbenchApp() {
                 />
               </section>
               <section className="min-h-0 space-y-4">
+                <ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />
                 <TaskDashboard
+                  openCollectionRequest={openCollectionRequest}
+                  onCollectionRequestHandled={() => setOpenCollectionRequest(undefined)}
+                  openTaskRequest={openTaskRequest}
+                  onOpenRequestHandled={() => setOpenTaskRequest(undefined)}
                   tasks={tasks}
                   events={events}
                   onToggleTask={handleToggleTask}
@@ -1527,6 +1590,8 @@ export function WorkbenchApp() {
           ) : (
             logReady ? (
               <LogPage
+                openLogRequest={openLogRequest}
+                onOpenRequestHandled={() => setOpenLogRequest(undefined)}
                 posts={logPosts}
                 tags={logTags}
                 uploading={logUploading}

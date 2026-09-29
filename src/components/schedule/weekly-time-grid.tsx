@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffectEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { addDays, format, parse } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -169,6 +169,8 @@ type SelectionDrag = {
 };
 
 type WeeklyTimeGridProps = {
+  openEventRequest?: { id: string; token: number };
+  onOpenRequestHandled?: () => void;
   savedCategoryDefs?: ScheduleCategoryDef[];
   onCategoryDefsChange?: (defs: ScheduleCategoryDef[]) => void;
   currentWeekStart: Date;
@@ -495,6 +497,8 @@ function buildRequirementLines(value: string) {
 }
 
 export function WeeklyTimeGrid({
+  openEventRequest,
+  onOpenRequestHandled,
   savedCategoryDefs,
   onCategoryDefsChange,
   currentWeekStart,
@@ -1156,6 +1160,13 @@ export function WeeklyTimeGrid({
       tag: event.tag,
     });
   }
+
+  const openRequestedEvent = useEffectEvent(() => {
+    const event = expandedEvents.find((item) => item.id === openEventRequest?.id);
+    if (event) handleOpenEdit(event);
+    onOpenRequestHandled?.();
+  });
+  useEffect(() => { if (openEventRequest) openRequestedEvent(); }, [openEventRequest]);
 
   function handleCreateEvent(alsoCreateDailyTask = false) {
     if (!selectedCell || !createForm.title.trim()) return;

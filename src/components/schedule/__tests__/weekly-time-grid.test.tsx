@@ -189,16 +189,17 @@ describe("WeeklyTimeGrid interactions", () => {
     const onUpdateEvent = vi.fn();
     renderGrid({ events: [{ ...scheduleEvent, endDate: "2026-07-30", startHour: 9, endHour: 10 }], onUpdateEvent });
     fireEvent.click(screen.getAllByRole("button", { name: `打开 ${scheduleEvent.title} 编辑窗口` })[0]);
-    fireEvent.change(screen.getByLabelText("编辑行程开始日期"), { target: { value: "2026-07-31" } });
-    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    const editor = within(screen.getByRole("dialog"));
+    fireEvent.change(editor.getByLabelText("编辑行程开始日期"), { target: { value: "2026-07-31" } });
+    fireEvent.click(editor.getByRole("button", { name: "保存修改" }));
     expect(onUpdateEvent).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("编辑行程开始日期"), { target: { value: "" } });
-    fireEvent.change(screen.getByLabelText("编辑行程结束日期"), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    fireEvent.change(editor.getByLabelText("编辑行程开始日期"), { target: { value: "" } });
+    fireEvent.change(editor.getByLabelText("编辑行程结束日期"), { target: { value: "" } });
+    fireEvent.click(editor.getByRole("button", { name: "保存修改" }));
     expect(onUpdateEvent).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("编辑行程结束日期"), { target: { value: "2026-07-30" } });
-    fireEvent.change(screen.getByLabelText("编辑行程开始日期"), { target: { value: "2026-07-30" } });
-    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    fireEvent.change(editor.getByLabelText("编辑行程结束日期"), { target: { value: "2026-07-30" } });
+    fireEvent.change(editor.getByLabelText("编辑行程开始日期"), { target: { value: "2026-07-30" } });
+    fireEvent.click(editor.getByRole("button", { name: "保存修改" }));
     expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, expect.objectContaining({ date: "2026-07-30", endDate: undefined, startHour: 9, endHour: 10 }));
   });
   it("resizes a multi-day start into a later date without moving its end", () => {
@@ -450,13 +451,14 @@ describe("WeeklyTimeGrid interactions", () => {
     });
 
     fireEvent.click(screen.getAllByRole("button", { name: "打开 循环编辑 编辑窗口" })[0]);
-    fireEvent.click(screen.getByRole("button", { name: /循环行程设置/ }));
+    const editor = within(screen.getByRole("dialog"));
+    fireEvent.click(editor.getByRole("button", { name: /循环行程设置/ }));
 
-    expect(screen.queryByText(/当前日期/)).toBeNull();
-    expect(screen.queryByText(/修改时间、标题等时/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "当天及未来" }));
-    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "未来循环编辑" } });
-    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    expect(editor.queryByText(/当前日期/)).toBeNull();
+    expect(editor.queryByText(/修改时间、标题等时/)).toBeNull();
+    fireEvent.click(editor.getByRole("button", { name: "当天及未来" }));
+    fireEvent.change(editor.getByLabelText("标题"), { target: { value: "未来循环编辑" } });
+    fireEvent.click(editor.getByRole("button", { name: "保存修改" }));
 
     expect(onUpdateEvent).toHaveBeenCalledWith(
       "recurring-edit-event__2026-07-27",

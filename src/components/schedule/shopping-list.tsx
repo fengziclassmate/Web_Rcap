@@ -103,6 +103,7 @@ export function ShoppingList({
           {orderedItems.map((item) => (
             <li
               key={item.id}
+              data-shopping-item-id={item.id}
               className={`shopping-item-row transition-[opacity,transform,background-color] ${item.done ? "bg-stone-50/70 opacity-70" : ""}`}
               onDragOver={(event) => {
                 const source = items.find((candidate) => candidate.id === draggingItemIdRef.current);
@@ -151,7 +152,7 @@ export function ShoppingList({
                 </p>
                 <time
                   dateTime={item.addedAt}
-                  className="mt-1 flex items-center gap-1 text-[11px] tabular-nums text-stone-400"
+                  className="mt-1 flex items-center gap-1 text-xs tabular-nums text-stone-400"
                 >
                   <Clock3 className="h-3 w-3" aria-hidden />
                   {formatAddedAt(item.addedAt)}
@@ -171,7 +172,7 @@ export function ShoppingList({
           ))}
         </ul>
       ) : (
-        <p className="py-2 text-center text-sm text-gray-500">清单还是空的，添加下一件要买的东西吧。</p>
+        <p className="py-2 text-center text-sm text-stone-500">清单还是空的，添加下一件要买的东西吧。</p>
       )}
       <p className="sr-only" role="status" aria-live="polite">
         {sortAnnouncement}
@@ -197,13 +198,13 @@ export function ShoppingList({
             className="section-trigger relative flex w-full items-center rounded-xl py-2.5 pl-3 pr-20 text-left"
             aria-label={open ? "折叠购物清单" : "展开购物清单"}
           >
-            <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-gray-700">
+            <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-stone-700">
               <ShoppingBasket className="h-4 w-4 shrink-0 text-amber-700" aria-hidden />
               购物清单
               <span className="text-xs font-normal tabular-nums text-stone-400">{items.length} 件</span>
             </span>
             <ChevronDown
-              className={`absolute right-3 h-4 w-4 text-gray-500 transition-transform ${open ? "" : "-rotate-90"}`}
+              className={`absolute right-3 h-4 w-4 text-stone-500 transition-transform ${open ? "" : "-rotate-90"}`}
               aria-hidden
             />
           </CollapsibleTrigger>
@@ -227,7 +228,7 @@ export function ShoppingList({
       )}
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="rounded-sm border-gray-200">
+        <DialogContent className="rounded-sm border-stone-200">
           <DialogHeader>
             <DialogTitle className="text-sm">添加购物项</DialogTitle>
           </DialogHeader>

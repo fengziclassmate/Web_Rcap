@@ -94,11 +94,11 @@ export function ResearchProgressPanel({
           <FlaskConical className="h-4 w-4 shrink-0 text-sky-800" aria-hidden />
           <h3 className="text-sm font-semibold text-stone-800">今日科研进展</h3>
           <Button type="button" size="icon-sm" variant="ghost" aria-label={open ? "折叠今日科研进展" : "展开今日科研进展"} aria-expanded={open} onClick={() => { setOpen(!open); try { localStorage.setItem("research-progress-open", open ? "closed" : "open"); } catch {} }}>{open ? "⌄" : "›"}</Button>
-          <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium tabular-nums text-sky-800">
+          <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium tabular-nums text-sky-800">
             今日 {todayEntryCount} 条
           </span>
           {canSubmit && draftDate !== date ? (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium tabular-nums text-amber-800">
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium tabular-nums text-amber-800">
               草稿 {draftDate.slice(5).replace("-", "/")}
             </span>
           ) : null}
@@ -117,7 +117,7 @@ export function ResearchProgressPanel({
 
         <div className="space-y-2.5" hidden={!open}>
           <label className="block space-y-1">
-            <span className="text-[11px] font-semibold text-stone-600">今日完成</span>
+            <span className="text-xs font-semibold text-stone-600">今日完成</span>
             <Textarea
               value={completed}
               onChange={(event) => setCompleted(event.target.value)}
@@ -128,7 +128,7 @@ export function ResearchProgressPanel({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-[11px] font-semibold text-stone-600">关键进展 / 卡点</span>
+            <span className="text-xs font-semibold text-stone-600">关键进展 / 卡点</span>
             <Textarea
               value={insight}
               onChange={(event) => setInsight(event.target.value)}
@@ -139,7 +139,7 @@ export function ResearchProgressPanel({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-[11px] font-semibold text-stone-600">明日计划</span>
+            <span className="text-xs font-semibold text-stone-600">明日计划</span>
             <Textarea
               value={nextPlan}
               onChange={(event) => setNextPlan(event.target.value)}

@@ -1024,3 +1024,54 @@
     }
   }
 }
+
+/* Desktop workbench: calm surfaces, readable controls, one primary color. */
+[hidden] { display: none !important; }
+.execution-panel {
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: var(--card);
+}
+.dashboard-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
+  border-radius: 0.625rem;
+  background: var(--muted);
+  padding: 0.25rem;
+}
+.dashboard-groups button {
+  min-height: 2.25rem;
+  border-radius: 0.45rem;
+  padding: 0.375rem 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  transition: background-color 140ms, color 140ms;
+}
+.dashboard-groups button[aria-pressed="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.dashboard-groups button:focus-visible,
+.search-result:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.search-result {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  border-radius: 0.625rem;
+  padding: 0.875rem;
+  text-align: left;
+}
+.search-result:hover { background: var(--muted); }
+.module-header { padding: 1rem 1.25rem; }
+.task-dashboard-section { padding: 1rem 1.25rem; }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-groups button { transition: none; }
+}

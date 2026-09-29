@@ -20,6 +20,9 @@ import type { Achievement } from "@/lib/achievements";
 import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/categories";
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
+  dashboardGroup: "today",
+  capacityStartHour: 9,
+  capacityEndHour: 22,
   timeGranularity: 60,
   dailyTaskSortMode: "time",
   annualSectionOpen: true,
@@ -262,7 +265,11 @@ export function normalizeAchievements(payload: unknown): Achievement[] {
 export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPreferences {
   if (!payload || typeof payload !== "object") return defaultDashboardUiPreferences;
   const value = payload as Partial<DashboardUiPreferences>;
+  const capacityStartHour = Number.isInteger(value.capacityStartHour) && value.capacityStartHour! >= 0 && value.capacityStartHour! < 24 ? value.capacityStartHour! : 9;
   return {
+    dashboardGroup: value.dashboardGroup === "goals" || value.dashboardGroup === "life" ? value.dashboardGroup : "today",
+    capacityStartHour,
+    capacityEndHour: Number.isInteger(value.capacityEndHour) && value.capacityEndHour! > capacityStartHour && value.capacityEndHour! <= 24 ? value.capacityEndHour : Math.max(22, capacityStartHour + 1),
     ...(Array.isArray(value.categoryDefs) ? { categoryDefs: normalizeCategoryDefList(value.categoryDefs) } : {}),
     timeGranularity: validTimeGranularities.has(value.timeGranularity as DashboardUiPreferences["timeGranularity"])
       ? value.timeGranularity as DashboardUiPreferences["timeGranularity"]
