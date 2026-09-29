@@ -712,7 +712,7 @@ export function DailyExpensePanel({
           </Button>
         </div>
 
-        <CollapsibleContent className="mt-2 flex flex-col gap-2">
+        <CollapsibleContent className="mx-auto mt-2 flex w-full max-w-[960px] flex-col gap-2">
           {contentHeader}
           <div className="grid gap-2 lg:grid-cols-3 [&>div]:py-2 [&_.text-xl]:text-base">
           <div className="rounded-lg border border-stone-200 bg-white px-3 py-3">
@@ -763,8 +763,8 @@ export function DailyExpensePanel({
           </div>
         </div>
 
-        <div className="grid items-start gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(280px,1fr)]">
-          <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-3">
+        <div className="grid items-start gap-2 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 space-y-3 rounded-lg border border-stone-200 bg-white p-3">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-semibold text-stone-900">当天支出列表</h4>
               <span className="text-xs text-stone-500">{summary.expenses.length} 条</span>

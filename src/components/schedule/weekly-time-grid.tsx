@@ -2375,7 +2375,7 @@ export function WeeklyTimeGrid({
                       placeholder="输入行程标题"
                     />
                   </div>
-                  <div className="grid grid-cols-[minmax(0,3fr)_minmax(7rem,2fr)] gap-3">
+                  <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] items-end gap-3">
                     <div className="min-w-0 space-y-2">
                       <Label>分类</Label>
                       <Select
@@ -2431,13 +2431,13 @@ export function WeeklyTimeGrid({
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
-                  <div className="space-y-3">
                     <section
                       aria-label="循环行程设置"
-                      className="rounded-xl border border-stone-200 bg-stone-50/80 p-3"
+                      className="contents"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="create-recurring" className="whitespace-nowrap">循环行程</Label>
+                        <div className="flex h-8 items-center justify-center rounded-md border border-stone-200 bg-stone-50/80 px-3">
                         <Switch
                           id="create-recurring"
                           checked={createRecurrence.enabled}
@@ -2452,10 +2452,10 @@ export function WeeklyTimeGrid({
                             })
                           }
                         />
-                        <Label htmlFor="create-recurring">循环行程</Label>
+                        </div>
                       </div>
                       {createRecurrence.enabled ? (
-                        <div className="mt-4 space-y-4 border-t border-stone-200 pt-4">
+                        <div className="col-span-3 space-y-4 rounded-xl border border-stone-200 bg-stone-50/80 p-3">
                           <div className="space-y-2">
                             <Label>重复方式</Label>
                             <Select
@@ -2516,7 +2516,8 @@ export function WeeklyTimeGrid({
                         </div>
                       ) : null}
                     </section>
-
+                  </div>
+                  <div className="space-y-3">
                     <section
                       aria-label="快捷事件"
                       className="rounded-xl border border-amber-200/80 bg-amber-50/55 p-3"
@@ -2576,10 +2577,10 @@ export function WeeklyTimeGrid({
                   <TimeRangeEditor
                     startHour={createForm.startHour}
                     endHour={createForm.endHour}
+                    endDateControl={<Input aria-label="新建行程结束日期" title="结束日期" type="date" min={selectedCell.date} value={createEndDate || selectedCell.date} onChange={(event) => setCreateEndDate(event.target.value)} className="h-6 w-[112px] min-w-0 shrink-0 rounded border-stone-200 bg-white px-1 py-0 text-[10px] md:text-[10px]" />}
                     onStartHourChange={(value) => setCreateForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setCreateForm((prev) => ({ ...prev, endHour: value }))}
                   />
-                  <label className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 whitespace-nowrap text-xs">结束日期<Input aria-label="新建行程结束日期" type="date" min={selectedCell.date} value={createEndDate || selectedCell.date} onChange={(event) => setCreateEndDate(event.target.value)} /></label>
                   <Collapsible
                     open={createDetailsOpen}
                     onOpenChange={setCreateDetailsOpen}
@@ -3562,11 +3563,13 @@ function MinuteQuickPick({
 function TimeRangeEditor({
   startHour,
   endHour,
+  endDateControl,
   onStartHourChange,
   onEndHourChange,
 }: {
   startHour: number;
   endHour: number;
+  endDateControl?: React.ReactNode;
   onStartHourChange: (value: number) => void;
   onEndHourChange: (value: number) => void;
 }) {
@@ -3578,7 +3581,7 @@ function TimeRangeEditor({
   return (
     <div className="grid grid-cols-2 gap-2 [&_[data-slot=select-trigger]]:h-7">
       <div className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex min-h-6 items-center justify-between gap-1">
           <Label className="text-xs font-semibold uppercase tracking-wide text-stone-600">
             开始时间
           </Label>
@@ -3612,15 +3615,16 @@ function TimeRangeEditor({
       </div>
 
       <div className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
-        <div className="flex items-center justify-between gap-3">
-          <Label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-600">
+        <div className="flex min-h-6 items-center justify-between gap-1">
+          <Label className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-stone-600">
             结束时间
-            {crossesMidnight ? (
+            {crossesMidnight && !endDateControl ? (
               <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-sky-700">
                 次日
               </span>
             ) : null}
           </Label>
+          {endDateControl}
         </div>
         <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-1 [&_label]:hidden">
           <CenteredTimePartSelect

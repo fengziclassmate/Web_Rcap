@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { addDays, addMonths, endOfMonth, endOfWeek, format, parseISO, startOfMonth, startOfWeek, eachDayOfInterval } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import type { ProjectCheckin } from "@/lib/types";
 
 export function ProjectCheckinCalendar({ project, today }: { project: ProjectCheckin; today: string }) {
+  const [open, setOpen] = useState(false);
+  const calendarId = useId();
   const [mode, setMode] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(today);
   const [selected, setSelected] = useState<string | null>(null);
@@ -21,7 +23,14 @@ export function ProjectCheckinCalendar({ project, today }: { project: ProjectChe
     setSelected(null);
   }
   return (
-    <section className="mb-2 rounded-lg border border-stone-200/80 bg-white/70 p-2" aria-label={`${project.name} 打卡日历`}>
+    <section className="mb-2" aria-label={`${project.name} 打卡日历`}>
+      <button type="button" aria-expanded={open} aria-controls={calendarId} onClick={() => setOpen(!open)} className="flex items-center gap-1.5 rounded px-1 py-1 text-[11px] text-stone-500 hover:bg-stone-100 hover:text-stone-900">
+        <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+        打卡日历
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden />
+      </button>
+      <div id={calendarId} hidden={!open}>
+      {open ? <div className="mt-1 rounded-lg border border-stone-200/80 bg-white/70 p-2">
       <div className="mb-2 flex items-center gap-1 text-[11px]">
         <div className="flex rounded bg-stone-100 p-0.5" role="group" aria-label="打卡视图">
           {(["week", "month"] as const).map((value) => <button type="button" key={value} aria-pressed={mode === value} onClick={() => { setMode(value); setSelected(null); }} className={`rounded px-2 py-0.5 ${mode === value ? "bg-white font-semibold shadow-sm" : "text-stone-500"}`}>{value === "week" ? "周" : "月"}</button>)}
@@ -44,6 +53,8 @@ export function ProjectCheckinCalendar({ project, today }: { project: ProjectChe
       </div>
       <div className="mt-2 flex gap-3 text-[10px] text-stone-500"><span>🟩 已打卡</span><span>□ 未打卡</span><span className="text-stone-400">浅灰：未开始 / 未来</span></div>
       {selected ? <div className="mt-2 max-h-32 overflow-y-auto border-t border-stone-100 pt-2 text-xs leading-5"><p className="font-medium">{selected}</p><p className="whitespace-pre-wrap break-words text-stone-600">{selectedNote ?? "这天未打卡"}</p></div> : null}
+      </div> : null}
+      </div>
     </section>
   );
 }
