@@ -1912,9 +1912,9 @@ export function TaskDashboard({
                     </Button>
                   </div>
                 </div>
-                <ProjectCheckinCalendar project={project} today={todayDate} />
                 {projectExpanded ? (
                   <>
+                    <ProjectCheckinCalendar project={project} today={todayDate} />
                     {project.description ? <p className="mb-2 text-xs text-gray-500">{project.description}</p> : null}
                     <div className="mb-2 h-2 rounded bg-gray-100">
                       <div className="h-2 rounded bg-black" style={{ width: `${percent}%` }} />

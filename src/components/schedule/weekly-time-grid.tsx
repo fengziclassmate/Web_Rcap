@@ -2300,11 +2300,10 @@ export function WeeklyTimeGrid({
               title={activeExpenseTitle}
               onChanged={handleExpenseChanged}
               contentHeader={viewMode === "week" && selectedWeekExpenseDateIso ? (
-                <div className="rounded-xl border border-stone-200 bg-white/80 p-3">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="rounded-xl border border-stone-200 bg-white/80 p-2">
+                  <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <h4 className="text-sm font-semibold text-stone-950">每日花销</h4>
-                      <p className="mt-0.5 text-xs text-stone-500">选择一天，查看并记录当天支出</p>
                     </div>
                     <span className="rounded-md border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600">
                       {selectedWeekExpenseDateIso}
@@ -2326,7 +2325,7 @@ export function WeeklyTimeGrid({
                           type="button"
                           aria-pressed={isSelected}
                           onClick={() => setSelectedExpenseDateIso(dateIso)}
-                          className={`min-h-20 rounded-lg border px-3 py-2 text-left transition ${
+                          className={`flex min-h-10 flex-wrap items-center justify-between gap-x-2 rounded-lg border px-2 py-1 text-left transition ${
                             isSelected
                               ? "border-stone-900 bg-stone-950 text-white shadow-sm"
                               : "border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:bg-white"
@@ -2346,7 +2345,7 @@ export function WeeklyTimeGrid({
                               </span>
                             ) : null}
                           </span>
-                          <span className="mt-2 block truncate text-base font-semibold">
+                          <span className="block text-sm font-semibold">
                             {getMonthlyExpenseLabel(summary)}
                           </span>
                         </button>

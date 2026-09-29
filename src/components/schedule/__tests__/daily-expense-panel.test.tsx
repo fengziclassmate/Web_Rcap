@@ -54,7 +54,7 @@ describe("DailyExpensePanel", () => {
     render(<DailyExpensePanel date="2026-08-02" />);
 
     expect(await screen.findByRole("switch", { name: "不计入个人预算" })).toBeTruthy();
-    expect(screen.getByText("适合出差、报销或代垫支出")).toBeTruthy();
+    expect(screen.getByTitle("适合出差、报销或代垫支出")).toBeTruthy();
   });
 
   it("collapses and restores the expense details from the title row", async () => {

@@ -378,5 +378,10 @@ describe("TaskDashboard task list sections", () => {
       name: "展开项目 受控待打卡项目一",
     });
     await waitFor(() => expect(document.activeElement).toBe(titleButton));
+    expect(within(movedCard!).queryByRole("button", { name: "打卡日历" })).toBeNull();
+    fireEvent.click(titleButton);
+    expect(within(movedCard!).getByRole("button", { name: "打卡日历" })).toBeTruthy();
+    fireEvent.click(within(movedCard!).getByRole("button", { name: "折叠项目 受控待打卡项目一" }));
+    expect(within(movedCard!).queryByRole("button", { name: "打卡日历" })).toBeNull();
   });
 });

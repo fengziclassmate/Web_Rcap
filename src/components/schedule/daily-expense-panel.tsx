@@ -712,7 +712,7 @@ export function DailyExpensePanel({
           </Button>
         </div>
 
-        <CollapsibleContent className="mx-auto mt-2 flex w-full max-w-[960px] flex-col gap-2">
+        <CollapsibleContent className="mt-2 flex w-full flex-col gap-2">
           {contentHeader}
           <div className="grid gap-2 lg:grid-cols-3 [&>div]:py-2 [&_.text-xl]:text-base">
           <div className="rounded-lg border border-stone-200 bg-white px-3 py-3">
@@ -763,7 +763,7 @@ export function DailyExpensePanel({
           </div>
         </div>
 
-        <div className="grid items-start gap-2 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid items-start gap-2 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
           <div className="min-w-0 space-y-3 rounded-lg border border-stone-200 bg-white p-3">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-semibold text-stone-900">当天支出列表</h4>
@@ -907,10 +907,10 @@ export function DailyExpensePanel({
           </div>
 
           <div className="contents">
-            <div className="rounded-lg border border-stone-200 bg-white p-3">
+            <div className="min-w-0 rounded-lg border border-stone-200 bg-white p-2">
               <h4 className="text-sm font-semibold text-stone-900">添加支出</h4>
-              <div className="mt-2 space-y-2">
-                <div className="space-y-1.5">
+              <div className="mt-1 grid grid-cols-2 items-end gap-2 sm:grid-cols-4 [&_label]:text-xs">
+                <div className="min-w-0 space-y-1">
                   <Label htmlFor="expense-amount">金额</Label>
                   <Input
                     id="expense-amount"
@@ -923,7 +923,7 @@ export function DailyExpensePanel({
                     placeholder="0.00"
                   />
                 </div>
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="contents [&>div]:min-w-0">
                   <div className="space-y-1.5">
                     <Label>一级分类</Label>
                     <Select value={expenseCategoryMain} onValueChange={handleExpenseMainChange}>
@@ -958,16 +958,15 @@ export function DailyExpensePanel({
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-1.5">
+                <div className="min-w-0 space-y-1 sm:col-span-2">
                   <Label htmlFor="expense-note">备注</Label>
                   <Input id="expense-note" value={expenseNote} onChange={(event) => setExpenseNote(event.target.value)} placeholder="可选" />
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2">
+                <div className="flex h-8 items-center justify-between gap-1 rounded-lg border border-amber-200 bg-amber-50/70 px-2" title="适合出差、报销或代垫支出">
                   <div className="min-w-0">
                     <Label htmlFor="expense-excluded-from-budget" className="text-sm font-semibold text-amber-950">
                       不计入个人预算
                     </Label>
-                    <p className="text-[11px] text-amber-700">适合出差、报销或代垫支出</p>
                   </div>
                   <Switch
                     id="expense-excluded-from-budget"
@@ -976,7 +975,7 @@ export function DailyExpensePanel({
                     aria-label="不计入个人预算"
                   />
                 </div>
-                <Button type="button" className="w-full" onClick={() => void handleAddExpense()} disabled={savingExpense}>
+                <Button type="button" className="h-8 w-full" onClick={() => void handleAddExpense()} disabled={savingExpense}>
                   <Plus className="h-3.5 w-3.5" />
                   {savingExpense ? "添加中..." : "添加支出"}
                 </Button>
@@ -984,9 +983,8 @@ export function DailyExpensePanel({
             </div>
 
             <div className="rounded-lg border border-stone-200 bg-white p-2 lg:col-span-2">
-              <h4 className="text-sm font-semibold text-stone-900">预算</h4>
-              <div className="mt-2 grid gap-3 lg:grid-cols-3">
-                <div className="space-y-1.5">
+              <div className="grid gap-3 lg:grid-cols-3 [&>div]:grid [&>div]:grid-cols-[auto_minmax(0,1fr)] [&>div]:items-center [&>div]:gap-x-2 [&>div>p]:col-start-2 [&_label]:text-xs">
+                <div>
                   <Label htmlFor="daily-budget-amount">每日预算</Label>
                   <div className="flex gap-2">
                     <Input
@@ -1004,7 +1002,7 @@ export function DailyExpensePanel({
                     </Button>
                   </div>
                 </div>
-                <div className="space-y-1.5">
+                <div>
                   <Label htmlFor="weekly-budget-amount">周预算</Label>
                   <div className="flex gap-2">
                     <Input
@@ -1025,7 +1023,7 @@ export function DailyExpensePanel({
                     {summary.week.periodStart} 至 {summary.week.periodEnd}，当前 {formatCompactMoney(summary.week.totalExpense)}
                   </p>
                 </div>
-                <div className="space-y-1.5">
+                <div>
                   <Label htmlFor="monthly-budget-amount">月预算</Label>
                   <div className="flex gap-2">
                     <Input
