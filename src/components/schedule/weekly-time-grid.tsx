@@ -291,8 +291,14 @@ function isWholeHour(value: number) {
 }
 
 function EventBufferEditor({ value, onChange }: { value: EventFormState; onChange: (patch: Partial<EventFormState>) => void }) {
-  const [open, setOpen] = useState(true);
-  return <Collapsible open={open} onOpenChange={setOpen} className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
+  const [open, setOpen] = useState(() => {
+    try { return localStorage.getItem("schedule-event-buffer-open") !== "closed"; } catch { return true; }
+  });
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    try { localStorage.setItem("schedule-event-buffer-open", nextOpen ? "open" : "closed"); } catch {}
+  }
+  return <Collapsible open={open} onOpenChange={handleOpenChange} className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
     <CollapsibleTrigger aria-label={open ? "折叠缓冲设置" : "展开缓冲设置"} className="flex w-full items-center justify-between gap-2 rounded text-xs font-medium text-stone-600 focus-visible:outline-2 focus-visible:outline-primary">
       <span>缓冲</span><ChevronDown className={`size-3.5 transition-transform ${open ? "" : "-rotate-90"}`} />
     </CollapsibleTrigger>
