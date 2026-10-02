@@ -40,7 +40,8 @@ export type Priority =
   | "\u4e0d\u7d27\u6025\u91cd\u8981"
   | "\u4e0d\u7d27\u6025\u4e0d\u91cd\u8981";
 
-export type TaskType = "daily" | "long";
+export type TaskType = "daily" | "long" | "followup";
+export type FollowUpStatus = "pending" | "trying" | "verifying" | "paused";
 export type DailyTaskSortMode = "time" | "custom";
 
 export type KnowledgeWorkType =
@@ -81,6 +82,7 @@ export type LongTask = {
   priority: Priority;
   subtasks: SubTask[];
   taskType: TaskType;
+  followUpStatus?: FollowUpStatus;
   isTodayFocus: boolean;
   uncertainty?: TaskUncertaintyProfile | null;
 };

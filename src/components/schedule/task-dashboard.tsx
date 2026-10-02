@@ -55,6 +55,7 @@ import type { Achievement } from "@/lib/achievements";
 import { DailyTaskPanel } from "@/components/schedule/daily-task-panel";
 import { ShoppingList } from "@/components/schedule/shopping-list";
 import { ResearchProgressPanel } from "@/components/schedule/research-progress-panel";
+import { FollowUpPanel } from "@/components/schedule/follow-up-panel";
 import type { LogComposerInput, LogPostRecord } from "@/lib/logs";
 import { cn } from "@/lib/utils";
 
@@ -711,6 +712,7 @@ export function TaskDashboard({
 
   const openRequestedTask = useEffectEvent(() => {
     const task = tasks.find((item) => item.id === openTaskRequest?.id);
+    if (task?.taskType === "followup") return;
     if (task) handleOpenEdit(task);
     onOpenRequestHandled?.();
   });
@@ -2334,6 +2336,14 @@ export function TaskDashboard({
         saving={logSaving}
         onCreatePost={onCreateLogPost}
         onOpenLogs={onOpenLogs}
+      />
+      <FollowUpPanel
+        tasks={tasks}
+        onAdd={(name) => onAddTask(name, "", "followup")}
+        onUpdate={onUpdateTask}
+        onDelete={onDeleteTask}
+        openTaskRequest={openTaskRequest}
+        onOpenRequestHandled={onOpenRequestHandled}
       />
       </div>
       <div hidden={group !== "life"} className="task-dashboard-section">

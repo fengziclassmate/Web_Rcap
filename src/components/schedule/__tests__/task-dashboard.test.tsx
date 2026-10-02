@@ -100,9 +100,11 @@ describe("TaskDashboard task list sections", () => {
     expect(screen.getByRole("button", { name: "目标与项目" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "今日执行" }));
     expect(screen.getByPlaceholderText("添加日常任务")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "跟进事项" })).toBeTruthy();
     expect(screen.queryByRole("tab", { name: /长期任务/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "生活记录" }));
     expect(screen.getByRole("button", { name: "添加购物项" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "跟进事项" })).toBeNull();
     expect(screen.queryByRole("tab", { name: /长期任务/ })).toBeNull();
   });
 

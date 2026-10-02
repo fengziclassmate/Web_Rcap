@@ -191,7 +191,7 @@ export function WorkbenchApp() {
     const token = Date.now();
     if (result.task) {
       setActiveModule("schedule");
-      setDashboardUiPreferences((previous) => ({ ...previous, dashboardGroup: result.task!.taskType === "daily" ? "today" : "goals" }));
+      setDashboardUiPreferences((previous) => ({ ...previous, dashboardGroup: result.task!.taskType === "long" ? "goals" : "today" }));
       setOpenTaskRequest({ id: result.id, token });
     } else if (result.event) {
       const event = result.event;

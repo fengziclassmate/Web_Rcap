@@ -1,5 +1,6 @@
 import { normalizeBufferMinutes, normalizeBufferName } from "@/lib/event-timing";
 import { normalizeEventTag } from "@/lib/event-tags";
+import { normalizeFollowUpStatus } from "@/lib/follow-up";
 import { format } from "date-fns";
 import { normalizeCategoryDefList } from "./categories";
 import type { RecurrenceConfig, RecurrenceInstanceOverride } from "@/lib/recurrence";
@@ -331,7 +332,7 @@ export function normalizeTasks(payload: unknown): LongTask[] {
     return {
       id: value.id ?? `task-restored-${index}`,
       name: value.name ?? "\u672a\u547d\u540d\u4efb\u52a1",
-      dueDate,
+      dueDate: value.taskType === "followup" ? "" : dueDate,
       createdAt,
       completedAt,
       abandonedAt,
@@ -349,7 +350,8 @@ export function normalizeTasks(payload: unknown): LongTask[] {
             done: Boolean(subtask.done),
           }))
         : [],
-      taskType: value.taskType === "daily" ? "daily" : "long",
+      taskType: value.taskType === "followup" ? "followup" : value.taskType === "daily" ? "daily" : "long",
+      ...(value.taskType === "followup" ? { followUpStatus: normalizeFollowUpStatus(value.followUpStatus) } : {}),
       isTodayFocus: Boolean(value.isTodayFocus),
       uncertainty: normalizeTaskUncertainty(value.uncertainty),
     };

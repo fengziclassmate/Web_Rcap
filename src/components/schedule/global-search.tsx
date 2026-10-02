@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { LogPostRecord } from "@/lib/logs";
+import { followUpStatuses, getFollowUpStatus } from "@/lib/follow-up";
 import type { AnnualTask, LongTask, ProjectCheckin, ScheduleEvent, ShoppingItem } from "@/lib/types";
 
 export type SearchResult = { collection?: "annual" | "project" | "shopping"; id: string; kind: string; title: string; detail: string; date?: string; task?: LongTask; log?: LogPostRecord; event?: ScheduleEvent };
 export function buildSearchIndex(events: ScheduleEvent[], tasks: LongTask[], logs: LogPostRecord[], annualTasks: AnnualTask[], projects: ProjectCheckin[], shopping: ShoppingItem[]): SearchResult[] {
   return [
-    ...tasks.map((task) => ({ id: task.id, kind: "任务", title: task.name, date: task.dueDate, detail: [task.done ? "已完成" : "未完成", task.priority, task.notes, ...task.subtasks.map((item) => item.name)].filter(Boolean).join("\n"), task })),
+    ...tasks.map((task) => ({ id: task.id, kind: task.taskType === "followup" ? "跟进事项" : "任务", title: task.name, date: task.dueDate, detail: [task.taskType === "followup" ? followUpStatuses[getFollowUpStatus(task)].label : task.done ? "已完成" : "未完成", task.priority, task.notes, ...task.subtasks.map((item) => item.name)].filter(Boolean).join("\n"), task })),
     ...events.map((event) => ({ id: event.id, kind: "日程", title: event.title, date: event.date, detail: [event.category, event.recurrence ? "重复日程" : "单次日程", event.notes, ...event.requirements].filter(Boolean).join("\n"), event })),
     ...logs.map((log) => ({ id: log.id, kind: "日志", title: log.content.slice(0, 60) || "无正文日志", date: log.createdAt.slice(0, 10), detail: [log.content, ...log.tags.map((tag) => tag.name), ...log.links.map((link) => link.title)].join("\n"), log })),
     ...annualTasks.map((task) => ({ id: task.id, kind: "年度目标", collection: "annual" as const, title: task.name, detail: task.done ? "已完成" : "未完成" })),

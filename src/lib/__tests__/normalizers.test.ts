@@ -8,6 +8,12 @@ import {
 } from "../normalizers";
 
 describe("normalizers", () => {
+  it("restores follow-up statuses, notes and archived dates without adding a deadline", () => {
+    const source = [{ id: "follow", taskType: "followup", followUpStatus: "verifying", notes: "解题思路", done: true, completedAt: "2026-10-02T01:00:00.000Z" }, { taskType: "followup", followUpStatus: "invalid" }];
+    const restored = normalizeTasks(JSON.parse(JSON.stringify(normalizeTasks(source))));
+    expect(restored[0]).toMatchObject({ taskType: "followup", followUpStatus: "verifying", dueDate: "", notes: "解题思路", done: true, completedAt: source[0].completedAt });
+    expect(restored[1]).toMatchObject({ taskType: "followup", followUpStatus: "pending", done: false, dueDate: "" });
+  });
   it("restores new and legacy event tags and discards invalid values", () => {
     const tags = ["待定", "不着急", "不可后退", "深度专注", "充电一下", "小挑战", "期待已久", "顺路办", "一起完成", "invalid"];
     expect(normalizeEvents(tags.map((tag) => ({ tag }))).map((event) => event.tag)).toEqual([...tags.slice(0, -1), null]);
