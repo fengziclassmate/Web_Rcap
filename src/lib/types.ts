@@ -146,6 +146,7 @@ export type DashboardUiPreferences = {
   dashboardGroup?: "today" | "goals" | "life";
   upNextSectionOpen?: boolean;
   executionSectionOpen?: boolean;
+  followUpSectionOpen?: boolean;
   capacityStartHour?: number;
   capacityEndHour?: number;
   categoryDefs?: import("./categories").ScheduleCategoryDef[];

@@ -5,8 +5,9 @@ import { FollowUpPanel } from "../follow-up-panel";
 import { normalizeTasks } from "@/lib/normalizers";
 
 function Harness() {
+  const [open, setOpen] = useState(true);
   const [tasks, setTasks] = useState(normalizeTasks([{ id: "paper", name: "Attention Is All You Need", taskType: "followup" }]));
-  return <FollowUpPanel tasks={tasks} onAdd={(name) => setTasks([...tasks, ...normalizeTasks([{ id: "new", name, taskType: "followup" }])])} onUpdate={(id, patch) => setTasks(tasks.map((task) => task.id === id ? { ...task, ...patch, completedAt: patch.done ? "2026-10-02T09:00:00+08:00" : null } : task))} onDelete={(id) => setTasks(tasks.filter((task) => task.id !== id))} />;
+  return <FollowUpPanel open={open} onOpenChange={setOpen} tasks={tasks} onAdd={(name) => setTasks([...tasks, ...normalizeTasks([{ id: "new", name, taskType: "followup" }])])} onUpdate={(id, patch) => setTasks(tasks.map((task) => task.id === id ? { ...task, ...patch, completedAt: patch.done ? "2026-10-02T09:00:00+08:00" : null } : task))} onDelete={(id) => setTasks(tasks.filter((task) => task.id !== id))} />;
 }
 
 describe("follow-up panel", () => {
@@ -45,7 +46,7 @@ describe("follow-up panel", () => {
 
   it("opens an archived follow-up from global search without showing unrelated tasks", () => {
     const handled = vi.fn();
-    render(<FollowUpPanel tasks={normalizeTasks([{ id: "archived", name: "已解决论文", taskType: "followup", done: true }, { id: "long", name: "长期任务" }])} onAdd={vi.fn()} onUpdate={vi.fn()} onDelete={vi.fn()} openTaskRequest={{ id: "archived", token: 1 }} onOpenRequestHandled={handled} />);
+    render(<FollowUpPanel open onOpenChange={vi.fn()} tasks={normalizeTasks([{ id: "archived", name: "已解决论文", taskType: "followup", done: true }, { id: "long", name: "长期任务" }])} onAdd={vi.fn()} onUpdate={vi.fn()} onDelete={vi.fn()} openTaskRequest={{ id: "archived", token: 1 }} onOpenRequestHandled={handled} />);
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect((screen.getByLabelText("事项名称") as HTMLInputElement).value).toBe("已解决论文");
     expect(screen.queryByText("长期任务")).toBeNull();

@@ -24,6 +24,7 @@ import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/cate
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   upNextSectionOpen: true,
   executionSectionOpen: true,
+  followUpSectionOpen: true,
   dashboardGroup: "today",
   capacityStartHour: 9,
   capacityEndHour: 22,
@@ -274,6 +275,7 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
     dashboardGroup: value.dashboardGroup === "goals" || value.dashboardGroup === "life" ? value.dashboardGroup : "today",
     upNextSectionOpen: value.upNextSectionOpen !== false,
     executionSectionOpen: value.executionSectionOpen !== false,
+    followUpSectionOpen: value.followUpSectionOpen !== false,
     capacityStartHour,
     capacityEndHour: Number.isInteger(value.capacityEndHour) && value.capacityEndHour! > capacityStartHour && value.capacityEndHour! <= 24 ? value.capacityEndHour : Math.max(22, capacityStartHour + 1),
     ...(Array.isArray(value.categoryDefs) ? { categoryDefs: normalizeCategoryDefList(value.categoryDefs) } : {}),

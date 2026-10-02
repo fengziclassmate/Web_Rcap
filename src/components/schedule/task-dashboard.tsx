@@ -2339,6 +2339,8 @@ export function TaskDashboard({
       />
       <FollowUpPanel
         tasks={tasks}
+        open={uiPreferences.followUpSectionOpen !== false}
+        onOpenChange={(open) => patchUiPreferences({ followUpSectionOpen: open })}
         onAdd={(name) => onAddTask(name, "", "followup")}
         onUpdate={onUpdateTask}
         onDelete={onDeleteTask}

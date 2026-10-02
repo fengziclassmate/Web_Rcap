@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useEffectEvent, useState } from "react";
-import { Archive, ListChecks, Plus, RotateCcw } from "lucide-react";
+import { useEffect, useEffectEvent, useId, useState } from "react";
+import { Archive, ChevronDown, ListChecks, Plus, RotateCcw } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,8 @@ import type { LongTask } from "@/lib/types";
 
 type Props = {
   tasks: LongTask[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onAdd: (name: string) => void;
   onUpdate: (id: string, patch: Partial<LongTask>) => void;
   onDelete: (id: string) => void;
@@ -20,7 +22,8 @@ type Props = {
   onOpenRequestHandled?: () => void;
 };
 
-export function FollowUpPanel({ tasks, onAdd, onUpdate, onDelete, openTaskRequest, onOpenRequestHandled }: Props) {
+export function FollowUpPanel({ tasks, open, onOpenChange, onAdd, onUpdate, onDelete, openTaskRequest, onOpenRequestHandled }: Props) {
+  const contentId = useId();
   const [name, setName] = useState("");
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -56,12 +59,13 @@ export function FollowUpPanel({ tasks, onAdd, onUpdate, onDelete, openTaskReques
   }
 
   return <section className="task-dashboard-section" aria-label="跟进事项">
-    <div className="mb-3 flex items-center justify-between gap-2">
-      <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold"><ListChecks className="h-4 w-4 text-emerald-800" />跟进事项<span className="text-xs font-normal tabular-nums text-stone-500">{active.length}</span></h3>
+    <div className={`flex items-center justify-between gap-2 ${open ? "mb-3" : ""}`}>
+      <h3 className="min-w-0 flex-1 text-sm font-semibold"><button type="button" aria-label={open ? "折叠跟进事项" : "展开跟进事项"} aria-expanded={open} aria-controls={contentId} onClick={() => onOpenChange(!open)} className="flex w-full items-center gap-2 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"><ListChecks className="h-4 w-4 shrink-0 text-emerald-800" />跟进事项<span className="text-xs font-normal tabular-nums text-stone-500">{active.length}</span><ChevronDown aria-hidden className={`h-3.5 w-3.5 shrink-0 text-stone-500 transition-transform ${open ? "" : "-rotate-90"}`} /></button></h3>
       <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 gap-1 px-2 text-xs" onClick={() => setArchiveOpen(true)}><Archive className="h-3.5 w-3.5" />存档库 {archived.length}</Button>
     </div>
+    <div id={contentId} hidden={!open}>
     <form className="mb-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); if (!name.trim()) return; onAdd(name.trim()); setName(""); }}>
-      <Input aria-label="新跟进事项" placeholder="文献、LeetCode 题或其他事项" value={name} onChange={(event) => setName(event.target.value)} className="min-w-0 flex-1 text-xs" />
+      <Input aria-label="新跟进事项" value={name} onChange={(event) => setName(event.target.value)} className="min-w-0 flex-1 text-xs" />
       <Button type="submit" size="icon-sm" disabled={!name.trim()} aria-label="添加跟进事项"><Plus className="h-4 w-4" /></Button>
     </form>
     <table className="w-full table-fixed text-xs" aria-label="待跟进事项列表">
@@ -69,6 +73,7 @@ export function FollowUpPanel({ tasks, onAdd, onUpdate, onDelete, openTaskReques
       <tbody>{active.map((task) => <tr key={task.id} className="border-b border-stone-100 last:border-0"><td className="py-2.5 align-top">{taskName(task)}</td><td className="py-2.5 pl-2 align-top">{statusSelect(task)}</td></tr>)}</tbody>
     </table>
     {!active.length && <p className="py-4 text-center text-xs text-stone-400">暂无待跟进事项</p>}
+    </div>
 
     <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
       <DialogContent className="max-w-lg">
