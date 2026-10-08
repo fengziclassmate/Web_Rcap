@@ -1,5 +1,7 @@
 "use client";
 
+import { useAccountId } from "@/components/account-scope";
+
 import { useState, type ReactNode } from "react";
 import {
   CalendarDays,
@@ -32,10 +34,12 @@ export function MonitoringSidebar({
   active: MonitoringModuleId;
   onChange: (id: MonitoringModuleId) => void;
 }) {
+  const userId = useAccountId();
+  const storageKey = `${motivationMessageStorageKey}:${userId}`;
   const [motivationMessage, setMotivationMessage] = useState(() => {
     if (typeof window === "undefined") return "";
     try {
-      return window.localStorage.getItem(motivationMessageStorageKey) ?? "";
+      return window.localStorage.getItem(storageKey) ?? "";
     } catch {
       return "";
     }
@@ -44,7 +48,7 @@ export function MonitoringSidebar({
   function handleMotivationMessageChange(value: string) {
     setMotivationMessage(value);
     try {
-      window.localStorage.setItem(motivationMessageStorageKey, value);
+      window.localStorage.setItem(storageKey, value);
     } catch {
       // localStorage may be unavailable in private browsing mode.
     }
@@ -87,6 +91,7 @@ export function MonitoringSidebar({
                       ? "border-teal-700/20 bg-stone-950 text-white shadow-[0_14px_28px_rgba(35,48,42,0.18)]"
                       : "border-white/60 bg-white/45 text-stone-700 hover:border-stone-200 hover:bg-white/80 hover:text-stone-950",
                   )}
+                  aria-pressed={selected}
                   onClick={() => onChange(item.id)}
                 >
                   <span

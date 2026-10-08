@@ -33,6 +33,14 @@ describe("undo transactions", () => {
     rerender({ scope: "other-account" });
     expect(result.current.canUndo).toBe(false);
   });
+  it("does not turn an identical cloud acknowledgement into an undo step", () => {
+    const { result } = renderHook(() => useFixture("account"));
+    act(() => result.current.setTasks(["edited"]));
+    act(() => result.current.setTasks(["edited"]));
+    act(() => result.current.undo());
+    expect(result.current.tasks).toEqual(["task"]);
+    expect(result.current.canUndo).toBe(false);
+  });
   it("preserves native text undo", () => {
     const { result } = renderHook(() => useFixture("account"));
     act(() => result.current.setTasks([]));

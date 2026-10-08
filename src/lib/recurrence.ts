@@ -9,10 +9,6 @@ export type RecurrenceConfig = {
 };
 
 export type RecurrenceInstanceOverride = Partial<{
-  bufferBeforeMinutes: number;
-  bufferAfterMinutes: number;
-  bufferBeforeName: string;
-  bufferAfterName: string;
   title: string;
   startHour: number;
   endHour: number;
@@ -26,10 +22,6 @@ export type RecurrenceInstanceOverride = Partial<{
 
 /** 与 page 中 ScheduleEvent 对齐，供展开逻辑使用（避免引用 app） */
 export type ExpandableScheduleEvent = {
-  bufferBeforeMinutes?: number;
-  bufferAfterMinutes?: number;
-  bufferBeforeName?: string;
-  bufferAfterName?: string;
   endDate?: string;
   id: string;
   date: string;
@@ -248,10 +240,6 @@ export function expandScheduleEvents(
 }
 
 const RECURRENCE_INSTANCE_OVERRIDE_KEYS = [
-  "bufferBeforeMinutes",
-  "bufferAfterMinutes",
-  "bufferBeforeName",
-  "bufferAfterName",
   "title",
   "startHour",
   "endHour",

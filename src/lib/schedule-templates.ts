@@ -74,20 +74,20 @@ export function normalizeScheduleTemplates(value: unknown): ScheduleTemplate[] {
   return templates;
 }
 
-export function loadScheduleTemplates() {
+export function loadScheduleTemplates(userId?: string | null) {
   if (typeof window === "undefined") return defaultScheduleTemplates.map((template) => ({ ...template }));
   try {
-    const raw = window.localStorage.getItem(scheduleTemplateStorageKey);
+    const raw = window.localStorage.getItem(userId ? `${scheduleTemplateStorageKey}:${userId}` : scheduleTemplateStorageKey);
     return normalizeScheduleTemplates(raw ? JSON.parse(raw) : null);
   } catch {
     return defaultScheduleTemplates.map((template) => ({ ...template }));
   }
 }
 
-export function saveScheduleTemplates(templates: ScheduleTemplate[]) {
+export function saveScheduleTemplates(templates: ScheduleTemplate[], userId?: string | null) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(scheduleTemplateStorageKey, JSON.stringify(templates));
+    window.localStorage.setItem(userId ? `${scheduleTemplateStorageKey}:${userId}` : scheduleTemplateStorageKey, JSON.stringify(templates));
   } catch {
     // localStorage may be unavailable in private browsing mode.
   }

@@ -176,6 +176,7 @@ describe("DailyReflectionPanel", () => {
 
     await waitFor(() => {
       expect(onCreatePost).toHaveBeenCalledWith({
+        requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         content: "今天的实验进展很稳。",
         category: "life",
         mood: "calm",

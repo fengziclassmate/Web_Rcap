@@ -1,4 +1,5 @@
-import { addDays, format, isWithinInterval, parseISO } from "date-fns";
+import { addDays, format, isWithinInterval, parseISO, startOfDay, endOfDay } from "date-fns";
+import { reportEventsInRange } from "@/lib/report/range-events";
 import type { Achievement } from "@/lib/achievements";
 import type { LogPostRecord } from "@/lib/logs";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
@@ -23,8 +24,8 @@ export function buildEfficiencyStats(
   achievements: Achievement[],
   logs: LogPostRecord[],
 ): EfficiencyAnalysisStats {
-  const end = new Date();
-  const start = addDays(end, -(days - 1));
+  const end = endOfDay(new Date());
+  const start = startOfDay(addDays(end, -(days - 1)));
   const inRange = (date: string) => {
     try {
       return isWithinInterval(parseISO(date.slice(0, 10)), { start, end });
@@ -32,7 +33,7 @@ export function buildEfficiencyStats(
       return false;
     }
   };
-  const rangeEvents = events.filter((event) => inRange(event.date));
+  const rangeEvents = reportEventsInRange(events, format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd"));
   const categoryMap = new Map<string, number>();
   const dailyResearchMap = new Map<string, number>();
   const dailyEventCount = new Map<string, number>();
@@ -47,7 +48,7 @@ export function buildEfficiencyStats(
     }
   }
 
-  const rangeTasks = tasks.filter((task) => inRange(task.dueDate));
+  const rangeTasks = tasks.filter((task) => !task.abandonedAt && inRange(task.done && task.completedAt ? format(parseISO(task.completedAt), "yyyy-MM-dd") : task.dueDate));
   const completedTasks = rangeTasks.filter((task) => task.done).length;
   const moodMap = new Map<string, number>();
   for (const post of logs.filter((item) => inRange(item.createdAt))) {

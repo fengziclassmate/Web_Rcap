@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useEffectEvent, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import { Archive, BarChart3, Image as ImageIcon, MapPin, Pencil, Pin, Plus, Search, Trash2, X } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -39,7 +39,7 @@ type LogPageProps = {
   tags: LogTag[];
   uploading: boolean;
   onCreatePost: (input: LogComposerInput) => Promise<unknown>;
-  onUpdatePost: (postId: string, input: LogPostEditorInput) => Promise<void>;
+  onUpdatePost: (postId: string, input: LogPostEditorInput) => Promise<boolean>;
   onDeletePost: (postId: string) => Promise<void>;
   onTogglePinned: (postId: string) => Promise<void>;
   onToggleArchived: (postId: string) => Promise<void>;
@@ -114,8 +114,8 @@ export function LogPage({
 
       <aside className="space-y-4 xl:order-1">
         <QuickNotesPanel />
-        <LogStatsPanel stats={stats} />
         <LogFilterPanel filters={filters} tags={tags} onChange={setFilters} />
+        <LogStatsPanel stats={stats} />
       </aside>
 
       <LogImagePreviewModal
@@ -134,8 +134,7 @@ export function LogPage({
         uploading={uploading}
         onClose={() => setEditingPost(null)}
         onSubmit={async (postId, input) => {
-          await onUpdatePost(postId, input);
-          setEditingPost(null);
+          if (await onUpdatePost(postId, input)) setEditingPost(null);
         }}
       />
     </section>
@@ -150,6 +149,7 @@ function LogComposer({
   onSubmit: (input: LogComposerInput) => Promise<unknown>;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const requestId = useRef<string | null>(null);
   const [draft, setDraft] = useState<ComposerDraft>(defaultComposerDraft);
 
   const previewUrls = useMemo(
@@ -158,8 +158,10 @@ function LogComposer({
   );
 
   async function handleSubmit() {
-    if (!draft.content.trim()) return;
-    await onSubmit({
+    if (!draft.content.trim() || uploading) return;
+    requestId.current ??= crypto.randomUUID();
+    const saved = await onSubmit({
+      requestId: requestId.current,
       content: draft.content.trim(),
       category: draft.category,
       mood: draft.mood,
@@ -168,8 +170,11 @@ function LogComposer({
       images: draft.images,
       links: draft.links,
     });
-    setDraft(defaultComposerDraft);
-    setExpanded(false);
+    if (saved === true) {
+      requestId.current = null;
+      setDraft(defaultComposerDraft);
+      setExpanded(false);
+    }
   }
 
   return (
@@ -190,7 +195,7 @@ function LogComposer({
         </button>
 
         {expanded ? (
-          <div className="mt-4 space-y-4">
+          <fieldset disabled={uploading} className="mt-4 min-w-0 space-y-4">
             <Textarea
               value={draft.content}
               onChange={(event) => setDraft((prev) => ({ ...prev, content: event.target.value }))}
@@ -282,6 +287,7 @@ function LogComposer({
                 type="button"
                 variant="outline"
                 onClick={() => {
+                  requestId.current = null;
                   setExpanded(false);
                   setDraft(defaultComposerDraft);
                 }}
@@ -292,7 +298,7 @@ function LogComposer({
                 {uploading ? "发布中..." : "发布动态"}
               </Button>
             </div>
-          </div>
+          </fieldset>
         ) : null}
       </div>
     </section>
@@ -584,12 +590,12 @@ function LogPostEditorModal({
     <Dialog
       open={Boolean(post)}
       onOpenChange={(open) => {
-        if (!open) {
+        if (!open && !uploading) {
           onClose();
         }
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent showCloseButton={!uploading} className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>编辑动态</DialogTitle>
         </DialogHeader>
@@ -707,8 +713,8 @@ function FieldSelect({
     <div className="space-y-2">
       <Label>{label}</Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue />
+        <SelectTrigger aria-label={label}>
+          <SelectValue>{options.find((option) => option.value === value)?.label ?? label}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
@@ -780,7 +786,7 @@ function LogPostEditorForm({
   const previewImages = useMemo(() => draft.newImages.map((file) => URL.createObjectURL(file)), [draft.newImages]);
 
   return (
-    <div className="space-y-4">
+    <fieldset disabled={uploading} className="min-w-0 space-y-4">
       <Textarea
         value={draft.content}
         onChange={(event) => setDraft((prev) => ({ ...prev, content: event.target.value }))}
@@ -907,6 +913,6 @@ function LogPostEditorForm({
           {uploading ? "保存中..." : "保存"}
         </Button>
       </div>
-    </div>
+    </fieldset>
   );
 }

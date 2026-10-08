@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Lightbulb, Trash2, X } from "lucide-react";
+import { Lightbulb, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuickNotes } from "@/hooks/useQuickNotes";
@@ -13,9 +15,11 @@ export function QuickNoteFab() {
 
   function save() {
     if (!content.trim()) return;
-    addNote(content);
-    setContent("");
-    setOpen(false);
+    if (addNote(content)) {
+      setContent("");
+      setOpen(false);
+      toast.success("速记已保存在当前账号的本机记录中");
+    }
   }
 
   return (
@@ -28,14 +32,9 @@ export function QuickNoteFab() {
       >
         <Lightbulb className="h-5 w-5" />
       </button>
-      {open ? (
-        <div className="fixed bottom-24 left-6 z-50 w-[min(360px,calc(100vw-3rem))] rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold">速记 / 脑洞捕获</h3>
-            <Button type="button" size="icon-sm" variant="ghost" onClick={() => setOpen(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="bottom-24 left-6 top-auto w-[360px] translate-x-0 translate-y-0 rounded-2xl sm:max-w-[360px]">
+          <DialogHeader><DialogTitle>速记 / 脑洞捕获</DialogTitle></DialogHeader>
           <Textarea
             value={content}
             onChange={(event) => setContent(event.target.value)}
@@ -50,8 +49,8 @@ export function QuickNoteFab() {
               保存速记
             </Button>
           </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -78,7 +77,8 @@ export function QuickNotesPanel() {
               <p className="whitespace-pre-wrap text-sm text-gray-800">{note.content}</p>
               <button
                 type="button"
-                className="opacity-0 transition group-hover:opacity-100"
+                aria-label={`删除速记：${note.content.slice(0, 24)}`}
+                className="rounded p-1 text-stone-500 opacity-60 transition hover:bg-stone-200 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-primary"
                 onClick={() => deleteNote(note.id)}
               >
                 <Trash2 className="h-4 w-4 text-gray-500" />

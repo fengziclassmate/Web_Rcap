@@ -1,14 +1,8 @@
-import { PROVIDER_ENDPOINTS } from "@/lib/llm/types";
+import { resolveLLMEndpoint } from "@/lib/llm/endpoint";
 import type { LLMRequestOptions, LLMUserConfig } from "@/lib/llm/types";
 
 const DEFAULT_SYSTEM_PROMPT =
   "You are a helpful research and productivity assistant. Reply in Chinese unless the user writes in another language. Be concise, concrete, and practical.";
-
-function buildRequestUrl(config: LLMUserConfig): string {
-  const endpoint = PROVIDER_ENDPOINTS[config.provider];
-  const base = (config.baseUrl?.trim() || endpoint.baseUrl).replace(/\/$/, "");
-  return `${base}${endpoint.chatPath}`;
-}
 
 function buildHeaders(config: LLMUserConfig): Record<string, string> {
   return {
@@ -35,8 +29,10 @@ function buildBody(options: LLMRequestOptions) {
 }
 
 export async function callLLM(options: LLMRequestOptions): Promise<string> {
-  const response = await fetch(buildRequestUrl(options.config), {
+  const response = await fetch(resolveLLMEndpoint(options.config), {
     method: "POST",
+    redirect: "error",
+    signal: AbortSignal.timeout(90_000),
     headers: buildHeaders(options.config),
     body: JSON.stringify(buildBody({ ...options, stream: false })),
   });
@@ -51,8 +47,10 @@ export async function callLLM(options: LLMRequestOptions): Promise<string> {
 }
 
 export async function streamLLM(options: LLMRequestOptions): Promise<Response> {
-  const response = await fetch(buildRequestUrl(options.config), {
+  const response = await fetch(resolveLLMEndpoint(options.config), {
     method: "POST",
+    redirect: "error",
+    signal: AbortSignal.timeout(90_000),
     headers: buildHeaders(options.config),
     body: JSON.stringify(buildBody({ ...options, stream: true })),
   });

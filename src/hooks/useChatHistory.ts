@@ -3,23 +3,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createId } from "@/lib/id";
 import { dbDelete, dbGetAll, dbPut } from "@/lib/db";
+import { useAccountId } from "@/components/account-scope";
+import { toast } from "sonner";
 import type { ChatSession, ContextSource, StoredChatMessage } from "@/lib/llm/context-types";
 
 const STORAGE_KEY = "llm-chat-history";
 
-function loadFromLocalStorage(): ChatSession[] {
+function loadFromLocalStorage(userId: string): ChatSession[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as ChatSession[]) : [];
+    const raw = localStorage.getItem(`${STORAGE_KEY}:${userId}`);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-function saveToLocalStorage(sessions: ChatSession[]) {
+function saveToLocalStorage(userId: string, sessions: ChatSession[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  localStorage.setItem(`${STORAGE_KEY}:${userId}`, JSON.stringify(sessions));
 }
 
 function buildInitialTitle(contextSources: ContextSource[]) {
@@ -32,16 +35,20 @@ function buildInitialTitle(contextSources: ContextSource[]) {
 }
 
 export function useChatHistory() {
+  const userId = useAccountId();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const localSessions = loadFromLocalStorage();
+      if (!userId) return;
+      const localSessions = loadFromLocalStorage(userId);
       try {
-        const indexedSessions = await dbGetAll<ChatSession>("chat-sessions");
+        const indexedSessions = (await dbGetAll<ChatSession & { userId?: string }>("chat-sessions"))
+          .filter((session) => session.userId === userId);
         if (!mounted) return;
-        const next = indexedSessions.length > 0 ? indexedSessions : localSessions;
+        // The local snapshot also records deletions; prefer it when available.
+        const next = localStorage.getItem(`${STORAGE_KEY}:${userId}`) !== null ? localSessions : indexedSessions;
         setSessions(next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
       } catch {
         if (mounted) setSessions(localSessions);
@@ -51,16 +58,18 @@ export function useChatHistory() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [userId]);
 
   const persist = useCallback((next: ChatSession[]) => {
-    const sorted = next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    saveToLocalStorage(sorted);
+    if (!userId) return next;
+    const sorted = [...next].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    try { saveToLocalStorage(userId, sorted); }
+    catch { toast.error("对话的本地备份失败，请检查浏览器存储空间"); }
     for (const session of sorted) {
-      void dbPut("chat-sessions", session).catch(() => undefined);
+      void dbPut("chat-sessions", { ...session, userId }).catch(() => undefined);
     }
     return sorted;
-  }, []);
+  }, [userId]);
 
   const createSession = useCallback(
     (contextSources: ContextSource[] = []) => {

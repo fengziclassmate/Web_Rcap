@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Undo2, Redo2 } from "lucide-react";
+import { AccountScope } from "@/components/account-scope";
+import { Check, CloudOff, Loader2, RefreshCw, Undo2, Redo2 } from "lucide-react";
 import { parseISO } from "date-fns";
 import { GlobalSearch, type SearchResult } from "@/components/schedule/global-search";
 import { ExecutionPanel } from "@/components/schedule/execution-panel";
-import { UpNextCard } from "@/components/schedule/up-next-card";
+import { FloatingScheduleCard } from "@/components/schedule/floating-schedule-card";
+import { useScheduleSync } from "@/hooks/useScheduleSync";
 import { useUndoHistory } from "@/hooks/useUndoHistory";
 import { expandScheduleEvents } from "@/lib/recurrence";
 
@@ -52,24 +54,8 @@ import {
   defaultDashboardUiPreferences,
   defaultEvents,
   defaultTasks,
-  normalizeAchievements,
-  normalizeAnnualTasks,
-  normalizeDashboardUiPreferences,
-  normalizeEvents,
-  normalizeFootprints,
-  normalizeProjectCheckins,
-  normalizeShoppingItems,
-  normalizeTasks,
 } from "@/lib/normalizers";
-import {
-  isColumnMissing,
-  isUiPreferencesColumnMissing,
-  readDashboardUiPreferencesFromLocal,
-  readScheduleBackupFromLocal,
-  writeScheduleBackupToLocal,
-  writeDashboardUiPreferencesToLocal,
-  type PersistedSchedulePayload,
-} from "@/lib/schedule-persistence";
+import { normalizePersistedSchedulePayload, type PersistedSchedulePayload } from "@/lib/schedule-persistence";
 import {
   composeLogPostRecords,
   fromLogImageRow,
@@ -78,6 +64,7 @@ import {
   fromLogTagRow,
 } from "@/lib/log-mappers";
 import { supabase } from "@/lib/supabase";
+import { saveLogPost, deleteLogPost, retryLogImageCleanup } from "@/lib/log-mutations";
 import { toast } from "sonner";
 import { todayISO } from "@/lib/date-utils";
 import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
@@ -113,13 +100,10 @@ function getCurrentWeekStart() {
 }
 
 export function WorkbenchApp() {
-  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [openCollectionRequest, setOpenCollectionRequest] = useState<{ id: string; kind: "annual" | "project" | "shopping"; token: number }>();
   const [openTaskRequest, setOpenTaskRequest] = useState<{ id: string; token: number }>();
   const [openEventRequest, setOpenEventRequest] = useState<{ id: string; token: number }>();
   const [openLogRequest, setOpenLogRequest] = useState<{ id: string; token: number }>();
-  const canSaveRemoteRef = useRef(false);
-  const lastLoadedSnapshotRef = useRef<string | null>(null);
   const [isBooted, setIsBooted] = useState(false);
   const [activeModule, setActiveModule] = useState<MonitoringModuleId>("schedule");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getCurrentWeekStart);
@@ -135,6 +119,7 @@ export function WorkbenchApp() {
   const [logReady, setLogReady] = useState(false);
   const [logHistoryAvailable, setLogHistoryAvailable] = useState(false);
   const [logUploading, setLogUploading] = useState(false);
+  const logMutationBusy = useRef(false);
   const [dashboardUiPreferences, setDashboardUiPreferences] = useState<DashboardUiPreferences>(
     defaultDashboardUiPreferences,
   );
@@ -143,7 +128,6 @@ export function WorkbenchApp() {
   const [user, setUser] = useState<User | null>(null);
   const [authEmail, setAuthEmail] = useState("");
   const [sendingLink, setSendingLink] = useState(false);
-  const [dataReady, setDataReady] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [confirmDangerousActions, setConfirmDangerousActions] = useState(true);
   const weekRange = useMemo(() => {
@@ -152,6 +136,7 @@ export function WorkbenchApp() {
     return `${start} - ${end}`;
   }, [currentWeekStart]);
   const displayRangeLabel = useMemo(() => {
+    if (viewMode === "day") return format(currentWeekStart, "yyyy年 M月d日 EEEE", { locale: zhCN });
     if (viewMode === "month") return format(currentWeekStart, "yyyy年 M月", { locale: zhCN });
     return weekRange;
   }, [currentWeekStart, viewMode, weekRange]);
@@ -177,15 +162,29 @@ export function WorkbenchApp() {
       tasks,
     ],
   );
-  const persistedPayloadJson = useMemo(() => JSON.stringify(persistedPayload), [persistedPayload]);
+  const [historyRevision, setHistoryRevision] = useState(0);
+  const hydrateSchedule = useCallback((value: PersistedSchedulePayload, externalChange: boolean) => {
+    if (externalChange) setHistoryRevision((revision) => revision + 1);
+    setEvents(value.events); setTasks(value.tasks); setAnnualTasks(value.annual_tasks);
+    setShoppingItems(value.shopping_items); setProjectCheckins(value.project_checkins);
+    setFootprints(value.footprints); setAchievements(value.achievements);
+    setDashboardUiPreferences(value.ui_preferences);
+  }, []);
+  const sync = useScheduleSync(user?.id ?? null, persistedPayload, hydrateSchedule);
+  const dataReady = sync.ready;
+  const currentUserId = useRef<string | null>(null);
+  useEffect(() => { currentUserId.current = user?.id ?? null; }, [user?.id]);
 
-  const undoSnapshot = useMemo(() => ({ events, tasks, annualTasks, shoppingItems, projectCheckins, footprints, achievements }), [events, tasks, annualTasks, shoppingItems, projectCheckins, footprints, achievements]);
+  const undoSnapshot = useMemo(() => {
+    const value = normalizePersistedSchedulePayload({ events, tasks, annual_tasks: annualTasks, shopping_items: shoppingItems, project_checkins: projectCheckins, footprints, achievements })!;
+    return { events: value.events, tasks: value.tasks, annualTasks: value.annual_tasks, shoppingItems: value.shopping_items, projectCheckins: value.project_checkins, footprints: value.footprints, achievements: value.achievements };
+  }, [events, tasks, annualTasks, shoppingItems, projectCheckins, footprints, achievements]);
   const restoreSnapshot = useCallback((snapshot: typeof undoSnapshot) => {
     setEvents(snapshot.events); setTasks(snapshot.tasks); setAnnualTasks(snapshot.annualTasks);
     setShoppingItems(snapshot.shoppingItems); setProjectCheckins(snapshot.projectCheckins);
     setFootprints(snapshot.footprints); setAchievements(snapshot.achievements);
   }, []);
-  const history = useUndoHistory(undoSnapshot, restoreSnapshot, dataReady && user ? user.id : null);
+  const history = useUndoHistory(undoSnapshot, restoreSnapshot, dataReady && user ? `${user.id}:${historyRevision}` : null);
 
   function locateSearchResult(result: SearchResult) {
     const token = Date.now();
@@ -246,7 +245,10 @@ export function WorkbenchApp() {
       }),
     );
 
-    setLogTags(tags);
+    if (currentUserId.current !== currentUser.id) return;
+    const usage = new Map<string, number>();
+    for (const link of tagLinks) usage.set(link.tagId, (usage.get(link.tagId) ?? 0) + 1);
+    setLogTags(tags.map((tag) => ({ ...tag, usageCount: usage.get(tag.id) ?? 0 })));
     setLogPosts(composeLogPostRecords(posts, signedImages, tags, tagLinks, links));
     setLogHistoryAvailable(true);
   }
@@ -274,271 +276,8 @@ export function WorkbenchApp() {
   }, []);
 
   useEffect(() => {
-    if (!isBooted) return;
-    if (!user) {
-      canSaveRemoteRef.current = false;
-      lastLoadedSnapshotRef.current = null;
-      setEvents(defaultEvents);
-      setTasks(defaultTasks);
-      setAnnualTasks([]);
-      setShoppingItems([]);
-      setProjectCheckins([]);
-      setFootprints([]);
-      setAchievements([]);
-      setLogPosts([]);
-      setLogTags([]);
-      setLogReady(false);
-      setLogHistoryAvailable(false);
-      setDashboardUiPreferences(defaultDashboardUiPreferences);
-      setDataReady(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function createScheduleDataTable() {
-      const { error } = await supabase
-        .rpc('postgres_functions', {
-          function_name: 'create_schedule_data_table'
-        });
-      if (error) {
-        console.error("鍒涘缓琛ㄥけ璐?", error);
-        return false;
-      }
-      return true;
-    }
-
-    async function loadUserData() {
-      try {
-        if (!user) return;
-        type ScheduleDataRow = {
-          events: unknown;
-          tasks: unknown;
-          annual_tasks: unknown;
-          shopping_items?: unknown;
-          project_checkins: unknown;
-          footprints: unknown;
-          ui_preferences?: unknown;
-          achievements?: unknown;
-        };
-
-        const primary = await supabase
-          .from("schedule_data")
-          .select(
-            "events,tasks,annual_tasks,shopping_items,project_checkins,footprints,ui_preferences,achievements",
-          )
-          .eq("user_id", user.id)
-          .maybeSingle();
-        let data: ScheduleDataRow | null = primary.data as ScheduleDataRow | null;
-        let error = primary.error;
-
-        if (
-          error?.message &&
-          (isUiPreferencesColumnMissing(error.message) ||
-            isColumnMissing(error.message, "achievements") ||
-            isColumnMissing(error.message, "shopping_items"))
-        ) {
-          const onlyShoppingMissing = isColumnMissing(error.message, "shopping_items") &&
-            !isUiPreferencesColumnMissing(error.message) &&
-            !isColumnMissing(error.message, "achievements");
-          const fallback = await supabase
-            .from("schedule_data")
-            .select(
-              onlyShoppingMissing
-                ? "events,tasks,annual_tasks,project_checkins,footprints,ui_preferences,achievements"
-                : "events,tasks,annual_tasks,project_checkins,footprints",
-            )
-            .eq("user_id", user.id)
-            .maybeSingle();
-          data = fallback.data as ScheduleDataRow | null;
-          error = fallback.error;
-        }
-
-        if (cancelled) return;
-        if (error) {
-          console.error("Failed to read remote schedule data:", error);
-          const localBackup = readScheduleBackupFromLocal(user.id);
-          if (localBackup) {
-            canSaveRemoteRef.current = true;
-            lastLoadedSnapshotRef.current = JSON.stringify(localBackup);
-            setEvents(localBackup.events);
-            setTasks(localBackup.tasks);
-            setAnnualTasks(localBackup.annual_tasks);
-            setShoppingItems(localBackup.shopping_items);
-            setProjectCheckins(localBackup.project_checkins);
-            setFootprints(localBackup.footprints);
-            setAchievements(localBackup.achievements);
-            setDashboardUiPreferences(localBackup.ui_preferences);
-            toast.warning("Remote read failed. Restored from local backup.");
-            setDataReady(true);
-            return;
-          }
-          canSaveRemoteRef.current = false;
-          lastLoadedSnapshotRef.current = null;
-          if (error.message.includes('relation \"schedule_data\" does not exist')) {
-            toast.info("Remote table missing. Creating it now...");
-            const created = await createScheduleDataTable();
-            if (created) {
-              await loadUserData();
-            } else {
-              toast.error("Failed to create remote table.");
-              setDataReady(true);
-            }
-          } else {
-            toast.error("Failed to read remote data: " + error.message);
-            setDataReady(true);
-          }
-          return;
-        }
-
-        if (data) {
-          const normalized: PersistedSchedulePayload = {
-            events: normalizeEvents(data.events),
-            tasks: normalizeTasks(data.tasks),
-            annual_tasks: normalizeAnnualTasks((data as { annual_tasks?: unknown }).annual_tasks),
-            shopping_items: normalizeShoppingItems(
-              (data as { shopping_items?: unknown }).shopping_items,
-            ),
-            project_checkins: normalizeProjectCheckins(
-              (data as { project_checkins?: unknown }).project_checkins,
-            ),
-            footprints: normalizeFootprints((data as { footprints?: unknown }).footprints),
-            achievements: normalizeAchievements((data as { achievements?: unknown }).achievements),
-            ui_preferences: (data as { ui_preferences?: unknown }).ui_preferences
-              ? normalizeDashboardUiPreferences((data as { ui_preferences?: unknown }).ui_preferences)
-              : readDashboardUiPreferencesFromLocal(),
-          };
-          canSaveRemoteRef.current = true;
-          lastLoadedSnapshotRef.current = JSON.stringify(normalized);
-          setEvents(normalized.events);
-          setTasks(normalized.tasks);
-          setAnnualTasks(normalized.annual_tasks);
-          setShoppingItems(normalized.shopping_items);
-          setProjectCheckins(normalized.project_checkins);
-          setFootprints(normalized.footprints);
-          setAchievements(normalized.achievements);
-          setDashboardUiPreferences(normalized.ui_preferences);
-        } else {
-          const localBackup = readScheduleBackupFromLocal(user.id);
-          if (localBackup) {
-            canSaveRemoteRef.current = true;
-            lastLoadedSnapshotRef.current = JSON.stringify(localBackup);
-            setEvents(localBackup.events);
-            setTasks(localBackup.tasks);
-            setAnnualTasks(localBackup.annual_tasks);
-            setShoppingItems(localBackup.shopping_items);
-            setProjectCheckins(localBackup.project_checkins);
-            setFootprints(localBackup.footprints);
-            setAchievements(localBackup.achievements);
-            setDashboardUiPreferences(localBackup.ui_preferences);
-            toast.warning("Remote data was empty. Restored from local backup.");
-          } else {
-            const emptyState: PersistedSchedulePayload = {
-              events: defaultEvents,
-              tasks: defaultTasks,
-              annual_tasks: [],
-              shopping_items: [],
-              project_checkins: [],
-              footprints: [],
-              achievements: [],
-              ui_preferences: readDashboardUiPreferencesFromLocal(),
-            };
-            canSaveRemoteRef.current = false;
-            lastLoadedSnapshotRef.current = JSON.stringify(emptyState);
-            setEvents(emptyState.events);
-            setTasks(emptyState.tasks);
-            setAnnualTasks(emptyState.annual_tasks);
-            setShoppingItems(emptyState.shopping_items);
-            setProjectCheckins(emptyState.project_checkins);
-            setFootprints(emptyState.footprints);
-            setAchievements(emptyState.achievements);
-            setDashboardUiPreferences(emptyState.ui_preferences);
-          }
-        }
-        setDataReady(true);
-      } catch (error) {
-        console.error("Failed to load schedule data:", error);
-        canSaveRemoteRef.current = false;
-        lastLoadedSnapshotRef.current = null;
-        toast.error("Failed to load schedule data.");
-        setDataReady(true);
-      }
-    }
-
-    loadUserData();
-    return () => {
-      cancelled = true;
-    };
-  }, [isBooted, user]);
-
-  useEffect(() => {
-    if (!user || !dataReady) return;
-    if (!canSaveRemoteRef.current) return;
-    let cancelled = false;
-    const currentUser = user;
-
-    async function saveUserData() {
-      if (cancelled || lastLoadedSnapshotRef.current === persistedPayloadJson) return;
-      const payload = {
-        user_id: currentUser.id,
-        ...persistedPayload,
-      };
-
-      const withPreferences = await supabase
-        .from("schedule_data")
-        .upsert(payload, { onConflict: "user_id" });
-
-      if (!withPreferences.error) {
-        lastLoadedSnapshotRef.current = persistedPayloadJson;
-        return;
-      }
-
-      if (withPreferences.error.message) {
-        const missingUi = isUiPreferencesColumnMissing(withPreferences.error.message);
-        const missingAchievements = isColumnMissing(withPreferences.error.message, "achievements");
-        const missingShopping = isColumnMissing(withPreferences.error.message, "shopping_items");
-        if (missingUi || missingAchievements || missingShopping) {
-          const fallbackPayload = {
-            user_id: payload.user_id,
-            events: payload.events,
-            tasks: payload.tasks,
-            annual_tasks: payload.annual_tasks,
-            ...(missingShopping ? {} : { shopping_items: payload.shopping_items }),
-            project_checkins: payload.project_checkins,
-            footprints: payload.footprints,
-            ...(missingAchievements ? {} : { achievements: payload.achievements }),
-            ...(missingUi ? {} : { ui_preferences: payload.ui_preferences }),
-          };
-
-          const fallbackSave = await supabase
-            .from("schedule_data")
-            .upsert(fallbackPayload, { onConflict: "user_id" });
-          if (fallbackSave.error) {
-            console.error("Failed to save schedule data:", fallbackSave.error);
-            toast.error("Failed to save remote data: " + fallbackSave.error.message);
-            return;
-          }
-          lastLoadedSnapshotRef.current = persistedPayloadJson;
-          toast.warning("Remote schema is behind. Used compatibility save.");
-          return;
-        }
-      }
-
-      console.error("Failed to save schedule data:", withPreferences.error);
-      toast.error("Failed to save remote data: " + withPreferences.error.message);
-    }
-
-    saveQueueRef.current = saveQueueRef.current.then(saveUserData).catch((error: unknown) => {
-      console.error("Schedule save failed", error);
-      toast.error("同步失败，数据已保留在本机");
-    });
-    return () => { cancelled = true; };
-  }, [persistedPayload, persistedPayloadJson, user, dataReady]);
-
-  useEffect(() => {
-    if (!user || !dataReady) return;
-    writeScheduleBackupToLocal(user.id, persistedPayload);
-  }, [dataReady, persistedPayload, user]);
+    setLogPosts([]); setLogTags([]); setLogReady(false); setLogHistoryAvailable(false);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user || !dataReady) return;
@@ -548,6 +287,7 @@ export function WorkbenchApp() {
     async function loadLogs() {
       try {
         await refreshLogs(currentUser);
+        void retryLogImageCleanup(supabase, currentUser.id);
         if (!cancelled) setLogReady(true);
       } catch (firstError) {
         if (cancelled) return;
@@ -569,256 +309,56 @@ export function WorkbenchApp() {
     };
   }, [dataReady, user]);
 
-  async function upsertLogTagsForUser(currentUser: User, tagNames: string[]) {
-    const cleaned = Array.from(new Set(tagNames.map((item) => item.trim()).filter(Boolean)));
-    if (cleaned.length === 0) return [] as LogTag[];
-    const { error } = await supabase.from("log_tags").upsert(
-      cleaned.map((name) => ({
-        user_id: currentUser.id,
-        name,
-      })),
-      { onConflict: "user_id,name" },
-    );
-    if (error) throw error;
-    const { data, error: selectError } = await supabase
-      .from("log_tags")
-      .select("*")
-      .eq("user_id", currentUser.id)
-      .in("name", cleaned);
-    if (selectError) throw selectError;
-    return (data ?? []).map((item) => fromLogTagRow(item));
-  }
-
-  async function recalculateLogTagUsage(currentUser: User) {
-    const [{ data: tagLinks, error: linksError }, { data: tagsData, error: tagsError }] = await Promise.all([
-      supabase.from("log_post_tags").select("tag_id").eq("user_id", currentUser.id),
-      supabase.from("log_tags").select("*").eq("user_id", currentUser.id),
-    ]);
-    if (linksError) throw linksError;
-    if (tagsError) throw tagsError;
-    const usageMap = new Map<string, number>();
-    (tagLinks ?? []).forEach((item) => {
-      const tagId = String(item.tag_id);
-      usageMap.set(tagId, (usageMap.get(tagId) ?? 0) + 1);
-    });
-    for (const row of tagsData ?? []) {
-      const count = usageMap.get(String(row.id)) ?? 0;
-      const { error } = await supabase
-        .from("log_tags")
-        .update({ usage_count: count, updated_at: new Date().toISOString() })
-        .eq("id", row.id)
-        .eq("user_id", currentUser.id);
-      if (error) throw error;
-    }
-  }
-
-  async function uploadLogImages(currentUser: User, postId: string, files: File[]) {
-    const rows: Array<Record<string, unknown>> = [];
-    const uploadedPaths: string[] = [];
-    try {
-    for (const [index, file] of files.entries()) {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-      const storagePath = `${currentUser.id}/${postId}/${Date.now()}-${index}-${safeName}`;
-      const { error: uploadError } = await supabase.storage
-        .from("log-images")
-        .upload(storagePath, file, { upsert: false });
-      if (uploadError) throw uploadError;
-      uploadedPaths.push(storagePath);
-      const { data } = await supabase.storage.from("log-images").createSignedUrl(storagePath, 60 * 60 * 24 * 30);
-      rows.push({
-        post_id: postId,
-        user_id: currentUser.id,
-        image_url: data?.signedUrl ?? "",
-        storage_path: storagePath,
-        sort_order: index,
-      });
-    }
-    if (rows.length > 0) {
-      const { error } = await supabase.from("log_post_images").insert(rows);
-      if (error) throw error;
-    }
-    } catch (error) {
-      if (uploadedPaths.length) await supabase.storage.from("log-images").remove(uploadedPaths);
-      throw error;
-    }
-  }
-
-  async function syncLogPostTags(currentUser: User, postId: string, tagNames: string[]) {
-    const ensuredTags = await upsertLogTagsForUser(currentUser, tagNames);
-    const { error: deleteError } = await supabase
-      .from("log_post_tags")
-      .delete()
-      .eq("post_id", postId)
-      .eq("user_id", currentUser.id);
-    if (deleteError) throw deleteError;
-    if (ensuredTags.length > 0) {
-      const { error } = await supabase.from("log_post_tags").insert(
-        ensuredTags.map((tag) => ({
-          post_id: postId,
-          tag_id: tag.id,
-          user_id: currentUser.id,
-        })),
-      );
-      if (error) throw error;
-    }
-    await recalculateLogTagUsage(currentUser);
-  }
-
-  async function syncLogPostLinks(currentUser: User, postId: string, links: Array<{ id: string; type: string; title: string }>) {
-    const { error: deleteError } = await supabase
-      .from("log_post_links")
-      .delete()
-      .eq("post_id", postId)
-      .eq("user_id", currentUser.id);
-    if (deleteError) throw deleteError;
-    if (links.length > 0) {
-      const { error } = await supabase.from("log_post_links").insert(
-        links.map((item) => ({
-          post_id: postId,
-          user_id: currentUser.id,
-          target_type: item.type,
-          target_id: item.id,
-          target_title: item.title,
-        })),
-      );
-      if (error) throw error;
-    }
+  async function finishLogSave(currentUser: User, cleanupComplete: boolean) {
+    try { await refreshLogs(currentUser); }
+    catch { toast.warning("日志已保存，列表刷新失败，请刷新页面查看。"); }
+    if (!cleanupComplete) toast.warning("日志已保存，部分旧图片等待联网清理。");
   }
 
   async function handleCreateLogPost(input: LogComposerInput) {
-    if (!user) return false;
+    if (!user || logMutationBusy.current) return false;
+    logMutationBusy.current = true;
     setLogUploading(true);
     const currentUser = user;
-    const nowDate = new Date();
-    const now = nowDate.toISOString();
-    const createdAt = input.recordDate
-      ? new Date(`${input.recordDate}T${format(nowDate, "HH:mm:ss.SSS")}`).toISOString()
-      : now;
-    let basePostCreated = false;
     try {
-      const { data, error } = await supabase
-        .from("log_posts")
-        .insert({
-          user_id: currentUser.id,
-          content: input.content,
-          category: input.category,
-          mood: input.mood || null,
-          location: input.location,
-          visibility: "private",
-          source_type: "manual",
-          created_at: createdAt,
-          updated_at: now,
-        })
-        .select("*")
-        .single();
-      if (error) throw error;
-      const post = fromLogPostRow(data);
-      basePostCreated = true;
-      try {
-        await uploadLogImages(currentUser, post.id, input.images.slice(0, 9));
-      } catch (error) {
-        const { error: deleteError } = await supabase.from("log_posts").delete().eq("id", post.id).eq("user_id", currentUser.id);
-        basePostCreated = Boolean(deleteError);
-        if (deleteError) {
-          await refreshLogs(currentUser);
-          toast.error("图片上传失败，正文已保留在动态日志；图片草稿仍在，请从该日志编辑补传图片");
-          return false;
-        }
-        throw error;
-      }
-      await syncLogPostTags(currentUser, post.id, input.tagNames);
-      await syncLogPostLinks(currentUser, post.id, input.links);
-      await refreshLogs(currentUser);
+      const now = new Date();
+      const createdAt = input.recordDate ? new Date(`${input.recordDate}T${format(now, "HH:mm:ss.SSS")}`).toISOString() : now.toISOString();
+      const result = await saveLogPost(supabase, currentUser.id, input.requestId, { ...input, newImages: input.images, keepImageIds: [], createdAt });
+      await finishLogSave(currentUser, result.cleanupComplete);
       toast.success("动态日志已保存");
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (basePostCreated) {
-        try {
-          await refreshLogs(currentUser);
-        } catch {
-          // The main post is already stored; a later refresh can recover it.
-        }
-        toast.warning(`日志正文已保存，但部分附属信息同步失败：${message}`);
-        return true;
-      }
-      toast.error(`Failed to create log post: ${message}`);
+      toast.error(`日志未完整保存，草稿已保留；重试会继续保存同一条日志：${error instanceof Error ? error.message : String(error)}`);
       return false;
-    } finally {
-      setLogUploading(false);
-    }
+    } finally { logMutationBusy.current = false; setLogUploading(false); }
   }
 
   async function handleUpdateLogPost(postId: string, input: LogPostEditorInput) {
-    if (!user) return;
+    if (!user || logMutationBusy.current) return false;
+    logMutationBusy.current = true;
     setLogUploading(true);
     const currentUser = user;
     try {
-      const { error: updateError } = await supabase
-        .from("log_posts")
-        .update({
-          content: input.content,
-          category: input.category,
-          mood: input.mood || null,
-          location: input.location,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", postId)
-        .eq("user_id", currentUser.id);
-      if (updateError) throw updateError;
-
-      const existingPost = logPosts.find((item) => item.id === postId);
-      const removedImages = existingPost?.images.filter((image) => !input.keepImageIds.includes(image.id)) ?? [];
-      if (removedImages.length > 0) {
-        const storagePaths = removedImages
-          .map((image) => image.storagePath)
-          .filter((item): item is string => Boolean(item));
-        if (storagePaths.length > 0) {
-          await supabase.storage.from("log-images").remove(storagePaths);
-        }
-        const { error: deleteImagesError } = await supabase
-          .from("log_post_images")
-          .delete()
-          .eq("post_id", postId)
-          .eq("user_id", currentUser.id)
-          .in("id", removedImages.map((item) => item.id));
-        if (deleteImagesError) throw deleteImagesError;
-      }
-
-      await uploadLogImages(currentUser, postId, input.newImages.slice(0, Math.max(0, 9 - input.keepImageIds.length)));
-      await syncLogPostTags(currentUser, postId, input.tagNames);
-      await syncLogPostLinks(currentUser, postId, input.links);
-      await refreshLogs(currentUser);
+      const result = await saveLogPost(supabase, currentUser.id, postId, input);
+      await finishLogSave(currentUser, result.cleanupComplete);
+      toast.success("日志修改已保存");
+      return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to update log post: ${message}`);
-    } finally {
-      setLogUploading(false);
-    }
+      toast.error(`日志未完整保存，编辑内容已保留：${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    } finally { logMutationBusy.current = false; setLogUploading(false); }
   }
 
   async function handleDeleteLogPost(postId: string) {
-    if (!user) return;
+    if (!user || logMutationBusy.current) return;
+    logMutationBusy.current = true;
     const currentUser = user;
     try {
-      const existingPost = logPosts.find((item) => item.id === postId);
-      const storagePaths = existingPost?.images
-        .map((image) => image.storagePath)
-        .filter((item): item is string => Boolean(item)) ?? [];
-      if (storagePaths.length > 0) {
-        await supabase.storage.from("log-images").remove(storagePaths);
-      }
-      await supabase.from("log_post_images").delete().eq("post_id", postId).eq("user_id", currentUser.id);
-      await supabase.from("log_post_tags").delete().eq("post_id", postId).eq("user_id", currentUser.id);
-      await supabase.from("log_post_links").delete().eq("post_id", postId).eq("user_id", currentUser.id);
-      const { error } = await supabase.from("log_posts").delete().eq("id", postId).eq("user_id", currentUser.id);
-      if (error) throw error;
-      await recalculateLogTagUsage(currentUser);
-      await refreshLogs(currentUser);
+      const result = await deleteLogPost(supabase, currentUser.id, postId);
+      await finishLogSave(currentUser, result.cleanupComplete);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to delete log post: ${message}`);
-    }
+      toast.error(`日志删除失败，请重试：${error instanceof Error ? error.message : String(error)}`);
+    } finally { logMutationBusy.current = false; }
   }
 
   async function handleToggleLogPinned(postId: string) {
@@ -865,11 +405,6 @@ export function WorkbenchApp() {
     setAchievements((prev) => prev.filter((x) => x.id !== id));
   }
 
-  useEffect(() => {
-    if (!dataReady) return;
-    writeDashboardUiPreferencesToLocal(dashboardUiPreferences);
-  }, [dashboardUiPreferences, dataReady]);
-
   async function handleSendMagicLink() {
     if (!authEmail.trim()) return;
     setSendingLink(true);
@@ -892,7 +427,7 @@ export function WorkbenchApp() {
     });
     setSendingLink(false);
     if (error) {
-      toast.error(`鍙戦€佺櫥褰曢摼鎺ュけ璐ワ細${error.message}`);
+      toast.error(`发送登录链接失败：${error.message}`);
       return;
     }
     toast.success("登录链接已发送，请检查邮箱。");
@@ -901,7 +436,7 @@ export function WorkbenchApp() {
   async function handleSignOut() {
     const { error } = await supabase.auth.signOut();
     if (error) {
-      toast.error(`閫€鍑哄け璐ワ細${error.message}`);
+      toast.error(`退出登录失败：${error.message}`);
       return;
     }
     toast.success("已退出登录。");
@@ -1405,8 +940,8 @@ export function WorkbenchApp() {
     return (
       <main className={shellClass}>
         <div className="mx-auto grid max-w-[1880px] grid-cols-[1fr_460px] gap-4 px-4 py-4">
-          <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
-          <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
+          <div role="status" aria-label="正在加载工作台" className="h-[720px] animate-pulse rounded-xl border border-stone-200 bg-white p-6"><p className="text-sm text-stone-500">正在加载工作台…</p></div>
+          <ModuleLoadingState />
         </div>
       </main>
     );
@@ -1445,18 +980,22 @@ export function WorkbenchApp() {
     return (
       <main className={shellClass}>
         <div className="mx-auto grid max-w-[1880px] grid-cols-[1fr_460px] gap-4 px-4 py-4">
-          <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
-          <div className="h-[720px] rounded-sm border border-gray-200 bg-white" />
+          <div role={sync.message ? "alert" : "status"} className="h-[720px] rounded-xl border border-stone-200 bg-white p-6">
+            <p className="text-sm text-stone-500">{sync.message || "正在加载工作台…"}</p>
+            {sync.message && <Button className="mt-4" variant="outline" onClick={() => window.location.reload()}>重新加载</Button>}
+          </div>
+          <ModuleLoadingState />
         </div>
       </main>
     );
   }
 
   return (
-    <main className={`${shellClass} pb-4`}>
-      <div className="relative z-10 mx-auto flex max-w-[1880px] items-center justify-between gap-3 px-4 pt-4">
-        <div className="workbench-hero min-w-0 rounded-2xl px-4 py-2">
-          <p className="truncate text-xs uppercase tracking-[0.22em] text-stone-500">Current account</p>
+    <AccountScope.Provider key={user.id} value={user.id}>
+    <main data-workbench className={`${shellClass} pb-4`}>
+      <div className="relative z-10 mx-auto flex max-w-[1880px] items-center justify-between gap-3 px-5 pt-4">
+        <div className="min-w-0 px-1 py-1">
+          <p className="truncate text-[11px] tracking-wide text-stone-500">当前账号</p>
           <p className="mt-0.5 min-w-0 truncate text-sm font-medium text-stone-900">{user.email}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -1483,7 +1022,7 @@ export function WorkbenchApp() {
             onClick={() => setConfirmDangerousActions((prev) => !prev)}
             className="shrink-0 rounded-xl border-stone-200/80 bg-white/65 text-stone-700 shadow-sm backdrop-blur hover:bg-white"
           >
-            删除确认：{confirmDangerousActions ? "开" : "关"}
+            任务删除确认：{confirmDangerousActions ? "开" : "关"}
           </Button>
           <Button
             type="button"
@@ -1497,10 +1036,18 @@ export function WorkbenchApp() {
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto flex max-w-[1880px] flex-col gap-4 px-4 py-4">
+      <div className="relative z-10 mx-auto max-w-[1880px] px-4 pt-0.5">
+        <div role="status" aria-live="polite" className={`flex flex-wrap items-center gap-2 rounded-xl px-2 py-1 text-xs ${["error", "offline", "conflict"].includes(sync.status) ? "border border-amber-200 bg-amber-50 text-amber-900" : "text-stone-500"}`}>
+          {sync.status === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : sync.status === "saved" ? <Check className="size-3.5 text-emerald-700" /> : <CloudOff className="size-3.5" />}
+          <span>{sync.message || ({ loading: "正在读取日程…", saved: "已同步到云端", pending: "已保存在本机，等待同步…", saving: "正在同步…", offline: "离线修改已保存在本机", error: "同步失败", conflict: "需要处理同步冲突" })[sync.status]}</span>
+          {["error", "offline"].includes(sync.status) && <Button variant="ghost" size="xs" onClick={() => void sync.retry()}><RefreshCw />重试同步</Button>}
+          {sync.status === "conflict" && <><Button variant="outline" size="xs" onClick={() => sync.resolve("local")}>冲突处保留本机</Button><Button variant="outline" size="xs" onClick={() => sync.resolve("remote")}>冲突处保留云端</Button></>}
+        </div>
+      </div>
+      <div className="relative z-10 mx-auto flex max-w-[1880px] flex-col gap-4 px-4 py-3">
         <MonitoringSidebar active={activeModule} onChange={setActiveModule} />
 
-        <div className="min-h-0 w-full">
+        <div key={activeModule} className="workbench-module min-h-0 w-full">
           {activeModule === "schedule" ? (
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(340px,380px)] gap-4">
               <section className="min-h-0">
@@ -1519,6 +1066,7 @@ export function WorkbenchApp() {
                   onDeleteEvent={handleDeleteEvent}
                   onPrevWeek={handleGoPrevWeek}
                   onNextWeek={handleGoNextWeek}
+                  onToday={() => setCurrentWeekStart(viewMode === "day" ? new Date() : viewMode === "month" ? startOfMonth(new Date()) : getCurrentWeekStart())}
                   onViewModeChange={handleViewModeChange}
                   onTimeGranularityChange={handleTimeGranularityChange}
                   onCreateLogPost={handleCreateLogPost}
@@ -1537,12 +1085,6 @@ export function WorkbenchApp() {
                 />
               </section>
               <section className="min-h-0 space-y-4">
-                <UpNextCard events={events} open={dashboardUiPreferences.upNextSectionOpen !== false} onOpenChange={(upNextSectionOpen) => setDashboardUiPreferences((previous) => ({ ...previous, upNextSectionOpen }))} onOpenEvent={(event) => {
-                  setViewMode("day");
-                  setCurrentWeekStart(parseISO(event.date));
-                  setOpenEventRequest({ id: event.id, token: Date.now() });
-                }} />
-                <ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />
                 <TaskDashboard
                   userId={user.id}
                   logsReady={logReady && logHistoryAvailable}
@@ -1596,6 +1138,7 @@ export function WorkbenchApp() {
                   uiPreferences={dashboardUiPreferences}
                   onUiPreferencesChange={setDashboardUiPreferences}
                 />
+                <ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />
               </section>
             </div>
           ) : (
@@ -1620,8 +1163,28 @@ export function WorkbenchApp() {
           )}
         </div>
       </div>
+      <FloatingScheduleCard
+        key={user.id}
+        userId={user.id}
+        events={events}
+        tasks={tasks}
+        preferences={dashboardUiPreferences}
+        onOpenEvent={(event) => {
+          setActiveModule("schedule");
+          setViewMode("day");
+          setCurrentWeekStart(parseISO(event.date));
+          setOpenEventRequest({ id: event.id, token: Date.now() });
+        }}
+        onOpenTask={(task) => {
+          setActiveModule("schedule");
+          setDashboardUiPreferences((previous) => ({ ...previous, dashboardGroup: task.taskType === "long" ? "goals" : "today" }));
+          setOpenTaskRequest({ id: task.id, token: Date.now() });
+        }}
+        onToggleTask={handleToggleTask}
+      />
       <LLMChatSidebar />
       <QuickNoteFab />
     </main>
+    </AccountScope.Provider>
   );
 }

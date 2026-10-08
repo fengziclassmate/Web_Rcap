@@ -16,6 +16,7 @@ import {
 } from "@/lib/report/weekly-report";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useAccountId } from "@/components/account-scope";
 
 const STORAGE_KEY = "schedule-app-saved-weekly-reports";
 
@@ -26,10 +27,10 @@ type WeeklyReportDialogProps = {
   achievements: Achievement[];
 };
 
-function readSavedReports(): SavedWeeklyReport[] {
+function readSavedReports(userId: string | null): SavedWeeklyReport[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(`${STORAGE_KEY}:${userId}`);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -37,9 +38,9 @@ function readSavedReports(): SavedWeeklyReport[] {
   }
 }
 
-function writeSavedReports(reports: SavedWeeklyReport[]) {
+function writeSavedReports(userId: string | null, reports: SavedWeeklyReport[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  localStorage.setItem(`${STORAGE_KEY}:${userId}`, JSON.stringify(reports));
 }
 
 function stripMarkdownArtifacts(value: string) {
@@ -58,13 +59,14 @@ export function WeeklyReportDialog({
   tasks,
   achievements,
 }: WeeklyReportDialogProps) {
+  const userId = useAccountId();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [title, setTitle] = useState("");
   const [savedReports, setSavedReports] = useState<SavedWeeklyReport[]>([]);
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
   const reportData = useWeekReportData(currentWeekStart, events, tasks, achievements);
-  const { loading, sendMessage } = useLLMChat();
+  const { loading, error, sendMessage } = useLLMChat();
 
   const activeReport = useMemo(
     () => savedReports.find((report) => report.id === activeReportId) ?? null,
@@ -88,8 +90,14 @@ export function WeeklyReportDialog({
 
   function persistReports(nextReports: SavedWeeklyReport[]) {
     const sorted = [...nextReports].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    setSavedReports(sorted);
-    writeSavedReports(sorted);
+    try {
+      writeSavedReports(userId, sorted);
+      setSavedReports(sorted);
+      return true;
+    } catch {
+      toast.error("周报保存失败，草稿仍保留在编辑器中");
+      return false;
+    }
   }
 
   function handleSave() {
@@ -107,10 +115,11 @@ export function WeeklyReportDialog({
       createdAt: activeReport?.createdAt ?? now,
       updatedAt: now,
     };
-    persistReports([
+    const saved = persistReports([
       nextReport,
       ...savedReports.filter((report) => report.id !== nextReport.id),
     ]);
+    if (!saved) return;
     setActiveReportId(nextReport.id);
     setDraft(content);
     toast.success("周报已保存");
@@ -123,7 +132,7 @@ export function WeeklyReportDialog({
   }
 
   function handleDelete(reportId: string) {
-    persistReports(savedReports.filter((report) => report.id !== reportId));
+    if (!persistReports(savedReports.filter((report) => report.id !== reportId))) return;
     if (activeReportId === reportId) {
       setActiveReportId(null);
       setDraft("");
@@ -133,7 +142,7 @@ export function WeeklyReportDialog({
   }
 
   function handleOpen() {
-    setSavedReports(readSavedReports());
+    setSavedReports(readSavedReports(userId));
     if (!activeReportId) setTitle(`${reportData.rangeText} 周报`);
     setOpen(true);
   }
@@ -150,6 +159,7 @@ export function WeeklyReportDialog({
             <DialogHeader className="shrink-0">
               <DialogTitle>周报自动生成与归档</DialogTitle>
             </DialogHeader>
+          {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
 
             <div className="grid min-h-0 flex-1 gap-4 overflow-hidden lg:grid-cols-[300px_minmax(0,1fr)]">
               <aside className="min-h-0 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm">

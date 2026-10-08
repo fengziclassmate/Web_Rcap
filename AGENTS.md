@@ -1,7 +1,11 @@
 <!-- BEGIN:nextjs-agent-rules -->
+
 # This is NOT the Next.js you know
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
 <!-- END:nextjs-agent-rules -->
 
 # 日程安排应用 - Agent Skills 配置
@@ -11,7 +15,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ### 项目概述
 - **项目名称**: 日程安排应用
 - **项目类型**: Web 应用
-- **框架**: Next.js 16.2.3 (Turbopack)
+- **框架**: Next.js 16.3.8 (Turbopack)
 - **语言**: TypeScript
 - **状态管理**: React useState/useContext
 - **样式**: Tailwind CSS
@@ -42,7 +46,7 @@ npm run start
 ## 技术栈
 
 ### 核心技术
-- **前端框架**: Next.js 16.2.3
+- **前端框架**: Next.js 16.3.8
 - **语言**: TypeScript
 - **样式**: Tailwind CSS v4
 - **图标**: Lucide React

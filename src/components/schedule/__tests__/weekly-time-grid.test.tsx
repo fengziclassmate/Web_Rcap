@@ -177,22 +177,18 @@ describe("WeeklyTimeGrid interactions", () => {
     fireEvent(slot, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 136 }));
     expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, expect.objectContaining({ date: "2026-07-27", startHour: 6.5, endHour: 6.75 }), undefined);
   });
-  it("displays and edits event buffers without moving the event time", () => {
+  it("ignores legacy buffers in the calendar and editor while preserving event times", () => {
     const onUpdateEvent = vi.fn();
-    const { container } = renderGrid({ events: [{ ...scheduleEvent, bufferBeforeMinutes: 20, bufferAfterMinutes: 15, bufferBeforeName: "去羽毛球场", bufferAfterName: "回实验室" }], onUpdateEvent });
-    expect(container.querySelectorAll('[data-testid="event-buffer"]')).toHaveLength(2);
-    expect(container.querySelector('[data-testid="event-buffer"]')?.textContent).toContain("去羽毛球场");
+    const legacyEvent = { ...scheduleEvent, bufferBeforeMinutes: 20, bufferAfterMinutes: 15, bufferBeforeName: "去羽毛球场", bufferAfterName: "回实验室" };
+    const { container } = renderGrid({ events: [legacyEvent], onUpdateEvent });
+    expect(container.querySelectorAll('[data-testid="event-buffer"]')).toHaveLength(0);
     fireEvent.click(screen.getAllByRole("button", { name: `打开 ${scheduleEvent.title} 编辑窗口` })[0]);
     const editor = within(screen.getByRole("dialog"));
-    expect((editor.getByLabelText("提前准备") as HTMLInputElement).value).toBe("20");
-    expect((editor.getByLabelText("事件前缓冲名称") as HTMLInputElement).value).toBe("去羽毛球场");
-    expect((editor.getByLabelText("事件后缓冲名称") as HTMLInputElement).value).toBe("回实验室");
-    fireEvent.change(editor.getByLabelText("事件前缓冲名称"), { target: { value: " 通勤 · 去球场 " } });
-    fireEvent.change(editor.getByLabelText("事件后缓冲名称"), { target: { value: "通勤 · 回实验室" } });
-    fireEvent.change(editor.getByLabelText("提前准备"), { target: { value: "30" } });
-    fireEvent.change(editor.getByLabelText("结束后缓冲"), { target: { value: "10" } });
+    expect(editor.queryByLabelText("提前准备")).toBeNull();
+    expect(editor.queryByLabelText("事件前缓冲名称")).toBeNull();
     fireEvent.click(editor.getByRole("button", { name: "保存修改" }));
-    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, expect.objectContaining({ bufferBeforeMinutes: 30, bufferAfterMinutes: 10, bufferBeforeName: "通勤 · 去球场", bufferAfterName: "通勤 · 回实验室", startHour: scheduleEvent.startHour, endHour: scheduleEvent.endHour }));
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, expect.objectContaining({ startHour: scheduleEvent.startHour, endHour: scheduleEvent.endHour }));
+    expect(onUpdateEvent.mock.calls[0][1]).not.toHaveProperty("bufferBeforeMinutes");
   });
   it("edits a multi-day start date while keeping its end fixed", () => {
     const onUpdateEvent = vi.fn();
@@ -242,7 +238,7 @@ describe("WeeklyTimeGrid interactions", () => {
   it("persists a custom quick-template order", () => {
     localStorage.setItem("schedule-event-templates-v1", JSON.stringify([{ id: "walk", title: "散步", category: "休息", notes: "", requirements: [], tag: null }]));
     const { container } = renderGrid();
-    const slot = Array.from(container.querySelectorAll("button")).find((button) => !button.textContent?.trim() && !button.getAttribute("aria-label"));
+    const slot = Array.from(container.querySelectorAll("button")).find((button) => button.getAttribute("aria-label")?.endsWith("新建日程"));
     fireEvent.click(slot!);
     fireEvent.dragStart(screen.getByRole("button", { name: "快捷填写：散步" }));
     fireEvent.drop(screen.getByRole("button", { name: "快捷填写：休息" }));
@@ -252,7 +248,7 @@ describe("WeeklyTimeGrid interactions", () => {
     const onUpdateEvent = vi.fn();
     const { container } = renderGrid({ events: [{ ...scheduleEvent, endDate: "2026-07-30", startHour: 9, endHour: 10 }], onUpdateEvent });
     const card = container.querySelector("[data-schedule-card]");
-    const slot = Array.from(container.querySelectorAll("button")).find((button) => !button.textContent?.trim() && !button.getAttribute("aria-label"));
+    const slot = Array.from(container.querySelectorAll("button")).find((button) => button.getAttribute("aria-label")?.endsWith("新建日程"));
     fireEvent.dragStart(card!);
     fireEvent(slot!, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 0 }));
     expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, { date: "2026-07-27", endDate: "2026-07-30", startHour: 0, endHour: 1 });
@@ -320,7 +316,7 @@ describe("WeeklyTimeGrid interactions", () => {
   it("keeps a simple blank-cell press available for creating an event", () => {
     const { container } = renderGrid();
     const emptySlot = Array.from(container.querySelectorAll("button")).find(
-      (button) => !button.textContent?.trim() && !button.getAttribute("aria-label"),
+      (button) => button.getAttribute("aria-label")?.endsWith("新建日程"),
     );
     const timeline = emptySlot?.closest<HTMLDivElement>(".relative.grid");
     expect(emptySlot).toBeTruthy();
@@ -347,7 +343,7 @@ describe("WeeklyTimeGrid interactions", () => {
   it("clears a pending marquee when the pointer leaves before dragging", () => {
     const { container } = renderGrid();
     const emptySlot = Array.from(container.querySelectorAll("button")).find(
-      (button) => !button.textContent?.trim() && !button.getAttribute("aria-label"),
+      (button) => button.getAttribute("aria-label")?.endsWith("新建日程"),
     );
     const timeline = emptySlot?.closest<HTMLDivElement>(".relative.grid");
     expect(emptySlot).toBeTruthy();
@@ -398,9 +394,8 @@ describe("WeeklyTimeGrid interactions", () => {
 
     const shortTitle = screen.getByText("短行程标题");
     const longTitle = screen.getByText("长行程标题");
-    expect(shortTitle.className).toContain("text-[10px]");
-    expect(longTitle.className).toContain("text-[10px]");
-    expect(longTitle.className).not.toContain("text-xs");
+    expect(shortTitle.className).toContain("text-xs");
+    expect(longTitle.className).toContain("text-xs");
   });
 
   it("commits an end-time resize after dragging the bottom edge", () => {
@@ -439,7 +434,7 @@ describe("WeeklyTimeGrid interactions", () => {
 
     const card = screen.getAllByText("循环锻炼")[0].closest<HTMLElement>("[data-schedule-card]");
     const targetSlot = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
-      (button) => !button.textContent?.trim() && !button.getAttribute("aria-label"),
+      (button) => button.getAttribute("aria-label")?.endsWith("新建日程"),
     );
     expect(card).toBeTruthy();
     expect(targetSlot).toBeTruthy();
@@ -746,7 +741,7 @@ describe("WeeklyTimeGrid interactions", () => {
   it("shows the recurrence switch directly and offers compact minute shortcuts", () => {
     const { container } = renderGrid();
     const emptySlot = Array.from(container.querySelectorAll("button")).find(
-      (button) => !button.textContent?.trim() && !button.getAttribute("aria-label"),
+      (button) => button.getAttribute("aria-label")?.endsWith("新建日程"),
     );
     expect(emptySlot).toBeTruthy();
     fireEvent.click(emptySlot!);
@@ -792,7 +787,7 @@ describe("WeeklyTimeGrid interactions", () => {
     );
     const { container } = renderGrid();
     const emptySlot = Array.from(container.querySelectorAll("button")).find(
-      (button) => !button.textContent?.trim() && !button.getAttribute("aria-label"),
+      (button) => button.getAttribute("aria-label")?.endsWith("新建日程"),
     );
     fireEvent.click(emptySlot!);
 
@@ -825,7 +820,7 @@ describe("WeeklyTimeGrid interactions", () => {
     expect((within(templateDialog).getByLabelText("标题") as HTMLInputElement).maxLength).toBe(80);
     expect((within(templateDialog).getByLabelText("所需物品\/准备事项") as HTMLTextAreaElement).value).toBe("");
 
-    fireEvent.click(within(templateDialog).getByRole("button", { name: "Close" }));
+    fireEvent.click(within(templateDialog).getByRole("button", { name: "关闭" }));
     const restoredCreateDialog = screen.getByRole("dialog");
     expect((within(restoredCreateDialog).getByLabelText("标题") as HTMLInputElement).value).toBe("文献阅读");
   });

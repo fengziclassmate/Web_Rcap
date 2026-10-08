@@ -198,6 +198,7 @@ describe("ResearchProgressPanel", () => {
 
     await waitFor(() => {
       expect(onCreatePost).toHaveBeenCalledWith({
+        requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         content:
           "今日完成：\n完成第一轮实验并整理图表。\n\n关键进展 / 卡点：\n基线波动仍需排查。\n\n明日计划：\n固定随机种子后复跑。",
         category: "research",

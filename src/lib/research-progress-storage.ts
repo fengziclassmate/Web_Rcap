@@ -1,6 +1,6 @@
 import { isValid, parseISO } from "date-fns";
 
-export type ResearchDraft = { completed: string; insight: string; nextPlan: string };
+export type ResearchDraft = { requestId?: string; completed: string; insight: string; nextPlan: string };
 export type ResearchLocalState = {
   drafts: Record<string, ResearchDraft>;
   restDays: string[];
@@ -13,7 +13,7 @@ export const isResearchDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(valu
 export const researchStorageKey = (userId: string) => `research-progress:v1:${userId}`;
 
 function sameDraft(left?: ResearchDraft, right?: ResearchDraft) {
-  return left?.completed === right?.completed && left?.insight === right?.insight && left?.nextPlan === right?.nextPlan;
+  return left?.requestId === right?.requestId && left?.completed === right?.completed && left?.insight === right?.insight && left?.nextPlan === right?.nextPlan;
 }
 
 // Patch only this action's changes into the latest browser snapshot.
@@ -26,6 +26,7 @@ export function mergeResearchLocalState(previous: ResearchLocalState, next: Rese
       for (const field of ["completed", "insight", "nextPlan"] as const) {
         if ((previous.drafts[day]?.[field] ?? "") !== next.drafts[day][field]) draft[field] = next.drafts[day][field];
       }
+      if (next.drafts[day].requestId) draft.requestId = next.drafts[day].requestId;
       drafts[day] = draft;
     }
     // A completed request must not delete text edited in another tab meanwhile.
@@ -47,7 +48,7 @@ export function parseResearchLocalState(raw: string | null, today: string): Rese
       if (!isResearchDate(date) || !draft || typeof draft !== "object") continue;
       const fields = draft as Record<string, unknown>;
       if (["completed", "insight", "nextPlan"].every((key) => typeof fields[key] === "string")) {
-        state.drafts[date] = { completed: fields.completed as string, insight: fields.insight as string, nextPlan: fields.nextPlan as string };
+        state.drafts[date] = { ...(typeof fields.requestId === "string" ? { requestId: fields.requestId } : {}), completed: fields.completed as string, insight: fields.insight as string, nextPlan: fields.nextPlan as string };
       }
     }
   }

@@ -1,6 +1,8 @@
+import { getAuthenticatedSupabase } from "@/lib/server/supabase-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { callLLM, streamLLM } from "@/lib/llm/client";
-import type { LLMMessage, LLMUserConfig } from "@/lib/llm/types";
+import { readLLMConfig } from "@/lib/server/llm-config";
+import type { LLMMessage } from "@/lib/llm/types";
 
 export const runtime = "nodejs";
 
@@ -11,29 +13,19 @@ type ChatRequest = {
   stream?: boolean;
 };
 
-function readConfig(request: NextRequest): LLMUserConfig | null {
-  const cookieConfig = request.cookies.get("llm_config")?.value;
-  if (!cookieConfig) return null;
-  try {
-    const config = JSON.parse(cookieConfig) as LLMUserConfig;
-    if (!config.apiKey || !config.provider || !config.model) return null;
-    return config;
-  } catch {
-    return null;
-  }
-}
-
 export async function POST(request: NextRequest) {
+  const auth = await getAuthenticatedSupabase(request);
+  if (auth.error) return auth.error;
   try {
-    const config = readConfig(request);
+    const config = readLLMConfig(request.cookies.get("llm_config")?.value, auth.user.id);
     if (!config) {
       return NextResponse.json({ error: "未配置 LLM API Key，请先打开 AI 助手设置" }, { status: 400 });
     }
 
     const body = (await request.json()) as ChatRequest;
     const messages = Array.isArray(body.messages) ? body.messages : [];
-    if (messages.length === 0) {
-      return NextResponse.json({ error: "消息列表不能为空" }, { status: 400 });
+    if (messages.length === 0 || messages.length > 200 || messages.some((item) => !item || !["user", "assistant", "system"].includes(item.role) || typeof item.content !== "string" || item.content.length > 100_000)) {
+      return NextResponse.json({ error: "消息为空、格式错误或超出长度限制" }, { status: 400 });
     }
 
     if (body.stream) {

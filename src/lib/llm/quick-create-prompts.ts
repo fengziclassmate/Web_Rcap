@@ -1,4 +1,4 @@
-import { addDays, format } from "date-fns";
+import { addDays, format, isValid, parseISO } from "date-fns";
 import {
   DEFAULT_SCHEDULE_CATEGORY,
   SCHEDULE_CATEGORY_PROMPT_LIST,
@@ -66,25 +66,29 @@ function cleanLLMJson(raw: string) {
 
 export function parseQuickCreateResponse(raw: string): QuickCreateResult {
   const parsed = JSON.parse(cleanLLMJson(raw)) as Partial<QuickCreateResult> & { error?: string };
+  if (!parsed || typeof parsed !== "object" || typeof parsed.title !== "string" || !parsed.title.trim()) throw new Error("AI 返回的标题无效，请重新描述");
+  const validDate = (value: unknown): value is string => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && isValid(parseISO(value));
   if (parsed.error) throw new Error(parsed.error);
 
   if (parsed.type === "event") {
     if (
       !parsed.title ||
-      !parsed.date ||
+      !validDate(parsed.date) ||
       typeof parsed.startHour !== "number" ||
-      typeof parsed.endHour !== "number"
+      typeof parsed.endHour !== "number" ||
+      !Number.isFinite(parsed.startHour) || !Number.isFinite(parsed.endHour) ||
+      parsed.startHour < 0 || parsed.startHour >= 24 || parsed.endHour < 0 || parsed.endHour > 24 || parsed.startHour === parsed.endHour
     ) {
       throw new Error("LLM 返回的日程结构不完整");
     }
     return {
       type: "event",
-      title: parsed.title,
+      title: parsed.title.trim(),
       date: parsed.date,
       startHour: parsed.startHour,
       endHour: parsed.endHour,
       category: normalizeScheduleCategory(parsed.category || DEFAULT_SCHEDULE_CATEGORY),
-      notes: parsed.notes || "",
+      notes: typeof parsed.notes === "string" ? parsed.notes : "",
     };
   }
 
@@ -92,16 +96,16 @@ export function parseQuickCreateResponse(raw: string): QuickCreateResult {
     if (!parsed.title) throw new Error("LLM 返回的年度计划结构不完整");
     return {
       type: "annual",
-      title: parsed.title,
-      notes: parsed.notes || "",
+      title: parsed.title.trim(),
+      notes: typeof parsed.notes === "string" ? parsed.notes : "",
     };
   }
 
-  if (!parsed.title) throw new Error("LLM 返回的任务结构不完整");
+  if (parsed.type !== "task" || !validDate(parsed.dueDate)) throw new Error("AI 返回的任务日期无效，请重新描述");
   return {
     type: "task",
-    title: parsed.title,
+    title: parsed.title.trim(),
     dueDate: "dueDate" in parsed && typeof parsed.dueDate === "string" ? parsed.dueDate : format(new Date(), "yyyy-MM-dd"),
-    notes: parsed.notes || "",
+    notes: typeof parsed.notes === "string" ? parsed.notes : "",
   };
 }

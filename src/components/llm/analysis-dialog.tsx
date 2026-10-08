@@ -22,7 +22,7 @@ export function EfficiencyAnalysisDialog({ events, tasks, achievements, logs }: 
   const [open, setOpen] = useState(false);
   const [days, setDays] = useState(30);
   const [report, setReport] = useState("");
-  const { loading, sendMessage } = useLLMChat();
+  const { loading, error, sendMessage } = useLLMChat();
   const stats = useMemo(
     () => buildEfficiencyStats(days, events, tasks, achievements, logs),
     [achievements, days, events, logs, tasks],
@@ -44,6 +44,7 @@ export function EfficiencyAnalysisDialog({ events, tasks, achievements, logs }: 
           <DialogHeader>
             <DialogTitle>情绪 / 效率模式分析</DialogTitle>
           </DialogHeader>
+          {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               {[7, 14, 30].map((item) => (

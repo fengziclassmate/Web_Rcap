@@ -5,6 +5,10 @@ import { defaultDashboardUiPreferences } from "@/lib/normalizers";
 import type { DashboardUiPreferences, ProjectCheckin } from "@/lib/types";
 import { TaskDashboard } from "../task-dashboard";
 
+vi.mock("@/lib/supabase", () => ({
+  supabase: { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }) } },
+}));
+
 function ControlledProjectDashboard({ today }: { today: string }) {
   const [projects, setProjects] = useState<ProjectCheckin[]>([
     {

@@ -12,7 +12,7 @@ export function useUndoHistory<T extends Record<string, unknown>>(value: T, rest
     const state = history.current;
     if (!scope || scope !== state.scope) {
       history.current = { scope, current: value, past: [], future: [] };
-    } else if (Object.keys(value).some((key) => value[key] !== state.current[key])) {
+    } else if (JSON.stringify(value) !== JSON.stringify(state.current)) {
       state.past = [...state.past.slice(-29), state.current];
       state.current = value;
       state.future = [];

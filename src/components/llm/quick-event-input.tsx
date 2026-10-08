@@ -42,13 +42,14 @@ function formatHour(value: number) {
 export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: QuickEventInputProps) {
   const [input, setInput] = useState("");
   const [parsed, setParsed] = useState<QuickCreateResult | null>(null);
-  const { loading, sendMessage } = useLLMChat();
+  const { loading, error, sendMessage } = useLLMChat();
 
   async function handleAnalyze() {
     const text = input.trim();
     if (!text) return;
 
     const result = await sendMessage(buildQuickCreatePrompt(text), { temperature: 0.1, maxTokens: 900 });
+    if (!result) return;
     try {
       setParsed(parseQuickCreateResponse(result));
     } catch (error) {
@@ -116,6 +117,7 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
         </Button>
       </div>
 
+      {error && <p role="alert" className="mt-1 text-xs text-red-700">{error}</p>}
       <Dialog open={Boolean(parsed)} onOpenChange={(open) => !open && setParsed(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

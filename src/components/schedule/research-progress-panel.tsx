@@ -143,10 +143,14 @@ function ResearchProgressContent({
 
   async function handleSubmit() {
     if (!canSubmit || disabled) return;
-    const submittedBaseline = persisted.current;
+    let submittedBaseline = persisted.current;
     setSubmitting(true);
     try {
+      const requestId = drafts[draftDate]?.requestId ?? crypto.randomUUID();
+      updateDraft({ requestId });
+      submittedBaseline = persisted.current;
       const saved = await onCreatePost({
+        requestId,
         content: buildResearchLogContent(completed, insight, nextPlan),
         category: "research",
         mood: "",

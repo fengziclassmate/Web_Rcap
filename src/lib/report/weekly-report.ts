@@ -1,4 +1,5 @@
-import { addDays, format, isWithinInterval, parseISO } from "date-fns";
+import { addDays, format, isWithinInterval, parseISO, startOfDay } from "date-fns";
+import { reportEventsInRange, reportTime } from "./range-events";
 import type { Achievement } from "@/lib/achievements";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
 import { normalizeScheduleCategory } from "@/lib/categories";
@@ -28,7 +29,7 @@ export function buildWeeklyReportData(
   tasks: LongTask[],
   achievements: Achievement[],
 ): WeeklyReportData {
-  const start = currentWeekStart;
+  const start = startOfDay(currentWeekStart);
   const end = addDays(start, 6);
   const rangeText = `${format(start, "yyyy-MM-dd")} 至 ${format(end, "yyyy-MM-dd")}`;
   const inWeek = (date: string) => {
@@ -39,7 +40,7 @@ export function buildWeeklyReportData(
     }
   };
 
-  const weekEvents = events.filter((event) => inWeek(event.date));
+  const weekEvents = reportEventsInRange(events, format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd"));
   const categoryMap = new Map<string, number>();
   for (const event of weekEvents) {
     const hours = Math.max(0, event.endHour - event.startHour);
@@ -51,8 +52,8 @@ export function buildWeeklyReportData(
     rangeText,
     events: weekEvents,
     completedEvents: weekEvents.filter((event) => event.isCompleted),
-    pendingTasks: tasks.filter((task) => !task.done),
-    completedTasks: tasks.filter((task) => task.done && inWeek(task.dueDate)),
+    pendingTasks: tasks.filter((task) => !task.done && !task.abandonedAt),
+    completedTasks: tasks.filter((task) => task.done && inWeek(task.completedAt ? format(parseISO(task.completedAt), "yyyy-MM-dd") : task.dueDate)),
     achievements: achievements.filter((item) => inWeek(item.date)),
     categoryHours: [...categoryMap.entries()]
       .map(([category, hours]) => ({ category, hours: Math.round(hours * 10) / 10 }))
@@ -79,7 +80,7 @@ export function buildWeeklyReportPrompt(data: WeeklyReportData) {
 周范围：${data.rangeText}
 
 本周行程：
-${data.events.map((event, index) => `${index + 1}. ${event.date} ${event.startHour}:00-${event.endHour}:00 ${event.title} [${normalizeScheduleCategory(event.category)}] ${event.isCompleted ? "已完成" : "未完成"}`).join("\n") || "无"}
+${data.events.map((event, index) => `${index + 1}. ${event.date} ${reportTime(event.startHour)}-${reportTime(event.endHour)} ${event.title} [${normalizeScheduleCategory(event.category)}] ${event.isCompleted ? "已完成" : "未完成"}`).join("\n") || "无"}
 
 已完成行程：
 ${data.completedEvents.map((event, index) => `${index + 1}. ${event.title}`).join("\n") || "无"}

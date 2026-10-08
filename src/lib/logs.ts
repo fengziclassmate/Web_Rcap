@@ -97,6 +97,7 @@ export type LogFilters = {
 };
 
 export type LogComposerInput = {
+  requestId: string;
   content: string;
   category: LogCategory;
   mood: LogMood | "";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import {
   ArrowUpRight,
@@ -64,6 +64,7 @@ export function DailyReflectionPanel({
   onOpenLogs,
 }: DailyReflectionPanelProps) {
   const fallbackDate = days.find((day) => day.isToday)?.date ?? days[0]?.date ?? "";
+  const requestId = useRef<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(fallbackDate);
   const [mood, setMood] = useState<LogMood | "">("");
   const [content, setContent] = useState("");
@@ -105,6 +106,7 @@ export function DailyReflectionPanel({
 
   useEffect(() => {
     if (!days.some((day) => day.date === selectedDate)) {
+      requestId.current = null;
       setSelectedDate(fallbackDate);
       setImages([]);
       setCustomExpression(false);
@@ -133,6 +135,7 @@ export function DailyReflectionPanel({
   const panelTitle = days.length > 1 ? "本周日志" : "当日日志";
 
   function selectDay(date: string) {
+    requestId.current = null;
     setImages([]);
     setCustomExpression(false);
     setSelectedDate(date);
@@ -145,7 +148,9 @@ export function DailyReflectionPanel({
     const normalizedContent = content.trim() || (mood ? `当日心情：${moodLabel(mood as LogMood)}` : customExpression ? "今日表情" : "图片日志");
     setSubmitting(true);
     try {
+      requestId.current ??= crypto.randomUUID();
       const saved = await onCreatePost({
+        requestId: requestId.current,
         content: normalizedContent,
         category: "life",
         mood,
@@ -156,6 +161,7 @@ export function DailyReflectionPanel({
         links: [],
       });
       if (!saved) return;
+      requestId.current = null;
       setImages([]);
       setCustomExpression(false);
       setMoodOpen(false);

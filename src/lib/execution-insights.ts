@@ -65,7 +65,7 @@ export function dailyCapacity(events: ScheduleEvent[], tasks: LongTask[], now: D
   const end = endHour * 60;
   const remainingEvents = eventsInDays(events, date, date).filter((event) => event.endHour * 60 > start && event.startHour * 60 < end);
   const midnight = parseISO(date).getTime();
-  const occupied = occupiedMinutes(eventTimingsInRange(events, date, date).map((item) => [Math.max(start, (item.prepareAt.getTime() - midnight) / 60000), Math.min(end, (item.freeAt.getTime() - midnight) / 60000)]));
+  const occupied = occupiedMinutes(eventTimingsInRange(events, date, date).map((item) => [Math.max(start, (item.start.getTime() - midnight) / 60000), Math.min(end, (item.end.getTime() - midnight) / 60000)]));
   const free = Math.max(0, end - start - occupied);
   const scheduledIntervals = new Map<string, Array<[number, number]>>();
   for (const event of remainingEvents) {

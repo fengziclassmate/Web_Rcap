@@ -7,7 +7,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans), "Microsoft YaHei UI", "PingFang SC", sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -131,13 +131,7 @@
   }
   html {
     @apply font-sans;
-    font-family:
-      "Aptos",
-      "LXGW WenKai",
-      "Source Han Sans SC",
-      "Noto Sans CJK SC",
-      "Microsoft YaHei UI",
-      sans-serif;
+    font-family: var(--font-geist-sans), "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
     scrollbar-gutter: stable;
   }
 }
@@ -1040,6 +1034,112 @@
   border-radius: 0.85rem;
   background: var(--card);
 }
+
+/* A small movable companion, kept above the workbench and below dialogs. */
+.floating-schedule-card {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(312px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--primary) 18%, var(--border));
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: 0 16px 44px -16px rgb(22 55 45 / 25%), 0 2px 8px rgb(22 55 45 / 7%);
+}
+.floating-schedule-card.is-dragging { box-shadow: 0 22px 54px -16px rgb(22 55 45 / 32%); }
+.floating-schedule-card button:not(.floating-drag-handle),
+.floating-restore { touch-action: manipulation; }
+.floating-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: color-mix(in oklch, var(--primary) 6%, var(--card));
+  border-bottom: 1px solid var(--border);
+}
+.floating-drag-handle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 32px;
+  border-radius: 6px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.is-dragging .floating-drag-handle { cursor: grabbing; }
+.floating-icon-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 32px;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+}
+.floating-icon-button:hover { background: var(--muted); color: var(--primary); }
+.floating-schedule-card button:focus-visible,
+.floating-restore:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.floating-view-switch {
+  display: flex;
+  flex-shrink: 0;
+  gap: 3px;
+  padding: 10px 12px 0;
+}
+.floating-view-switch button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 34px;
+  border-radius: 7px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+.floating-view-switch button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+.floating-view-switch button[aria-pressed="false"]:hover { background: var(--muted); }
+.floating-card-body { min-height: 0; padding: 16px; overflow-y: auto; overscroll-behavior: contain; }
+.floating-phase { border-radius: 5px; background: var(--muted); padding: 3px 7px; color: var(--primary); font-size: 11px; font-weight: 500; }
+.floating-countdown { display: flex; align-items: baseline; gap: 8px; margin-top: 14px; color: var(--primary); }
+.floating-countdown strong { font-size: 24px; font-weight: 600; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.floating-countdown span { font-size: 11px; color: var(--muted-foreground); }
+.floating-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 22px 0; color: var(--muted-foreground); }
+.floating-empty p { font-size: 13px; color: var(--primary); }
+.floating-empty span { font-size: 11px; }
+.floating-section-caption { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 12px; color: var(--muted-foreground); font-size: 11px; }
+.floating-agenda li + li { margin-top: 4px; }
+.floating-agenda button { display: flex; align-items: center; gap: 12px; width: 100%; border-radius: 9px; padding: 10px 6px; text-align: left; font-size: 13px; }
+.floating-agenda button:hover { background: var(--muted); }
+.floating-agenda button.is-current { background: color-mix(in oklch, var(--primary) 7%, var(--card)); }
+.floating-agenda .is-finished { opacity: 0.6; }
+.floating-agenda-time { flex-shrink: 0; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.floating-agenda-time small { display: block; margin-top: 4px; font-size: 10px; font-weight: 400; color: var(--muted-foreground); }
+.floating-capacity { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; border-radius: 9px; background: var(--muted); padding: 12px; }
+.floating-capacity span { color: var(--muted-foreground); font-size: 11px; }
+.floating-capacity strong { color: var(--primary); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.floating-tasks li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.floating-tasks li:last-child { border-bottom: 0; }
+.floating-tasks input { flex-shrink: 0; width: 16px; height: 16px; margin-top: 3px; accent-color: var(--primary); cursor: pointer; }
+.floating-tasks button { flex: 1; min-width: 0; border-radius: 4px; text-align: left; }
+.floating-tasks button:hover { color: var(--primary); }
+.floating-collapsed-summary { padding: 10px 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 12px; color: var(--muted-foreground); }
+.floating-restore { position: fixed; right: 24px; bottom: 90px; z-index: 40; display: flex; align-items: center; gap: 8px; min-height: 38px; border: 1px solid var(--border); border-radius: 20px; background: var(--card); padding: 0 14px; box-shadow: 0 4px 16px rgb(22 55 45 / 12%); color: var(--primary); font-size: 12px; }
+@media (max-width: 640px) {
+  .floating-icon-button { width: 34px; height: 36px; }
+  .floating-drag-handle { min-height: 36px; }
+  .floating-restore { right: 12px; }
+}
 .dashboard-groups {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1080,4 +1180,45 @@
 .task-dashboard-section { padding: 1rem 1.25rem; }
 @media (prefers-reduced-motion: reduce) {
   .dashboard-groups button { transition: none; }
+}
+
+.calendar-scroll {
+  height: clamp(360px, calc(100dvh - 335px), 760px);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #b7c8bf #f5f7f5;
+  background: #fff;
+}
+.calendar-scroll:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.calendar-scroll [data-timeline-date] { background: #fff; }
+.calendar-scroll [data-timeline-date]:nth-child(even) { background: #fcfdfb; }
+.calendar-panel header { border-color: var(--border); }
+
+@keyframes workbench-enter {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes drawer-enter { from { opacity: .4; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes drawer-exit { to { opacity: 0; transform: translateX(28px); } }
+.workbench-module { animation: workbench-enter 180ms ease-out; }
+.chat-drawer[data-open] { animation: drawer-enter 180ms ease-out; }
+.chat-drawer[data-closed] { animation: drawer-exit 150ms ease-in; }
+.collapsible-motion {
+  height: var(--collapsible-panel-height);
+  transition: height 180ms ease-out, opacity 180ms ease-out;
+}
+.collapsible-motion[data-starting-style],
+.collapsible-motion[data-ending-style] { height: 0; opacity: 0; overflow: hidden; }
+[data-slot="button"] { transition-duration: 150ms; }
+[data-slot="button"]:not(:disabled):hover { filter: brightness(.98); }
+[data-slot="dialog-content"] { box-shadow: 0 20px 65px #1c191326; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -1,9 +1,12 @@
 "use client";
 
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Bot, History, MessageSquarePlus, Pencil, Send, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,14 +84,6 @@ export function LLMChatSidebar() {
   );
 
   useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
@@ -154,7 +149,7 @@ export function LLMChatSidebar() {
         ...[...messages, userMessage].map(({ role, content }) => ({ role, content })),
       ];
 
-      const res = await fetch("/api/llm/chat", {
+      const res = await authenticatedFetch("/api/llm/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -224,15 +219,11 @@ export function LLMChatSidebar() {
         <Bot className="h-5 w-5" />
       </button>
 
-      <div
-        className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-full max-w-[460px] translate-x-full flex-col border-l border-gray-200 bg-white shadow-2xl transition-transform",
-          open && "translate-x-0",
-        )}
-      >
+      <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent showCloseButton={false} className="chat-drawer inset-y-0 right-0 left-auto top-0 flex h-dvh max-h-dvh w-[460px] max-w-[460px] translate-x-0 translate-y-0 flex-col gap-0 rounded-none p-0 sm:max-w-[460px]">
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <div>
-            <h2 className="text-sm font-semibold">科研对话助手</h2>
+            <DialogTitle className="text-sm font-semibold">科研对话助手</DialogTitle>
           </div>
           <div className="flex gap-1">
             <Button type="button" size="icon-sm" variant="ghost" onClick={startNewSession} title="新对话">
@@ -247,7 +238,7 @@ export function LLMChatSidebar() {
             >
               <History className="h-4 w-4" />
             </Button>
-            <Button type="button" size="icon-sm" variant="ghost" onClick={() => setOpen(false)}>
+            <Button type="button" size="icon-sm" variant="ghost" aria-label="关闭 AI 对话" onClick={() => setOpen(false)}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -368,7 +359,7 @@ export function LLMChatSidebar() {
                   )}
                 </div>
               ))}
-              {error ? <p className="text-xs text-red-600">{error}</p> : null}
+              {error ? <p role="alert" className="rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p> : null}
             </div>
 
             <div className="border-t border-gray-200 p-3">
@@ -378,7 +369,7 @@ export function LLMChatSidebar() {
                 placeholder="输入问题，Enter 发送，Shift+Enter 换行"
                 className="min-h-20"
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                     event.preventDefault();
                     void handleSend();
                   }
@@ -393,7 +384,8 @@ export function LLMChatSidebar() {
             </div>
           </>
         )}
-      </div>
+      </DialogContent>
+      </Dialog>
     </>
   );
 }

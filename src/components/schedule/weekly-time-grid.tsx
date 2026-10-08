@@ -1,7 +1,8 @@
 "use client";
 
+import { useAccountId } from "@/components/account-scope";
+
 import React, { useEffectEvent, useEffect, useMemo, useRef, useState } from "react";
-import { eventTiming, eventBufferName, normalizeBufferName, normalizeBufferMinutes } from "@/lib/event-timing";
 import { createPortal } from "react-dom";
 import { addDays, format, parse } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -123,10 +124,6 @@ type GridCell = {
 };
 
 type EventFormState = {
-  bufferBeforeName: string;
-  bufferAfterName: string;
-  bufferBeforeMinutes: number;
-  bufferAfterMinutes: number;
   title: string;
   startHour: number;
   endHour: number;
@@ -192,6 +189,7 @@ type WeeklyTimeGridProps = {
   onDeleteEvent: (eventId: string, options?: { mode?: "single" | "future" | "all" }) => void;
   onPrevWeek: () => void;
   onNextWeek: () => void;
+  onToday?: () => void;
   onViewModeChange?: (mode: ViewMode) => void;
   onTimeGranularityChange?: (granularity: TimeGranularity) => void;
   onCreateLogPost?: (input: LogComposerInput) => Promise<boolean>;
@@ -290,37 +288,7 @@ function isWholeHour(value: number) {
   return Math.abs(value - Math.round(value)) < 0.0001;
 }
 
-function EventBufferEditor({ value, onChange }: { value: EventFormState; onChange: (patch: Partial<EventFormState>) => void }) {
-  const [open, setOpen] = useState(() => {
-    try { return localStorage.getItem("schedule-event-buffer-open") !== "closed"; } catch { return true; }
-  });
-  function handleOpenChange(nextOpen: boolean) {
-    setOpen(nextOpen);
-    try { localStorage.setItem("schedule-event-buffer-open", nextOpen ? "open" : "closed"); } catch {}
-  }
-  return <Collapsible open={open} onOpenChange={handleOpenChange} className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
-    <CollapsibleTrigger aria-label={open ? "折叠缓冲设置" : "展开缓冲设置"} className="flex w-full items-center justify-between gap-2 rounded text-xs font-medium text-stone-600 focus-visible:outline-2 focus-visible:outline-primary">
-      <span>缓冲</span><ChevronDown className={`size-3.5 transition-transform ${open ? "" : "-rotate-90"}`} />
-    </CollapsibleTrigger>
-    <CollapsibleContent>
-      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1fr)_3.5rem] items-center gap-1.5" data-testid="event-buffer-fields">
-        {([['bufferBeforeMinutes', 'bufferBeforeName', '事件前缓冲名称', '提前准备'], ['bufferAfterMinutes', 'bufferAfterName', '事件后缓冲名称', '结束后缓冲']] as const).map(([minutesField, nameField, nameLabel, durationLabel]) => <React.Fragment key={minutesField}>
-          <Input aria-label={nameLabel} title={value[nameField] || nameLabel} maxLength={80} placeholder="名称" value={value[nameField]} onChange={(event) => onChange({ [nameField]: event.target.value })} className="h-8 bg-white px-2 text-xs md:text-xs" />
-          <div className="relative min-w-0">
-            <Input type="number" min={0} max={180} step={5} aria-label={durationLabel} title={`${durationLabel}（分钟）`} value={value[minutesField]} onChange={(event) => onChange({ [minutesField]: normalizeBufferMinutes(Number(event.target.value)) })} className="h-8 bg-white py-1 pr-5 pl-1.5 text-xs tabular-nums md:text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
-            <span aria-hidden className="pointer-events-none absolute inset-y-0 right-1.5 flex items-center text-[10px] text-stone-500">分</span>
-          </div>
-        </React.Fragment>)}
-      </div>
-    </CollapsibleContent>
-  </Collapsible>;
-}
-
 const defaultForm: EventFormState = {
-  bufferBeforeName: "",
-  bufferAfterName: "",
-  bufferBeforeMinutes: 0,
-  bufferAfterMinutes: 0,
   title: "",
   startHour: 8,
   endHour: 9,
@@ -378,11 +346,6 @@ function getEndHourFromStartAndDuration(startHour: number, durationHour: number)
   if (absoluteEndHour < hoursPerDay) return absoluteEndHour;
   if (absoluteEndHour === hoursPerDay) return hoursPerDay;
   return absoluteEndHour - hoursPerDay;
-}
-
-function dayTitle(date: Date) {
-  const weekday = format(date, "EEEE", { locale: zhCN }).replace("星期", "周");
-  return `${weekday} ${format(date, "yyyy/MM/dd")}`;
 }
 
 function getCategoryColor(categories: Category[], categoryName: string) {
@@ -553,6 +516,7 @@ export function WeeklyTimeGrid({
   onDeleteEvent,
   onPrevWeek,
   onNextWeek,
+  onToday,
   onViewModeChange,
   onTimeGranularityChange,
   onCreateLogPost,
@@ -563,6 +527,7 @@ export function WeeklyTimeGrid({
   viewMode = "week",
   timeGranularity = 60,
 }: WeeklyTimeGridProps) {
+  const userId = useAccountId();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [selectedCell, setSelectedCell] = useState<GridCell | null>(null);
@@ -579,6 +544,7 @@ export function WeeklyTimeGrid({
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
   const resizePreviewRef = useRef<ResizePreview | null>(null);
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const timelineBodyRef = useRef<HTMLDivElement | null>(null);
   const selectionDragRef = useRef<SelectionDrag | null>(null);
   const suppressSlotClickRef = useRef(false);
@@ -592,7 +558,7 @@ export function WeeklyTimeGrid({
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [returnToCreateAfterTemplate, setReturnToCreateAfterTemplate] = useState(false);
   const [scheduleTemplates, setScheduleTemplates] = useState<ScheduleTemplate[]>(() =>
-    loadScheduleTemplates(),
+    loadScheduleTemplates(userId),
   );
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [templateForm, setTemplateForm] = useState({
@@ -605,7 +571,7 @@ export function WeeklyTimeGrid({
   const [templateWeekdays, setTemplateWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [templateStartHour, setTemplateStartHour] = useState(9);
   const [templateEndHour, setTemplateEndHour] = useState(18);
-  const [localCategoryDefs, setLocalCategoryDefs] = useState<ScheduleCategoryDef[]>(() => loadCategoryDefs());
+  const [localCategoryDefs, setLocalCategoryDefs] = useState<ScheduleCategoryDef[]>(() => loadCategoryDefs(userId));
   const categoryDefs = savedCategoryDefs ?? localCategoryDefs;
   function setCategoryDefs(update: (previous: ScheduleCategoryDef[]) => ScheduleCategoryDef[]) {
     const next = update(categoryDefs);
@@ -675,12 +641,12 @@ export function WeeklyTimeGrid({
   const timeGridSlots = useMemo(() => getTimeGridSlots(timeGranularity), [timeGranularity]);
 
   useEffect(() => {
-    saveCategoryDefs(categoryDefs);
-  }, [categoryDefs]);
+    saveCategoryDefs(categoryDefs, userId);
+  }, [categoryDefs, userId]);
 
   useEffect(() => {
-    saveScheduleTemplates(scheduleTemplates);
-  }, [scheduleTemplates]);
+    saveScheduleTemplates(scheduleTemplates, userId);
+  }, [scheduleTemplates, userId]);
 
   const displayDates = useMemo(() => {
     if (viewMode === "day") return [currentWeekStart];
@@ -868,6 +834,13 @@ export function WeeklyTimeGrid({
       };
     });
   }, [displayDates, displayDateKeys, displayEventSegments, expandedEvents, resizePreview, viewMode]);
+
+  const visibleRangeStart = format(currentWeekStart, "yyyy-MM-dd");
+  useEffect(() => {
+    if (viewMode !== "month" && timelineScrollRef.current) {
+      timelineScrollRef.current.scrollTop = 8 * hourCellHeight;
+    }
+  }, [visibleRangeStart, viewMode]);
 
   const timelineGridTemplateColumns = useMemo(
     () => `${viewMode === "day" ? 72 : 56}px repeat(${timelineDayLayouts.length}, minmax(0, 1fr))`,
@@ -1184,10 +1157,6 @@ export function WeeklyTimeGrid({
     setEditRecurrenceOpen(false);
     setEditScope("occurrence");
     setEditForm({
-      bufferBeforeName: normalizeBufferName(event.bufferBeforeName),
-      bufferAfterName: normalizeBufferName(event.bufferAfterName),
-      bufferBeforeMinutes: normalizeBufferMinutes(event.bufferBeforeMinutes),
-      bufferAfterMinutes: normalizeBufferMinutes(event.bufferAfterMinutes),
       title: event.title,
       startHour: event.startHour,
       endHour: event.endHour,
@@ -1235,10 +1204,6 @@ export function WeeklyTimeGrid({
       title: createForm.title.trim(),
       notes: createForm.notes.trim(),
       requirements: buildRequirementLines(createForm.requirements),
-      bufferBeforeMinutes: createForm.bufferBeforeMinutes,
-      bufferAfterMinutes: createForm.bufferAfterMinutes,
-      bufferBeforeName: normalizeBufferName(createForm.bufferBeforeName),
-      bufferAfterName: normalizeBufferName(createForm.bufferAfterName),
       isCompleted: createForm.isCompleted,
       category: createForm.category,
       tag: createForm.tag,
@@ -1281,10 +1246,6 @@ export function WeeklyTimeGrid({
       endHour: editEndDate > editStartDate ? editForm.endHour : endHour,
       notes: editForm.notes.trim(),
       requirements: buildRequirementLines(editForm.requirements),
-      bufferBeforeMinutes: editForm.bufferBeforeMinutes,
-      bufferAfterMinutes: editForm.bufferAfterMinutes,
-      bufferBeforeName: normalizeBufferName(editForm.bufferBeforeName),
-      bufferAfterName: normalizeBufferName(editForm.bufferAfterName),
       ...(selectedEvent && editForm.isCompleted !== selectedEvent.isCompleted
         ? { isCompleted: editForm.isCompleted }
         : {}),
@@ -1770,8 +1731,8 @@ export function WeeklyTimeGrid({
     : null;
 
   return (
-    <section className="rounded-lg border border-gray-200 bg-white shadow-md">
-      <header className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2.5">
+    <section className="calendar-panel overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+      <header className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-4 py-3">
         <div className="shrink-0">
           <h2 className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-gray-900">
             <Clock3 className="h-4 w-4 text-primary" />
@@ -1826,8 +1787,8 @@ export function WeeklyTimeGrid({
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-gray-600">粒度</span>
               <Select value={String(timeGranularity)} onValueChange={handleGranularityChange}>
-                <SelectTrigger className="h-8 w-24 rounded-md border-gray-300 text-xs">
-                  <SelectValue />
+                <SelectTrigger aria-label="时间粒度" className="h-8 w-24 rounded-md border-gray-300 text-xs">
+                  <SelectValue>{typeof timeGranularity === "number" ? `${timeGranularity} 分钟` : timeGranularity.replace("-", " + ")}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="5">5 分钟</SelectItem>
@@ -1841,12 +1802,13 @@ export function WeeklyTimeGrid({
             </div>
           ) : null}
 
-          <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={onPrevWeek}>
+          {onToday && <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={() => { onToday(); if (timelineScrollRef.current) timelineScrollRef.current.scrollTop = 8 * hourCellHeight; }}>今天</Button>}
+          <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" aria-label={viewMode === "day" ? "前一天" : viewMode === "week" ? "前一周" : "前一月"} title="上一时段" onClick={onPrevWeek}>
             <ChevronLeft className="h-3.5 w-3.5" />
-            {viewMode === "day" ? "前一天" : viewMode === "week" ? "前一周" : "前一段"}
+
           </Button>
-          <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={onNextWeek}>
-            {viewMode === "day" ? "后一天" : viewMode === "week" ? "后一周" : "后一段"}
+          <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" aria-label={viewMode === "day" ? "后一天" : viewMode === "week" ? "后一周" : "后一月"} title="下一时段" onClick={onNextWeek}>
+
             <ChevronRight className="h-3.5 w-3.5" />
           </Button>
           {viewMode !== "month" ? (
@@ -1855,18 +1817,19 @@ export function WeeklyTimeGrid({
               模板
             </Button>
           ) : null}
-          <Button type="button" size="sm" className="h-8 px-2.5 text-xs" onClick={() => setShowCategoryManager(true)}>
+          <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={() => setShowCategoryManager(true)}>
             分类管理
           </Button>
+          <Button type="button" size="sm" className="h-8 px-3 text-xs" onClick={() => resetCreateDialog({ date: viewMode === "day" ? visibleRangeStart : (displayDateKeys.has(todayIso) ? todayIso : visibleRangeStart), startHour: 9 })}><Plus className="size-3.5" />新建日程</Button>
         </div>
       </header>
 
       <div className="overflow-hidden">
         <div className="relative min-w-0">
           {viewMode !== "month" ? (
-            <>
+            <div ref={timelineScrollRef} className="calendar-scroll" role="region" aria-label="全天日程时间网格" tabIndex={0}>
               <div
-                className="grid border-b border-gray-200 bg-white"
+                className="sticky top-0 z-[80] grid border-b border-stone-200 bg-white shadow-[0_1px_0_rgba(0,0,0,0.03)]"
                 style={{ gridTemplateColumns: timelineGridTemplateColumns }}
               >
                 <div className="border-r border-gray-200 bg-gray-50 px-1.5 py-2 text-[11px] font-medium text-gray-700">时间</div>
@@ -1876,7 +1839,7 @@ export function WeeklyTimeGrid({
                     aria-current={day.dateIso === todayIso ? "date" : undefined}
                     className={`border-r border-gray-200 px-3 py-2 text-center text-xs font-medium last:border-r-0 ${day.dateIso === todayIso ? "bg-emerald-50 text-emerald-900 shadow-[inset_0_-2px_0_#047857]" : "bg-stone-50 text-stone-600"}`}
                   >
-                    <div className="flex flex-wrap items-center justify-center gap-1"><span>{dayTitle(day.date)}</span>{day.dateIso === todayIso ? <span className="inline-flex shrink-0 whitespace-nowrap rounded bg-emerald-800 px-1 py-0.5 text-[9px] text-white">今天</span> : null}</div>
+                    <div className="flex flex-wrap items-center justify-center gap-1"><span>{format(day.date, "EEE", { locale: zhCN })}<span className="mt-1 block text-[11px] tabular-nums opacity-80">{format(day.date, "MM/dd")}</span></span>{day.dateIso === todayIso ? <span className="inline-flex shrink-0 whitespace-nowrap rounded bg-emerald-800 px-1 py-0.5 text-[9px] text-white">今天</span> : null}</div>
                     {day.laneCount > 1 ? (
                       <div className="mt-0.5 text-[10px] font-medium text-gray-500">
                         {day.laneCount} 个并行
@@ -1888,7 +1851,7 @@ export function WeeklyTimeGrid({
 
               <div
                 ref={timelineBodyRef}
-                className="relative grid"
+                className="relative isolate grid"
                 style={{ gridTemplateColumns: timelineGridTemplateColumns }}
                 onPointerDown={handleSelectionPointerDown}
                 onPointerMove={handleSelectionPointerMove}
@@ -1932,6 +1895,7 @@ export function WeeklyTimeGrid({
                             <button
                               key={`${dayLayout.dateIso}-${slot.startHour}`}
                               type="button"
+                              aria-label={`${dayLayout.dateIso} ${formatHour(slot.startHour)} 新建日程`}
                               className={`border-b transition-colors hover:bg-gray-50 ${endsAtMainHour ? "border-gray-200" : "border-gray-100"}`}
                               style={{
                                 height: `${(slot.durationMinutes / minutesPerHour) * hourCellHeight}px`,
@@ -1958,17 +1922,6 @@ export function WeeklyTimeGrid({
                       </div>
 
                       <div className="pointer-events-none absolute inset-0 p-1">
-                        {expandedEvents.flatMap((event) => {
-                          const timing = eventTiming(event);
-                          const midnight = parse(dayLayout.dateIso, "yyyy-MM-dd", new Date()).getTime();
-                          return ([[timing.prepareAt, timing.start, "before"], [timing.end, timing.freeAt, "after"]] as const).map(([from, to, side]) => {
-                            const label = eventBufferName(event, side);
-                            const start = Math.max(0, (+from - midnight) / 3600000);
-                            const end = Math.min(24, (+to - midnight) / 3600000);
-                            if (end <= start) return null;
-                            return <div key={`${event.id}-${side}`} data-testid="event-buffer" aria-label={`${event.title} ${label} ${formatHour(start)}—${formatHour(end)}`} className="absolute inset-x-1 overflow-hidden rounded border border-dashed border-stone-300 px-1 text-[10px] text-stone-500" style={{ top: start * hourCellHeight, height: (end - start) * hourCellHeight, background: "repeating-linear-gradient(135deg, rgba(120,113,108,.06), rgba(120,113,108,.06) 4px, transparent 4px, transparent 8px)" }}>{label} · {event.title}</div>;
-                          });
-                        })}
                         {dayLayout.events.map((event) => {
                           const sourceEvent = toSourceScheduleEvent(event);
                           const activePreview =
@@ -2078,14 +2031,14 @@ export function WeeklyTimeGrid({
                                   {microCard ? (
                                     <div className="flex h-full min-w-0 items-center gap-1 overflow-hidden leading-none">
                                       <span
-                                        className="shrink-0 whitespace-nowrap font-mono text-[9px] font-semibold tracking-[-0.03em] text-gray-700 [font-variant-numeric:tabular-nums]"
+                                        className="shrink-0 whitespace-nowrap font-mono text-[10px] font-medium tracking-[-0.03em] text-gray-700 [font-variant-numeric:tabular-nums]"
                                         title={fullTimeLabel}
                                       >
                                         {timeLabel}
                                       </span>
                                       <span className="h-2.5 w-px shrink-0 bg-current/20" aria-hidden />
                                       <p
-                                        className="min-w-0 flex-1 truncate text-[10px] font-semibold leading-none"
+                                        className="min-w-0 flex-1 truncate text-xs font-semibold leading-none"
                                         title={`${event.title} (${fullTimeLabel})`}
                                       >
                                         {event.title}
@@ -2124,7 +2077,7 @@ export function WeeklyTimeGrid({
                                         <Repeat className="mt-0.5 h-3 w-3 shrink-0 text-gray-600" aria-hidden />
                                       ) : null}
                                       <p
-                                        className="min-w-0 flex-1 truncate text-[10px] font-semibold leading-snug"
+                                        className="min-w-0 flex-1 truncate text-xs font-semibold leading-snug"
                                         title={`${event.title} (${fullTimeLabel})`}
                                       >
                                         {event.title}
@@ -2143,7 +2096,7 @@ export function WeeklyTimeGrid({
                                     <>
                                       <div className="flex min-w-0 items-center gap-1.5">
                                         <span
-                                          className="shrink-0 whitespace-nowrap font-mono text-[9px] font-semibold tracking-[-0.03em] text-gray-700 [font-variant-numeric:tabular-nums]"
+                                          className="shrink-0 whitespace-nowrap font-mono text-[10px] font-medium tracking-[-0.03em] text-gray-700 [font-variant-numeric:tabular-nums]"
                                           title={fullTimeLabel}
                                         >
                                           {timeLabel}
@@ -2185,7 +2138,7 @@ export function WeeklyTimeGrid({
                                       </div>
 
                                       <p
-                                        className={`min-w-0 flex-1 overflow-hidden break-words text-[10px] font-semibold leading-snug ${
+                                        className={`min-w-0 flex-1 overflow-hidden break-words text-xs font-semibold leading-snug ${
                                           mediumCard || denseCard
                                             ? "[display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
                                             : ""
@@ -2196,7 +2149,7 @@ export function WeeklyTimeGrid({
                                       </p>
 
                                       {showDetails && event.notes ? (
-                                        <p className="min-h-0 overflow-hidden text-[10px] leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
+                                        <p className="min-h-0 overflow-hidden text-[11px] leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
                                           {event.notes}
                                         </p>
                                       ) : null}
@@ -2279,7 +2232,7 @@ export function WeeklyTimeGrid({
                   />
                 ) : null}
               </div>
-            </>
+            </div>
           ) : (
             <div className="p-4">
               <div className="grid grid-cols-7 gap-2">
@@ -2660,7 +2613,6 @@ export function WeeklyTimeGrid({
                     onStartHourChange={(value) => setCreateForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setCreateForm((prev) => ({ ...prev, endHour: value }))}
                   />
-                  <EventBufferEditor value={createForm} onChange={(patch) => setCreateForm((previous) => ({ ...previous, ...patch }))} />
                   <Collapsible
                     open={createDetailsOpen}
                     onOpenChange={setCreateDetailsOpen}
@@ -2799,7 +2751,6 @@ export function WeeklyTimeGrid({
                     onStartHourChange={(value) => setEditForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setEditForm((prev) => ({ ...prev, endHour: value }))}
                   />
-                  <EventBufferEditor value={editForm} onChange={(patch) => setEditForm((previous) => ({ ...previous, ...patch }))} />
                   <Collapsible
                     open={editDetailsOpen}
                     onOpenChange={setEditDetailsOpen}

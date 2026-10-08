@@ -1,5 +1,7 @@
 "use client";
 
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
+
 import { useCallback, useState } from "react";
 import type { LLMMessage } from "@/lib/llm/types";
 
@@ -59,7 +61,7 @@ export function useLLMChat(initialMessages: ChatMessage[] = []) {
 
       let fullText = "";
       try {
-        const res = await fetch("/api/llm/chat", {
+        const res = await authenticatedFetch("/api/llm/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

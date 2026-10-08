@@ -1,5 +1,7 @@
 "use client";
 
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
+
 import { useCallback, useEffect, useState } from "react";
 import { PRESET_MODELS } from "@/lib/llm/types";
 import type { LLMUserConfig } from "@/lib/llm/types";
@@ -24,8 +26,9 @@ export function useLLMConfig() {
   const refresh = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const res = await fetch("/api/llm/config");
+      const res = await authenticatedFetch("/api/llm/config");
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "读取配置失败");
       setState({
         configured: Boolean(data.configured),
         loading: false,
@@ -49,7 +52,7 @@ export function useLLMConfig() {
   const saveConfig = useCallback(async (config: LLMUserConfig) => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const res = await fetch("/api/llm/config", {
+      const res = await authenticatedFetch("/api/llm/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
@@ -80,7 +83,8 @@ export function useLLMConfig() {
   const clearConfig = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      await fetch("/api/llm/config", { method: "DELETE" });
+      const res = await authenticatedFetch("/api/llm/config", { method: "DELETE" });
+      if (!res.ok) throw new Error("清除配置失败，请重试");
       setState({ configured: false, loading: false, error: null, config: null });
     } catch (error) {
       setState((prev) => ({

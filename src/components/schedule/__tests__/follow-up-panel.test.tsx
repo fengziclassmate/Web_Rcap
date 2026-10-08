@@ -40,7 +40,7 @@ describe("follow-up panel", () => {
     expect(screen.getByText("重新推导 attention 公式")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "编辑跟进事项：Transformer 精读" }));
     fireEvent.click(screen.getByRole("button", { name: "删除事项" }));
-    fireEvent.click(screen.getByRole("button", { name: "删除", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "删除" }));
     expect(screen.queryByText("Transformer 精读")).toBeNull();
   });
 

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AccountScope } from "@/components/account-scope";
 import { MonitoringSidebar } from "../sidebar";
 
 describe("MonitoringSidebar", () => {
@@ -25,13 +26,13 @@ describe("MonitoringSidebar", () => {
   });
 
   it("restores and saves the centered reminder", async () => {
-    window.localStorage.setItem("workbench-motivation-message-v1", "先完成今天最重要的一件事");
-    render(<MonitoringSidebar active="schedule" onChange={vi.fn()} />);
+    window.localStorage.setItem("workbench-motivation-message-v1:test-owner", "先完成今天最重要的一件事");
+    render(<AccountScope.Provider value="test-owner"><MonitoringSidebar active="schedule" onChange={vi.fn()} /></AccountScope.Provider>);
 
     const reminder = await screen.findByLabelText("工作台提醒") as HTMLInputElement;
     await waitFor(() => expect(reminder.value).toBe("先完成今天最重要的一件事"));
 
     fireEvent.change(reminder, { target: { value: "完成实验后及时复盘" } });
-    expect(window.localStorage.getItem("workbench-motivation-message-v1")).toBe("完成实验后及时复盘");
+    expect(window.localStorage.getItem("workbench-motivation-message-v1:test-owner")).toBe("完成实验后及时复盘");
   });
 });

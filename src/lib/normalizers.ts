@@ -1,9 +1,8 @@
-import { normalizeBufferMinutes, normalizeBufferName } from "@/lib/event-timing";
 import { normalizeEventTag } from "@/lib/event-tags";
 import { normalizeFollowUpStatus } from "@/lib/follow-up";
 import { format } from "date-fns";
 import { normalizeCategoryDefList } from "./categories";
-import type { RecurrenceConfig, RecurrenceInstanceOverride } from "@/lib/recurrence";
+import { pickRecurrenceOverridePatch, type RecurrenceConfig } from "@/lib/recurrence";
 import type {
   AnnualTask,
   DashboardUiPreferences,
@@ -22,7 +21,6 @@ import type { Achievement } from "@/lib/achievements";
 import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/categories";
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
-  upNextSectionOpen: true,
   executionSectionOpen: true,
   followUpSectionOpen: true,
   dashboardGroup: "today",
@@ -133,9 +131,13 @@ function isTimeString(value: unknown): value is string {
   return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export function normalizeAnnualTasks(payload: unknown): AnnualTask[] {
   if (!Array.isArray(payload)) return [];
-  return payload.map((item, index) => {
+  return payload.filter(isRecord).map((item, index) => {
     const value = item as Partial<AnnualTask>;
     return {
       id: value.id ?? `annual-restored-${index}`,
@@ -165,10 +167,11 @@ export function normalizeShoppingItems(payload: unknown): ShoppingItem[] {
 
 export function normalizeProjectCheckins(payload: unknown): ProjectCheckin[] {
   if (!Array.isArray(payload)) return [];
-  return payload.map((item, index) => {
+  return payload.filter(isRecord).map((item, index) => {
     const value = item as Partial<ProjectCheckin>;
     const checkins = Array.isArray(value.checkins)
       ? value.checkins
+          .filter(isRecord)
           .map((checkin) => ({
             date: typeof checkin.date === "string" ? checkin.date : "",
             note: typeof checkin.note === "string" ? checkin.note : "",
@@ -177,6 +180,7 @@ export function normalizeProjectCheckins(payload: unknown): ProjectCheckin[] {
       : [];
     const dailyCheckins = Array.isArray(value.dailyCheckins)
       ? value.dailyCheckins
+          .filter(isRecord)
           .map((slot, slotIndex) => ({
             id:
               typeof slot.id === "string" && slot.id.length > 0
@@ -192,6 +196,7 @@ export function normalizeProjectCheckins(payload: unknown): ProjectCheckin[] {
       : [];
     const dailyCompletions = Array.isArray(value.dailyCompletions)
       ? value.dailyCompletions
+          .filter(isRecord)
           .map((completion) => ({
             date: typeof completion.date === "string" ? completion.date : "",
             slotId: typeof completion.slotId === "string" ? completion.slotId : "",
@@ -206,6 +211,7 @@ export function normalizeProjectCheckins(payload: unknown): ProjectCheckin[] {
           const archived = archive as Partial<ProjectCheckinArchive>;
           const archivedCheckins = Array.isArray(archived.checkins)
             ? archived.checkins
+                .filter(isRecord)
                 .map((checkin) => ({
                   date: typeof checkin.date === "string" ? checkin.date : "",
                   note: typeof checkin.note === "string" ? checkin.note : "",
@@ -238,7 +244,7 @@ export function normalizeProjectCheckins(payload: unknown): ProjectCheckin[] {
 
 export function normalizeFootprints(payload: unknown): FootprintItem[] {
   if (!Array.isArray(payload)) return [];
-  return payload.map((item, index) => {
+  return payload.filter(isRecord).map((item, index) => {
     const value = item as Partial<FootprintItem>;
     return {
       id: value.id ?? `footprint-restored-${index}`,
@@ -251,6 +257,7 @@ export function normalizeFootprints(payload: unknown): FootprintItem[] {
 export function normalizeAchievements(payload: unknown): Achievement[] {
   if (!Array.isArray(payload)) return [];
   return payload
+    .filter(isRecord)
     .map((item, index) => {
       const value = item as Partial<Achievement>;
       const title = typeof value.title === "string" ? value.title.trim() : "";
@@ -273,7 +280,6 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
   const capacityStartHour = Number.isInteger(value.capacityStartHour) && value.capacityStartHour! >= 0 && value.capacityStartHour! < 24 ? value.capacityStartHour! : 9;
   return {
     dashboardGroup: value.dashboardGroup === "goals" || value.dashboardGroup === "life" ? value.dashboardGroup : "today",
-    upNextSectionOpen: value.upNextSectionOpen !== false,
     executionSectionOpen: value.executionSectionOpen !== false,
     followUpSectionOpen: value.followUpSectionOpen !== false,
     capacityStartHour,
@@ -322,7 +328,7 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
 
 export function normalizeTasks(payload: unknown): LongTask[] {
   if (!Array.isArray(payload)) return [];
-  return payload.map((task, index) => {
+  return payload.filter(isRecord).map((task, index) => {
     const value = task as Partial<LongTask>;
     const dueDate =
       typeof value.dueDate === "string" && value.dueDate.length > 0 ? value.dueDate : todayIso();
@@ -333,22 +339,22 @@ export function normalizeTasks(payload: unknown): LongTask[] {
 
     return {
       id: value.id ?? `task-restored-${index}`,
-      name: value.name ?? "\u672a\u547d\u540d\u4efb\u52a1",
+      name: typeof value.name === "string" ? value.name : "未命名任务",
       dueDate: value.taskType === "followup" ? "" : dueDate,
       createdAt,
       completedAt,
       abandonedAt,
       done: Boolean(value.done),
-      notes: value.notes ?? "",
+      notes: typeof value.notes === "string" ? value.notes : "",
       precautions: Array.isArray(value.precautions)
         ? value.precautions.filter((item): item is string => typeof item === "string")
         : [],
-      completionLog: value.completionLog ?? "",
+      completionLog: typeof value.completionLog === "string" ? value.completionLog : "",
       priority: normalizePriority(value.priority),
       subtasks: Array.isArray(value.subtasks)
-        ? value.subtasks.map((subtask, subIndex) => ({
+        ? value.subtasks.filter(isRecord).map((subtask, subIndex) => ({
             id: subtask.id ?? `subtask-${index}-${subIndex}`,
-            name: subtask.name ?? `\u5b50\u4efb\u52a1 ${subIndex + 1}`,
+            name: typeof subtask.name === "string" ? subtask.name : `子任务 ${subIndex + 1}`,
             done: Boolean(subtask.done),
           }))
         : [],
@@ -375,13 +381,13 @@ function normalizeRecurrence(value: unknown): RecurrenceConfig | undefined {
 
 export function normalizeEvents(payload: unknown): ScheduleEvent[] {
   if (!Array.isArray(payload)) return [];
-  return payload.map((event, index) => {
+  return payload.filter(isRecord).map((event, index) => {
     const value = event as Partial<ScheduleEvent>;
     const recurrence = normalizeRecurrence(value.recurrence);
     const overridesRaw = value.recurrenceOverrides;
     const recurrenceOverrides =
       overridesRaw && typeof overridesRaw === "object" && !Array.isArray(overridesRaw)
-        ? (overridesRaw as Record<string, RecurrenceInstanceOverride>)
+        ? Object.fromEntries(Object.entries(overridesRaw).filter(([, patch]) => isRecord(patch)).map(([date, patch]) => [date, pickRecurrenceOverridePatch(patch)]))
         : {};
     return {
       id: value.id ?? `event-restored-${index}`,
@@ -389,12 +395,8 @@ export function normalizeEvents(payload: unknown): ScheduleEvent[] {
       ...(typeof value.endDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.endDate) && value.endDate >= (value.date ?? "") ? { endDate: value.endDate } : {}),
       startHour: typeof value.startHour === "number" ? value.startHour : 9,
       endHour: typeof value.endHour === "number" ? value.endHour : 10,
-      bufferBeforeMinutes: normalizeBufferMinutes(value.bufferBeforeMinutes),
-      bufferAfterMinutes: normalizeBufferMinutes(value.bufferAfterMinutes),
-      bufferBeforeName: normalizeBufferName(value.bufferBeforeName),
-      bufferAfterName: normalizeBufferName(value.bufferAfterName),
-      title: value.title ?? "\u672a\u547d\u540d\u884c\u7a0b",
-      notes: value.notes ?? "",
+      title: typeof value.title === "string" ? value.title : "未命名行程",
+      notes: typeof value.notes === "string" ? value.notes : "",
       requirements: Array.isArray(value.requirements)
         ? value.requirements.filter((item): item is string => typeof item === "string")
         : [],

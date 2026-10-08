@@ -317,20 +317,20 @@ export function normalizeCategoryDefList(value: unknown): ScheduleCategoryDef[] 
   return merged.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-export function loadCategoryDefs(): ScheduleCategoryDef[] {
+export function loadCategoryDefs(userId?: string | null): ScheduleCategoryDef[] {
   if (typeof window === "undefined") return createDefaultCategoryDefs();
   try {
-    const raw = localStorage.getItem(CATEGORY_STORAGE_KEY);
+    const raw = localStorage.getItem(userId ? `${CATEGORY_STORAGE_KEY}:${userId}` : CATEGORY_STORAGE_KEY);
     return normalizeCategoryDefList(raw ? JSON.parse(raw) : null);
   } catch {
     return createDefaultCategoryDefs();
   }
 }
 
-export function saveCategoryDefs(defs: ScheduleCategoryDef[]) {
+export function saveCategoryDefs(defs: ScheduleCategoryDef[], userId?: string | null) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(defs));
+    localStorage.setItem(userId ? `${CATEGORY_STORAGE_KEY}:${userId}` : CATEGORY_STORAGE_KEY, JSON.stringify(defs));
   } catch {
     // localStorage can be unavailable in private mode.
   }

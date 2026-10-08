@@ -6,10 +6,6 @@ export const ROUTINE_CHECKIN_PROJECT_ID = "routine-checkin-task";
 export type { EventTag } from "@/lib/event-tags";
 
 export type ScheduleEvent = {
-  bufferBeforeMinutes?: number;
-  bufferAfterMinutes?: number;
-  bufferBeforeName?: string;
-  bufferAfterName?: string;
   endDate?: string;
   id: string;
   date: string;
@@ -144,7 +140,6 @@ export type FootprintItem = {
 
 export type DashboardUiPreferences = {
   dashboardGroup?: "today" | "goals" | "life";
-  upNextSectionOpen?: boolean;
   executionSectionOpen?: boolean;
   followUpSectionOpen?: boolean;
   capacityStartHour?: number;
