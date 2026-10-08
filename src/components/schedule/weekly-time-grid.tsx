@@ -66,6 +66,7 @@ import {
   getScheduleEventDurationHour,
   getScheduleEventVisualMetrics,
   layoutOverlappingScheduleEvents,
+  moveScheduleEvent,
   type PositionedScheduleEvent,
   type ScheduleEventSegment,
   splitScheduleEventByDay,
@@ -541,6 +542,9 @@ export function WeeklyTimeGrid({
   const [editScope, setEditScope] = useState<"occurrence" | "future">("occurrence");
   const draggingEventIdRef = useRef<string | null>(null);
   const draggingSegmentDateRef = useRef<string | null>(null);
+  const dragGrabRef = useRef<{ segmentId: string; offsetHour: number } | null>(null);
+  const draggingOffsetHourRef = useRef(0);
+  const [dragPreview, setDragPreview] = useState<ScheduleEvent | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
   const resizePreviewRef = useRef<ResizePreview | null>(null);
@@ -1303,43 +1307,50 @@ export function WeeklyTimeGrid({
     closeContextMenu();
   }
 
-  function handleDropEvent(targetDate: string, targetHour: number) {
-    const draggingEventId = draggingEventIdRef.current;
-    if (!draggingEventId) return;
-    const source = expandedEvents.find((event) => event.id === draggingEventId);
-    draggingEventIdRef.current = null;
-    if (!source) return;
-
-    const duration = getScheduleEventDurationHour(source);
-    if (source.endDate && source.endDate > source.date) {
-      const dayOffset = Math.round((Date.parse(targetDate) - Date.parse(draggingSegmentDateRef.current ?? source.date)) / 86400000);
-      const hourOffset = targetHour - (draggingSegmentDateRef.current && draggingSegmentDateRef.current !== source.date ? 0 : source.startHour);
-      const start = addDays(parse(source.date, "yyyy-MM-dd", new Date()), dayOffset);
-      start.setMinutes(Math.round((source.startHour + hourOffset) * 60));
-      const end = new Date(start);
-      end.setMinutes(end.getMinutes() + Math.round(duration * 60));
-      onUpdateEvent(source.id, { date: format(start, "yyyy-MM-dd"), endDate: format(end, "yyyy-MM-dd"), startHour: start.getHours() + start.getMinutes() / 60, endHour: end.getHours() + end.getMinutes() / 60 });
-      draggingEventIdRef.current = null;
-      draggingSegmentDateRef.current = null;
-      return;
-    }
-    const startHour = normalizeStartTimeValue(targetHour);
-    const endMinutes = Math.round((startHour + duration) * 60);
-    const endHour = endMinutes <= minutesPerDay ? endMinutes / 60 : (endMinutes % minutesPerDay) / 60;
-    const occurrence = parseSyntheticEventId(source.id);
-
-    onUpdateEvent(
-      source.id,
-      {
-        date: targetDate,
-        ...(source.endDate || duration >= 24 ? { endDate: format(addDays(parse(targetDate, "yyyy-MM-dd", new Date()), endMinutes > minutesPerDay ? 1 : 0), "yyyy-MM-dd") } : {}),
-        startHour,
-        endHour,
-      },
-      occurrence ? { scope: "occurrence" } : undefined,
-    );
+  function clearEventDrag() {
     draggingEventIdRef.current = null;
     draggingSegmentDateRef.current = null;
+    draggingOffsetHourRef.current = 0;
+    dragGrabRef.current = null;
+    setDragPreview(null);
+  }
+
+  function getDragTarget(targetDate: string, clientY: number, column: HTMLElement, precise: boolean) {
+    const draggingEventId = draggingEventIdRef.current;
+    if (!draggingEventId || !Number.isFinite(clientY)) return null;
+    const source = expandedEvents.find((event) => event.id === draggingEventId);
+    if (!source) return null;
+    const pointerHour = (clientY - column.getBoundingClientRect().top) / hourCellHeight;
+    const stepMinutes = precise ? 1 : 5;
+    // Subtract the original grab offset before snapping; the pointer is not the card's start.
+    const targetHour = Math.round((pointerHour - draggingOffsetHourRef.current) * minutesPerHour / stepMinutes) * stepMinutes / minutesPerHour;
+    return { source, patch: moveScheduleEvent(source, draggingSegmentDateRef.current ?? source.date, targetDate, targetHour) };
+  }
+
+  function handleEventDragOver(event: React.DragEvent<HTMLElement>, targetDate: string) {
+    if (!draggingEventIdRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    const column = event.currentTarget.closest<HTMLElement>("[data-timeline-date]")!;
+    const target = getDragTarget(targetDate, event.clientY, column, event.shiftKey);
+    if (target) {
+      const next = { ...target.source, ...target.patch };
+      setDragPreview((previous) => previous?.id === next.id && previous.date === next.date && previous.endDate === next.endDate && previous.startHour === next.startHour && previous.endHour === next.endHour ? previous : next);
+    }
+  }
+
+  function handleDropEvent(event: React.DragEvent<HTMLElement>, targetDate: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    const column = event.currentTarget.closest<HTMLElement>("[data-timeline-date]")!;
+    const target = getDragTarget(targetDate, event.clientY, column, event.shiftKey);
+    clearEventDrag();
+    if (!target) return;
+    const { source, patch } = target;
+    const occurrence = parseSyntheticEventId(source.id);
+    if (source.endDate && source.endDate > source.date && !occurrence) onUpdateEvent(source.id, patch);
+    else onUpdateEvent(source.id, patch, occurrence ? { scope: "occurrence" } : undefined);
   }
 
   function handleContextMenu(event: React.MouseEvent, eventId: string) {
@@ -1882,7 +1893,13 @@ export function WeeklyTimeGrid({
 
                 {timelineDayLayouts.map((dayLayout) => {
                   return (
-                    <div key={dayLayout.dateIso} data-timeline-date={dayLayout.dateIso} className="relative border-r border-gray-200 last:border-r-0">
+                    <div
+                      key={dayLayout.dateIso}
+                      data-timeline-date={dayLayout.dateIso}
+                      className="relative border-r border-gray-200 last:border-r-0"
+                      onDragOver={(event) => handleEventDragOver(event, dayLayout.dateIso)}
+                      onDrop={(event) => handleDropEvent(event, dayLayout.dateIso)}
+                    >
                       <div
                         className="grid"
                         style={{ gridTemplateRows }}
@@ -1908,13 +1925,6 @@ export function WeeklyTimeGrid({
                                 }
                                 setSelectedExpenseDateIso(dayLayout.dateIso);
                                 resetCreateDialog({ date: dayLayout.dateIso, startHour: slot.startHour });
-                              }}
-                              onDragOver={(event) => event.preventDefault()}
-                              onDrop={(event) => {
-                                event.preventDefault();
-                                const column = event.currentTarget.closest<HTMLElement>("[data-timeline-date]")!;
-                                const pointerHour = (event.clientY - column.getBoundingClientRect().top) / hourCellHeight;
-                                handleDropEvent(dayLayout.dateIso, normalizeStartTimeValue(Math.round(pointerHour * 12) / 12));
                               }}
                             />
                           );
@@ -1971,27 +1981,22 @@ export function WeeklyTimeGrid({
                               data-schedule-card
                               data-schedule-event-id={event.id}
                               draggable={resizeState?.eventId !== event.id}
-                              onDragStart={() => {
+                              onPointerDown={(pointerEvent) => {
+                                if (pointerEvent.button !== 0 || (pointerEvent.target as HTMLElement).closest("[data-resize-handle]")) return;
+                                const column = pointerEvent.currentTarget.closest<HTMLElement>("[data-timeline-date]")!;
+                                const pointerHour = (pointerEvent.clientY - column.getBoundingClientRect().top) / hourCellHeight;
+                                dragGrabRef.current = { segmentId: event.segmentId, offsetHour: pointerHour - event.startHour };
+                              }}
+                              onDragStart={(dragEvent) => {
                                 draggingEventIdRef.current = event.id;
                                 draggingSegmentDateRef.current = event.displayDate;
-                              }}
-                              onDragEnd={() => {
-                                draggingEventIdRef.current = null;
-                                draggingSegmentDateRef.current = null;
-                              }}
-                              onDragOver={(dragEvent) => {
-                                if (draggingEventIdRef.current) {
-                                  dragEvent.preventDefault();
-                                  dragEvent.stopPropagation();
+                                draggingOffsetHourRef.current = dragGrabRef.current?.segmentId === event.segmentId ? dragGrabRef.current.offsetHour : 0;
+                                if (dragEvent.dataTransfer) {
+                                  dragEvent.dataTransfer.effectAllowed = "move";
+                                  dragEvent.dataTransfer.setData("text/plain", event.id);
                                 }
                               }}
-                              onDrop={(dragEvent) => {
-                                dragEvent.preventDefault();
-                                dragEvent.stopPropagation();
-                                const column = dragEvent.currentTarget.closest<HTMLElement>("[data-timeline-date]")!;
-                                const pointerHour = (dragEvent.clientY - column.getBoundingClientRect().top) / hourCellHeight;
-                                handleDropEvent(event.displayDate, normalizeStartTimeValue(Math.round(pointerHour * 12) / 12));
-                              }}
+                              onDragEnd={clearEventDrag}
                               onContextMenu={(mouseEvent) => handleContextMenu(mouseEvent, event.id)}
                             >
                               <div
@@ -2220,6 +2225,19 @@ export function WeeklyTimeGrid({
                             </div>
                           );
                         })}
+                        {dragPreview ? splitScheduleEventByDay(dragPreview).filter((segment) => segment.displayDate === dayLayout.dateIso).map((segment) => (
+                          <div
+                            key={`drag-preview-${segment.segmentId}`}
+                            data-drag-preview
+                            className="pointer-events-none absolute inset-x-1 z-[60] rounded-lg border-2 border-dashed border-sky-500 bg-sky-100/65 shadow-sm"
+                            style={getScheduleEventVisualMetrics(segment, hourCellHeight)}
+                          >
+                            <div role="status" aria-label="拖动落点" className="absolute -top-7 left-0 whitespace-nowrap rounded-md bg-sky-700 px-2 py-1 text-[11px] font-semibold text-white shadow-md">
+                              {dragPreview.date} {formatHour(dragPreview.startHour)} - {dragPreview.endDate && dragPreview.endDate !== dragPreview.date ? `${dragPreview.endDate} ` : dragPreview.endHour < dragPreview.startHour ? "次日 " : ""}{formatHour(dragPreview.endHour)}
+                              <span className="ml-2 font-normal opacity-85">Shift 精确到分钟</span>
+                            </div>
+                          </div>
+                        )) : null}
                       </div>
                     </div>
                   );

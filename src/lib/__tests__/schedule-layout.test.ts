@@ -6,6 +6,7 @@ import {
   getScheduleEventVisualMetrics,
   getScheduleEventDurationHour,
   layoutOverlappingScheduleEvents,
+  moveScheduleEvent,
   splitScheduleEventByDay,
   toSourceScheduleEvent,
 } from "../schedule-layout";
@@ -28,6 +29,16 @@ function event(patch: Partial<ScheduleEvent> = {}): ScheduleEvent {
 }
 
 describe("schedule event layout", () => {
+  it("moves a continuation across midnight and preserves the full interval", () => {
+    expect(moveScheduleEvent(event({ startHour: 23, endHour: 2 }), "2026-06-12", "2026-06-12", -0.5)).toEqual({ date: "2026-06-11", startHour: 22.5, endHour: 1.5 });
+    expect(moveScheduleEvent(event({ endDate: "2026-06-14", startHour: 9, endHour: 10 }), "2026-06-12", "2026-06-13", 2)).toEqual({ date: "2026-06-12", endDate: "2026-06-15", startHour: 11, endHour: 12 });
+  });
+
+  it("normalizes a start snapped to midnight and retains an ordinary midnight end", () => {
+    expect(moveScheduleEvent(event({ startHour: 9, endHour: 10 }), "2026-06-11", "2026-06-11", 24)).toEqual({ date: "2026-06-12", startHour: 0, endHour: 1 });
+    expect(moveScheduleEvent(event({ startHour: 9, endHour: 10 }), "2026-06-11", "2026-06-11", 23)).toEqual({ date: "2026-06-11", startHour: 23, endHour: 24 });
+  });
+
   it("splits one continuous multi-day event and retains its original identity", () => {
     const source = event({ date: "2026-06-11", endDate: "2026-06-14", startHour: 9, endHour: 10 });
     const segments = splitScheduleEventByDay(source);

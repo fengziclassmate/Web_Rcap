@@ -70,6 +70,30 @@ function dayNumberToIsoDate(dayNumber: number) {
   return new Date(dayNumber * millisecondsPerDay).toISOString().slice(0, 10);
 }
 
+/** Moves the whole event relative to the grabbed segment, including overnight tails. */
+export function moveScheduleEvent(
+  event: ScheduleEvent,
+  segmentDate: string,
+  targetDate: string,
+  targetSegmentStartHour: number,
+): Pick<ScheduleEvent, "date" | "endDate" | "startHour" | "endHour"> {
+  const segmentStartHour = segmentDate === event.date ? event.startHour : 0;
+  const shiftMinutes = (isoDateToDayNumber(targetDate) - isoDateToDayNumber(segmentDate)) * minutesPerDay
+    + Math.round((targetSegmentStartHour - segmentStartHour) * minutesPerHour);
+  const start = isoDateToDayNumber(event.date) * minutesPerDay + Math.round(event.startHour * minutesPerHour) + shiftMinutes;
+  const durationMinutes = Math.round(getScheduleEventDurationHour(event) * minutesPerHour);
+  const end = start + durationMinutes;
+  const startDay = Math.floor(start / minutesPerDay);
+  const endWithinStartDay = end - startDay * minutesPerDay;
+  const explicitEnd = Boolean(event.endDate) || durationMinutes >= minutesPerDay;
+  return {
+    date: dayNumberToIsoDate(startDay),
+    ...(explicitEnd ? { endDate: dayNumberToIsoDate(Math.floor(end / minutesPerDay)) } : {}),
+    startHour: (start - startDay * minutesPerDay) / minutesPerHour,
+    endHour: (explicitEnd ? end % minutesPerDay : endWithinStartDay <= minutesPerDay ? endWithinStartDay : end % minutesPerDay) / minutesPerHour,
+  };
+}
+
 /**
  * Finds the first interval at or after the requested drop position that does
  * not overlap another event. Minute-based arithmetic keeps adjacent 15-minute

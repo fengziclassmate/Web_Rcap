@@ -578,6 +578,43 @@ describe("WeeklyTimeGrid interactions", () => {
     );
   });
 
+  it("preserves the pointer grab offset when moving a card", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, startHour: 9, endHour: 10.5 }], onUpdateEvent });
+    const card = container.querySelector('[data-schedule-card]')!;
+    const column = card.closest('[data-timeline-date]')!;
+    Object.defineProperty(column, "getBoundingClientRect", { value: () => ({ top: -400, height: 1728 }) });
+    fireEvent(card, new MouseEvent("pointerdown", { bubbles: true, button: 0, clientY: -400 + 9.75 * 72 }));
+    fireEvent(card, new MouseEvent("dragstart", { bubbles: true, clientY: -400 + 9.85 * 72 }));
+    fireEvent(column.firstElementChild!.children[10], new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: -400 + 10.75 * 72 }));
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, { date: "2026-07-27", startHour: 10, endHour: 11.5 }, undefined);
+  });
+
+  it("moves an overnight event by its continuation without changing its duration", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, startHour: 23, endHour: 2 }], onUpdateEvent });
+    const card = container.querySelector('[data-timeline-date="2026-07-28"] [data-schedule-card]')!;
+    const column = card.closest('[data-timeline-date]')!;
+    Object.defineProperty(column, "getBoundingClientRect", { value: () => ({ top: 100, height: 1728 }) });
+    fireEvent(card, new MouseEvent("pointerdown", { bubbles: true, button: 0, clientY: 136 }));
+    fireEvent.dragStart(card);
+    fireEvent(column.firstElementChild!.children[1], new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 208 }));
+    expect(onUpdateEvent).toHaveBeenCalledWith(scheduleEvent.id, { date: "2026-07-28", startHour: 0, endHour: 3 }, undefined);
+  });
+
+  it("shows the snapped landing time and clears the preview when dragging is cancelled", () => {
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, startHour: 9, endHour: 10.5 }] });
+    const card = container.querySelector('[data-schedule-card]')!;
+    const column = card.closest('[data-timeline-date]')!;
+    Object.defineProperty(column, "getBoundingClientRect", { value: () => ({ top: 100, height: 1728 }) });
+    fireEvent(card, new MouseEvent("pointerdown", { bubbles: true, button: 0, clientY: 100 + 9.75 * 72 }));
+    fireEvent.dragStart(card);
+    fireEvent(column.firstElementChild!.children[10], new MouseEvent("dragover", { bubbles: true, cancelable: true, clientY: 100 + 10.75 * 72 }));
+    expect(screen.getByRole("status", { name: "拖动落点" }).textContent).toContain("10:00 - 11:30");
+    fireEvent.dragEnd(card);
+    expect(screen.queryByRole("status", { name: "拖动落点" })).toBeNull();
+  });
+
   it("keeps the selected date even when the rest of the day is occupied", () => {
     const onUpdateEvent = vi.fn();
     const { container } = renderGrid({ events: [
