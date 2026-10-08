@@ -28,6 +28,17 @@ function mount() {
 }
 
 describe("floating schedule window", () => {
+  it("shows chosen task times and orders today's tasks by them", async () => {
+    const timedTasks = normalizeTasks([
+      { id: "late", name: "下午任务", dueDate: "2026-10-08", taskType: "daily", plannedTime: "15:30" },
+      { id: "early", name: "早间任务", dueDate: "2026-10-08", taskType: "daily", plannedTime: "08:05" },
+    ]);
+    render(<FloatingScheduleCard userId="account-a" events={[]} tasks={timedTasks} preferences={defaultDashboardUiPreferences} onOpenEvent={vi.fn()} onOpenTask={vi.fn()} onToggleTask={vi.fn()} />);
+    const panel = within(await screen.findByRole("complementary", { name: "日程悬浮窗口" }));
+    fireEvent.click(panel.getByRole("button", { name: "今日待办" }));
+    expect(panel.getAllByRole("listitem").map((item) => item.textContent)).toEqual(["早间任务今天到期 · 08:05", "下午任务今天到期 · 15:30"]);
+  });
+
   it("uses the visible viewport when the desktop page overflows a phone screen", async () => {
     vi.stubGlobal("innerWidth", 1180);
     vi.stubGlobal("innerHeight", 2554);

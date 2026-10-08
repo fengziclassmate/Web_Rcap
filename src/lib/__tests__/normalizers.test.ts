@@ -8,6 +8,14 @@ import {
 } from "../normalizers";
 
 describe("normalizers", () => {
+  it("preserves chosen daily task times across a JSON round trip", () => {
+    const restored = normalizeTasks(JSON.parse(JSON.stringify(normalizeTasks([{ name: "计划任务", plannedTime: "10:30", taskType: "daily" }]))));
+    expect(restored[0].plannedTime).toBe("10:30");
+  });
+
+  it("accepts minute boundaries and drops invalid or empty planned times", () => {
+    expect(normalizeTasks(["00:00", "23:59", "24:00", "10:60", "garbage", ""].map((plannedTime) => ({ plannedTime }))).map((task) => task.plannedTime)).toEqual(["00:00", "23:59", undefined, undefined, undefined, undefined]);
+  });
   it("restores follow-up statuses, notes and archived dates without adding a deadline", () => {
     const source = [{ id: "follow", taskType: "followup", followUpStatus: "verifying", notes: "解题思路", done: true, completedAt: "2026-10-02T01:00:00.000Z" }, { taskType: "followup", followUpStatus: "invalid" }];
     const restored = normalizeTasks(JSON.parse(JSON.stringify(normalizeTasks(source))));

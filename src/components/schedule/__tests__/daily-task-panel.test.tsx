@@ -25,6 +25,85 @@ afterEach(() => {
 });
 
 describe("DailyTaskPanel completion archive", () => {
+  function renderDateEditor(focused = true) {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 27, 15, 0));
+    const onUpdateTask = vi.fn();
+    const item = task({ name: "准备汇报", isTodayFocus: focused });
+    const props = {
+      tasks: [item], events: [], onAddTask: vi.fn(), onToggleTask: vi.fn(), onUpdateTask,
+      onRequestDeleteTask: vi.fn(), onReorderTask: vi.fn(), sortMode: "time" as const,
+      onSortModeChange: vi.fn(), onCreateTimeBlock: vi.fn(), archivedSectionOpen: false,
+      onArchivedSectionOpenChange: vi.fn(),
+    };
+    return { ...render(<DailyTaskPanel {...props} />), onUpdateTask, item, props };
+  }
+
+  it("reschedules a today-focus task to an arbitrary date two weeks later", () => {
+    const { onUpdateTask, rerender, item, props } = renderDateEditor();
+    const focus = screen.getByText("今日三件事").parentElement!.parentElement!;
+    fireEvent.click(within(focus).getByRole("button", { name: "修改 准备汇报 的时间" }));
+    const dialog = within(screen.getByRole("dialog", { name: "修改任务时间" }));
+    expect((dialog.getByLabelText("任务日期") as HTMLInputElement).value).toBe("2026-07-27");
+    fireEvent.change(dialog.getByLabelText("任务日期"), { target: { value: "2026-08-10" } });
+    fireEvent.change(dialog.getByLabelText("计划时间（可选）"), { target: { value: "10:30" } });
+    fireEvent.click(dialog.getByRole("button", { name: "保存时间" }));
+    expect(onUpdateTask).toHaveBeenCalledWith("task", { dueDate: "2026-08-10", plannedTime: "10:30", isTodayFocus: false });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    rerender(<DailyTaskPanel {...props} tasks={[{ ...item, ...onUpdateTask.mock.calls[0][1] }]} />);
+    expect(within(focus).queryByText("准备汇报")).toBeNull();
+    expect(screen.getByText("2026-08-10 10:30")).toBeTruthy();
+  });
+
+  it("retains today's focus when the selected date remains today", () => {
+    const { onUpdateTask } = renderDateEditor();
+    fireEvent.click(screen.getAllByRole("button", { name: "修改 准备汇报 的时间" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "保存时间" }));
+    expect(onUpdateTask).toHaveBeenCalledWith("task", { dueDate: "2026-07-27", plannedTime: "", isTodayFocus: true });
+  });
+
+  it("offers arbitrary rescheduling in the context menu and cancels without saving", () => {
+    const { onUpdateTask } = renderDateEditor(false);
+    fireEvent.contextMenu(screen.getByText("准备汇报").closest("article")!, { clientX: 120, clientY: 120 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "修改时间" }));
+    const dialog = within(screen.getByRole("dialog", { name: "修改任务时间" }));
+    fireEvent.change(dialog.getByLabelText("任务日期"), { target: { value: "2026-08-12" } });
+    fireEvent.click(dialog.getByRole("button", { name: "取消" }));
+    expect(onUpdateTask).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("rejects an empty date without saving", () => {
+    const { onUpdateTask } = renderDateEditor(false);
+    fireEvent.click(screen.getByRole("button", { name: "修改 准备汇报 的时间" }));
+    fireEvent.change(screen.getByLabelText("任务日期"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存时间" }));
+    expect(onUpdateTask).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "修改任务时间" })).toBeTruthy();
+  });
+
+  it("loads an existing time and allows clearing it while keeping the date", () => {
+    const { props, item, rerender, onUpdateTask } = renderDateEditor(false);
+    rerender(<DailyTaskPanel {...props} tasks={[{ ...item, plannedTime: "23:59" }]} />);
+    fireEvent.click(screen.getByRole("button", { name: "修改 准备汇报 的时间" }));
+    expect((screen.getByLabelText("计划时间（可选）") as HTMLInputElement).value).toBe("23:59");
+    fireEvent.click(screen.getByRole("button", { name: "清除时间" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存时间" }));
+    expect(onUpdateTask).toHaveBeenCalledWith("task", { dueDate: "2026-07-27", plannedTime: "", isTodayFocus: false });
+  });
+
+  it("orders by the user-selected date and time even when old linked time blocks exist", () => {
+    const { props, item, rerender } = renderDateEditor(false);
+    rerender(<DailyTaskPanel {...props} tasks={[
+      { ...item, id: "late", name: "下午任务", plannedTime: "15:00" },
+      { ...item, id: "untimed", name: "未指定时间" },
+      { ...item, id: "early", name: "上午任务", plannedTime: "00:00" },
+      { ...item, id: "future", name: "未来任务", dueDate: "2026-08-10", plannedTime: "10:30" },
+    ]} events={[{ id: "old-block", date: "2026-07-26", startHour: 8, endHour: 9, linkedDailyTaskId: "future", title: "旧时间块", notes: "", requirements: [], category: "其他", isCompleted: false, tag: null }]} />);
+    const names = Array.from(screen.getByTestId("daily-task-scroll-list").querySelectorAll("article p")).map((node) => node.textContent);
+    expect(names).toEqual(["上午任务", "下午任务", "未指定时间", "未来任务"]);
+  });
+
   it("collapses daily tasks and deadline radar while keeping a scrollable task list", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 6, 27, 15, 0));

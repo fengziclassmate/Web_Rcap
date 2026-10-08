@@ -68,6 +68,7 @@ export type LongTask = {
   id: string;
   name: string;
   dueDate: string;
+  plannedTime?: string;
   createdAt?: string;
   completedAt?: string | null;
   abandonedAt?: string | null;

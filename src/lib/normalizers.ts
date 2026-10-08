@@ -341,6 +341,7 @@ export function normalizeTasks(payload: unknown): LongTask[] {
       id: value.id ?? `task-restored-${index}`,
       name: typeof value.name === "string" ? value.name : "未命名任务",
       dueDate: value.taskType === "followup" ? "" : dueDate,
+      ...(typeof value.plannedTime === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.plannedTime) ? { plannedTime: value.plannedTime } : {}),
       createdAt,
       completedAt,
       abandonedAt,

@@ -11,7 +11,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { DailyTaskSortMode, LongTask, ScheduleEvent, TaskType } from "@/lib/types";
 
@@ -114,6 +114,9 @@ export function DailyTaskPanel({
   const [name, setName] = useState("");
   const [targetDate, setTargetDate] = useState(today);
   const [taskForSchedule, setTaskForSchedule] = useState<LongTask | null>(null);
+  const [taskForDate, setTaskForDate] = useState<LongTask | null>(null);
+  const [taskDate, setTaskDate] = useState(today);
+  const [taskTime, setTaskTime] = useState("");
   const [scheduleDate, setScheduleDate] = useState(today);
   const [scheduleTime, setScheduleTime] = useState("09:00");
   const [duration, setDuration] = useState("30");
@@ -157,13 +160,13 @@ export function DailyTaskPanel({
     return activeTasks
       .map((task, index) => ({ task, index, schedule: dailyTaskScheduleTimes.get(task.id) }))
       .sort((left, right) => {
-        const leftDate = left.schedule?.date ?? left.task.dueDate;
-        const rightDate = right.schedule?.date ?? right.task.dueDate;
+        const leftDate = left.task.dueDate;
+        const rightDate = right.task.dueDate;
         const dateOrder = leftDate.localeCompare(rightDate);
         if (dateOrder !== 0) return dateOrder;
         const timeOrder =
-          (left.schedule?.startHour ?? Number.POSITIVE_INFINITY)
-          - (right.schedule?.startHour ?? Number.POSITIVE_INFINITY);
+          (left.task.plannedTime ? parseTimeToHour(left.task.plannedTime) : left.schedule?.date === leftDate ? left.schedule.startHour : Number.POSITIVE_INFINITY)
+          - (right.task.plannedTime ? parseTimeToHour(right.task.plannedTime) : right.schedule?.date === rightDate ? right.schedule.startHour : Number.POSITIVE_INFINITY);
         return timeOrder || left.index - right.index;
       })
       .map(({ task }) => task);
@@ -264,7 +267,7 @@ export function DailyTaskPanel({
   function openSchedule(task: LongTask) {
     setTaskForSchedule(task);
     setScheduleDate(task.dueDate);
-    setScheduleTime("09:00");
+    setScheduleTime(task.plannedTime || "09:00");
     setDuration("30");
   }
 
@@ -290,6 +293,33 @@ export function DailyTaskPanel({
     onUpdateTask(task.id, { dueDate: tomorrow, isTodayFocus: false });
   }
 
+  function openDateEditor(task: LongTask) {
+    setDailyCloseOpen(false);
+    setTaskForDate(task);
+    setTaskDate(task.dueDate || today);
+    setTaskTime(task.plannedTime || "");
+  }
+
+  function saveTaskDate() {
+    if (!taskForDate) return;
+    const date = new Date(`${taskDate}T00:00:00`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(taskDate) || Number.isNaN(date.getTime()) || getLocalISODate(date) !== taskDate) {
+      toast.error("请选择有效的任务日期");
+      return;
+    }
+    if (taskTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(taskTime)) {
+      toast.error("请选择有效的计划时间");
+      return;
+    }
+    onUpdateTask(taskForDate.id, {
+      dueDate: taskDate,
+      plannedTime: taskTime,
+      isTodayFocus: taskDate === today ? taskForDate.isTodayFocus : false,
+    });
+    setTaskForDate(null);
+    toast.success(`任务已改到 ${taskDate}${taskTime ? ` ${taskTime}` : ""}`);
+  }
+
   function turnIntoLongTask(task: LongTask) {
     onUpdateTask(task.id, { taskType: "long", isTodayFocus: false, abandonedAt: null });
   }
@@ -306,7 +336,7 @@ export function DailyTaskPanel({
     event.preventDefault();
     event.stopPropagation();
     const menuWidth = 224;
-    const menuHeight = 372;
+    const menuHeight = 412;
     const padding = 12;
     setContextMenu({
       taskId: task.id,
@@ -430,6 +460,16 @@ export function DailyTaskPanel({
                   {index + 1}
                 </span>
                 <span className="min-w-0 flex-1 truncate">{task.name}</span>
+                {task.plannedTime ? <span className="shrink-0 text-xs tabular-nums text-emerald-700">{task.plannedTime}</span> : null}
+                <button
+                  type="button"
+                  aria-label={`修改 ${task.name} 的时间`}
+                  title="修改日期和时间"
+                  className="shrink-0 rounded-md p-1 text-emerald-700 transition hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-emerald-700"
+                  onClick={() => openDateEditor(task)}
+                >
+                  <CalendarDays className="size-3.5" aria-hidden />
+                </button>
               </li>
             ))}
           </ol>
@@ -469,7 +509,17 @@ export function DailyTaskPanel({
               />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-stone-900">{task.name}</p>
-                <p className="mt-0.5 text-xs tabular-nums text-stone-500">{task.dueDate}</p>
+                <button
+                  type="button"
+                  className="mt-0.5 inline-flex items-center gap-1 rounded text-xs tabular-nums text-stone-500 transition hover:text-emerald-700 hover:underline focus-visible:outline-2 focus-visible:outline-emerald-700"
+                  aria-label={`修改 ${task.name} 的时间`}
+                  title="修改日期和时间"
+                  onClick={() => openDateEditor(task)}
+                >
+                  <CalendarDays className="size-3" aria-hidden />
+                  {task.dueDate || "设置日期"}
+                  {task.plannedTime ? ` ${task.plannedTime}` : ""}
+                </button>
               </div>
             </article>
           ))
@@ -577,6 +627,14 @@ export function DailyTaskPanel({
                 type="button"
                 role="menuitem"
                 className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100"
+                onClick={() => runContextAction(() => openDateEditor(contextMenuTask))}
+              >
+                修改时间
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100"
                 onClick={() => runContextAction(() => turnIntoLongTask(contextMenuTask))}
               >
                 转为长期任务
@@ -636,6 +694,33 @@ export function DailyTaskPanel({
         </CollapsibleContent>
       </div>
       </Collapsible>
+
+      <Dialog open={Boolean(taskForDate)} onOpenChange={(open) => !open && setTaskForDate(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>修改任务时间</DialogTitle>
+            <DialogDescription>自行选择任务的日期和具体时间。改到其他日期后，将从今日三件事中移出。</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" noValidate onSubmit={(event) => { event.preventDefault(); saveTaskDate(); }}>
+            <p className="break-words rounded-lg bg-stone-100 px-3 py-2 text-sm font-medium text-stone-800">{taskForDate?.name}</p>
+            <div className="space-y-1.5">
+              <label htmlFor="daily-task-date" className="text-xs font-medium text-stone-600">任务日期</label>
+              <Input id="daily-task-date" type="date" required value={taskDate} onChange={(event) => setTaskDate(event.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="daily-task-time" className="text-xs font-medium text-stone-600">计划时间（可选）</label>
+              <div className="flex items-center gap-2">
+                <Input id="daily-task-time" type="time" step="60" value={taskTime} onChange={(event) => setTaskTime(event.target.value)} />
+                {taskTime ? <Button type="button" variant="ghost" onClick={() => setTaskTime("")}>清除时间</Button> : null}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setTaskForDate(null)}>取消</Button>
+              <Button type="submit" disabled={!taskDate}>保存时间</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(taskForSchedule)} onOpenChange={(open) => !open && setTaskForSchedule(null)}>
         <DialogContent>
@@ -730,6 +815,7 @@ export function DailyTaskPanel({
                 <p className="text-sm font-medium text-stone-900">{task.name}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <Button type="button" size="xs" variant="outline" onClick={() => moveToTomorrow(task)}>移到明天</Button>
+                  <Button type="button" size="xs" variant="outline" onClick={() => openDateEditor(task)}>修改时间</Button>
                   <Button type="button" size="xs" variant="outline" onClick={() => turnIntoLongTask(task)}>转长期任务</Button>
                   <Button type="button" size="xs" variant="outline" onClick={() => abandonDailyTask(task)}>标记放弃</Button>
                   <Button type="button" size="xs" onClick={() => onToggleTask(task.id)}><CheckCircle className="h-3 w-3" />标记完成</Button>
