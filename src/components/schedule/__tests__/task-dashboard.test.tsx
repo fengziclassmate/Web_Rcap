@@ -99,6 +99,23 @@ function ControlledProjectDashboard({ today, initiallyCollapsed = false, archive
 }
 
 describe("TaskDashboard task list sections", () => {
+  it("toggles the routine entry form and keeps unfinished values when reopened", () => {
+    render(<ControlledProjectDashboard today="2026-10-13" />);
+    fireEvent.click(screen.getByRole("button", { name: "日常打卡" }));
+    expect(screen.queryByRole("textbox", { name: "新日常打卡名称" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "添加日常打卡" }));
+    const close = screen.getByRole("button", { name: "收起日常打卡输入" });
+    expect(close.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.change(screen.getByRole("textbox", { name: "新日常打卡名称" }), { target: { value: "站立活动" } });
+    fireEvent.change(screen.getByLabelText("新日常打卡时间"), { target: { value: "10:30" } });
+    fireEvent.click(close);
+    expect(screen.queryByRole("textbox", { name: "新日常打卡名称" })).toBeNull();
+    expect(screen.getByRole("button", { name: "添加日常打卡" }).getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: "添加日常打卡" }));
+    expect((screen.getByRole("textbox", { name: "新日常打卡名称" }) as HTMLInputElement).value).toBe("站立活动");
+    expect((screen.getByLabelText("新日常打卡时间") as HTMLInputElement).value).toBe("10:30");
+  });
+
   it("opens past daily check-ins from the toolbar without an inline archive", () => {
     const today = format(new Date(), "yyyy-MM-dd");
     const archiveDate = format(subDays(new Date(), 1), "yyyy-MM-dd");

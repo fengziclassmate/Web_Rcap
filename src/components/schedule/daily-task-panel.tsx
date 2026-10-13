@@ -378,9 +378,9 @@ export function DailyTaskPanel({
   }
 
   return (
-    <section className="daily-task-panel">
+    <section className="daily-task-panel dashboard-section-card" aria-label="日常任务">
       <Collapsible open={sectionOpen} onOpenChange={onSectionOpenChange}>
-      <div className="flex items-center justify-between gap-3">
+      <div className="dashboard-section-heading flex flex-wrap items-center justify-between gap-2" data-expanded={sectionOpen}>
         <CollapsibleTrigger
           className="flex min-w-0 items-center gap-2 rounded-lg px-1 py-1 text-left"
           aria-label={sectionOpen ? "折叠日常任务" : "展开日常任务"}
@@ -432,7 +432,7 @@ export function DailyTaskPanel({
       </div>
 
       <CollapsibleContent>
-      <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_132px_auto]">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_132px_auto]">
         <Input
           value={name}
           onChange={(event) => setName(event.target.value)}

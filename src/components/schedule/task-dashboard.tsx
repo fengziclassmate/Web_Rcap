@@ -1697,7 +1697,7 @@ export function TaskDashboard({
               <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowAddProjectDialog(true)} aria-label="添加项目" title="添加项目"><Plus className="h-4 w-4" aria-hidden /></Button>
             </> : null}
             {activeUtilityPanel === "routine" ? <>
-              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowRoutineCheckinForm(true)} aria-label="添加日常打卡" title="添加日常打卡"><Plus className="h-4 w-4" aria-hidden /></Button>
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowRoutineCheckinForm((open) => !open)} aria-expanded={showRoutineCheckinForm} aria-controls="routine-checkin-inputs" aria-label={showRoutineCheckinForm ? "收起日常打卡输入" : "添加日常打卡"} title={showRoutineCheckinForm ? "收起添加表单" : "添加日常打卡"}><Plus className={`h-4 w-4 transition-transform ${showRoutineCheckinForm ? "rotate-45" : ""}`} aria-hidden /></Button>
               <Button type="button" size="icon-sm" variant="outline" onClick={() => setRoutineArchiveOpen(true)} aria-label="查看日常打卡归档库" title={`归档库 · ${dailyCheckinArchive.length} 天`}><Archive className="h-3.5 w-3.5 text-emerald-700" aria-hidden /></Button>
             </> : null}
             {activeUtilityPanel === "achievement" ? <>
@@ -1940,12 +1940,7 @@ export function TaskDashboard({
                   {completedDailyCheckinCount}/{dailyCheckinEntries.length}
                 </span>
               </div>
-              <p className="mt-1 text-xs leading-5 text-emerald-700">
-                今日记录只属于 {todayDate}；跨过当天后，列表会自动重新开始，旧日期会进入归档。
-              </p>
-
-              {showRoutineCheckinForm ? (
-                <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_104px_auto]">
+                <div id="routine-checkin-inputs" hidden={!showRoutineCheckinForm} className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_104px_auto]">
                   <Input
                     value={getDailyCheckinDraft(routineProject.id).label}
                     onChange={(event) =>
@@ -1974,8 +1969,6 @@ export function TaskDashboard({
                     保存
                   </Button>
                 </div>
-              ) : null}
-
               {dailyCheckinEntries.length > 0 ? (
                 <div className="mt-3 grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
                   {dailyCheckinEntries.map(({ project, slot }) => {
