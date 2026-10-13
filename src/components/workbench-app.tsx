@@ -202,9 +202,9 @@ export function WorkbenchApp() {
       setActiveModule("schedule");
       const kind = result.collection;
       setDashboardUiPreferences((previous) => ({ ...previous,
-        ...(kind === "annual" ? { annualSectionOpen: true, longTaskSectionOpen: false } : {}),
-        ...(kind === "shopping" ? { shoppingSectionOpen: true } : {}),
-        ...(kind === "project" ? { projectSectionOpen: true, expandedProjects: [...new Set([...previous.expandedProjects, result.id])] } : {}),
+        ...(kind === "annual" ? { annualSectionOpen: true, longTaskSectionOpen: false, shoppingSectionOpen: false } : {}),
+        ...(kind === "shopping" ? { shoppingSectionOpen: true, annualSectionOpen: false, longTaskSectionOpen: false } : {}),
+        ...(kind === "project" ? { projectSectionOpen: true, routineCheckinSectionOpen: false, achievementSectionOpen: false, footprintSectionOpen: false, expandedProjects: [...new Set([...previous.expandedProjects, result.id])] } : {}),
         ...(result.id === ROUTINE_CHECKIN_PROJECT_ID ? { projectSectionOpen: false, routineCheckinSectionOpen: true, achievementSectionOpen: false, footprintSectionOpen: false } : {}),
       }));
       setOpenCollectionRequest({ id: result.id, kind, token });

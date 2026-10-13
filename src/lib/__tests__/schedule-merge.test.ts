@@ -4,6 +4,26 @@ import { mergeScheduleChanges } from "../schedule-merge";
 
 const snapshot = (tasks: unknown[]) => normalizePersistedSchedulePayload({ tasks })!;
 describe("concurrent schedule changes", () => {
+  it("merges each panel row as one choice when devices open different panels", () => {
+    const base = snapshot([]);
+    const local = { ...base, ui_preferences: { ...base.ui_preferences, shoppingSectionOpen: true } };
+    const remote = { ...base, ui_preferences: { ...base.ui_preferences, annualSectionOpen: true } };
+    const merged = mergeScheduleChanges(base, local, remote);
+    expect(merged.value.ui_preferences).toMatchObject({ shoppingSectionOpen: true, annualSectionOpen: false, longTaskSectionOpen: false });
+    expect(merged.conflicts).toEqual(["schedule.ui_preferences.taskListPanel"]);
+    expect(mergeScheduleChanges(base, local, remote, "remote").value.ui_preferences).toMatchObject({ shoppingSectionOpen: false, annualSectionOpen: true });
+  });
+
+  it("keeps independent panel choices from different rows", () => {
+    const base = snapshot([]);
+    const local = { ...base, ui_preferences: { ...base.ui_preferences, shoppingSectionOpen: true } };
+    const remote = { ...base, ui_preferences: { ...base.ui_preferences, footprintSectionOpen: true } };
+    const merged = mergeScheduleChanges(base, local, remote);
+    expect(merged.conflicts).toEqual([]);
+    expect(merged.value.ui_preferences).toMatchObject({ shoppingSectionOpen: true, footprintSectionOpen: true, annualSectionOpen: false, projectSectionOpen: false });
+    expect(JSON.stringify(merged.value.ui_preferences)).toBe(JSON.stringify(normalizePersistedSchedulePayload(merged.value)!.ui_preferences));
+  });
+
   it("retains independent additions from two devices", () => {
     const result = mergeScheduleChanges(snapshot([]), snapshot([{ id: "a", name: "A" }]), snapshot([{ id: "b", name: "B" }]));
     expect(result.value.tasks.map((item) => item.id).sort()).toEqual(["a", "b"]);

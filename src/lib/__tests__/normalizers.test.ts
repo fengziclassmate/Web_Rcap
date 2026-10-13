@@ -148,6 +148,12 @@ describe("normalizers", () => {
     });
   });
 
+  it("restores selected panels and collapses legacy all-open rows", () => {
+    const selected = normalizeDashboardUiPreferences({ annualSectionOpen: true, footprintSectionOpen: true });
+    expect(normalizeDashboardUiPreferences(JSON.parse(JSON.stringify(selected)))).toMatchObject({ annualSectionOpen: true, longTaskSectionOpen: false, shoppingSectionOpen: false, footprintSectionOpen: true, projectSectionOpen: false, routineCheckinSectionOpen: false, achievementSectionOpen: false });
+    expect(normalizeDashboardUiPreferences({ annualSectionOpen: true, longTaskSectionOpen: true, shoppingSectionOpen: true, projectSectionOpen: true, routineCheckinSectionOpen: true, achievementSectionOpen: true, footprintSectionOpen: true })).toMatchObject({ annualSectionOpen: false, longTaskSectionOpen: false, shoppingSectionOpen: false, projectSectionOpen: false, routineCheckinSectionOpen: false, achievementSectionOpen: false, footprintSectionOpen: false });
+  });
+
   it("normalizes dashboard preferences safely", () => {
     expect(normalizeDashboardUiPreferences({
       timeGranularity: "45-15",
@@ -159,8 +165,8 @@ describe("normalizers", () => {
     })).toMatchObject({
       timeGranularity: "45-15",
       dailyTaskSortMode: "custom",
-      annualSectionOpen: true,
-      longTaskSectionOpen: true,
+      annualSectionOpen: false,
+      longTaskSectionOpen: false,
       completedSectionOpen: true,
       dailyTaskSectionOpen: false,
       deadlineRadarSectionOpen: false,

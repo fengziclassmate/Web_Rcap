@@ -1080,10 +1080,32 @@
 .search-result:hover { background: var(--muted); }
 .module-header { padding: 1rem 1.25rem; }
 .task-dashboard-section { padding: 1rem 1.25rem; }
-.utility-panel + .utility-panel {
-  margin-top: 1.25rem;
-  border-top: 1px solid var(--border);
-  padding-top: 1.25rem;
+.dashboard-panel-switch {
+  display: grid;
+  gap: 0.25rem;
+  border-radius: 0.625rem;
+  background: var(--muted);
+  padding: 0.25rem;
+}
+.dashboard-panel-switch button {
+  display: flex;
+  min-width: 0;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border-radius: 0.375rem;
+  padding: 0.25rem;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+.dashboard-panel-switch button:hover { background: color-mix(in oklch, var(--primary) 8%, white); }
+.dashboard-panel-switch button[aria-expanded="true"] { background: var(--primary); color: var(--primary-foreground); }
+.dashboard-panel-switch button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.utility-panel-grid > .utility-panel:not([hidden]) {
+  margin-top: 0.75rem;
 }
 
 .calendar-grid {

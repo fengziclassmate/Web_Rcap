@@ -11,6 +11,7 @@ import {
   ListTodo,
   Plus,
   RotateCcw,
+  ShoppingBasket,
   Star,
   Trash2,
   AlertTriangle,
@@ -399,7 +400,8 @@ export function TaskDashboard({
   const [editingFootprintId, setEditingFootprintId] = useState<string | null>(null);
   const [editingFootprintName, setEditingFootprintName] = useState("");
   const [editingFootprintDate, setEditingFootprintDate] = useState(getTodayISODate);
-  const shoppingSectionOpen = uiPreferences.shoppingSectionOpen;
+  const activeTaskListPanel = uiPreferences.longTaskSectionOpen ? "long" : uiPreferences.annualSectionOpen ? "annual" : uiPreferences.shoppingSectionOpen ? "shopping" : null;
+  const activeUtilityPanel = uiPreferences.projectSectionOpen ? "project" : uiPreferences.routineCheckinSectionOpen ? "routine" : uiPreferences.achievementSectionOpen ? "achievement" : uiPreferences.footprintSectionOpen ? "footprint" : null;
   const expandedCompletedTasks = useMemo(
     () => new Set(uiPreferences.expandedCompletedTasks),
     [uiPreferences.expandedCompletedTasks],
@@ -644,6 +646,14 @@ export function TaskDashboard({
 
   function patchUiPreferences(patch: Partial<DashboardUiPreferences>) {
     onUiPreferencesChange({ ...uiPreferences, ...patch });
+  }
+
+  function setTaskListPanel(panel: "long" | "annual" | "shopping" | null) {
+    patchUiPreferences({ longTaskSectionOpen: panel === "long", annualSectionOpen: panel === "annual", shoppingSectionOpen: panel === "shopping" });
+  }
+
+  function setUtilityPanel(panel: "project" | "routine" | "achievement" | "footprint" | null) {
+    patchUiPreferences({ projectSectionOpen: panel === "project", routineCheckinSectionOpen: panel === "routine", achievementSectionOpen: panel === "achievement", footprintSectionOpen: panel === "footprint" });
   }
 
   function handleAddTask() {
@@ -1380,7 +1390,14 @@ export function TaskDashboard({
 
 
       <div className="task-dashboard-section utility-panel-grid" data-testid="task-list-panel-group">
-        <section className="utility-panel utility-panel-long-task">
+        <div className="dashboard-panel-switch grid-cols-3" role="group" aria-label="任务与清单">
+          {([['long', '长期任务'], ['annual', '年度任务'], ['shopping', '购物清单']] as const).map(([panel, label]) => (
+            <button key={panel} type="button" aria-expanded={activeTaskListPanel === panel} aria-controls={`task-panel-${panel}`} onClick={() => setTaskListPanel(activeTaskListPanel === panel ? null : panel)}>
+              {label}<ChevronDown className={`size-3 shrink-0 transition-transform ${activeTaskListPanel === panel ? "" : "-rotate-90"}`} aria-hidden />
+            </button>
+          ))}
+        </div>
+        <section id="task-panel-long" hidden={activeTaskListPanel !== "long"} className="utility-panel utility-panel-long-task">
         <div className="flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><ListTodo className="h-4 w-4 text-primary" aria-hidden />长期任务</h3>
             <div className="flex items-center gap-2">
@@ -1554,7 +1571,7 @@ export function TaskDashboard({
           </div>
         </section>
 
-        <section className="utility-panel utility-panel-annual">
+        <section id="task-panel-annual" hidden={activeTaskListPanel !== "annual"} className="utility-panel utility-panel-annual">
           <div className="flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><CalendarRange className="h-4 w-4 text-primary" aria-hidden />年度任务</h3>
             <div className="flex items-center gap-2">
@@ -1629,11 +1646,36 @@ export function TaskDashboard({
         </section>
 
 
+        <section id="task-panel-shopping" hidden={activeTaskListPanel !== "shopping"} className="utility-panel">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><ShoppingBasket className="h-4 w-4 text-primary" aria-hidden />购物清单</h3>
+            <Button type="button" size="icon-sm" variant="outline" onClick={() => setShoppingAddDialogOpen(true)} aria-label="添加购物项" title="添加购物项"><Plus className="h-4 w-4" aria-hidden /></Button>
+          </div>
+          <ShoppingList
+            variant="panel"
+            items={shoppingItems}
+            open={activeTaskListPanel === "shopping"}
+            onOpenChange={(open) => setTaskListPanel(open ? "shopping" : null)}
+            addDialogOpen={shoppingAddDialogOpen}
+            onAddDialogOpenChange={setShoppingAddDialogOpen}
+            onAddItem={onAddShoppingItem}
+            onToggleItem={onToggleShoppingItem}
+            onDeleteItem={onDeleteShoppingItem}
+            onReorderItem={onReorderShoppingItem}
+          />
+        </section>
       </div>
 
 
-      <div className="task-dashboard-section utility-panel-grid">
-      <section className="utility-panel utility-panel-project">
+      <div className="task-dashboard-section utility-panel-grid" data-testid="utility-panel-group">
+        <div className="dashboard-panel-switch grid-cols-4" role="group" aria-label="项目与生活记录">
+          {([['project', '项目'], ['routine', '日常打卡'], ['achievement', '成就'], ['footprint', '足迹']] as const).map(([panel, label]) => (
+            <button key={panel} type="button" aria-expanded={activeUtilityPanel === panel} aria-controls={`utility-panel-${panel}`} onClick={() => setUtilityPanel(activeUtilityPanel === panel ? null : panel)}>
+              {label}<ChevronDown className={`size-3 shrink-0 transition-transform ${activeUtilityPanel === panel ? "" : "-rotate-90"}`} aria-hidden />
+            </button>
+          ))}
+        </div>
+      <section id="utility-panel-project" hidden={activeUtilityPanel !== "project"} className="utility-panel utility-panel-project">
         <div className="flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><KanbanSquare className="h-4 w-4 text-primary" aria-hidden />项目</h3>
             <div className="flex items-center gap-2">
@@ -1860,7 +1902,7 @@ export function TaskDashboard({
           </div>
       </section>
 
-      <section className="utility-panel utility-panel-routine" data-project-checkin-id={ROUTINE_CHECKIN_PROJECT_ID}>
+      <section id="utility-panel-routine" hidden={activeUtilityPanel !== "routine"} className="utility-panel utility-panel-routine" data-project-checkin-id={ROUTINE_CHECKIN_PROJECT_ID}>
         <div className="flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><Clock className="h-4 w-4 text-primary" aria-hidden />日常打卡</h3>
             <div className="flex items-center gap-2">
@@ -2020,7 +2062,7 @@ export function TaskDashboard({
           </div>
       </section>
 
-      <section className="utility-panel utility-panel-achievement">
+      <section id="utility-panel-achievement" hidden={activeUtilityPanel !== "achievement"} className="utility-panel utility-panel-achievement">
         <div className="flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><Trophy className="h-4 w-4 text-primary" aria-hidden />成就</h3>
             <div className="flex items-center gap-2">
@@ -2088,7 +2130,7 @@ export function TaskDashboard({
           </div>
       </section>
 
-      <section className="utility-panel utility-panel-footprint">
+      <section id="utility-panel-footprint" hidden={activeUtilityPanel !== "footprint"} className="utility-panel utility-panel-footprint">
         <div className="flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><Footprints className="h-4 w-4 text-primary" aria-hidden />足迹</h3>
             <div className="flex items-center gap-2">
@@ -2167,20 +2209,6 @@ export function TaskDashboard({
         openTaskRequest={openTaskRequest}
         onOpenRequestHandled={onOpenRequestHandled}
       />
-      </div>
-      <div className="task-dashboard-section">
-        <ShoppingList
-          variant="section"
-          items={shoppingItems}
-          open={shoppingSectionOpen}
-          onOpenChange={(open) => patchUiPreferences({ shoppingSectionOpen: open })}
-          addDialogOpen={shoppingAddDialogOpen}
-          onAddDialogOpenChange={setShoppingAddDialogOpen}
-          onAddItem={onAddShoppingItem}
-          onToggleItem={onToggleShoppingItem}
-          onDeleteItem={onDeleteShoppingItem}
-          onReorderItem={onReorderShoppingItem}
-        />
       </div>
 
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>

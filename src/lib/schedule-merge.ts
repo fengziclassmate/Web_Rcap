@@ -5,6 +5,10 @@ const object = (value: unknown): value is Record<string, unknown> => Boolean(val
 const records = (value: unknown): value is Array<Record<string, unknown> & { id: string }> =>
   Array.isArray(value) && value.every((item) => object(item) && typeof item.id === "string")
   && new Set(value.map((item) => item.id)).size === value.length;
+const panelGroups = {
+  taskListPanel: ["longTaskSectionOpen", "annualSectionOpen", "shoppingSectionOpen"],
+  utilityPanel: ["projectSectionOpen", "routineCheckinSectionOpen", "achievementSectionOpen", "footprintSectionOpen"],
+} as const;
 
 /** Merge changes against the last acknowledged snapshot; never silently choose a conflicting edit. */
 export function mergeScheduleChanges(
@@ -18,8 +22,18 @@ export function mergeScheduleChanges(
     if (same(ours, before)) return theirs;
     if (same(theirs, before) || same(ours, theirs)) return ours;
     if (object(before) && object(ours) && object(theirs)) {
-      return Object.fromEntries([...new Set([...Object.keys(before), ...Object.keys(ours), ...Object.keys(theirs)])]
-        .map((key) => [key, merge(before[key], ours[key], theirs[key], `${path}.${key}`)])
+      const keys = new Set([...Object.keys(before), ...Object.keys(ours), ...Object.keys(theirs)]);
+      const panelValues: Record<string, boolean> = {};
+      if (path === "schedule.ui_preferences") {
+        // Each row is one choice, even though older payloads store it as several booleans.
+        for (const [name, fields] of Object.entries(panelGroups)) {
+          const selected = (value: Record<string, unknown>) => fields.find((key) => value[key] === true) ?? null;
+          const choice = merge(selected(before), selected(ours), selected(theirs), `${path}.${name}`);
+          for (const key of fields) panelValues[key] = key === choice;
+        }
+      }
+      return Object.fromEntries([...keys]
+        .map((key) => [key, Object.hasOwn(panelValues, key) ? panelValues[key] : merge(before[key], ours[key], theirs[key], `${path}.${key}`)])
         .filter(([, value]) => value !== undefined));
     }
     if (records(before) && records(ours) && records(theirs)) {

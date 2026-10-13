@@ -27,17 +27,17 @@ export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   capacityEndHour: 22,
   timeGranularity: 60,
   dailyTaskSortMode: "time",
-  annualSectionOpen: true,
-  shoppingSectionOpen: true,
-  longTaskSectionOpen: true,
+  annualSectionOpen: false,
+  shoppingSectionOpen: false,
+  longTaskSectionOpen: false,
   completedSectionOpen: true,
   dailyTaskSectionOpen: true,
   deadlineRadarSectionOpen: true,
   dailyArchiveSectionOpen: false,
-  projectSectionOpen: true,
-  routineCheckinSectionOpen: true,
-  achievementSectionOpen: true,
-  footprintSectionOpen: true,
+  projectSectionOpen: false,
+  routineCheckinSectionOpen: false,
+  achievementSectionOpen: false,
+  footprintSectionOpen: false,
   expandedTasks: [],
   expandedCompletedTasks: [],
   expandedProjects: [],
@@ -276,6 +276,9 @@ export function normalizeAchievements(payload: unknown): Achievement[] {
 export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPreferences {
   if (!payload || typeof payload !== "object") return defaultDashboardUiPreferences;
   const value = payload as Partial<DashboardUiPreferences>;
+  // Only a single open panel represents a saved choice; older layouts opened all panels.
+  const taskPanels = (["longTaskSectionOpen", "annualSectionOpen", "shoppingSectionOpen"] as const).filter((key) => value[key] === true);
+  const utilityPanels = (["projectSectionOpen", "routineCheckinSectionOpen", "achievementSectionOpen", "footprintSectionOpen"] as const).filter((key) => value[key] === true);
   const capacityStartHour = Number.isInteger(value.capacityStartHour) && value.capacityStartHour! >= 0 && value.capacityStartHour! < 24 ? value.capacityStartHour! : 9;
   return {
     executionSectionOpen: value.executionSectionOpen !== false,
@@ -288,11 +291,11 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
       : 60,
     dailyTaskSortMode: value.dailyTaskSortMode === "custom" ? "custom" : "time",
     annualSectionOpen:
-      typeof value.annualSectionOpen === "boolean" ? value.annualSectionOpen : true,
+      taskPanels.length === 1 && value.annualSectionOpen === true,
     shoppingSectionOpen:
-      typeof value.shoppingSectionOpen === "boolean" ? value.shoppingSectionOpen : true,
+      taskPanels.length === 1 && value.shoppingSectionOpen === true,
     longTaskSectionOpen:
-      typeof value.longTaskSectionOpen === "boolean" ? value.longTaskSectionOpen : true,
+      taskPanels.length === 1 && value.longTaskSectionOpen === true,
     completedSectionOpen:
       typeof value.completedSectionOpen === "boolean" ? value.completedSectionOpen : true,
     dailyTaskSectionOpen:
@@ -302,13 +305,13 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
     dailyArchiveSectionOpen:
       typeof value.dailyArchiveSectionOpen === "boolean" ? value.dailyArchiveSectionOpen : false,
     projectSectionOpen:
-      typeof value.projectSectionOpen === "boolean" ? value.projectSectionOpen : true,
+      utilityPanels.length === 1 && value.projectSectionOpen === true,
     routineCheckinSectionOpen:
-      typeof value.routineCheckinSectionOpen === "boolean" ? value.routineCheckinSectionOpen : true,
+      utilityPanels.length === 1 && value.routineCheckinSectionOpen === true,
     achievementSectionOpen:
-      typeof value.achievementSectionOpen === "boolean" ? value.achievementSectionOpen : true,
+      utilityPanels.length === 1 && value.achievementSectionOpen === true,
     footprintSectionOpen:
-      typeof value.footprintSectionOpen === "boolean" ? value.footprintSectionOpen : true,
+      utilityPanels.length === 1 && value.footprintSectionOpen === true,
     expandedTasks: Array.isArray(value.expandedTasks)
       ? value.expandedTasks.filter((item): item is string => typeof item === "string")
       : [],
