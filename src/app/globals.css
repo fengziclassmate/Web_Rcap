@@ -1080,6 +1080,22 @@
 .search-result:hover { background: var(--muted); }
 .module-header { padding: 1rem 1.25rem; }
 .task-dashboard-section { padding: 1rem 1.25rem; }
+.dashboard-section-card {
+  --section-accent: #047857;
+  margin: 0.75rem 1.25rem;
+  border: 1px solid color-mix(in oklch, var(--section-accent) 22%, var(--border));
+  border-left: 3px solid var(--section-accent);
+  border-radius: 0.75rem;
+  padding: 0.875rem;
+  background: color-mix(in oklch, var(--section-accent) 2%, white);
+  box-shadow: 0 1px 3px rgb(28 25 23 / 4%);
+}
+.research-progress-card { --section-accent: #0369a1; }
+.dashboard-section-heading[data-expanded="true"] {
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--section-accent) 16%, var(--border));
+  padding-bottom: 0.625rem;
+}
 .dashboard-panel-toolbar {
   display: flex;
   align-items: center;

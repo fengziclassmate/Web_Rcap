@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format, subDays } from "date-fns";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { defaultDashboardUiPreferences } from "@/lib/normalizers";
@@ -9,7 +10,7 @@ vi.mock("@/lib/supabase", () => ({
   supabase: { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }) } },
 }));
 
-function ControlledProjectDashboard({ today, initiallyCollapsed = false }: { today: string; initiallyCollapsed?: boolean }) {
+function ControlledProjectDashboard({ today, initiallyCollapsed = false, archiveDate }: { today: string; initiallyCollapsed?: boolean; archiveDate?: string }) {
   const [projects, setProjects] = useState<ProjectCheckin[]>([
     {
       id: "first",
@@ -18,8 +19,8 @@ function ControlledProjectDashboard({ today, initiallyCollapsed = false }: { tod
       startDate: today,
       checkins: [],
       archives: [],
-      dailyCheckins: [],
-      dailyCompletions: [],
+      dailyCheckins: archiveDate ? [{ id: "water", label: "喝水", time: "07:50" }] : [],
+      dailyCompletions: archiveDate ? [{ date: archiveDate, slotId: "water", completedAt: `${archiveDate}T07:50:00` }] : [],
     },
     {
       id: "second",
@@ -98,6 +99,27 @@ function ControlledProjectDashboard({ today, initiallyCollapsed = false }: { tod
 }
 
 describe("TaskDashboard task list sections", () => {
+  it("opens past daily check-ins from the toolbar without an inline archive", () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const archiveDate = format(subDays(new Date(), 1), "yyyy-MM-dd");
+    render(<ControlledProjectDashboard today={today} archiveDate={archiveDate} />);
+    const row = screen.getByRole("group", { name: "项目与生活记录" });
+    fireEvent.click(within(row).getByRole("button", { name: "日常打卡" }));
+    const content = within(screen.getByRole("region", { name: "日常打卡" }));
+    expect(content.queryByText("历史归档")).toBeNull();
+    expect(content.queryByText(archiveDate)).toBeNull();
+    const archiveButton = screen.getByRole("button", { name: "查看日常打卡归档库" });
+    expect(row.parentElement!.contains(archiveButton)).toBe(true);
+    expect(row.parentElement!.contains(screen.getByRole("button", { name: "添加日常打卡" }))).toBe(true);
+    fireEvent.click(archiveButton);
+    const archive = within(screen.getByRole("dialog", { name: "日常打卡归档库" }));
+    expect(archive.getByText(archiveDate)).toBeTruthy();
+    expect(archive.getByText("喝水")).toBeTruthy();
+    expect(archive.getByText("已打卡")).toBeTruthy();
+    expect(archive.getByText("1/1")).toBeTruthy();
+    expect(archive.queryByText(today)).toBeNull();
+  });
+
   it("switches rows independently and allows both rows to collapse", () => {
     render(<ControlledProjectDashboard today="2026-09-29" initiallyCollapsed />);
     expect(screen.queryByRole("button", { name: "今日执行" })).toBeNull();

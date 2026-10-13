@@ -35,7 +35,7 @@ import {
   type TaskType,
   type TaskUncertaintyLevel,
 } from "@/lib/types";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -380,6 +380,7 @@ export function TaskDashboard({
   const [draggingAnnualTaskId, setDraggingAnnualTaskId] = useState<string | null>(null);
   const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showRoutineCheckinForm, setShowRoutineCheckinForm] = useState(false);
+  const [routineArchiveOpen, setRoutineArchiveOpen] = useState(false);
   const [showAchievementDialog, setShowAchievementDialog] = useState(false);
   const [showAddFootprintDialog, setShowAddFootprintDialog] = useState(false);
   const [historyProjectId, setHistoryProjectId] = useState<string | null>(null);
@@ -1697,6 +1698,7 @@ export function TaskDashboard({
             </> : null}
             {activeUtilityPanel === "routine" ? <>
               <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowRoutineCheckinForm(true)} aria-label="添加日常打卡" title="添加日常打卡"><Plus className="h-4 w-4" aria-hidden /></Button>
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setRoutineArchiveOpen(true)} aria-label="查看日常打卡归档库" title={`归档库 · ${dailyCheckinArchive.length} 天`}><Archive className="h-3.5 w-3.5 text-emerald-700" aria-hidden /></Button>
             </> : null}
             {activeUtilityPanel === "achievement" ? <>
               <Button type="button" size="icon-sm" variant="outline" onClick={openCreateAchievement} aria-label="添加成就" title="添加成就"><Plus className="h-4 w-4" aria-hidden /></Button>
@@ -2025,59 +2027,7 @@ export function TaskDashboard({
               )}
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white/80 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-700">
-                  <CalendarRange className="h-4 w-4 text-stone-500" />
-                  历史归档
-                </p>
-                <span className="text-xs text-stone-500">按日期自动整理</span>
-              </div>
 
-              {dailyCheckinArchive.length > 0 ? (
-                <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-                  {dailyCheckinArchive.map((day) => (
-                    <div key={day.date} className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-medium text-stone-800">{day.date}</p>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-stone-600">
-                          {day.completedCount}/{day.totalCount}
-                        </span>
-                      </div>
-                      <div className="mt-2 space-y-1">
-                        {day.entries.map((entry) => (
-                          <div
-                            key={entry.id}
-                            className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1.5"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-medium text-stone-800">{entry.label}</p>
-                              <p className="text-xs tabular-nums text-stone-500">
-                                {entry.time}
-                                {entry.projectName ? ` · 来自 ${entry.projectName}` : ""}
-                              </p>
-                            </div>
-                            <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                                entry.completed
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-stone-100 text-stone-400"
-                              }`}
-                            >
-                              {entry.completed ? "已打卡" : "未打卡"}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-3 rounded-lg border border-dashed border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-500">
-                  还没有过往归档。今天完成的勾选会按日期保存，明天会在这里看到今天的记录。
-                </p>
-              )}
-            </div>
           </div>
       </section>
 
@@ -2196,6 +2146,58 @@ export function TaskDashboard({
       </div>
 
 
+
+      <Dialog open={routineArchiveOpen} onOpenChange={setRoutineArchiveOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Archive className="h-4 w-4 text-emerald-700" aria-hidden />日常打卡归档库</DialogTitle>
+            <DialogDescription>按日期查看往日的打卡记录和完成情况，共 {dailyCheckinArchive.length} 天。</DialogDescription>
+          </DialogHeader>
+          {dailyCheckinArchive.length > 0 ? (
+                <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+                  {dailyCheckinArchive.map((day) => (
+                    <div key={day.date} className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-stone-800">{day.date}</p>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-stone-600">
+                          {day.completedCount}/{day.totalCount}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {day.entries.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1.5"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-medium text-stone-800">{entry.label}</p>
+                              <p className="text-xs tabular-nums text-stone-500">
+                                {entry.time}
+                                {entry.projectName ? ` · 来自 ${entry.projectName}` : ""}
+                              </p>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                                entry.completed
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-stone-100 text-stone-400"
+                              }`}
+                            >
+                              {entry.completed ? "已打卡" : "未打卡"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg border border-dashed border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-500">
+                  还没有过往归档。今天完成的勾选会按日期保存，明天会在这里看到今天的记录。
+                </p>
+              )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
         <DialogContent className="rounded-sm border-stone-200">

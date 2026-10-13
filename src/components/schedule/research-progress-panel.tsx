@@ -173,9 +173,9 @@ function ResearchProgressContent({
   }
 
   return (
-    <section className="task-dashboard-section" data-testid="research-progress-panel">
-      <div className="border-t border-stone-200 pt-3">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
+    <section className="task-dashboard-section dashboard-section-card research-progress-card" aria-label="今日科研进展" data-testid="research-progress-panel">
+      <div>
+        <div className="dashboard-section-heading flex flex-wrap items-center gap-2" data-expanded={open}>
           <FlaskConical className="h-4 w-4 shrink-0 text-sky-800" aria-hidden />
           <h3 className="text-sm font-semibold text-stone-800">今日科研进展</h3>
           <Button type="button" size="icon-sm" variant="ghost" aria-label={open ? "折叠今日科研进展" : "展开今日科研进展"} aria-expanded={open} onClick={() => { setOpen(!open); try { localStorage.setItem("research-progress-open", open ? "closed" : "open"); } catch {} }}>{open ? "⌄" : "›"}</Button>

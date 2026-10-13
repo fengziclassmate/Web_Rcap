@@ -58,8 +58,8 @@ export function FollowUpPanel({ tasks, open, onOpenChange, onAdd, onUpdate, onDe
     </button>;
   }
 
-  return <section className="task-dashboard-section" aria-label="跟进事项">
-    <div className={`flex items-center justify-between gap-2 ${open ? "mb-3" : ""}`}>
+  return <section className="task-dashboard-section dashboard-section-card follow-up-card" aria-label="跟进事项">
+    <div className="dashboard-section-heading flex items-center justify-between gap-2" data-expanded={open}>
       <h3 className="min-w-0 flex-1 text-sm font-semibold"><button type="button" aria-label={open ? "折叠跟进事项" : "展开跟进事项"} aria-expanded={open} aria-controls={contentId} onClick={() => onOpenChange(!open)} className="flex w-full items-center gap-2 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"><ListChecks className="h-4 w-4 shrink-0 text-emerald-800" />跟进事项<span className="text-xs font-normal tabular-nums text-stone-500">{active.length}</span><ChevronDown aria-hidden className={`h-3.5 w-3.5 shrink-0 text-stone-500 transition-transform ${open ? "" : "-rotate-90"}`} /></button></h3>
       <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 gap-1 px-2 text-xs" onClick={() => setArchiveOpen(true)}><Archive className="h-3.5 w-3.5" />存档库 {archived.length}</Button>
     </div>
