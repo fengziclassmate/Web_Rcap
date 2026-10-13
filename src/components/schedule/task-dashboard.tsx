@@ -38,10 +38,6 @@ import {
   type TaskType,
   type TaskUncertaintyLevel,
 } from "@/lib/types";
-import {
-  Collapsible,
-  CollapsibleContent,
-} from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -403,30 +399,12 @@ export function TaskDashboard({
   const [editingFootprintId, setEditingFootprintId] = useState<string | null>(null);
   const [editingFootprintName, setEditingFootprintName] = useState("");
   const [editingFootprintDate, setEditingFootprintDate] = useState(getTodayISODate);
-  const group = uiPreferences.dashboardGroup ?? "today";
-  const longTaskSectionOpen = uiPreferences.longTaskSectionOpen;
-  const annualSectionOpen = uiPreferences.annualSectionOpen;
   const shoppingSectionOpen = uiPreferences.shoppingSectionOpen;
   const expandedCompletedTasks = useMemo(
     () => new Set(uiPreferences.expandedCompletedTasks),
     [uiPreferences.expandedCompletedTasks],
   );
   const [completedLibraryOpen, setCompletedLibraryOpen] = useState(false);
-  const activeUtilityPanel: "project" | "routine" | "achievement" | "footprint" | null =
-    group === "goals"
-      ? "project"
-      : uiPreferences.routineCheckinSectionOpen
-        ? "routine"
-        : uiPreferences.achievementSectionOpen
-          ? "achievement"
-          : uiPreferences.footprintSectionOpen
-            ? "footprint"
-            : "routine";
-  const activeTaskListPanel: "long" | "annual" | "shopping" | null = longTaskSectionOpen
-    ? "long"
-    : annualSectionOpen
-      ? "annual"
-      : null;
   const expandedProjects = useMemo(
     () => new Set(uiPreferences.expandedProjects),
     [uiPreferences.expandedProjects],
@@ -1156,56 +1134,6 @@ export function TaskDashboard({
     setDraggingAnnualTaskId(null);
   }
 
-  function setUtilityPanel(
-    panel: "project" | "routine" | "achievement" | "footprint",
-    open: boolean,
-  ) {
-    patchUiPreferences({
-      projectSectionOpen: open && panel === "project",
-      routineCheckinSectionOpen: open && panel === "routine",
-      achievementSectionOpen: open && panel === "achievement",
-      footprintSectionOpen: open && panel === "footprint",
-    });
-  }
-
-  function setTaskListPanel(panel: "long" | "annual" | "shopping", open: boolean) {
-    patchUiPreferences({
-      longTaskSectionOpen: open && panel === "long",
-      annualSectionOpen: open && panel === "annual",
-    });
-  }
-
-  function handleAddTaskListItem() {
-    if (activeTaskListPanel === "shopping") {
-      setShoppingAddDialogOpen(true);
-      return;
-    }
-    if (activeTaskListPanel === "annual") {
-      setShowAddAnnualDialog(true);
-      return;
-    }
-    setShowAddTaskDialog(true);
-  }
-
-  function handleAddUtilityItem() {
-    if (activeUtilityPanel === "routine") {
-      setShowRoutineCheckinForm(true);
-      return;
-    }
-
-    if (activeUtilityPanel === "achievement") {
-      openCreateAchievement();
-      return;
-    }
-
-    if (activeUtilityPanel === "footprint") {
-      setShowAddFootprintDialog(true);
-      return;
-    }
-
-    setShowAddProjectDialog(true);
-  }
-
   return (
     <aside className="module-shell">
       <div className="module-header px-6 py-5">
@@ -1213,11 +1141,6 @@ export function TaskDashboard({
           <ListTodo className="h-5 w-5 text-primary" />
           任务控制台
         </h2>
-        <div className="dashboard-groups mt-4" aria-label="工作台内容分组">
-          {([['today', '今日执行'], ['goals', '目标与项目'], ['life', '生活记录']] as const).map(([value, label]) => (
-            <button key={value} type="button" aria-pressed={group === value} onClick={() => patchUiPreferences({ dashboardGroup: value })}>{label}</button>
-          ))}
-        </div>
       </div>
 
 
@@ -1431,7 +1354,7 @@ export function TaskDashboard({
         </DialogContent>
       </Dialog>
 
-      <div hidden={group !== "today"}>
+      <div>
       <DailyTaskPanel
         tasks={tasks}
         events={events}
@@ -1456,69 +1379,16 @@ export function TaskDashboard({
       </div>
 
 
-      <div hidden={group !== "goals"} className="task-dashboard-section utility-panel-grid" data-testid="task-list-panel-group">
-        <div className="utility-panel-controls task-list-panel-controls">
-          <div className="utility-panel-tabs task-list-panel-tabs" role="tablist" aria-label="任务与清单">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTaskListPanel === "long"}
-              className={`utility-panel-tab ${activeTaskListPanel === "long" ? "utility-panel-tab-active" : ""}`}
-              onClick={() => setTaskListPanel("long", activeTaskListPanel !== "long")}
-            >
-              <ListTodo className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="shrink-0 whitespace-nowrap">长期任务</span>
-              <span className="shrink-0 text-xs tabular-nums opacity-70">{orderedIncompleteTasks.length}</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTaskListPanel === "annual"}
-              className={`utility-panel-tab ${activeTaskListPanel === "annual" ? "utility-panel-tab-active" : ""}`}
-              onClick={() => setTaskListPanel("annual", activeTaskListPanel !== "annual")}
-            >
-              <CalendarRange className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="shrink-0 whitespace-nowrap">年度任务</span>
-              <span className="shrink-0 text-xs tabular-nums opacity-70">{annualTasks.length}</span>
-            </button>
-
-          </div>
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-          {activeTaskListPanel ? (
-            <Button
-              type="button"
-              size="icon"
-              className="utility-panel-add shrink-0"
-              onClick={handleAddTaskListItem}
-              aria-label={activeTaskListPanel === "long" ? "添加长期任务" : activeTaskListPanel === "annual" ? "添加年度任务" : "添加购物项"}
-              title={activeTaskListPanel === "long" ? "添加长期任务" : activeTaskListPanel === "annual" ? "添加年度任务" : "添加购物项"}
-            >
-              <Plus className="h-4 w-4" aria-hidden />
-            </Button>
-          ) : null}
-          {activeTaskListPanel === "long" ? (
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              className="h-8 w-8 shrink-0 rounded-full border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-              onClick={() => setCompletedLibraryOpen(true)}
-              aria-label={`查看已完成任务，共 ${completedTaskInsights.total} 项`}
-              title={`已完成任务 · ${completedTaskInsights.total} 项`}
-            >
-              <CheckCircle className="h-3.5 w-3.5" aria-hidden />
-            </Button>
-          ) : null}
-          </div>
-        </div>
-
+      <div className="task-dashboard-section utility-panel-grid" data-testid="task-list-panel-group">
         <section className="utility-panel utility-panel-long-task">
-        <Collapsible
-          className="utility-panel-root"
-          open={activeTaskListPanel === "long"}
-          onOpenChange={(open) => setTaskListPanel("long", open)}
-        >
-          <CollapsibleContent className="utility-panel-content mt-3">
+        <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><ListTodo className="h-4 w-4 text-primary" aria-hidden />长期任务</h3>
+            <div className="flex items-center gap-2">
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowAddTaskDialog(true)} aria-label="添加长期任务" title="添加长期任务"><Plus className="h-4 w-4" aria-hidden /></Button>
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setCompletedLibraryOpen(true)} aria-label={`查看已完成任务，共 ${completedTaskInsights.total} 项`} title={`已完成任务 · ${completedTaskInsights.total} 项`}><CheckCircle className="h-3.5 w-3.5 text-emerald-700" aria-hidden /></Button>
+            </div>
+          </div>
+          <div className="utility-panel-content mt-3">
             <div className="mb-3 flex items-center gap-1.5">
               <Button
                 type="button"
@@ -1681,17 +1551,17 @@ export function TaskDashboard({
             {orderedIncompleteTasks.length === 0 && (
               <p className="mt-4 border border-stone-200 rounded-lg p-4 text-sm text-stone-500 text-center">当前没有未完成长期任务</p>
             )}
-          </CollapsibleContent>
-        </Collapsible>
+          </div>
         </section>
 
         <section className="utility-panel utility-panel-annual">
-          <Collapsible
-            className="utility-panel-root"
-            open={activeTaskListPanel === "annual"}
-            onOpenChange={(open) => setTaskListPanel("annual", open)}
-          >
-            <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><CalendarRange className="h-4 w-4 text-primary" aria-hidden />年度任务</h3>
+            <div className="flex items-center gap-2">
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowAddAnnualDialog(true)} aria-label="添加年度任务" title="添加年度任务"><Plus className="h-4 w-4" aria-hidden /></Button>
+            </div>
+          </div>
+          <div className="utility-panel-content mt-3 space-y-3">
               {annualTasks.length > 0 ? (
                 <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">
                   {annualTasks.map((item) => (
@@ -1755,71 +1625,22 @@ export function TaskDashboard({
               ) : (
                 <p className="text-center text-sm text-stone-500">尚未添加年度任务。</p>
               )}
-            </CollapsibleContent>
-          </Collapsible>
+            </div>
         </section>
 
 
       </div>
 
 
-      <div hidden={group === "today"} className="task-dashboard-section utility-panel-grid">
-      <div className="utility-panel-controls">
-        <div className="utility-panel-tabs" role="tablist" aria-label="打卡、成就与足迹栏目">
-          <button hidden={group !== "goals"}
-            type="button"
-            role="tab"
-            aria-selected={activeUtilityPanel === "project"}
-            className={`utility-panel-tab ${activeUtilityPanel === "project" ? "utility-panel-tab-active" : ""}`}
-            onClick={() => setUtilityPanel("project", activeUtilityPanel !== "project")}
-          >
-            <KanbanSquare className="h-4 w-4 shrink-0" />
-            <span className="truncate">项目</span>
-          </button>
-          <button hidden={group !== "life"}
-            type="button"
-            role="tab"
-            aria-selected={activeUtilityPanel === "routine"}
-            className={`utility-panel-tab ${activeUtilityPanel === "routine" ? "utility-panel-tab-active" : ""}`}
-            onClick={() => setUtilityPanel("routine", activeUtilityPanel !== "routine")}
-          >
-            <Clock className="h-4 w-4 shrink-0" />
-            <span className="truncate">日常</span>
-          </button>
-          <button hidden={group !== "life"}
-            type="button"
-            role="tab"
-            aria-selected={activeUtilityPanel === "achievement"}
-            className={`utility-panel-tab ${activeUtilityPanel === "achievement" ? "utility-panel-tab-active" : ""}`}
-            onClick={() => setUtilityPanel("achievement", activeUtilityPanel !== "achievement")}
-          >
-            <Trophy className="h-4 w-4 shrink-0" />
-            <span className="truncate">成就</span>
-          </button>
-          <button hidden={group !== "life"}
-            type="button"
-            role="tab"
-            aria-selected={activeUtilityPanel === "footprint"}
-            className={`utility-panel-tab ${activeUtilityPanel === "footprint" ? "utility-panel-tab-active" : ""}`}
-            onClick={() => setUtilityPanel("footprint", activeUtilityPanel !== "footprint")}
-          >
-            <Footprints className="h-4 w-4 shrink-0" />
-            <span className="truncate">足迹</span>
-          </button>
-        </div>
-        {activeUtilityPanel ? (
-          <Button type="button" size="icon" className="utility-panel-add shrink-0" onClick={handleAddUtilityItem} aria-label="添加当前栏目项目" title="添加当前栏目项目">
-            <Plus className="h-4 w-4" />
-          </Button>
-        ) : null}
-      </div>
+      <div className="task-dashboard-section utility-panel-grid">
       <section className="utility-panel utility-panel-project">
-        <Collapsible
-          className="utility-panel-root"
-          open={activeUtilityPanel === "project"}
-          onOpenChange={(open) => setUtilityPanel("project", open)}
-        >
-          <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><KanbanSquare className="h-4 w-4 text-primary" aria-hidden />项目</h3>
+            <div className="flex items-center gap-2">
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowAddProjectDialog(true)} aria-label="添加项目" title="添加项目"><Plus className="h-4 w-4" aria-hidden /></Button>
+            </div>
+          </div>
+          <div className="utility-panel-content mt-3 space-y-3">
             <div className="space-y-3">
               {visibleProjectCheckins.map((project) => {
                 const projectExpanded = expandedProjects.has(project.id);
@@ -2036,17 +1857,17 @@ export function TaskDashboard({
                 {projectSortAnnouncement}
               </p>
             </div>
-          </CollapsibleContent>
-        </Collapsible>
+          </div>
       </section>
 
       <section className="utility-panel utility-panel-routine" data-project-checkin-id={ROUTINE_CHECKIN_PROJECT_ID}>
-        <Collapsible
-          className="utility-panel-root"
-          open={activeUtilityPanel === "routine"}
-          onOpenChange={(open) => setUtilityPanel("routine", open)}
-        >
-          <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><Clock className="h-4 w-4 text-primary" aria-hidden />日常打卡</h3>
+            <div className="flex items-center gap-2">
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowRoutineCheckinForm(true)} aria-label="添加日常打卡" title="添加日常打卡"><Plus className="h-4 w-4" aria-hidden /></Button>
+            </div>
+          </div>
+          <div className="utility-panel-content mt-3 space-y-3">
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
@@ -2196,17 +2017,17 @@ export function TaskDashboard({
                 </p>
               )}
             </div>
-          </CollapsibleContent>
-        </Collapsible>
+          </div>
       </section>
 
       <section className="utility-panel utility-panel-achievement">
-        <Collapsible
-          className="utility-panel-root"
-          open={activeUtilityPanel === "achievement"}
-          onOpenChange={(open) => setUtilityPanel("achievement", open)}
-        >
-          <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><Trophy className="h-4 w-4 text-primary" aria-hidden />成就</h3>
+            <div className="flex items-center gap-2">
+              <Button type="button" size="icon-sm" variant="outline" onClick={openCreateAchievement} aria-label="添加成就" title="添加成就"><Plus className="h-4 w-4" aria-hidden /></Button>
+            </div>
+          </div>
+          <div className="utility-panel-content mt-3 space-y-3">
             {groupedAchievements.length === 0 ? (
               <p className="rounded-lg border border-stone-200 p-4 text-sm text-stone-500">
                 暂无成就记录。可以把今天完成的重要进展记下来。
@@ -2264,17 +2085,17 @@ export function TaskDashboard({
                 ))}
               </div>
             )}
-          </CollapsibleContent>
-        </Collapsible>
+          </div>
       </section>
 
       <section className="utility-panel utility-panel-footprint">
-        <Collapsible
-          className="utility-panel-root"
-          open={activeUtilityPanel === "footprint"}
-          onOpenChange={(open) => setUtilityPanel("footprint", open)}
-        >
-          <CollapsibleContent className="utility-panel-content mt-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><Footprints className="h-4 w-4 text-primary" aria-hidden />足迹</h3>
+            <div className="flex items-center gap-2">
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowAddFootprintDialog(true)} aria-label="添加足迹" title="添加足迹"><Plus className="h-4 w-4" aria-hidden /></Button>
+            </div>
+          </div>
+          <div className="utility-panel-content mt-3 space-y-3">
             {footprints.length === 0 ? (
               <p className="rounded-lg border border-dashed border-stone-200 bg-white/70 px-3 py-4 text-sm text-stone-500">
                 暂无足迹项目，点击添加开始跟踪。
@@ -2321,13 +2142,12 @@ export function TaskDashboard({
                 })}
               </div>
             )}
-          </CollapsibleContent>
-        </Collapsible>
+          </div>
       </section>
       </div>
 
 
-      <div hidden={group !== "today"}>
+      <div>
       <ResearchProgressPanel
         userId={userId}
         logsReady={logsReady}
@@ -2348,7 +2168,7 @@ export function TaskDashboard({
         onOpenRequestHandled={onOpenRequestHandled}
       />
       </div>
-      <div hidden={group !== "life"} className="task-dashboard-section">
+      <div className="task-dashboard-section">
         <ShoppingList
           variant="section"
           items={shoppingItems}

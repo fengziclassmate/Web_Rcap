@@ -23,7 +23,6 @@ import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/cate
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   executionSectionOpen: true,
   followUpSectionOpen: true,
-  dashboardGroup: "today",
   capacityStartHour: 9,
   capacityEndHour: 22,
   timeGranularity: 60,
@@ -279,7 +278,6 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
   const value = payload as Partial<DashboardUiPreferences>;
   const capacityStartHour = Number.isInteger(value.capacityStartHour) && value.capacityStartHour! >= 0 && value.capacityStartHour! < 24 ? value.capacityStartHour! : 9;
   return {
-    dashboardGroup: value.dashboardGroup === "goals" || value.dashboardGroup === "life" ? value.dashboardGroup : "today",
     executionSectionOpen: value.executionSectionOpen !== false,
     followUpSectionOpen: value.followUpSectionOpen !== false,
     capacityStartHour,

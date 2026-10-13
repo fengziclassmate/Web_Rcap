@@ -190,7 +190,6 @@ export function WorkbenchApp() {
     const token = Date.now();
     if (result.task) {
       setActiveModule("schedule");
-      setDashboardUiPreferences((previous) => ({ ...previous, dashboardGroup: result.task!.taskType === "long" ? "goals" : "today" }));
       setOpenTaskRequest({ id: result.id, token });
     } else if (result.event) {
       const event = result.event;
@@ -203,7 +202,6 @@ export function WorkbenchApp() {
       setActiveModule("schedule");
       const kind = result.collection;
       setDashboardUiPreferences((previous) => ({ ...previous,
-        dashboardGroup: kind === "shopping" || result.id === ROUTINE_CHECKIN_PROJECT_ID ? "life" : "goals",
         ...(kind === "annual" ? { annualSectionOpen: true, longTaskSectionOpen: false } : {}),
         ...(kind === "shopping" ? { shoppingSectionOpen: true } : {}),
         ...(kind === "project" ? { projectSectionOpen: true, expandedProjects: [...new Set([...previous.expandedProjects, result.id])] } : {}),
@@ -993,10 +991,18 @@ export function WorkbenchApp() {
   return (
     <AccountScope.Provider key={user.id} value={user.id}>
     <main data-workbench className={`${shellClass} pb-4`}>
-      <div className="relative z-10 mx-auto flex max-w-[1880px] items-center justify-between gap-3 px-5 pt-4">
+      <div className="relative z-10 mx-auto flex max-w-[1880px] flex-wrap items-center justify-between gap-3 px-5 pt-4">
+        <div className="flex min-w-0 items-center gap-4">
         <div className="min-w-0 px-1 py-1">
           <p className="truncate text-[11px] tracking-wide text-stone-500">当前账号</p>
           <p className="mt-0.5 min-w-0 truncate text-sm font-medium text-stone-900">{user.email}</p>
+        </div>
+        <div role="status" aria-live="polite" className={`flex flex-wrap items-center gap-2 rounded-xl px-2 py-1 text-xs ${["error", "offline", "conflict"].includes(sync.status) ? "border border-amber-200 bg-amber-50 text-amber-900" : "text-stone-500"}`}>
+          {sync.status === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : sync.status === "saved" ? <Check className="size-3.5 text-emerald-700" /> : <CloudOff className="size-3.5" />}
+          <span>{sync.message || ({ loading: "正在读取日程…", saved: "已同步到云端", pending: "已保存在本机，等待同步…", saving: "正在同步…", offline: "离线修改已保存在本机", error: "同步失败", conflict: "需要处理同步冲突" })[sync.status]}</span>
+          {["error", "offline"].includes(sync.status) && <Button variant="ghost" size="xs" onClick={() => void sync.retry()}><RefreshCw />重试同步</Button>}
+          {sync.status === "conflict" && <><Button variant="outline" size="xs" onClick={() => sync.resolve("local")}>冲突处保留本机</Button><Button variant="outline" size="xs" onClick={() => sync.resolve("remote")}>冲突处保留云端</Button></>}
+        </div>
         </div>
         <div className="flex items-center gap-2">
           <GlobalSearch events={events} tasks={tasks} logs={logPosts} annualTasks={annualTasks} projects={projectCheckins} shopping={shoppingItems} logsReady={logReady} onLocate={locateSearchResult} />
@@ -1036,14 +1042,6 @@ export function WorkbenchApp() {
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto max-w-[1880px] px-4 pt-0.5">
-        <div role="status" aria-live="polite" className={`flex flex-wrap items-center gap-2 rounded-xl px-2 py-1 text-xs ${["error", "offline", "conflict"].includes(sync.status) ? "border border-amber-200 bg-amber-50 text-amber-900" : "text-stone-500"}`}>
-          {sync.status === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : sync.status === "saved" ? <Check className="size-3.5 text-emerald-700" /> : <CloudOff className="size-3.5" />}
-          <span>{sync.message || ({ loading: "正在读取日程…", saved: "已同步到云端", pending: "已保存在本机，等待同步…", saving: "正在同步…", offline: "离线修改已保存在本机", error: "同步失败", conflict: "需要处理同步冲突" })[sync.status]}</span>
-          {["error", "offline"].includes(sync.status) && <Button variant="ghost" size="xs" onClick={() => void sync.retry()}><RefreshCw />重试同步</Button>}
-          {sync.status === "conflict" && <><Button variant="outline" size="xs" onClick={() => sync.resolve("local")}>冲突处保留本机</Button><Button variant="outline" size="xs" onClick={() => sync.resolve("remote")}>冲突处保留云端</Button></>}
-        </div>
-      </div>
       <div className="relative z-10 mx-auto flex max-w-[1880px] flex-col gap-4 px-4 py-3">
         <MonitoringSidebar active={activeModule} onChange={setActiveModule} />
 
@@ -1177,7 +1175,6 @@ export function WorkbenchApp() {
         }}
         onOpenTask={(task) => {
           setActiveModule("schedule");
-          setDashboardUiPreferences((previous) => ({ ...previous, dashboardGroup: task.taskType === "long" ? "goals" : "today" }));
           setOpenTaskRequest({ id: task.id, token: Date.now() });
         }}
         onToggleTask={handleToggleTask}

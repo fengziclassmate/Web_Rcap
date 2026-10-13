@@ -140,7 +140,6 @@ export type FootprintItem = {
 };
 
 export type DashboardUiPreferences = {
-  dashboardGroup?: "today" | "goals" | "life";
   executionSectionOpen?: boolean;
   followUpSectionOpen?: boolean;
   capacityStartHour?: number;

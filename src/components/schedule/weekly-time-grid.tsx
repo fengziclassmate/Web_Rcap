@@ -548,7 +548,6 @@ export function WeeklyTimeGrid({
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
   const resizePreviewRef = useRef<ResizePreview | null>(null);
-  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const timelineBodyRef = useRef<HTMLDivElement | null>(null);
   const selectionDragRef = useRef<SelectionDrag | null>(null);
   const suppressSlotClickRef = useRef(false);
@@ -840,12 +839,6 @@ export function WeeklyTimeGrid({
   }, [displayDates, displayDateKeys, displayEventSegments, expandedEvents, resizePreview, viewMode]);
 
   const visibleRangeStart = format(currentWeekStart, "yyyy-MM-dd");
-  useEffect(() => {
-    if (viewMode !== "month" && timelineScrollRef.current) {
-      timelineScrollRef.current.scrollTop = 8 * hourCellHeight;
-    }
-  }, [visibleRangeStart, viewMode]);
-
   const timelineGridTemplateColumns = useMemo(
     () => `${viewMode === "day" ? 72 : 56}px repeat(${timelineDayLayouts.length}, minmax(0, 1fr))`,
     [timelineDayLayouts.length, viewMode],
@@ -1742,7 +1735,7 @@ export function WeeklyTimeGrid({
     : null;
 
   return (
-    <section className="calendar-panel overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+    <section className="calendar-panel overflow-clip rounded-2xl border border-stone-200 bg-white shadow-sm">
       <header className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-4 py-3">
         <div className="shrink-0">
           <h2 className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-gray-900">
@@ -1813,7 +1806,7 @@ export function WeeklyTimeGrid({
             </div>
           ) : null}
 
-          {onToday && <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={() => { onToday(); if (timelineScrollRef.current) timelineScrollRef.current.scrollTop = 8 * hourCellHeight; }}>今天</Button>}
+          {onToday && <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={onToday}>今天</Button>}
           <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" aria-label={viewMode === "day" ? "前一天" : viewMode === "week" ? "前一周" : "前一月"} title="上一时段" onClick={onPrevWeek}>
             <ChevronLeft className="h-3.5 w-3.5" />
 
@@ -1835,10 +1828,10 @@ export function WeeklyTimeGrid({
         </div>
       </header>
 
-      <div className="overflow-hidden">
+      <div className="overflow-clip">
         <div className="relative min-w-0">
           {viewMode !== "month" ? (
-            <div ref={timelineScrollRef} className="calendar-scroll" role="region" aria-label="全天日程时间网格" tabIndex={0}>
+            <div className="calendar-grid" role="region" aria-label="全天日程时间网格">
               <div
                 className="sticky top-0 z-[80] grid border-b border-stone-200 bg-white shadow-[0_1px_0_rgba(0,0,0,0.03)]"
                 style={{ gridTemplateColumns: timelineGridTemplateColumns }}
