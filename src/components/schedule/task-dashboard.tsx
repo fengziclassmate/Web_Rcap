@@ -11,15 +11,11 @@ import {
   ListTodo,
   Plus,
   RotateCcw,
-  ShoppingBasket,
   Star,
   Trash2,
   AlertTriangle,
-  Footprints,
-  KanbanSquare,
   GripVertical,
   Pencil,
-  Trophy,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1389,22 +1385,51 @@ export function TaskDashboard({
       </div>
 
 
+      <div>
+      <ResearchProgressPanel
+        userId={userId}
+        logsReady={logsReady}
+        date={todayDate}
+        posts={logPosts}
+        saving={logSaving}
+        onCreatePost={onCreateLogPost}
+        onOpenLogs={onOpenLogs}
+      />
+      <FollowUpPanel
+        tasks={tasks}
+        open={uiPreferences.followUpSectionOpen !== false}
+        onOpenChange={(open) => patchUiPreferences({ followUpSectionOpen: open })}
+        onAdd={(name) => onAddTask(name, "", "followup")}
+        onUpdate={onUpdateTask}
+        onDelete={onDeleteTask}
+        openTaskRequest={openTaskRequest}
+        onOpenRequestHandled={onOpenRequestHandled}
+      />
+      </div>
+
       <div className="task-dashboard-section utility-panel-grid" data-testid="task-list-panel-group">
-        <div className="dashboard-panel-switch grid-cols-3" role="group" aria-label="任务与清单">
+        <div className="dashboard-panel-toolbar">
+          <div className="dashboard-panel-switch grid-cols-3" role="group" aria-label="任务与清单">
           {([['long', '长期任务'], ['annual', '年度任务'], ['shopping', '购物清单']] as const).map(([panel, label]) => (
-            <button key={panel} type="button" aria-expanded={activeTaskListPanel === panel} aria-controls={`task-panel-${panel}`} onClick={() => setTaskListPanel(activeTaskListPanel === panel ? null : panel)}>
+            <button id={`task-panel-trigger-${panel}`} key={panel} type="button" aria-expanded={activeTaskListPanel === panel} aria-controls={`task-panel-${panel}`} onClick={() => setTaskListPanel(activeTaskListPanel === panel ? null : panel)}>
               {label}<ChevronDown className={`size-3 shrink-0 transition-transform ${activeTaskListPanel === panel ? "" : "-rotate-90"}`} aria-hidden />
             </button>
           ))}
         </div>
-        <section id="task-panel-long" hidden={activeTaskListPanel !== "long"} className="utility-panel utility-panel-long-task">
-        <div className="flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><ListTodo className="h-4 w-4 text-primary" aria-hidden />长期任务</h3>
-            <div className="flex items-center gap-2">
+          {activeTaskListPanel ? <div className="dashboard-panel-actions">
+            {activeTaskListPanel === "long" ? <>
               <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowAddTaskDialog(true)} aria-label="添加长期任务" title="添加长期任务"><Plus className="h-4 w-4" aria-hidden /></Button>
               <Button type="button" size="icon-sm" variant="outline" onClick={() => setCompletedLibraryOpen(true)} aria-label={`查看已完成任务，共 ${completedTaskInsights.total} 项`} title={`已完成任务 · ${completedTaskInsights.total} 项`}><CheckCircle className="h-3.5 w-3.5 text-emerald-700" aria-hidden /></Button>
-            </div>
-          </div>
+            </> : null}
+            {activeTaskListPanel === "annual" ? <>
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowAddAnnualDialog(true)} aria-label="添加年度任务" title="添加年度任务"><Plus className="h-4 w-4" aria-hidden /></Button>
+            </> : null}
+            {activeTaskListPanel === "shopping" ? <>
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShoppingAddDialogOpen(true)} aria-label="添加购物项" title="添加购物项"><Plus className="h-4 w-4" aria-hidden /></Button>
+            </> : null}
+          </div> : null}
+        </div>
+        <section id="task-panel-long" aria-labelledby="task-panel-trigger-long" hidden={activeTaskListPanel !== "long"} className="utility-panel utility-panel-long-task">
           <div className="utility-panel-content mt-3">
             <div className="mb-3 flex items-center gap-1.5">
               <Button
@@ -1571,13 +1596,7 @@ export function TaskDashboard({
           </div>
         </section>
 
-        <section id="task-panel-annual" hidden={activeTaskListPanel !== "annual"} className="utility-panel utility-panel-annual">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><CalendarRange className="h-4 w-4 text-primary" aria-hidden />年度任务</h3>
-            <div className="flex items-center gap-2">
-              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowAddAnnualDialog(true)} aria-label="添加年度任务" title="添加年度任务"><Plus className="h-4 w-4" aria-hidden /></Button>
-            </div>
-          </div>
+        <section id="task-panel-annual" aria-labelledby="task-panel-trigger-annual" hidden={activeTaskListPanel !== "annual"} className="utility-panel utility-panel-annual">
           <div className="utility-panel-content mt-3 space-y-3">
               {annualTasks.length > 0 ? (
                 <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">
@@ -1646,11 +1665,7 @@ export function TaskDashboard({
         </section>
 
 
-        <section id="task-panel-shopping" hidden={activeTaskListPanel !== "shopping"} className="utility-panel">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><ShoppingBasket className="h-4 w-4 text-primary" aria-hidden />购物清单</h3>
-            <Button type="button" size="icon-sm" variant="outline" onClick={() => setShoppingAddDialogOpen(true)} aria-label="添加购物项" title="添加购物项"><Plus className="h-4 w-4" aria-hidden /></Button>
-          </div>
+        <section id="task-panel-shopping" aria-labelledby="task-panel-trigger-shopping" hidden={activeTaskListPanel !== "shopping"} className="utility-panel">
           <ShoppingList
             variant="panel"
             items={shoppingItems}
@@ -1668,20 +1683,30 @@ export function TaskDashboard({
 
 
       <div className="task-dashboard-section utility-panel-grid" data-testid="utility-panel-group">
-        <div className="dashboard-panel-switch grid-cols-4" role="group" aria-label="项目与生活记录">
+        <div className="dashboard-panel-toolbar">
+          <div className="dashboard-panel-switch grid-cols-4" role="group" aria-label="项目与生活记录">
           {([['project', '项目'], ['routine', '日常打卡'], ['achievement', '成就'], ['footprint', '足迹']] as const).map(([panel, label]) => (
-            <button key={panel} type="button" aria-expanded={activeUtilityPanel === panel} aria-controls={`utility-panel-${panel}`} onClick={() => setUtilityPanel(activeUtilityPanel === panel ? null : panel)}>
+            <button id={`utility-panel-trigger-${panel}`} key={panel} type="button" aria-expanded={activeUtilityPanel === panel} aria-controls={`utility-panel-${panel}`} onClick={() => setUtilityPanel(activeUtilityPanel === panel ? null : panel)}>
               {label}<ChevronDown className={`size-3 shrink-0 transition-transform ${activeUtilityPanel === panel ? "" : "-rotate-90"}`} aria-hidden />
             </button>
           ))}
         </div>
-      <section id="utility-panel-project" hidden={activeUtilityPanel !== "project"} className="utility-panel utility-panel-project">
-        <div className="flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><KanbanSquare className="h-4 w-4 text-primary" aria-hidden />项目</h3>
-            <div className="flex items-center gap-2">
+          {activeUtilityPanel ? <div className="dashboard-panel-actions">
+            {activeUtilityPanel === "project" ? <>
               <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowAddProjectDialog(true)} aria-label="添加项目" title="添加项目"><Plus className="h-4 w-4" aria-hidden /></Button>
-            </div>
-          </div>
+            </> : null}
+            {activeUtilityPanel === "routine" ? <>
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowRoutineCheckinForm(true)} aria-label="添加日常打卡" title="添加日常打卡"><Plus className="h-4 w-4" aria-hidden /></Button>
+            </> : null}
+            {activeUtilityPanel === "achievement" ? <>
+              <Button type="button" size="icon-sm" variant="outline" onClick={openCreateAchievement} aria-label="添加成就" title="添加成就"><Plus className="h-4 w-4" aria-hidden /></Button>
+            </> : null}
+            {activeUtilityPanel === "footprint" ? <>
+              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowAddFootprintDialog(true)} aria-label="添加足迹" title="添加足迹"><Plus className="h-4 w-4" aria-hidden /></Button>
+            </> : null}
+          </div> : null}
+        </div>
+      <section id="utility-panel-project" aria-labelledby="utility-panel-trigger-project" hidden={activeUtilityPanel !== "project"} className="utility-panel utility-panel-project">
           <div className="utility-panel-content mt-3 space-y-3">
             <div className="space-y-3">
               {visibleProjectCheckins.map((project) => {
@@ -1902,13 +1927,7 @@ export function TaskDashboard({
           </div>
       </section>
 
-      <section id="utility-panel-routine" hidden={activeUtilityPanel !== "routine"} className="utility-panel utility-panel-routine" data-project-checkin-id={ROUTINE_CHECKIN_PROJECT_ID}>
-        <div className="flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><Clock className="h-4 w-4 text-primary" aria-hidden />日常打卡</h3>
-            <div className="flex items-center gap-2">
-              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowRoutineCheckinForm(true)} aria-label="添加日常打卡" title="添加日常打卡"><Plus className="h-4 w-4" aria-hidden /></Button>
-            </div>
-          </div>
+      <section id="utility-panel-routine" aria-labelledby="utility-panel-trigger-routine" hidden={activeUtilityPanel !== "routine"} className="utility-panel utility-panel-routine" data-project-checkin-id={ROUTINE_CHECKIN_PROJECT_ID}>
           <div className="utility-panel-content mt-3 space-y-3">
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
               <div className="flex items-center justify-between gap-2">
@@ -2062,13 +2081,7 @@ export function TaskDashboard({
           </div>
       </section>
 
-      <section id="utility-panel-achievement" hidden={activeUtilityPanel !== "achievement"} className="utility-panel utility-panel-achievement">
-        <div className="flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><Trophy className="h-4 w-4 text-primary" aria-hidden />成就</h3>
-            <div className="flex items-center gap-2">
-              <Button type="button" size="icon-sm" variant="outline" onClick={openCreateAchievement} aria-label="添加成就" title="添加成就"><Plus className="h-4 w-4" aria-hidden /></Button>
-            </div>
-          </div>
+      <section id="utility-panel-achievement" aria-labelledby="utility-panel-trigger-achievement" hidden={activeUtilityPanel !== "achievement"} className="utility-panel utility-panel-achievement">
           <div className="utility-panel-content mt-3 space-y-3">
             {groupedAchievements.length === 0 ? (
               <p className="rounded-lg border border-stone-200 p-4 text-sm text-stone-500">
@@ -2130,13 +2143,7 @@ export function TaskDashboard({
           </div>
       </section>
 
-      <section id="utility-panel-footprint" hidden={activeUtilityPanel !== "footprint"} className="utility-panel utility-panel-footprint">
-        <div className="flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><Footprints className="h-4 w-4 text-primary" aria-hidden />足迹</h3>
-            <div className="flex items-center gap-2">
-              <Button type="button" size="icon-sm" variant="outline" onClick={() => setShowAddFootprintDialog(true)} aria-label="添加足迹" title="添加足迹"><Plus className="h-4 w-4" aria-hidden /></Button>
-            </div>
-          </div>
+      <section id="utility-panel-footprint" aria-labelledby="utility-panel-trigger-footprint" hidden={activeUtilityPanel !== "footprint"} className="utility-panel utility-panel-footprint">
           <div className="utility-panel-content mt-3 space-y-3">
             {footprints.length === 0 ? (
               <p className="rounded-lg border border-dashed border-stone-200 bg-white/70 px-3 py-4 text-sm text-stone-500">
@@ -2189,27 +2196,6 @@ export function TaskDashboard({
       </div>
 
 
-      <div>
-      <ResearchProgressPanel
-        userId={userId}
-        logsReady={logsReady}
-        date={todayDate}
-        posts={logPosts}
-        saving={logSaving}
-        onCreatePost={onCreateLogPost}
-        onOpenLogs={onOpenLogs}
-      />
-      <FollowUpPanel
-        tasks={tasks}
-        open={uiPreferences.followUpSectionOpen !== false}
-        onOpenChange={(open) => patchUiPreferences({ followUpSectionOpen: open })}
-        onAdd={(name) => onAddTask(name, "", "followup")}
-        onUpdate={onUpdateTask}
-        onDelete={onDeleteTask}
-        openTaskRequest={openTaskRequest}
-        onOpenRequestHandled={onOpenRequestHandled}
-      />
-      </div>
 
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
         <DialogContent className="rounded-sm border-stone-200">

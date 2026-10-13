@@ -113,22 +113,22 @@ describe("TaskDashboard task list sections", () => {
     fireEvent.click(utilities.getByRole("button", { name: "项目" }));
     for (const name of ["长期任务", "年度任务", "购物清单"]) {
       fireEvent.click(tasks.getByRole("button", { name }));
-      expect(screen.getByRole("heading", { name })).toBeTruthy();
-      expect(screen.getByRole("heading", { name: "项目" })).toBeTruthy();
+      expect(screen.getByRole("region", { name })).toBeTruthy();
+      expect(screen.getByRole("region", { name: "项目" })).toBeTruthy();
       expect(tasks.getAllByRole("button").filter((button) => button.getAttribute("aria-expanded") === "true")).toHaveLength(1);
     }
     expect(screen.getByRole("button", { name: "添加购物项" })).toBeTruthy();
     fireEvent.click(tasks.getByRole("button", { name: "购物清单" }));
     for (const name of ["日常打卡", "成就", "足迹"]) {
       fireEvent.click(utilities.getByRole("button", { name }));
-      expect(screen.getByRole("heading", { name })).toBeTruthy();
-      expect(screen.queryByRole("heading", { name: "项目" })).toBeNull();
+      expect(screen.getByRole("region", { name })).toBeTruthy();
+      expect(screen.queryByRole("region", { name: "项目" })).toBeNull();
     }
     fireEvent.click(utilities.getByRole("button", { name: "足迹" }));
     expect([...tasks.getAllByRole("button"), ...utilities.getAllByRole("button")].every((button) => button.getAttribute("aria-expanded") === "false")).toBe(true);
   });
 
-  it("keeps add and completed-library controls inside the selected task panel", () => {
+  it("places context actions beside the selectors and research above the task row", () => {
     const noop = vi.fn();
     const onUiPreferencesChange = vi.fn();
     render(
@@ -182,7 +182,7 @@ describe("TaskDashboard task list sections", () => {
 
     const taskListGroup = screen.getByTestId("task-list-panel-group");
     expect(within(taskListGroup).queryByRole("tablist")).toBeNull();
-    expect(within(taskListGroup).getByRole("heading", { name: "长期任务" })).toBeTruthy();
+    expect(within(taskListGroup).queryByRole("heading", { name: "长期任务" })).toBeNull();
     expect(within(taskListGroup).queryByRole("heading", { name: "年度任务" })).toBeNull();
     expect(within(taskListGroup).getByText("当前没有未完成长期任务")).toBeTruthy();
 
@@ -192,13 +192,16 @@ describe("TaskDashboard task list sections", () => {
     expect(onUiPreferencesChange).toHaveBeenCalledWith(expect.objectContaining({ annualSectionOpen: true, longTaskSectionOpen: false, shoppingSectionOpen: false }));
 
     const completedTaskButton = screen.getByRole("button", { name: /查看已完成任务/ });
-    expect(completedTaskButton.closest("section")).toBe(addButton.closest("section"));
+    const toolbar = screen.getByRole("group", { name: "任务与清单" }).parentElement!;
+    expect(toolbar.contains(completedTaskButton)).toBe(true);
+    expect(toolbar.contains(addButton)).toBe(true);
     expect(completedTaskButton.textContent?.trim()).toBe("");
     expect(
-      taskListGroup.compareDocumentPosition(
-        screen.getByTestId("research-progress-panel"),
+      screen.getByTestId("research-progress-panel").compareDocumentPosition(
+        taskListGroup,
       ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
+    expect(screen.getByRole("region", { name: "跟进事项" }).compareDocumentPosition(taskListGroup) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
 
     fireEvent.click(addButton);
     expect(screen.getByRole("dialog")).toBeTruthy();
