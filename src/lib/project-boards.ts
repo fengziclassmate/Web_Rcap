@@ -159,6 +159,18 @@ export function getTaskSubtaskProgress(task: BoardTask) {
   return { total: task.subtasks.length, done: task.subtasks.filter((item) => item.status === "done").length };
 }
 
+export function reorderVisibleRecords<T extends { id: string }>(items: T[], sourceId: string, targetId: string, visibleIds = items.map((item) => item.id)): T[] {
+  const latest = new Map(items.map((item) => [item.id, item]));
+  const order = [...new Set(visibleIds.filter((id) => latest.has(id)))];
+  const from = order.indexOf(sourceId);
+  const to = order.indexOf(targetId);
+  if (from < 0 || to < 0 || from === to) return items;
+  order.splice(to, 0, ...order.splice(from, 1));
+  const visible = new Set(order);
+  let index = 0;
+  return items.map((item) => visible.has(item.id) ? latest.get(order[index++])! : item);
+}
+
 export function reorderProjectBoards(boards: ProjectBoard[], sourceId: string, targetId: string) {
   const source = boards.find((board) => board.id === sourceId);
   const target = boards.find((board) => board.id === targetId);

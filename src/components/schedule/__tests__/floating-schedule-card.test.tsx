@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FloatingScheduleCard } from "@/components/schedule/floating-schedule-card";
 import { defaultDashboardUiPreferences, normalizeEvents, normalizeTasks } from "@/lib/normalizers";
@@ -19,7 +19,7 @@ beforeEach(() => {
   vi.stubGlobal("cancelAnimationFrame", window.clearTimeout);
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
 });
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 function mount() {
   const callbacks = { onOpenEvent: vi.fn(), onOpenTask: vi.fn(), onToggleTask: vi.fn() };

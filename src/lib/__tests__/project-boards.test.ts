@@ -1,9 +1,44 @@
 import { describe, expect, it } from "vitest";
-import { boardTasksToCsv, checklistProgress, createBoardTask, createBoardSubtask, createProjectBoard, getTaskSubtaskProgress, matchesBoardScope, normalizeProjectBoards, reorderProjectBoards, setBoardTaskStatus, toggleChecklistLine } from "../project-boards";
+import { boardTasksToCsv, checklistProgress, createBoardTask, createBoardSubtask, createProjectBoard, getTaskSubtaskProgress, matchesBoardScope, normalizeProjectBoards, reorderProjectBoards, reorderVisibleRecords, setBoardTaskStatus, toggleChecklistLine } from "../project-boards";
 import { normalizePersistedSchedulePayload } from "../schedule-persistence";
 import { mergeScheduleChanges } from "../schedule-merge";
 
 describe("project board records", () => {
+  it("reorders visible records without moving hidden rows or resurrecting removed records", () => {
+    const items = ["a", "hidden", "b", "c", "new"].map((id) => ({ id, notes: `最新备注 ${id}` }));
+    const reordered = reorderVisibleRecords(items, "c", "b", ["b", "c", "a"]);
+    expect(reordered.map((item) => item.id)).toEqual(["c", "hidden", "b", "a", "new"]);
+    expect(reordered[0]).toBe(items[3]);
+    expect(reordered[1]).toBe(items[1]);
+    expect(items.map((item) => item.id)).toEqual(["a", "hidden", "b", "c", "new"]);
+    expect(reorderVisibleRecords(items, "removed", "a", ["removed", "a"])).toBe(items);
+    expect(reorderVisibleRecords(items, "a", "a")).toBe(items);
+    expect(reorderVisibleRecords(items, "a", "missing")).toBe(items);
+  });
+
+  it("keeps task and subtask order through cloud merge and backup while merging remote notes", () => {
+    const board = createProjectBoard("research", "排序同步");
+    const base = normalizePersistedSchedulePayload({ project_boards: [board] })!;
+    const local = structuredClone(base);
+    const remote = structuredClone(base);
+    const taskId = board.tasks[0].id;
+    const childId = board.tasks[0].subtasks[0].id;
+    local.project_boards![0].tasks = reorderVisibleRecords(local.project_boards![0].tasks, board.tasks[3].id, taskId);
+    const localTask = local.project_boards![0].tasks.find((task) => task.id === taskId)!;
+    localTask.subtasks = reorderVisibleRecords(localTask.subtasks, localTask.subtasks[1].id, childId);
+    remote.project_boards![0].tasks[0].notes = "另一台电脑补充任务备注";
+    remote.project_boards![0].tasks[0].subtasks[0].notes = "另一台电脑补充子任务备注";
+    remote.project_boards![0].tasks[0].subtasks[0].status = "done";
+    const merged = mergeScheduleChanges(base, local, remote);
+    expect(merged.conflicts).toEqual([]);
+    expect(merged.value.project_boards![0].tasks.map((task) => task.id)).toEqual([board.tasks[3].id, ...board.tasks.slice(0, 3).map((task) => task.id)]);
+    const task = merged.value.project_boards![0].tasks.find((item) => item.id === taskId)!;
+    expect(task.notes).toBe("另一台电脑补充任务备注");
+    expect(task.subtasks.map((item) => item.id)).toEqual(board.tasks[0].subtasks.map((item) => item.id).reverse());
+    expect(task.subtasks.find((item) => item.id === childId)).toMatchObject({ notes: "另一台电脑补充子任务备注", status: "done" });
+    expect(normalizePersistedSchedulePayload(JSON.parse(JSON.stringify(merged.value)))).toEqual(merged.value);
+  });
+
   it("converts old annotated checklists to stable rows without losing content or completion", () => {
     const old = [{ id: "research", name: "研究", tasks: [{ id: "task", title: "验证方法", content: "# 核心问题\n- [ ] ==分析**边界**==\n补充数据来源\n- [X] {red}核对结果{/red}\n- [ ] [论文](https://example.com/paper)", notes: "原始备注" }] }];
     const normalized = normalizeProjectBoards(old);

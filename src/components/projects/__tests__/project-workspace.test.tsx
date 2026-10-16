@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ProjectWorkspace } from "../project-workspace";
 import { AnnotatedContent, AnnotatedEditor } from "../annotated-content";
 import { InlineProjectText } from "../subtask-table";
-import { createProjectBoard, type ProjectBoard } from "@/lib/project-boards";
+import { createBoardSubtask, createProjectBoard, type ProjectBoard } from "@/lib/project-boards";
 
 function Workspace({ initial = [] }: { initial?: ProjectBoard[] }) {
   const [boards, setBoards] = useState(initial);
@@ -12,6 +12,115 @@ function Workspace({ initial = [] }: { initial?: ProjectBoard[] }) {
 }
 
 describe("research and learning workspace", () => {
+  it("drags tasks from priority view into manual order and keeps that order when switching views", () => {
+    const board = createProjectBoard("research", "手动排序");
+    board.tasks.forEach((task, index) => { task.priority = (["p3", "p1", "p2", "p4"] as const)[index]; });
+    const { container } = render(<Workspace initial={[board]} />);
+    const order = () => Array.from(container.querySelectorAll(".project-content-scroll [data-task-order-id]")).map((row) => row.getAttribute("data-task-order-id"));
+    expect((screen.getByLabelText("任务排序") as HTMLSelectElement).value).toBe("manual");
+    fireEvent.change(screen.getByLabelText("任务排序"), { target: { value: "priority" } });
+    expect(order()).toEqual([1, 2, 0, 3].map((index) => board.tasks[index].id));
+    const dataTransfer = { setData: vi.fn(), effectAllowed: "move", dropEffect: "move" };
+    fireEvent.dragStart(screen.getByRole("button", { name: `移动任务：${board.tasks[3].title}` }), { dataTransfer });
+    const target = container.querySelector(`[data-task-order-id="${board.tasks[2].id}"]`)!;
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+    const expected = [1, 3, 2, 0].map((index) => board.tasks[index].id);
+    expect((screen.getByLabelText("任务排序") as HTMLSelectElement).value).toBe("manual");
+    expect(order()).toEqual(expected);
+    fireEvent.change(screen.getByLabelText("任务排序"), { target: { value: "due" } });
+    fireEvent.change(screen.getByLabelText("任务排序"), { target: { value: "manual" } });
+    expect(order()).toEqual(expected);
+    fireEvent.click(screen.getByRole("button", { name: "看板" }));
+    expect(order()).toEqual(expected);
+  });
+
+  it("keeps hidden tasks in place and prevents dropping tasks into another project", () => {
+    const first = createProjectBoard("research", "科研一");
+    const second = createProjectBoard("research", "科研二");
+    second.tasks[0].title = "另一个项目的任务";
+    first.tasks[0].phase = first.tasks[2].phase = "显示阶段";
+    const { container } = render(<Workspace initial={[first, second]} />);
+    const dataTransfer = { setData: vi.fn(), effectAllowed: "move", dropEffect: "move" };
+    const rows = () => Array.from(container.querySelectorAll(".project-task-table > tbody > tr[data-task-order-id]"));
+    fireEvent.dragStart(screen.getAllByRole("button", { name: `移动任务：${first.tasks[0].title}` })[0], { dataTransfer });
+    fireEvent.drop(rows().find((row) => row.getAttribute("data-task-order-id") === second.tasks[0].id)!, { dataTransfer });
+    expect(rows().map((row) => row.getAttribute("data-task-order-id"))).toEqual([...first.tasks, ...second.tasks].map((task) => task.id));
+    fireEvent.click(screen.getByRole("button", { name: "筛选" }));
+    fireEvent.change(screen.getByLabelText("筛选任务阶段"), { target: { value: "显示阶段" } });
+    fireEvent.dragStart(screen.getByRole("button", { name: `移动任务：${first.tasks[2].title}` }), { dataTransfer });
+    fireEvent.drop(rows()[0], { dataTransfer });
+    fireEvent.change(screen.getByLabelText("筛选任务阶段"), { target: { value: "all" } });
+    expect(rows().slice(0, 4).map((row) => row.getAttribute("data-task-order-id"))).toEqual([2, 1, 0, 3].map((index) => first.tasks[index].id));
+  });
+
+  it("drags and keyboard-sorts subtasks independently without changing notes or parent order", () => {
+    const board = createProjectBoard("research", "子任务排序");
+    const task = board.tasks[0];
+    task.subtasks.push(createBoardSubtask("第三个子任务"));
+    task.subtasks[0].notes = "保留备注";
+    task.subtasks[0].status = "done";
+    const { container } = render(<Workspace initial={[board]} />);
+    fireEvent.click(screen.getByRole("button", { name: `展开任务：${task.title}` }));
+    const table = screen.getByRole("table", { name: `${task.title}的子任务表` });
+    const order = () => Array.from(table.querySelectorAll("[data-subtask-id]")).map((row) => row.getAttribute("data-subtask-id"));
+    const dataTransfer = { setData: vi.fn(), effectAllowed: "move", dropEffect: "move" };
+    fireEvent.dragStart(screen.getByRole("button", { name: "移动子任务：第三个子任务" }), { dataTransfer });
+    const target = table.querySelectorAll("[data-subtask-id]")[0];
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+    expect(order()).toEqual([2, 0, 1].map((index) => task.subtasks[index].id));
+    fireEvent.keyDown(screen.getByRole("button", { name: "移动子任务：第三个子任务" }), { key: "ArrowDown" });
+    expect(order()).toEqual([0, 2, 1].map((index) => task.subtasks[index].id));
+    expect((screen.getByLabelText(`子任务备注：${task.subtasks[0].title}`) as HTMLTextAreaElement).value).toBe("保留备注");
+    expect((screen.getByLabelText(`完成子任务：${task.subtasks[0].title}`) as HTMLInputElement).checked).toBe(true);
+    expect(Array.from(container.querySelectorAll(".project-task-table > tbody > tr[data-task-order-id]")).map((row) => row.getAttribute("data-task-order-id"))).toEqual(board.tasks.map((item) => item.id));
+  });
+
+  it("saves subtask ordering from the task detail editor", async () => {
+    const board = createProjectBoard("research", "详情排序");
+    const task = board.tasks[0];
+    render(<Workspace initial={[board]} />);
+    fireEvent.click(screen.getByRole("button", { name: task.title }));
+    fireEvent.keyDown(screen.getByRole("button", { name: `移动子任务：${task.subtasks[1].title}` }), { key: "ArrowUp" });
+    fireEvent.click(screen.getByRole("button", { name: "保存任务" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: `展开任务：${task.title}` }));
+    expect(Array.from(screen.getByRole("table", { name: `${task.title}的子任务表` }).querySelectorAll("[data-subtask-id]")).map((row) => row.getAttribute("data-subtask-id"))).toEqual(task.subtasks.map((item) => item.id).reverse());
+  });
+
+  it("accepts a task drop onto an expanded task body and keeps its subtask draft", () => {
+    const board = createProjectBoard("research", "展开区排序");
+    const task = board.tasks[0];
+    const { container } = render(<Workspace initial={[board]} />);
+    fireEvent.click(screen.getByRole("button", { name: `展开任务：${task.title}` }));
+    const note = screen.getByLabelText(`子任务备注：${task.subtasks[0].title}`) as HTMLTextAreaElement;
+    fireEvent.focus(note);
+    fireEvent.change(note, { target: { value: "尚未失焦的备注" } });
+    const dataTransfer = { setData: vi.fn(), effectAllowed: "move", dropEffect: "move" };
+    fireEvent.dragStart(screen.getByRole("button", { name: `移动任务：${board.tasks[3].title}` }), { dataTransfer });
+    fireEvent.drop(container.querySelector(".project-expanded-cell")!, { dataTransfer });
+    expect(Array.from(container.querySelectorAll(".project-task-table > tbody > tr[data-task-order-id]")).map((row) => row.getAttribute("data-task-order-id"))).toEqual([3, 0, 1, 2].map((index) => board.tasks[index].id));
+    expect((screen.getByLabelText(`子任务备注：${task.subtasks[0].title}`) as HTMLTextAreaElement).value).toBe("尚未失焦的备注");
+  });
+
+  it("reorders kanban cards within their status without moving a task to another status", () => {
+    const board = createProjectBoard("research", "看板排序");
+    board.tasks[0].status = board.tasks[1].status = "doing";
+    const { container } = render(<Workspace initial={[board]} />);
+    fireEvent.click(screen.getByRole("button", { name: "看板" }));
+    const dataTransfer = { setData: vi.fn(), effectAllowed: "move", dropEffect: "move" };
+    const doingOrder = () => Array.from(container.querySelectorAll(".project-kanban-column")[1].querySelectorAll("[data-task-order-id]")).map((row) => row.getAttribute("data-task-order-id"));
+    fireEvent.dragStart(screen.getByRole("button", { name: `移动任务：${board.tasks[1].title}` }), { dataTransfer });
+    fireEvent.drop(container.querySelector(`[data-task-order-id="${board.tasks[0].id}"]`)!, { dataTransfer });
+    expect(doingOrder()).toEqual([board.tasks[1].id, board.tasks[0].id]);
+    fireEvent.dragStart(screen.getByRole("button", { name: `移动任务：${board.tasks[1].title}` }), { dataTransfer });
+    fireEvent.drop(container.querySelector(`[data-task-order-id="${board.tasks[2].id}"]`)!, { dataTransfer });
+    expect(doingOrder()).toEqual([board.tasks[1].id, board.tasks[0].id]);
+    expect((screen.getByLabelText(`状态：${board.tasks[1].title}`) as HTMLSelectElement).value).toBe("doing");
+    expect((screen.getByLabelText(`状态：${board.tasks[2].title}`) as HTMLSelectElement).value).toBe("todo");
+  });
+
   it("retains a conflicting note draft and lets Escape restore the remote note", () => {
     const onChange = vi.fn();
     const { rerender } = render(<InlineProjectText multiline label="备注" value="初稿" onChange={onChange} />);

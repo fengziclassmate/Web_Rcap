@@ -168,6 +168,11 @@
   .project-drag-handle { display: grid; width: 20px; min-height: 32px; flex-shrink: 0; place-items: center; border-radius: 4px; color: #75847b; cursor: grab; }
   .project-drag-handle:active { cursor: grabbing; }
   .project-drag-handle:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .project-row-drag-handle { width: 18px; min-height: 24px; }
+  .project-row-drag-handle:disabled { cursor: default; opacity: .35; }
+  .project-row-drag-handle:not(:disabled):hover { background: #e7efe9; color: #235b3c; }
+  .project-sortable-row[data-sort-over="true"] > td { background: #eaf3ec; box-shadow: inset 0 2px 0 #3c7654; }
+  .project-kanban-card[data-sort-over="true"] { outline: 2px solid #3c7654; }
   .project-nav-count { color: #637568; font-size: 12px; font-variant-numeric: tabular-nums; }
   .project-list-label { display: flex; align-items: center; justify-content: space-between; margin: 26px 8px 7px 10px; color: #637568; font-size: 12px; font-weight: 500; }
   .project-backup-actions { display: flex; justify-content: space-around; gap: 4px; margin-top: 16px; border-top: 1px solid #e3e9e5; padding-top: 10px; color: #77837a; }
@@ -265,7 +270,7 @@
   .project-subtask-table { width: 100%; min-width: 520px; border-collapse: collapse; text-align: left; }
   .project-subtask-table th { border-bottom: 1px solid #e7ece8; background: #fafbfa; padding: 6px 10px; color: #637568; font-size: 11px; font-weight: 400; }
   .project-subtask-table td { border-bottom: 1px solid #edf0ee; padding: 7px 10px; vertical-align: top; }
-  .project-subtask-table td:first-child { padding-top: 16px; }
+  .project-subtask-table td:first-child { padding-top: 11px; }
   .project-subtask-table th:nth-child(2) { min-width: 160px; }
   .project-subtask-add { display: flex; align-items: center; gap: 6px; padding: 5px 10px; color: #728177; }
   .project-subtask-add input { height: 28px; min-width: 0; flex: 1; padding-inline: 3px; color: #374a3e; font-size: 12px; }
