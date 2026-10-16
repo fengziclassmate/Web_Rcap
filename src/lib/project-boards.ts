@@ -11,6 +11,7 @@ export const boardStatuses = { todo: "未开始", doing: "进行中", blocked: "
 export type BoardPriority = keyof typeof boardPriorities;
 export type BoardStatus = keyof typeof boardStatuses;
 export type BoardScope = "all" | "today" | "week" | "overdue" | "archived";
+export type BoardSubtask = { id: string; title: string; notes: string; status: BoardStatus };
 export type BoardTask = {
   id: string;
   title: string;
@@ -26,6 +27,7 @@ export type BoardTask = {
   milestone: boolean;
   createdAt: string;
   completedAt: string;
+  subtasks: BoardSubtask[];
 };
 export type ProjectBoard = {
   id: string;
@@ -42,6 +44,37 @@ export type ProjectBoard = {
 const text = (value: unknown) => typeof value === "string" ? value : "";
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const date = (value: unknown) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && isValid(parseISO(value)) ? value : "";
+
+function plainChecklistTitle(value: string) {
+  // Preserve the text and resource URL while retiring marks used as completion states.
+  for (let depth = 0; depth < 8; depth++) {
+    const next = value.replace(/\*\*([\s\S]+?)\*\*|==([\s\S]+?)==|~~([\s\S]+?)~~|__([\s\S]+?)__|\{(red|blue|green)\}([\s\S]+?)\{\/\5\}|\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
+      (_, bold, highlight, strike, underline, _color, colored, label, url) => bold ?? highlight ?? strike ?? underline ?? colored ?? `${label} (${url})`);
+    if (next === value) break;
+    value = next;
+  }
+  return value;
+}
+
+function normalizeTaskSubtasks(task: Record<string, unknown>): { content: string; subtasks: BoardSubtask[] } {
+  if (!Array.isArray(task.subtasks)) {
+    const subtasks: BoardSubtask[] = [];
+    const content = text(task.content).split("\n").filter((line, index) => {
+      const match = line.match(/^\s*- \[([ xX])\] (.*)$/);
+      if (!match) return true;
+      subtasks.push({ id: `${task.id}:subtask:${index}`, title: plainChecklistTitle(match[2]), notes: "", status: match[1] === " " ? "todo" : "done" });
+      return false;
+    }).join("\n");
+    return { content, subtasks };
+  }
+  const ids = new Set<string>();
+  const subtasks = task.subtasks.filter(record).filter((item) => {
+    if (typeof item.id !== "string" || !item.id || ids.has(item.id)) return false;
+    ids.add(item.id);
+    return true;
+  }).map((item): BoardSubtask => ({ id: item.id as string, title: text(item.title) || "未命名子任务", notes: text(item.notes), status: Object.hasOwn(boardStatuses, text(item.status)) ? item.status as BoardStatus : "todo" }));
+  return { content: text(task.content), subtasks };
+}
 
 export function normalizeProjectBoards(value: unknown): ProjectBoard[] {
   if (!Array.isArray(value)) return [];
@@ -62,7 +95,7 @@ export function normalizeProjectBoards(value: unknown): ProjectBoard[] {
         taskIds.add(task.id);
         return true;
       }).map((task): BoardTask => ({
-        id: task.id as string, title: text(task.title) || "未命名任务", content: text(task.content),
+        id: task.id as string, title: text(task.title) || "未命名任务", ...normalizeTaskSubtasks(task),
         notes: text(task.notes), review: text(task.review), phase: text(task.phase),
         tags: Array.isArray(task.tags) ? [...new Set(task.tags.filter((tag): tag is string => typeof tag === "string" && Boolean(tag.trim())).map((tag) => tag.trim()))] : [],
         priority: Object.hasOwn(boardPriorities, text(task.priority)) ? task.priority as BoardPriority : "p2",
@@ -75,7 +108,11 @@ export function normalizeProjectBoards(value: unknown): ProjectBoard[] {
 }
 
 export function createBoardTask(title = ""): BoardTask {
-  return { id: createId("board-task"), title, content: "", notes: "", review: "", phase: "", tags: [], priority: "p2", status: "todo", plannedDate: "", dueDate: "", milestone: false, createdAt: new Date().toISOString(), completedAt: "" };
+  return { id: createId("board-task"), title, content: "", notes: "", review: "", phase: "", tags: [], priority: "p2", status: "todo", plannedDate: "", dueDate: "", milestone: false, createdAt: new Date().toISOString(), completedAt: "", subtasks: [] };
+}
+
+export function createBoardSubtask(title = ""): BoardSubtask {
+  return { id: createId("board-subtask"), title, notes: "", status: "todo" };
 }
 
 export function createProjectBoard(template: "blank" | "research" | "learning", name: string): ProjectBoard {
@@ -86,7 +123,7 @@ export function createProjectBoard(template: "blank" | "research" | "learning", 
   return {
     id: createId("board"), name: name.trim(), kind: template === "blank" ? "other" : template,
     goal: "", description: "", targetDate: "", archived: false, createdAt: new Date().toISOString(),
-    tasks: titles.map(([title, phase], index) => ({ ...createBoardTask(title), phase, milestone: index === titles.length - 1, content: "- [ ] 写下一个可以执行的下一步\n- [ ] 明确完成后要留下的成果" })),
+    tasks: titles.map(([title, phase], index) => ({ ...createBoardTask(title), phase, milestone: index === titles.length - 1, subtasks: [createBoardSubtask("写下一个可以执行的下一步"), createBoardSubtask("明确完成后要留下的成果")] })),
   };
 }
 
@@ -118,11 +155,27 @@ export function getBoardProgress(board: ProjectBoard) {
   return { done, total: board.tasks.length, percent: board.tasks.length ? Math.round(done / board.tasks.length * 100) : 0 };
 }
 
+export function getTaskSubtaskProgress(task: BoardTask) {
+  return { total: task.subtasks.length, done: task.subtasks.filter((item) => item.status === "done").length };
+}
+
+export function reorderProjectBoards(boards: ProjectBoard[], sourceId: string, targetId: string) {
+  const source = boards.find((board) => board.id === sourceId);
+  const target = boards.find((board) => board.id === targetId);
+  if (!source || !target || sourceId === targetId || source.archived !== target.archived) return boards;
+  const visible = boards.filter((board) => board.archived === source.archived);
+  const from = visible.findIndex((board) => board.id === sourceId);
+  const to = visible.findIndex((board) => board.id === targetId);
+  visible.splice(to, 0, ...visible.splice(from, 1));
+  let index = 0;
+  return boards.map((board) => board.archived === source.archived ? visible[index++] : board);
+}
+
 export function setBoardTaskStatus(task: BoardTask, status: BoardStatus): BoardTask {
   return { ...task, status, completedAt: status === "done" ? task.completedAt || new Date().toISOString() : "" };
 }
 
 export function boardTasksToCsv(rows: { board: ProjectBoard; task: BoardTask }[]) {
   const escape = (value: string) => `"${value.replace(/^[\s]*[=+\-@]/, (match) => `'${match}`).replaceAll('"', '""')}"`;
-  return "\uFEFF" + [["项目", "任务", "阶段", "优先级", "状态", "计划日期", "截止日期", "标签", "里程碑", "任务内容", "备注与资料", "成果与复盘"], ...rows.map(({ board, task }) => [board.name, task.title, task.phase, boardPriorities[task.priority].label, boardStatuses[task.status], task.plannedDate, task.dueDate, task.tags.join("、"), task.milestone ? "是" : "否", task.content, task.notes, task.review])].map((row) => row.map(escape).join(",")).join("\r\n");
+  return "\uFEFF" + [["项目", "任务", "阶段", "优先级", "状态", "计划日期", "截止日期", "标签", "里程碑", "任务内容", "备注与资料", "成果与复盘", "类型", "父任务"], ...rows.flatMap(({ board, task }) => [[board.name, task.title, task.phase, boardPriorities[task.priority].label, boardStatuses[task.status], task.plannedDate, task.dueDate, task.tags.join("、"), task.milestone ? "是" : "否", task.content, task.notes, task.review, "任务", ""], ...task.subtasks.map((item) => [board.name, item.title, task.phase, "", boardStatuses[item.status], "", "", "", "", "", item.notes, "", "子任务", task.title])])].map((row) => row.map(escape).join(",")).join("\r\n");
 }

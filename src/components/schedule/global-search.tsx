@@ -21,7 +21,7 @@ export function buildSearchIndex(events: ScheduleEvent[], tasks: LongTask[], log
     ...shopping.map((item) => ({ id: item.id, kind: "购物", collection: "shopping" as const, title: item.name, detail: item.done ? "已购" : "待购" })),
     ...boards.flatMap((board) => [
       { id: board.id, boardId: board.id, kind: "项目任务表", title: board.name, detail: [board.archived ? "已归档" : "进行中", board.goal, board.description].join("\n"), date: board.targetDate },
-      ...board.tasks.map((task) => ({ id: `${board.id}:${task.id}`, boardId: board.id, boardTaskId: task.id, kind: "项目任务", title: task.title, detail: [board.name, boardStatuses[task.status], task.phase, ...task.tags, task.content, task.notes, task.review].join("\n"), date: task.dueDate })),
+      ...board.tasks.map((task) => ({ id: `${board.id}:${task.id}`, boardId: board.id, boardTaskId: task.id, kind: "项目任务", title: task.title, detail: [board.name, boardStatuses[task.status], task.phase, ...task.tags, task.content, task.notes, task.review, ...task.subtasks.map((item) => `${item.title} · ${boardStatuses[item.status]}\n${item.notes}`)].join("\n"), date: task.dueDate })),
     ]),
   ];
 }

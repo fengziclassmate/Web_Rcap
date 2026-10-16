@@ -43,7 +43,7 @@ export function AnnotatedContent({ value, onChange, compact = false }: { value: 
   </div>;
 }
 
-export function AnnotatedEditor({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
+export function AnnotatedEditor({ label, value, onChange, placeholder, allowChecklist = true }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; allowChecklist?: boolean }) {
   const editor = useRef<HTMLTextAreaElement>(null);
   function wrap(before: string, after: string) {
     const input = editor.current;
@@ -77,9 +77,9 @@ export function AnnotatedEditor({ label, value, onChange, placeholder }: { label
         {actions.map(({ name, icon: Icon, before, after }) => <Button key={name} type="button" variant="ghost" size="icon-sm" aria-label={name} title={name} onMouseDown={(event) => event.preventDefault()} onClick={() => wrap(before, after)}><Icon className="size-4" /></Button>)}
         <span className="mx-1 h-4 border-l border-stone-200" />
         {([['red', '红色', 'bg-red-600'], ['blue', '蓝色', 'bg-blue-600'], ['green', '绿色', 'bg-emerald-700']] as const).map(([color, name, style]) => <button key={color} type="button" aria-label={`${name}文字`} title={`${name}文字`} onMouseDown={(event) => event.preventDefault()} onClick={() => wrap(`{${color}}`, `{/${color}}`)} className="flex size-7 items-center justify-center rounded hover:bg-stone-200 focus-visible:outline-2"><span className={`size-3 rounded-full ${style}`} /></button>)}
-        <Button type="button" variant="ghost" size="sm" onMouseDown={(event) => event.preventDefault()} onClick={checklist}><CheckSquare className="size-4" />子任务</Button>
+        {allowChecklist && <Button type="button" variant="ghost" size="sm" onMouseDown={(event) => event.preventDefault()} onClick={checklist}><CheckSquare className="size-4" />子任务</Button>}
       </div>
-      <textarea ref={editor} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") { event.preventDefault(); wrap("**", "**"); } }} className="min-h-48 w-full resize-y bg-transparent p-3 text-sm leading-7 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700/40" />
+      <textarea ref={editor} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") { event.preventDefault(); wrap("**", "**"); } }} className="min-h-28 w-full resize-y bg-transparent p-3 text-sm leading-7 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700/40" />
     </div>
     {value.trim() && <div className="rounded-lg border border-stone-100 bg-stone-50/60 p-3">
       <p className="mb-2 text-[11px] font-medium text-stone-400">预览</p>

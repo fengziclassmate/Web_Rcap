@@ -1,16 +1,17 @@
 "use client";
 
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { Archive, ArrowDownToLine, ArrowUpDown, BookOpen, CalendarDays, ChevronDown, ChevronRight, CircleAlert, Flag, FlaskConical, FolderOpen, LayoutGrid, ListTodo, Play, Plus, Search, Settings2, SlidersHorizontal, Table2, Trash2, Upload, X } from "lucide-react";
+import { Archive, ArrowDownToLine, ArrowUpDown, BookOpen, CalendarDays, ChevronDown, ChevronRight, CircleAlert, Flag, FlaskConical, FolderOpen, GripVertical, LayoutGrid, ListTodo, Play, Plus, Search, Settings2, SlidersHorizontal, Table2, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AnnotatedContent } from "./annotated-content";
+import { InlineProjectText, SubtaskTable, TaskStatusControl } from "./subtask-table";
 import { BoardTaskEditor, ProjectBoardEditor, selectClass } from "./board-editors";
 import { createId } from "@/lib/id";
 import { todayISO } from "@/lib/date-utils";
-import { boardPriorities, boardStatuses, boardTasksToCsv, checklistProgress, createBoardTask, isBoardTaskOverdue, matchesBoardScope, normalizeProjectBoards, setBoardTaskStatus, type BoardPriority, type BoardScope, type BoardStatus, type BoardTask, type ProjectBoard } from "@/lib/project-boards";
+import { boardPriorities, boardStatuses, boardTasksToCsv, createBoardTask, getTaskSubtaskProgress, isBoardTaskOverdue, matchesBoardScope, normalizeProjectBoards, reorderProjectBoards, setBoardTaskStatus, type BoardPriority, type BoardScope, type BoardStatus, type BoardTask, type ProjectBoard } from "@/lib/project-boards";
 
 type TaskRow = { board: ProjectBoard; task: BoardTask };
 const kinds = { research: "科研", learning: "自学", other: "其他" };
@@ -35,7 +36,7 @@ function PriorityBadge({ priority }: { priority: BoardPriority }) {
 }
 
 function TaskProgress({ task }: { task: BoardTask }) {
-  const progress = checklistProgress(task.content);
+  const progress = getTaskSubtaskProgress(task);
   if (!progress.total) return null;
   return <span className="inline-flex items-center gap-2 text-xs tabular-nums text-stone-500" title="已完成子任务 / 全部子任务"><span className="h-1 w-12 overflow-hidden rounded-full bg-stone-200"><span className="block h-full rounded-full bg-emerald-700" style={{ width: `${progress.done / progress.total * 100}%` }} /></span>{progress.done}/{progress.total}</span>;
 }
@@ -67,6 +68,10 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, onStartFocus
   });
   const [deletion, setDeletion] = useState<{ boardId: string; taskId?: string; name: string } | null>(null);
   const importInput = useRef<HTMLInputElement>(null);
+  const draggingProject = useRef<string | null>(null);
+  const projectHandles = useRef(new Map<string, HTMLButtonElement>());
+  const [dropProject, setDropProject] = useState<string | null>(null);
+  const [sortAnnouncement, setSortAnnouncement] = useState("");
   const selected = boards.find((board) => board.id === selectedId);
   const activeBoards = boards.filter((board) => scope === "archived" ? board.archived : !board.archived);
   const sourceBoards = selected ? [selected] : activeBoards;
@@ -74,7 +79,7 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, onStartFocus
   const sourceRows = sourceBoards.flatMap((board) => board.tasks.map((task) => ({ board, task })));
   const phases = [...new Set(sourceRows.map(({ task }) => task.phase).filter(Boolean))];
   const rows = sourceRows.filter(({ task, board }) => {
-    const searchText = [board.name, task.title, task.content, task.notes, task.review, task.phase, ...task.tags].join(" ").toLocaleLowerCase();
+    const searchText = [board.name, task.title, task.content, task.notes, task.review, task.phase, ...task.tags, ...task.subtasks.flatMap((item) => [item.title, item.notes])].join(" ").toLocaleLowerCase();
     return matchesBoardScope(task, selected ? "all" : scope, today) && (status === "all" || task.status === status) && (priority === "all" || task.priority === priority) && (phase === "all" || task.phase === phase) && query.trim().toLocaleLowerCase().split(/\s+/).every((word) => searchText.includes(word));
   }).sort((a, b) => sort === "priority" ? a.task.priority.localeCompare(b.task.priority) || (a.task.dueDate || "9999").localeCompare(b.task.dueDate || "9999") : sort === "due" ? (a.task.dueDate || "9999").localeCompare(b.task.dueDate || "9999") : a.task.createdAt.localeCompare(b.task.createdAt));
   const doneCount = sourceRows.filter(({ task }) => task.status === "done").length;
@@ -84,6 +89,11 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, onStartFocus
 
   function clearFilters() { setQuery(""); setStatus("all"); setPriority("all"); setPhase("all"); }
   function openProject(id: string) { setSelectedId(id); clearFilters(); }
+  function moveProject(sourceId: string, targetId: string) {
+    onChange((previous) => reorderProjectBoards(previous, sourceId, targetId));
+    const name = boards.find((board) => board.id === sourceId)?.name;
+    if (name) setSortAnnouncement(`已调整${name}的项目顺序`);
+  }
   function updateTask(boardId: string, taskId: string, update: (task: BoardTask) => BoardTask) {
     onChange((previous) => previous.map((board) => board.id === boardId ? { ...board, tasks: board.tasks.map((task) => task.id === taskId ? update(task) : task) } : board));
   }
@@ -162,11 +172,14 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, onStartFocus
       </nav>
       <div className="project-list-label"><span>项目 <span className="ml-1 font-normal text-stone-400">{activeBoards.length}</span></span><Button variant="ghost" size="icon-sm" aria-label="新建项目" title="新建项目" onClick={() => setProjectEditor({})}><Plus className="size-3.5" /></Button></div>
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto" aria-label="项目列表">
-        {activeBoards.map((board) => <button key={board.id} type="button" aria-pressed={selected?.id === board.id} onClick={() => openProject(board.id)} className={`project-nav-item ${selected?.id === board.id ? "is-active" : ""}`}>
+        {activeBoards.map((board, index) => <div key={board.id} data-project-order-id={board.id} className={`project-list-row ${dropProject === board.id ? "is-drop-target" : ""}`} onDragOver={(event) => { if (draggingProject.current && draggingProject.current !== board.id) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropProject(board.id); } }} onDrop={(event) => { event.preventDefault(); if (draggingProject.current) moveProject(draggingProject.current, board.id); draggingProject.current = null; setDropProject(null); }}>
+          <button type="button" ref={(node) => { if (node) projectHandles.current.set(board.id, node); else projectHandles.current.delete(board.id); }} draggable className="project-drag-handle" aria-label={`移动项目：${board.name}`} title="拖动排序，或使用上下方向键" aria-keyshortcuts="ArrowUp ArrowDown" onDragStart={(event) => { draggingProject.current = board.id; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/project-board", board.id); }} onDragEnd={() => { draggingProject.current = null; setDropProject(null); }} onKeyDown={(event) => { if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return; event.preventDefault(); const target = activeBoards[index + (event.key === "ArrowUp" ? -1 : 1)]; if (target) { moveProject(board.id, target.id); requestAnimationFrame(() => projectHandles.current.get(board.id)?.focus()); } }}><GripVertical className="size-3.5" /></button>
+          <button type="button" aria-pressed={selected?.id === board.id} onClick={() => openProject(board.id)} className={`project-nav-item ${selected?.id === board.id ? "is-active" : ""}`}>
           {board.kind === "research" ? <FlaskConical className="size-4 shrink-0" /> : board.kind === "learning" ? <BookOpen className="size-4 shrink-0" /> : <FolderOpen className="size-4 shrink-0" />}
           <span className="min-w-0 flex-1 truncate text-left" title={board.name}>{board.name}</span><span className="project-nav-count">{board.tasks.filter((task) => task.status !== "done").length}</span>
-        </button>)}
+        </button></div>)}
       </nav>
+      <span role="status" className="sr-only">{sortAnnouncement}</span>
       <div className="project-backup-actions">
         <Button variant="ghost" size="sm" aria-label="备份全部项目" onClick={() => download(JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), project_boards: boards }, null, 2), `科研自学项目-${today}.json`, "application/json")} disabled={!boards.length}><ArrowDownToLine className="size-3.5" />备份</Button>
         <Button variant="ghost" size="sm" aria-label="从备份导入" onClick={() => importInput.current?.click()}><Upload className="size-3.5" />导入</Button>
@@ -211,10 +224,10 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, onStartFocus
         </div>
 
         <div className="project-content-scroll">
-          {view === "table" ? <table className="project-task-table"><thead><tr><th className="w-9"><span className="sr-only">完成状态</span></th><th>任务</th><th className="w-40">阶段</th><th className="w-40">优先级</th><th className="w-28">状态</th><th className="w-44">日期</th><th className="w-28"><span className="sr-only">操作</span></th></tr></thead><tbody>
+          {view === "table" ? <table className="project-task-table"><thead><tr><th className="w-9"><span className="sr-only">完成状态</span></th><th>任务</th><th className="w-32">阶段</th><th className="w-36">优先级</th><th className="w-24">状态</th><th className="w-44">日期</th><th className="w-60">备注</th><th className="w-24"><span className="sr-only">操作</span></th></tr></thead><tbody>
             {rows.map(({ board, task }) => <TaskTableRow key={`${board.id}:${task.id}`} board={board} task={task} today={today} expanded={expanded.includes(task.id)} showProject={!selected} onExpand={() => setExpanded((previous) => previous.includes(task.id) ? previous.filter((id) => id !== task.id) : [...previous, task.id])} onEdit={() => setTaskEditor({ boardId: board.id, task })} onUpdate={(update) => updateTask(board.id, task.id, update)} actions={rowActions({ board, task })} />)}
           </tbody></table> : <div className="project-kanban">{Object.entries(boardStatuses).map(([id, label]) => <section key={id} className="project-kanban-column"><h3><span className={`project-status-dot status-${id}`} />{label}<span className="ml-auto font-normal text-stone-400">{rows.filter(({ task }) => task.status === id).length}</span></h3>
-            {rows.filter(({ task }) => task.status === id).map(({ board, task }) => <article key={`${board.id}:${task.id}`} className="project-kanban-card"><div className="mb-2">{!selected && <p className="mb-1 truncate text-[11px] text-stone-500">{board.name}</p>}<PhaseControl task={task} onChange={(phase) => updateTask(board.id, task.id, (previous) => ({ ...previous, phase }))} /></div><button type="button" onClick={() => setTaskEditor({ boardId: board.id, task })} className="text-left text-sm font-medium leading-6 hover:text-primary">{task.milestone && <Flag className="mr-1 inline size-3 text-amber-700" />}{task.title}</button><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><PriorityBadge priority={task.priority} /><TaskProgress task={task} /></div><div className="mt-2"><TaskDateControls task={task} today={today} onUpdate={(update) => updateTask(board.id, task.id, update)} /></div><div className="mt-3 flex items-center gap-1 border-t border-stone-100 pt-2"><StatusControl task={task} onChange={(next) => updateTask(board.id, task.id, (previous) => setBoardTaskStatus(previous, next))} />{rowActions({ board, task })}</div></article>)}
+            {rows.filter(({ task }) => task.status === id).map(({ board, task }) => <article key={`${board.id}:${task.id}`} className="project-kanban-card"><div className="mb-2">{!selected && <p className="mb-1 truncate text-[11px] text-stone-500">{board.name}</p>}<PhaseControl task={task} onChange={(phase) => updateTask(board.id, task.id, (previous) => ({ ...previous, phase }))} /></div><button type="button" onClick={() => setTaskEditor({ boardId: board.id, task })} className="text-left text-sm font-medium leading-6 hover:text-primary">{task.milestone && <Flag className="mr-1 inline size-3 text-amber-700" />}{task.title}</button><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><PriorityBadge priority={task.priority} /><TaskProgress task={task} /></div><div className="mt-2"><TaskDateControls task={task} today={today} onUpdate={(update) => updateTask(board.id, task.id, update)} /></div><div className="mt-2"><InlineProjectText multiline label={`任务备注：${task.title}`} value={task.notes} placeholder="添加备注" onChange={(notes) => updateTask(board.id, task.id, (previous) => ({ ...previous, notes }))} /></div><Button type="button" size="sm" variant="ghost" className="mt-1" aria-label={`编辑子任务：${task.title}`} onClick={() => setTaskEditor({ boardId: board.id, task })}>子任务 {task.subtasks.length}</Button><div className="mt-3 flex items-center gap-1 border-t border-stone-100 pt-2"><StatusControl task={task} onChange={(next) => updateTask(board.id, task.id, (previous) => setBoardTaskStatus(previous, next))} />{rowActions({ board, task })}</div></article>)}
           </section>)}</div>}
           {!rows.length && <div className="project-empty-tasks"><ListTodo className="mb-3 size-6 text-stone-300" /><p>{sourceRows.length ? "没有匹配任务" : "暂无任务"}</p>{(query || filterCount > 0) && <Button variant="ghost" size="sm" onClick={clearFilters}>清除筛选</Button>}</div>}
           {selected && !selected.archived && <form className="project-quick-add" onSubmit={(event) => { event.preventDefault(); quickAdd(); }}><Plus className="size-4 text-stone-400" /><Input aria-label="快速添加任务" value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder="添加任务…" className="h-8 rounded-none border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0" /><Button type="submit" size="icon-sm" variant="ghost" aria-label="添加任务" disabled={!quickTitle.trim()}><Plus className="size-4" /></Button></form>}
@@ -229,7 +242,7 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, onStartFocus
 }
 
 function StatusControl({ task, onChange }: { task: BoardTask; onChange: (status: BoardStatus) => void }) {
-  return <span className="project-status-control"><span className={`project-status-dot status-${task.status}`} /><select aria-label={`状态：${task.title}`} value={task.status} onChange={(event) => onChange(event.target.value as BoardStatus)}>{Object.entries(boardStatuses).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select><ChevronDown className="size-3 text-stone-400" /></span>;
+  return <TaskStatusControl status={task.status} label={`状态：${task.title}`} onChange={onChange} />;
 }
 
 function PhaseControl({ task, onChange }: { task: BoardTask; onChange: (phase: string) => void }) {
@@ -258,7 +271,7 @@ function TaskDateControls({ task, today, onUpdate }: { task: BoardTask; today: s
 }
 
 function TaskTableRow({ board, task, today, expanded, showProject, onExpand, onEdit, onUpdate, actions }: TaskRow & { today: string; expanded: boolean; showProject: boolean; onExpand: () => void; onEdit: () => void; onUpdate: (update: (task: BoardTask) => BoardTask) => void; actions: React.ReactNode }) {
-  const details = ([['content', '内容'], ['notes', '备注与资料'], ['review', '成果与复盘']] as const).filter(([field]) => task[field].trim());
+  const details = ([['content', '内容'], ['review', '成果与复盘']] as const).filter(([field]) => task[field].trim());
   return <>
     <tr className={task.status === "done" ? "is-completed" : ""}>
       <td><input type="checkbox" aria-label={`完成任务：${task.title}`} checked={task.status === "done"} onChange={(event) => onUpdate((previous) => setBoardTaskStatus(previous, event.target.checked ? "done" : "todo"))} className="size-3.5 accent-emerald-800" /></td>
@@ -267,8 +280,9 @@ function TaskTableRow({ board, task, today, expanded, showProject, onExpand, onE
       <td><span className={`project-priority-control priority-${task.priority}`}><select aria-label={`优先级：${task.title}`} value={task.priority} onChange={(event) => onUpdate((previous) => ({ ...previous, priority: event.target.value as BoardPriority }))}>{Object.entries(boardPriorities).map(([id, item]) => <option key={id} value={id}>{item.short} · {item.label}</option>)}</select><ChevronDown className="size-3" /></span></td>
       <td><StatusControl task={task} onChange={(next) => onUpdate((previous) => setBoardTaskStatus(previous, next))} /></td>
       <td><TaskDateControls task={task} today={today} onUpdate={onUpdate} /></td>
+      <td><InlineProjectText multiline label={`任务备注：${task.title}`} value={task.notes} placeholder="添加备注" onChange={(notes) => onUpdate((previous) => ({ ...previous, notes }))} /></td>
       <td>{actions}</td>
     </tr>
-    {expanded && <tr><td colSpan={7} className="project-expanded-cell">{details.length ? <div className="project-task-details">{details.map(([field, label]) => <div key={field} className={`project-detail-${field}`}><span className="project-detail-label">{label}</span><AnnotatedContent value={task[field]} onChange={(value) => onUpdate((previous) => ({ ...previous, [field]: value }))} /></div>)}</div> : null}<Button size="sm" variant="ghost" className="mt-1 text-primary" onClick={onEdit}>{details.length ? "编辑" : "添加内容"}</Button></td></tr>}
+    {expanded && <tr><td colSpan={8} className="project-expanded-cell">{details.length ? <div className="project-task-details">{details.map(([field, label]) => <div key={field} className={`project-detail-${field}`}><span className="project-detail-label">{label}</span><AnnotatedContent value={task[field]} onChange={(value) => onUpdate((previous) => ({ ...previous, [field]: value }))} /></div>)}</div> : null}<SubtaskTable title={task.title} subtasks={task.subtasks} onChange={(update) => onUpdate((previous) => ({ ...previous, subtasks: update(previous.subtasks) }))} /><Button size="sm" variant="ghost" className="mt-1 text-primary" onClick={onEdit}>{details.length ? "编辑内容" : "添加内容"}</Button></td></tr>}
   </>;
 }

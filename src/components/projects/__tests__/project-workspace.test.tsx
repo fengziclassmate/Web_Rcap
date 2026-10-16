@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within, waitFor } from "@testing-library/rea
 import { describe, expect, it, vi } from "vitest";
 import { ProjectWorkspace } from "../project-workspace";
 import { AnnotatedContent, AnnotatedEditor } from "../annotated-content";
+import { InlineProjectText } from "../subtask-table";
 import { createProjectBoard, type ProjectBoard } from "@/lib/project-boards";
 
 function Workspace({ initial = [] }: { initial?: ProjectBoard[] }) {
@@ -11,6 +12,20 @@ function Workspace({ initial = [] }: { initial?: ProjectBoard[] }) {
 }
 
 describe("research and learning workspace", () => {
+  it("retains a conflicting note draft and lets Escape restore the remote note", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<InlineProjectText multiline label="备注" value="初稿" onChange={onChange} />);
+    const input = screen.getByLabelText("备注") as HTMLTextAreaElement;
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "本机草稿" } });
+    rerender(<InlineProjectText multiline label="备注" value="远端新稿" onChange={onChange} />);
+    fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input.value).toBe("本机草稿");
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(input.value).toBe("远端新稿");
+  });
+
   it("edits phase, status and dates directly in table and board without opening details", () => {
     const board = createProjectBoard("research", "直接编辑");
     render(<Workspace initial={[board]} />);
@@ -81,23 +96,55 @@ describe("research and learning workspace", () => {
     expect((screen.getByLabelText("任务名称") as HTMLInputElement).value).toBe("本机改名");
   });
 
-  it("creates a learning template, edits a task and checks its annotated subtask", async () => {
+  it("edits structured subtask rows and notes without submitting the task form early", async () => {
     render(<Workspace />);
     fireEvent.click(screen.getByRole("button", { name: /自学计划/ }));
     fireEvent.change(screen.getByLabelText("项目名称"), { target: { value: "LeetCode" } });
     fireEvent.click(screen.getByRole("button", { name: "创建项目" }));
     await screen.findByRole("heading", { name: "LeetCode" });
-    fireEvent.click(screen.getByRole("button", { name: "明确学习目标与检验方式" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "任务内容" }), { target: { value: "- [ ] ==分析复杂度==\n- [ ] 独立实现" } });
+    const title = "明确学习目标与检验方式";
+    fireEvent.click(screen.getByRole("button", { name: title }));
+    const add = screen.getByLabelText(`添加子任务：${title}`);
+    fireEvent.change(add, { target: { value: "分析复杂度" } });
+    fireEvent.keyDown(add, { key: "Enter" });
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    const note = screen.getByLabelText("子任务备注：分析复杂度");
+    fireEvent.focus(note);
+    fireEvent.change(note, { target: { value: "记录时间和空间复杂度" } });
+    fireEvent.blur(note);
     fireEvent.click(screen.getByRole("button", { name: "保存任务" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    fireEvent.click(screen.getByRole("button", { name: "展开任务：明确学习目标与检验方式" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "子任务：==分析复杂度==" }));
-    expect((screen.getByRole("checkbox", { name: "子任务：==分析复杂度==" }) as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByText("1/2")).toBeTruthy();
-    expect(screen.getByText("分析复杂度").tagName).toBe("MARK");
-    fireEvent.click(screen.getByRole("button", { name: "明确学习目标与检验方式" }));
-    expect((screen.getByRole("textbox", { name: "任务内容" }) as HTMLTextAreaElement).value).toContain("- [x] ==分析复杂度==");
+    fireEvent.click(screen.getByRole("button", { name: `展开任务：${title}` }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "完成子任务：分析复杂度" }));
+    expect((screen.getByRole("checkbox", { name: "完成子任务：分析复杂度" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("子任务备注：分析复杂度") as HTMLTextAreaElement).value).toBe("记录时间和空间复杂度");
+    expect((screen.getByLabelText("子任务状态：分析复杂度") as HTMLSelectElement).value).toBe("done");
+    expect(screen.getByLabelText("子任务状态：分析复杂度").parentElement?.querySelector("svg")).toBeNull();
+    const mainNote = screen.getByLabelText(`任务备注：${title}`);
+    fireEvent.focus(mainNote);
+    fireEvent.change(mainNote, { target: { value: "本周完成两轮练习" } });
+    fireEvent.blur(mainNote);
+    fireEvent.click(screen.getByRole("button", { name: title }));
+    expect((within(screen.getByRole("dialog")).getByLabelText("子任务备注：分析复杂度") as HTMLTextAreaElement).value).toBe("记录时间和空间复杂度");
+    fireEvent.click(screen.getByRole("tab", { name: "备注与资料" }));
+    expect((screen.getByRole("textbox", { name: "备注与资料" }) as HTMLTextAreaElement).value).toBe("本周完成两轮练习");
+  });
+
+  it("supports dragging and keyboard ordering without changing the selected project", () => {
+    const first = createProjectBoard("blank", "城市用地诊断");
+    const second = createProjectBoard("blank", "LeetCode");
+    const { container } = render(<Workspace initial={[first, second]} />);
+    const nav = screen.getByRole("navigation", { name: "项目列表" });
+    fireEvent.click(within(nav).getByRole("button", { name: /城市用地诊断/, pressed: false }));
+    const transfer = { setData: vi.fn(), effectAllowed: "move", dropEffect: "move" };
+    fireEvent.dragStart(screen.getByRole("button", { name: "移动项目：LeetCode" }), { dataTransfer: transfer });
+    const target = container.querySelector(`[data-project-order-id="${first.id}"]`)!;
+    fireEvent.dragOver(target, { dataTransfer: transfer });
+    fireEvent.drop(target, { dataTransfer: transfer });
+    expect(Array.from(nav.querySelectorAll("[data-project-order-id]")).map((item) => item.getAttribute("data-project-order-id"))).toEqual([second.id, first.id]);
+    expect(screen.getByRole("heading", { name: first.name })).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("button", { name: "移动项目：LeetCode" }), { key: "ArrowDown" });
+    expect(Array.from(nav.querySelectorAll("[data-project-order-id]")).map((item) => item.getAttribute("data-project-order-id"))).toEqual([first.id, second.id]);
   });
 
   it("filters by status and archives projects without removing their tasks", async () => {
@@ -108,9 +155,9 @@ describe("research and learning workspace", () => {
     fireEvent.change(screen.getByLabelText("筛选任务状态"), { target: { value: "blocked" } });
     expect(screen.getByRole("button", { name: board.tasks[0].title })).toBeTruthy();
     expect(screen.queryByRole("button", { name: board.tasks[1].title })).toBeNull();
-    fireEvent.click(within(screen.getByRole("navigation", { name: "项目列表" })).getByRole("button", { name: /城市用地诊断/ }));
+    fireEvent.click(within(screen.getByRole("navigation", { name: "项目列表" })).getByRole("button", { name: /城市用地诊断/, pressed: false }));
     fireEvent.click(screen.getByRole("button", { name: "归档项目" }));
-    fireEvent.click(within(screen.getByRole("navigation", { name: "项目列表" })).getByRole("button", { name: /城市用地诊断/ }));
+    fireEvent.click(within(screen.getByRole("navigation", { name: "项目列表" })).getByRole("button", { name: /城市用地诊断/, pressed: false }));
     expect(screen.getByRole("button", { name: board.tasks[1].title })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "恢复项目" }));
     expect(screen.getByRole("button", { name: board.tasks[1].title })).toBeTruthy();
@@ -130,7 +177,7 @@ describe("research and learning workspace", () => {
   it("quickly adds a task and shows only filled detail fields", () => {
     const board = createProjectBoard("blank", "城市用地诊断");
     render(<Workspace initial={[board]} />);
-    fireEvent.click(within(screen.getByRole("navigation", { name: "项目列表" })).getByRole("button", { name: /城市用地诊断/ }));
+    fireEvent.click(within(screen.getByRole("navigation", { name: "项目列表" })).getByRole("button", { name: /城市用地诊断/, pressed: false }));
     const input = screen.getByRole("textbox", { name: "快速添加任务" });
     fireEvent.change(input, { target: { value: "核对分类口径" } });
     fireEvent.submit(input.closest("form")!);

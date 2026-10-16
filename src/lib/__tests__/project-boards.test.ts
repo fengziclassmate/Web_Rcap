@@ -1,9 +1,63 @@
 import { describe, expect, it } from "vitest";
-import { boardTasksToCsv, checklistProgress, createBoardTask, createProjectBoard, matchesBoardScope, normalizeProjectBoards, setBoardTaskStatus, toggleChecklistLine } from "../project-boards";
+import { boardTasksToCsv, checklistProgress, createBoardTask, createBoardSubtask, createProjectBoard, getTaskSubtaskProgress, matchesBoardScope, normalizeProjectBoards, reorderProjectBoards, setBoardTaskStatus, toggleChecklistLine } from "../project-boards";
 import { normalizePersistedSchedulePayload } from "../schedule-persistence";
 import { mergeScheduleChanges } from "../schedule-merge";
 
 describe("project board records", () => {
+  it("converts old annotated checklists to stable rows without losing content or completion", () => {
+    const old = [{ id: "research", name: "研究", tasks: [{ id: "task", title: "验证方法", content: "# 核心问题\n- [ ] ==分析**边界**==\n补充数据来源\n- [X] {red}核对结果{/red}\n- [ ] [论文](https://example.com/paper)", notes: "原始备注" }] }];
+    const normalized = normalizeProjectBoards(old);
+    const task = normalized[0].tasks[0];
+    expect(task.content).toBe("# 核心问题\n补充数据来源");
+    expect(task.notes).toBe("原始备注");
+    expect(task.subtasks.map(({ title, status }) => ({ title, status }))).toEqual([{ title: "分析边界", status: "todo" }, { title: "核对结果", status: "done" }, { title: "论文 (https://example.com/paper)", status: "todo" }]);
+    expect(normalizeProjectBoards(old)).toEqual(normalized);
+    task.subtasks[0].notes = "记录样本不足时的处理";
+    const restored = normalizePersistedSchedulePayload(JSON.parse(JSON.stringify({ project_boards: normalized })))!;
+    expect(restored.project_boards).toEqual(normalized);
+    expect(getTaskSubtaskProgress(task)).toEqual({ total: 3, done: 1 });
+    task.subtasks = [];
+    expect(normalizeProjectBoards(normalized)[0].tasks[0].subtasks).toEqual([]);
+  });
+
+  it("merges a subtask status with another device's note and keeps rows in CSV", () => {
+    const board = createProjectBoard("research", "研究");
+    const base = normalizePersistedSchedulePayload({ project_boards: [board] })!;
+    const local = structuredClone(base);
+    const remote = structuredClone(base);
+    local.project_boards![0].tasks[0].subtasks[0].notes = "保留实验记录";
+    remote.project_boards![0].tasks[0].subtasks[0].status = "done";
+    const merged = mergeScheduleChanges(base, local, remote);
+    expect(merged.conflicts).toEqual([]);
+    expect(merged.value.project_boards![0].tasks[0].subtasks[0]).toMatchObject({ notes: "保留实验记录", status: "done" });
+    expect(boardTasksToCsv([{ board, task: merged.value.project_boards![0].tasks[0] }])).toContain('"保留实验记录"');
+    expect(boardTasksToCsv([{ board, task: merged.value.project_boards![0].tasks[0] }])).toContain('"子任务"');
+  });
+
+  it("reorders projects while keeping hidden archive slots and concurrent content intact", () => {
+    const first = createProjectBoard("blank", "一");
+    const archived = { ...createProjectBoard("blank", "归档"), archived: true };
+    const second = createProjectBoard("blank", "二");
+    const third = createProjectBoard("blank", "三");
+    const boards = [first, archived, second, third];
+    const changed = reorderProjectBoards(boards, third.id, first.id);
+    expect(changed).toEqual([third, archived, first, second]);
+    expect(changed[2]).toBe(first);
+    expect(reorderProjectBoards(boards, first.id, "missing")).toBe(boards);
+    expect(reorderProjectBoards(boards, first.id, archived.id)).toBe(boards);
+    const child = createBoardSubtask("追加记录");
+    first.tasks.push({ ...createBoardTask("新任务"), subtasks: [child] });
+    expect(reorderProjectBoards(boards, second.id, first.id).find((board) => board.id === first.id)?.tasks[0].subtasks[0]).toBe(child);
+    const base = normalizePersistedSchedulePayload({ project_boards: boards })!;
+    const local = structuredClone(base);
+    const remote = structuredClone(base);
+    local.project_boards = reorderProjectBoards(local.project_boards!, second.id, first.id);
+    remote.project_boards![0].tasks[0].notes = "另一个设备的备注";
+    const merged = mergeScheduleChanges(base, local, remote);
+    expect(merged.conflicts).toEqual([]);
+    expect(merged.value.project_boards!.map((board) => board.id)).toEqual([second.id, archived.id, first.id, third.id]);
+    expect(merged.value.project_boards!.find((board) => board.id === first.id)?.tasks[0].notes).toBe("另一个设备的备注");
+  });
   it("round trips annotations, checklists and archived projects through account backups", () => {
     const board = createProjectBoard("learning", "LeetCode");
     board.archived = true;

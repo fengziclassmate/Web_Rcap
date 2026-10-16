@@ -5,9 +5,9 @@ import { buildSearchIndex, GlobalSearch } from "../global-search";
 import { createProjectBoard } from "@/lib/project-boards";
 
 describe("global search", () => {
-  it("locates an annotated project task by its research notes", () => {
+  it("locates a project task through its subtask notes", () => {
     const board = createProjectBoard("research", "城市用地诊断");
-    board.tasks[0].notes = "核对土地分类口径";
+    board.tasks[0].subtasks[0].notes = "核对土地分类口径";
     const onLocate = vi.fn();
     render(<GlobalSearch tasks={[]} events={[]} logs={[]} annualTasks={[]} projects={[]} shopping={[]} boards={[board]} logsReady onLocate={onLocate} />);
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
