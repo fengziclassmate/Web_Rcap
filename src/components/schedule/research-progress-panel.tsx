@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { addDays, format, isValid, parseISO } from "date-fns";
-import { ArrowUpRight, FlaskConical, Send } from "lucide-react";
+import { ArrowUpRight, ChevronDown, FlaskConical, Moon, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -174,118 +174,38 @@ function ResearchProgressContent({
 
   return (
     <section className="task-dashboard-section dashboard-section-card research-progress-card" aria-label="今日科研进展" data-testid="research-progress-panel">
-      <div>
-        <div className="dashboard-section-heading flex flex-wrap items-center gap-2" data-expanded={open}>
-          <FlaskConical className="h-4 w-4 shrink-0 text-sky-800" aria-hidden />
-          <h3 className="text-sm font-semibold text-stone-800">今日科研进展</h3>
-          <Button type="button" size="icon-sm" variant="ghost" aria-label={open ? "折叠今日科研进展" : "展开今日科研进展"} aria-expanded={open} onClick={() => { setOpen(!open); try { localStorage.setItem("research-progress-open", open ? "closed" : "open"); } catch {} }}>{open ? "⌄" : "›"}</Button>
-          <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium tabular-nums text-sky-800">
-            {draftDate === date ? "今日" : "当日"} {selectedEntryCount} 条
-          </span>
-          {canSubmit && draftDate !== date ? (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium tabular-nums text-amber-800">
-              草稿 {draftDate.slice(5).replace("-", "/")}
-            </span>
-          ) : null}
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            className="ml-auto text-stone-500 hover:bg-white hover:text-sky-900"
-            onClick={onOpenLogs}
-            aria-label="打开科研动态日志"
-            title="打开动态日志"
-          >
-            <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
-          </Button>
+      <div className="dashboard-section-heading flex items-center gap-2" data-expanded={open}>
+        <FlaskConical className="size-4 shrink-0 text-primary" aria-hidden />
+        <h3 className="min-w-0 flex-1 font-semibold">今日科研进展</h3>
+        <span className="console-count" role="status" aria-label="科研日志条数">{selectedEntryCount}</span>
+        {canSubmit && draftDate !== date && <span className="console-draft" title={draftDate}>草稿</span>}
+        <Button type="button" size="icon-sm" variant="ghost" aria-label={open ? "折叠今日科研进展" : "展开今日科研进展"} aria-expanded={open} onClick={() => { setOpen(!open); try { localStorage.setItem("research-progress-open", open ? "closed" : "open"); } catch {} }}><ChevronDown className={`size-3.5 ${open ? "" : "-rotate-90"}`} /></Button>
+        <Button type="button" size="icon-sm" variant="ghost" onClick={onOpenLogs} aria-label="打开科研动态日志" title="动态日志"><ArrowUpRight className="size-3.5" /></Button>
+      </div>
+      <div hidden={!open} className="research-body">
+        <div className="research-week" role="group" aria-label="近七天科研记录">
+          {recentDates.map((day) => {
+            const status = !logsReady ? "待确认" : recordedDates.has(day) ? "已记录" : restDays.includes(day) ? "休息日" : hasResearchDraft(drafts[day]) ? "草稿" : day === date ? "待记录" : "待补记";
+            return <button key={day} type="button" disabled={disabled} aria-label={`${day} ${status}`} title={`${day} · ${status}`} aria-pressed={draftDate === day} data-status={status} onClick={() => selectDate(day)}>
+              <span>{day === date ? "今" : format(parseISO(day), "dd")}</span><i aria-hidden />
+            </button>;
+          })}
         </div>
-
-        <div className="space-y-2.5" hidden={!open}>
-          <div className="rounded-lg border border-stone-200 bg-stone-50/80 p-2">
-            <div className="mb-2 flex items-center justify-between gap-2 text-xs">
-              <span className="font-semibold text-stone-600">近 7 天</span>
-              <span className={logsReady && missingCount ? "text-amber-800" : "text-stone-500"}>
-                {!logsReady ? "记录状态暂不可用" : missingCount ? `${missingCount} 天待补记` : "往日无漏记"}
-              </span>
-            </div>
-            <div className="grid grid-cols-7 gap-1" aria-label="近七天科研记录">
-              {recentDates.map((day) => {
-                const status = !logsReady ? "待确认" : recordedDates.has(day) ? "已记录" : restDays.includes(day) ? "休息日" : hasResearchDraft(drafts[day]) ? "草稿" : day === date ? "待记录" : "待补记";
-                const color = status === "已记录" ? "text-emerald-700" : status === "草稿" ? "text-sky-800" : status === "待补记" ? "text-amber-800" : "text-stone-500";
-                return <button key={day} type="button" disabled={disabled} aria-label={`${day} ${status}`} aria-pressed={draftDate === day} onClick={() => selectDate(day)} className={`min-w-0 rounded-md border px-0.5 py-1.5 text-center text-xs disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-sky-800 ${draftDate === day ? "border-sky-800 bg-sky-50" : "border-transparent hover:bg-white"}`}>
-                  <span className="block tabular-nums text-stone-700">{day === date ? "今天" : format(parseISO(day), "M/d")}</span>
-                  <span className={`mt-1 block text-[10px] leading-4 ${color}`}>{status}</span>
-                </button>;
-              })}
-            </div>
-          </div>
-          <div className="flex items-end gap-1.5">
-            <label className="min-w-0 flex-1 space-y-1">
-              <span className="text-xs font-semibold text-stone-600">日志日期</span>
-              <Input
-                type="date"
-                aria-label="科研日志日期"
-                value={draftDate}
-                max={date}
-                disabled={disabled}
-                onChange={(event) => selectDate(event.target.value)}
-                className="bg-white/90"
-              />
-            </label>
-            <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => selectDate(format(addDays(parseISO(date), -1), "yyyy-MM-dd"))}>昨天</Button>
-            <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => selectDate(date)}>今天</Button>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-1 text-xs">
-            <span role="status" className={storageError ? "text-amber-800" : "text-stone-500"}>
-              {storageError ? "本地保存失败，离开前请保存日志" : userId && canSubmit ? "草稿已自动保存到本机" : ""}
-            </span>
-            {!recordedDates.has(draftDate) && logsReady && <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => persist({ ...local, restDays: restDays.includes(draftDate) ? restDays.filter((day) => day !== draftDate) : [...restDays, draftDate] })}>
-              {restDays.includes(draftDate) ? "取消休息日" : "标记休息日"}
-            </Button>}
-          </div>
-          <label className="block space-y-1">
-            <span className="text-xs font-semibold text-stone-600">{draftDate === date ? "今日完成" : "当日完成"}</span>
-            <Textarea
-              value={completed}
-              onChange={(event) => updateDraft({ completed: event.target.value })}
-              disabled={disabled}
-              aria-label={draftDate === date ? "今日完成" : "当日完成"}
-              placeholder="实验、阅读、写作或分析进展"
-              className="min-h-16 resize-y border-sky-900/10 bg-white/90 text-xs leading-5"
-            />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-xs font-semibold text-stone-600">关键进展 / 卡点</span>
-            <Textarea
-              value={insight}
-              onChange={(event) => updateDraft({ insight: event.target.value })}
-              disabled={disabled}
-              aria-label="关键进展或卡点"
-              placeholder="新发现、待验证判断或当前阻碍"
-              className="min-h-14 resize-y border-sky-900/10 bg-white/90 text-xs leading-5"
-            />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-xs font-semibold text-stone-600">{draftDate === date ? "明日计划" : "次日计划"}</span>
-            <Textarea
-              value={nextPlan}
-              onChange={(event) => updateDraft({ nextPlan: event.target.value })}
-              disabled={disabled}
-              aria-label={draftDate === date ? "明日计划" : "次日计划"}
-              placeholder="下一步最小且明确的行动"
-              className="min-h-14 resize-y border-sky-900/10 bg-white/90 text-xs leading-5"
-            />
-          </label>
-          <Button
-            type="button"
-            size="sm"
-            className="w-full bg-sky-950 text-white hover:bg-sky-900"
-            disabled={!canSubmit || disabled}
-            onClick={() => void handleSubmit()}
-          >
-            <Send className="h-3.5 w-3.5" aria-hidden />
-            {disabled ? "保存中…" : "保存科研日志"}
-          </Button>
+        <div className="research-datebar">
+          <Input type="date" aria-label="科研日志日期" value={draftDate} max={date} disabled={disabled} onChange={(event) => selectDate(event.target.value)} />
+          <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => selectDate(format(addDays(parseISO(date), -1), "yyyy-MM-dd"))}>昨天</Button>
+          <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => selectDate(date)}>今天</Button>
+          <span className="research-gap-count">{!logsReady ? "记录状态暂不可用" : missingCount ? `${missingCount} 天待补记` : ""}</span>
+        </div>
+        <div className="research-note-rows">
+          <label><span>{draftDate === date ? "今日完成" : "当日完成"}</span><Textarea rows={2} value={completed} onChange={(event) => updateDraft({ completed: event.target.value })} disabled={disabled} aria-label={draftDate === date ? "今日完成" : "当日完成"} placeholder="完成了什么" className="research-note-input" /></label>
+          <label><span>进展卡点</span><Textarea rows={2} value={insight} onChange={(event) => updateDraft({ insight: event.target.value })} disabled={disabled} aria-label="关键进展或卡点" placeholder="进展或阻碍" className="research-note-input" /></label>
+          <label><span>{draftDate === date ? "明日计划" : "次日计划"}</span><Textarea rows={2} value={nextPlan} onChange={(event) => updateDraft({ nextPlan: event.target.value })} disabled={disabled} aria-label={draftDate === date ? "明日计划" : "次日计划"} placeholder="下一步" className="research-note-input" /></label>
+        </div>
+        <span role="status" className={storageError ? "console-storage-error" : "sr-only"}>{storageError ? "本地保存失败，离开前请保存日志" : userId && canSubmit ? "草稿已自动保存到本机" : ""}</span>
+        <div className="research-footer">
+          {!recordedDates.has(draftDate) && logsReady && <Button type="button" size="sm" variant="ghost" aria-label={restDays.includes(draftDate) ? "取消休息日" : "标记休息日"} aria-pressed={restDays.includes(draftDate)} disabled={disabled} onClick={() => persist({ ...local, restDays: restDays.includes(draftDate) ? restDays.filter((day) => day !== draftDate) : [...restDays, draftDate] })}><Moon className="size-3" />{restDays.includes(draftDate) ? "已休息" : "休息日"}</Button>}
+          <Button type="button" size="sm" className="ml-auto" aria-label="保存科研日志" disabled={!canSubmit || disabled} onClick={() => void handleSubmit()}><Send className="size-3" />{disabled ? "保存中…" : "保存"}</Button>
         </div>
       </div>
     </section>

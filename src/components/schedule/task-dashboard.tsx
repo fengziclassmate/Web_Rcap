@@ -1421,7 +1421,7 @@ export function TaskDashboard({
           ) },
           { id: "boards", content: projectBoardsPanel },
           { id: "taskLists", content: (
-      <div className="task-dashboard-section utility-panel-grid" data-testid="task-list-panel-group">
+      <div className="task-dashboard-section dashboard-section-card utility-panel-grid" data-testid="task-list-panel-group">
         <div className="dashboard-panel-toolbar">
           <div className="dashboard-panel-switch grid-cols-3" role="group" aria-label="任务与清单">
           {([['long', '长期任务'], ['annual', '年度任务'], ['shopping', '购物清单']] as const).map(([panel, label]) => (
@@ -1698,7 +1698,7 @@ export function TaskDashboard({
 
           ) },
           { id: "utilities", content: (
-      <div className="task-dashboard-section utility-panel-grid" data-testid="utility-panel-group">
+      <div className="task-dashboard-section dashboard-section-card utility-panel-grid" data-testid="utility-panel-group">
         <div className="dashboard-panel-toolbar">
           <div className="dashboard-panel-switch grid-cols-4" role="group" aria-label="项目与生活记录">
           {([['project', '项目'], ['routine', '日常打卡'], ['achievement', '成就'], ['footprint', '足迹']] as const).map(([panel, label]) => (
@@ -2030,7 +2030,7 @@ export function TaskDashboard({
                 </div>
               ) : (
                 <p className="mt-3 rounded-lg border border-dashed border-emerald-200 bg-white/60 px-3 py-2 text-xs text-emerald-700">
-                  还没有日常打卡任务。可以添加 07:50 喝水、08:40 站立这类固定时间点。
+                  暂无打卡任务
                 </p>
               )}
             </div>
@@ -2043,7 +2043,7 @@ export function TaskDashboard({
           <div className="utility-panel-content mt-3 space-y-3">
             {groupedAchievements.length === 0 ? (
               <p className="rounded-lg border border-stone-200 p-4 text-sm text-stone-500">
-                暂无成就记录。可以把今天完成的重要进展记下来。
+                暂无成就记录
               </p>
             ) : (
               <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
@@ -2105,7 +2105,7 @@ export function TaskDashboard({
           <div className="utility-panel-content mt-3 space-y-3">
             {footprints.length === 0 ? (
               <p className="rounded-lg border border-dashed border-stone-200 bg-white/70 px-3 py-4 text-sm text-stone-500">
-                暂无足迹项目，点击添加开始跟踪。
+                暂无足迹项目
               </p>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -2202,7 +2202,7 @@ export function TaskDashboard({
                 </div>
               ) : (
                 <p className="mt-3 rounded-lg border border-dashed border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-500">
-                  还没有过往归档。今天完成的勾选会按日期保存，明天会在这里看到今天的记录。
+                  暂无过往归档
                 </p>
               )}
         </DialogContent>
@@ -2462,7 +2462,7 @@ export function TaskDashboard({
                 ))}
                 {(historyProject.archives ?? []).length === 0 ? (
                   <p className="rounded-md border border-dashed border-stone-200 p-3 text-xs text-stone-500">
-                    还没有历史存档。当前阶段存档后，会在这里保留原有记录。
+                    暂无历史存档
                   </p>
                 ) : null}
               </section>

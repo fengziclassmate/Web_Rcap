@@ -50,8 +50,8 @@ describe("DailyTaskPanel completion archive", () => {
 
   it("reschedules a today-focus task to an arbitrary date two weeks later", () => {
     const { onUpdateTask, rerender, item, props } = renderDateEditor();
-    const focus = screen.getByText("今日三件事").parentElement!.parentElement!;
-    fireEvent.click(within(focus).getByRole("button", { name: "修改 准备汇报 的时间" }));
+    expect(screen.getAllByText("准备汇报")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "修改 准备汇报 的时间" }));
     const dialog = within(screen.getByRole("dialog", { name: "修改任务时间" }));
     expect((dialog.getByLabelText("任务日期") as HTMLInputElement).value).toBe("2026-07-27");
     fireEvent.change(dialog.getByLabelText("任务日期"), { target: { value: "2026-08-10" } });
@@ -60,7 +60,7 @@ describe("DailyTaskPanel completion archive", () => {
     expect(onUpdateTask).toHaveBeenCalledWith("task", { dueDate: "2026-08-10", plannedTime: "10:30", isTodayFocus: false });
     expect(screen.queryByRole("dialog")).toBeNull();
     rerender(<DailyTaskPanel {...props} tasks={[{ ...item, ...onUpdateTask.mock.calls[0][1] }]} />);
-    expect(within(focus).queryByText("准备汇报")).toBeNull();
+    expect(screen.queryByText("今日三件事")).toBeNull();
     expect(screen.getByText("2026-08-10 10:30")).toBeTruthy();
   });
 
@@ -329,9 +329,9 @@ describe("DailyTaskPanel completion archive", () => {
     );
 
     expect(screen.getAllByRole("article").map((row) => row.textContent)).toEqual([
-      "早间任务2026-07-27",
-      "下午任务2026-07-27",
-      "今日未排期2026-07-27",
+      "早间任务今天",
+      "下午任务今天",
+      "今日未排期今天",
       "明日任务2026-07-28",
     ]);
   });
@@ -363,8 +363,8 @@ describe("DailyTaskPanel completion archive", () => {
     );
 
     expect(screen.getAllByRole("article").map((row) => row.textContent)).toEqual([
-      "自定义第二项2026-07-27",
-      "自定义第一项2026-07-27",
+      "自定义第二项今天",
+      "自定义第一项今天",
     ]);
     fireEvent.click(screen.getByRole("button", { name: "按时间排序" }));
     expect(onSortModeChange).toHaveBeenCalledWith("time");

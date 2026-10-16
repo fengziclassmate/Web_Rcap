@@ -858,24 +858,24 @@ export function DailyExpensePanel({
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-3">
+                        <div className="expense-record-row">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-700">{categoryPath.main}</span>
                               <span className="rounded-md bg-stone-50 px-2 py-0.5 text-xs font-medium text-stone-600">
                                 {categoryPath.sub} / {categoryPath.detail}
                               </span>
-                              <span className="text-sm font-semibold text-stone-950">{formatMoney(expense.amount)}</span>
                               {expense.excluded_from_budget ? (
                                 <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
                                   <BriefcaseBusiness className="h-3 w-3" aria-hidden />
-                                  出差/报销 · 不计预算
+                                  预算外
                                 </span>
                               ) : null}
                             </div>
                             {expense.note ? <p className="mt-1 whitespace-pre-wrap break-words text-xs text-stone-500">{expense.note}</p> : null}
                           </div>
-                          <div className="flex items-center gap-1">
+                          <span className="expense-record-amount">{formatMoney(expense.amount)}</span>
+                          <div className="expense-record-actions">
                             <Button
                               type="button"
                               size="icon-sm"
@@ -927,7 +927,7 @@ export function DailyExpensePanel({
                   <div className="space-y-1.5">
                     <Label>一级分类</Label>
                     <Select value={expenseCategoryMain} onValueChange={handleExpenseMainChange}>
-                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectTrigger aria-label="一级分类" className="w-full"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {expenseCategoryTree.map((category) => (
                           <SelectItem key={category.main} value={category.main}>{category.main}</SelectItem>
@@ -938,7 +938,7 @@ export function DailyExpensePanel({
                   <div className="space-y-1.5">
                     <Label>二级分类</Label>
                     <Select value={expenseCategorySub} onValueChange={handleExpenseSubChange}>
-                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectTrigger aria-label="二级分类" className="w-full"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {categorySubOptions.map((category) => (
                           <SelectItem key={category.name} value={category.name}>{category.name}</SelectItem>
@@ -949,7 +949,7 @@ export function DailyExpensePanel({
                   <div className="space-y-1.5">
                     <Label>三级分类</Label>
                     <Select value={expenseCategoryDetail} onValueChange={(value) => value && setExpenseCategoryDetail(value)}>
-                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectTrigger aria-label="三级分类" className="w-full"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {categoryDetailOptions.map((category) => (
                           <SelectItem key={category} value={category}>{category}</SelectItem>
@@ -962,10 +962,11 @@ export function DailyExpensePanel({
                   <Label htmlFor="expense-note">备注</Label>
                   <Input id="expense-note" value={expenseNote} onChange={(event) => setExpenseNote(event.target.value)} placeholder="可选" />
                 </div>
-                <div className="expense-budget-toggle flex h-8 items-center justify-between gap-2 rounded-md border border-stone-200 px-2" title="适合出差、报销或代垫支出">
+                <div className="expense-entry-actions">
+                <div className="expense-budget-toggle" title="适合出差、报销或代垫支出">
                   <div className="min-w-0">
                     <Label htmlFor="expense-excluded-from-budget" className="whitespace-nowrap text-xs font-normal text-stone-600">
-                      不计入个人预算
+                      不计入预算
                     </Label>
                   </div>
                   <Switch
@@ -979,6 +980,7 @@ export function DailyExpensePanel({
                   <Plus className="h-3.5 w-3.5" />
                   {savingExpense ? "添加中..." : "添加支出"}
                 </Button>
+                </div>
               </div>
             </div>
 

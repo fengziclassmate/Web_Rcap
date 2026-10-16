@@ -8,6 +8,7 @@ import { addDays, differenceInCalendarDays, format, parse } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import {
   Check,
+  AlertTriangle,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -2375,7 +2376,7 @@ export function WeeklyTimeGrid({
                       {selectedWeekExpenseDateIso}
                     </span>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
+                  <div className="expense-week-strip">
                     {weekExpenseDateOptions.map(({ date, dateIso }) => {
                       const summary = dateExpenseSummaries[dateIso] ?? {
                         totalExpense: 0,
@@ -2390,29 +2391,18 @@ export function WeeklyTimeGrid({
                           key={dateIso}
                           type="button"
                           aria-pressed={isSelected}
+                          aria-label={`${format(date, "M/d")} 花销 ${getMonthlyExpenseLabel(summary)}${isOverBudget ? "，超支" : ""}`}
+                          title={`${format(date, "yyyy-MM-dd")} · ${getMonthlyExpenseLabel(summary)}${isOverBudget ? " · 超支" : ""}`}
+                          data-over-budget={isOverBudget || undefined}
                           onClick={() => setSelectedExpenseDateIso(dateIso)}
-                          className={`flex min-h-10 flex-wrap items-center justify-between gap-x-2 rounded-lg border px-2 py-1 text-left transition ${
-                            isSelected
-                              ? "border-stone-900 bg-stone-950 text-white shadow-sm"
-                              : "border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:bg-white"
-                          }`}
+                          className="expense-day-card"
                         >
-                          <span className="flex items-center justify-between gap-2">
-                            <span className="truncate text-xs font-medium opacity-80">
+                            <span className="expense-day-label">
                               {format(date, "M/d")} {format(date, "EEE", { locale: zhCN })}
                             </span>
-                            {isOverBudget ? (
-                              <span
-                                className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold ${
-                                  isSelected ? "bg-white/15 text-white" : "bg-rose-100 text-rose-700"
-                                }`}
-                              >
-                                超支
-                              </span>
-                            ) : null}
-                          </span>
-                          <span className="block text-sm font-semibold">
-                            {getMonthlyExpenseLabel(summary)}
+                          <span className="expense-day-value">
+                            {getMonthlyExpenseLabel({ ...summary, dailyBudget: null })}
+                            {isOverBudget && <AlertTriangle className="size-3" aria-hidden />}
                           </span>
                         </button>
                       );
@@ -2424,7 +2414,7 @@ export function WeeklyTimeGrid({
           ) : null}
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             {selectedCell ? (
-              <DialogContent className="event-editor-dialog max-h-[92vh] overflow-y-auto sm:max-w-[560px]">
+              <DialogContent className="event-editor-dialog max-h-[92vh] overflow-y-auto sm:max-w-[600px]">
                 <DialogHeader>
                   <DialogTitle className="text-lg font-semibold text-gray-900">
                     新建行程 - {selectedCell.date} {formatHour(selectedCell.startHour)}
@@ -2699,7 +2689,7 @@ export function WeeklyTimeGrid({
           <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => !open && setEditingEventId(null)}>
             {selectedEvent ? (
               <DialogContent
-                className="event-editor-dialog max-h-[92vh] overflow-y-auto sm:max-w-[560px]"
+                className="event-editor-dialog max-h-[92vh] overflow-y-auto sm:max-w-[600px]"
                 onKeyDown={(event) => {
                   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                     event.preventDefault();

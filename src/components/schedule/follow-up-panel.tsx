@@ -64,15 +64,15 @@ export function FollowUpPanel({ tasks, open, onOpenChange, onAdd, onUpdate, onDe
       <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 gap-1 px-2 text-xs" onClick={() => setArchiveOpen(true)}><Archive className="h-3.5 w-3.5" />存档库 {archived.length}</Button>
     </div>
     <div id={contentId} hidden={!open}>
-    <form className="mb-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); if (!name.trim()) return; onAdd(name.trim()); setName(""); }}>
-      <Input aria-label="新跟进事项" value={name} onChange={(event) => setName(event.target.value)} className="min-w-0 flex-1 text-xs" />
+    <form className="mb-2 flex gap-2" onSubmit={(event) => { event.preventDefault(); if (!name.trim()) return; onAdd(name.trim()); setName(""); }}>
+      <Input aria-label="新跟进事项" placeholder="添加跟进事项…" value={name} onChange={(event) => setName(event.target.value)} className="min-w-0 flex-1 text-xs" />
       <Button type="submit" size="icon-sm" disabled={!name.trim()} aria-label="添加跟进事项"><Plus className="h-4 w-4" /></Button>
     </form>
-    <table className="w-full table-fixed text-xs" aria-label="待跟进事项列表">
+    {active.length > 0 && <table className="w-full table-fixed text-xs" aria-label="待跟进事项列表">
       <thead><tr className="border-b border-stone-200 text-stone-500"><th className="pb-2 text-left font-medium">事项</th><th className="w-[96px] pb-2 pl-2 text-left font-medium">状态</th></tr></thead>
       <tbody>{active.map((task) => <tr key={task.id} className="border-b border-stone-100 last:border-0"><td className="py-2.5 align-top">{taskName(task)}</td><td className="py-2.5 pl-2 align-top">{statusSelect(task)}</td></tr>)}</tbody>
-    </table>
-    {!active.length && <p className="py-4 text-center text-xs text-stone-400">暂无待跟进事项</p>}
+    </table>}
+    {!active.length && <p className="py-2 text-center text-xs text-stone-500">暂无待跟进事项</p>}
     </div>
 
     <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>

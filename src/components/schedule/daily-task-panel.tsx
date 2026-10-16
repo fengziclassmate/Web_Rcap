@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CalendarDays, CheckCircle, ChevronDown, GripVertical, ListTodo, Play, Plus, RotateCcw } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle, ChevronDown, GripVertical, ListTodo, Play, Plus, RotateCcw, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -382,107 +382,43 @@ export function DailyTaskPanel({
   return (
     <section className="daily-task-panel dashboard-section-card" aria-label="日常任务">
       <Collapsible open={sectionOpen} onOpenChange={onSectionOpenChange}>
-      <div className="dashboard-section-heading flex flex-wrap items-center justify-between gap-2" data-expanded={sectionOpen}>
-        <CollapsibleTrigger
-          className="flex min-w-0 items-center gap-2 rounded-lg px-1 py-1 text-left"
-          aria-label={sectionOpen ? "折叠日常任务" : "展开日常任务"}
-        >
-          <span className="flex items-center gap-2 text-sm font-semibold text-stone-900">
-            <ListTodo className="h-4 w-4 text-emerald-700" aria-hidden />
-            日常任务
-          </span>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${sectionOpen ? "" : "-rotate-90"}`} aria-hidden />
+      <div className="dashboard-section-heading daily-panel-heading" data-expanded={sectionOpen}>
+        <CollapsibleTrigger className="daily-panel-title" aria-label={sectionOpen ? "折叠日常任务" : "展开日常任务"}>
+          <ListTodo className="size-4 text-primary" aria-hidden /><span>日常任务</span><span className="console-count">{dailyTasks.length}</span><ChevronDown className={`size-3.5 text-stone-500 ${sectionOpen ? "" : "-rotate-90"}`} aria-hidden />
         </CollapsibleTrigger>
-        {sectionOpen ? <div className="flex items-center gap-1.5">
-          <div
-            role="group"
-            aria-label="日常任务排序方式"
-            className="flex rounded-lg bg-stone-100 p-0.5"
-          >
-            <button
-              type="button"
-              aria-label="按时间排序"
-              aria-pressed={sortMode === "time"}
-              className={`rounded-md px-2 py-1 text-xs font-medium transition ${
-                sortMode === "time"
-                  ? "bg-white text-stone-900 shadow-sm"
-                  : "text-stone-500 hover:text-stone-800"
-              }`}
-              onClick={() => onSortModeChange("time")}
-            >
-              按时间
-            </button>
-            <button
-              type="button"
-              aria-label="自定义排序"
-              aria-pressed={sortMode === "custom"}
-              className={`rounded-md px-2 py-1 text-xs font-medium transition ${
-                sortMode === "custom"
-                  ? "bg-white text-stone-900 shadow-sm"
-                  : "text-stone-500 hover:text-stone-800"
-              }`}
-              onClick={() => onSortModeChange("custom")}
-            >
-              自定义
-            </button>
+        {sectionOpen && <div className="daily-panel-tools">
+          <div role="group" aria-label="日常任务排序方式" className="daily-sort-switch">
+            <button type="button" aria-label="按时间排序" title="按时间排序" aria-pressed={sortMode === "time"} onClick={() => onSortModeChange("time")}><CalendarDays className="size-3.5" /></button>
+            <button type="button" aria-label="自定义排序" title="自定义排序" aria-pressed={sortMode === "custom"} onClick={() => onSortModeChange("custom")}><GripVertical className="size-3.5" /></button>
           </div>
-          <Button type="button" size="sm" variant="outline" onClick={() => setDailyCloseOpen(true)}>
-            <RotateCcw className="h-3.5 w-3.5" />
-            每日收尾
-          </Button>
-        </div> : null}
+          <Button type="button" size="icon-sm" variant="ghost" aria-label="每日收尾" title="每日收尾" onClick={() => setDailyCloseOpen(true)}><RotateCcw className="size-3.5" /></Button>
+        </div>}
       </div>
 
       <CollapsibleContent>
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_132px_auto]">
+      <div className="daily-task-entry">
         <Input
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="添加日常任务"
+          placeholder="添加日常任务" aria-label="添加日常任务"
           onKeyDown={(event) => {
             if (event.key === "Enter") addDailyTask();
           }}
         />
-        <Input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
+        <Input type="date" aria-label="新任务日期" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
         <Button type="button" size="icon-sm" onClick={addDailyTask} disabled={!name.trim()} aria-label="添加日常任务" title="添加日常任务">
           <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
 
-      <div className="today-focus-strip mt-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-semibold tracking-wide text-emerald-900">今日三件事</p>
-          <span className="text-xs tabular-nums text-emerald-700">{focusTasks.length}/3</span>
-        </div>
-        {focusTasks.length > 0 ? (
-          <ol className="mt-2 grid gap-1.5">
-            {focusTasks.map((task, index) => (
-              <li key={task.id} className="flex items-center gap-2 text-sm text-emerald-950">
-                <span className="grid size-5 place-items-center rounded-full bg-emerald-700 text-xs font-bold text-white">
-                  {index + 1}
-                </span>
-                <span className="min-w-0 flex-1 truncate">{task.name}</span>
-                {task.plannedTime ? <span className="shrink-0 text-xs tabular-nums text-emerald-700">{task.plannedTime}</span> : null}
-                <button
-                  type="button"
-                  aria-label={`修改 ${task.name} 的时间`}
-                  title="修改日期和时间"
-                  className="shrink-0 rounded-md p-1 text-emerald-700 transition hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-emerald-700"
-                  onClick={() => openDateEditor(task)}
-                >
-                  <CalendarDays className="size-3.5" aria-hidden />
-                </button>
-              </li>
-            ))}
-          </ol>
-        ) : null}
-      </div>
+      {focusTasks.length > 0 && <div className="daily-focus-summary"><span><Star className="size-3" />今日三件事</span><span>{focusTasks.length}/3</span></div>}
 
-      <div className="mt-3 max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1" data-testid="daily-task-scroll-list">
+      <div className="daily-task-list mt-2 max-h-72 overflow-y-auto overscroll-contain" data-testid="daily-task-scroll-list">
         {dailyTasks.length > 0 ? (
           dailyTasks.map((task) => (
             <article
               key={task.id}
+              data-focus={task.isTodayFocus || undefined}
               className={`daily-task-row ${draggingTaskId === task.id ? "opacity-60" : ""}`}
               onContextMenu={(event) => openContextMenu(event, task)}
               onDragOver={(event) => {
@@ -509,8 +445,8 @@ export function DailyTaskPanel({
                 onCheckedChange={() => onToggleTask(task.id)}
                 aria-label={`完成日常任务 ${task.name}`}
               />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-stone-900">{task.name}</p>
+              <div className="daily-task-content">
+                <p title={task.name} className="daily-task-name">{task.isTodayFocus && <Star className="mr-1 inline size-3 fill-emerald-700 text-emerald-700" aria-label="今日重点" />}{task.name}</p>
                 <button
                   type="button"
                   className="mt-0.5 inline-flex items-center gap-1 rounded text-xs tabular-nums text-stone-500 transition hover:text-emerald-700 hover:underline focus-visible:outline-2 focus-visible:outline-emerald-700"
@@ -519,7 +455,7 @@ export function DailyTaskPanel({
                   onClick={() => openDateEditor(task)}
                 >
                   <CalendarDays className="size-3" aria-hidden />
-                  {task.dueDate || "设置日期"}
+                  {task.dueDate === today ? "今天" : task.dueDate || "设置日期"}
                   {task.plannedTime ? ` ${task.plannedTime}` : ""}
                 </button>
               </div>
@@ -527,19 +463,20 @@ export function DailyTaskPanel({
             </article>
           ))
         ) : (
-          <p className="rounded-lg border border-dashed border-stone-200 px-3 py-3 text-xs text-stone-500">
+          <p className="py-2 text-center text-xs text-stone-500">
             暂无日常任务
           </p>
         )}
       </div>
 
-      <div className="mt-2 rounded-lg border border-stone-200/80 bg-white/55 px-2.5 py-2">
+      <div className="daily-task-archive">
         <div className="flex items-center gap-2">
           <button
             type="button"
             className="flex min-w-0 flex-1 items-center justify-between text-xs font-medium text-stone-600"
             onClick={() => onArchivedSectionOpenChange(!archivedSectionOpen)}
-            aria-expanded={archivedSectionOpen}
+            disabled={completedTodayTasks.length === 0}
+            aria-expanded={archivedSectionOpen && completedTodayTasks.length > 0}
           >
             <span>今日已完成</span>
             <span>{completedTodayTasks.length} 项</span>
@@ -549,7 +486,7 @@ export function DailyTaskPanel({
             历史记录
           </Button>
         </div>
-        {archivedSectionOpen ? (
+        {archivedSectionOpen && completedTodayTasks.length > 0 ? (
           <div className="mt-2 space-y-1.5">
             {completedTodayTasks.length > 0 ? (
               completedTodayTasks.map((task) => (
@@ -692,7 +629,7 @@ export function DailyTaskPanel({
             ))}
           </div>
         ) : (
-          <p className="mt-2 text-xs text-amber-800">未来 7 天没有待处理的长期任务截止日。</p>
+          null
         )}
         </CollapsibleContent>
       </div>
@@ -702,7 +639,7 @@ export function DailyTaskPanel({
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>修改任务时间</DialogTitle>
-            <DialogDescription>自行选择任务的日期和具体时间。改到其他日期后，将从今日三件事中移出。</DialogDescription>
+            <DialogDescription className="sr-only">任务日期与计划时间</DialogDescription>
           </DialogHeader>
           <form className="space-y-4" noValidate onSubmit={(event) => { event.preventDefault(); saveTaskDate(); }}>
             <p className="break-words rounded-lg bg-stone-100 px-3 py-2 text-sm font-medium text-stone-800">{taskForDate?.name}</p>

@@ -153,9 +153,9 @@ describe("ResearchProgressPanel", () => {
       updatedAt: "2026-09-04T12:00:00", images: [], tags: [], links: [],
     };
     render(<ResearchProgressPanel date="2026-09-05" posts={[post, { ...post, id: "life", category: "life" }]} onCreatePost={vi.fn()} onOpenLogs={vi.fn()} />);
-    expect(screen.getByText("今日 0 条")).toBeTruthy();
+    expect(screen.getByLabelText("科研日志条数").textContent).toBe("0");
     fireEvent.click(screen.getByRole("button", { name: "昨天" }));
-    expect(screen.getByText("当日 1 条")).toBeTruthy();
+    expect(screen.getByLabelText("科研日志条数").textContent).toBe("1");
     fireEvent.change(screen.getByLabelText("科研日志日期"), { target: { value: "2026-09-06" } });
     expect((screen.getByLabelText("科研日志日期") as HTMLInputElement).value).toBe("2026-09-04");
   });
@@ -231,7 +231,8 @@ describe("ResearchProgressPanel", () => {
     });
     rerender(<ResearchProgressPanel date="2026-09-06" {...props} />);
 
-    expect(screen.getByText("草稿 09/05")).toBeTruthy();
+    expect(screen.getByText("草稿")).toBeTruthy();
+    expect((screen.getByLabelText("科研日志日期") as HTMLInputElement).value).toBe("2026-09-05");
     fireEvent.click(screen.getByRole("button", { name: "保存科研日志" }));
 
     await waitFor(() => {

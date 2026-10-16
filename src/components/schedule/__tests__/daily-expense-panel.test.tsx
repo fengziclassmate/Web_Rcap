@@ -53,7 +53,7 @@ describe("DailyExpensePanel", () => {
   it("offers a compact tag for expenses that should not use the personal budget", async () => {
     render(<DailyExpensePanel date="2026-08-02" />);
 
-    expect(await screen.findByRole("switch", { name: "不计入个人预算" })).toBeTruthy();
+    expect(await screen.findByRole("switch", { name: "不计入预算" })).toBeTruthy();
     expect(screen.getByTitle("适合出差、报销或代垫支出")).toBeTruthy();
   });
 
@@ -97,7 +97,7 @@ describe("DailyExpensePanel", () => {
     render(<DailyExpensePanel date="2026-08-02" />);
 
     fireEvent.change(await screen.findByLabelText("金额"), { target: { value: "128.50" } });
-    fireEvent.click(screen.getByRole("switch", { name: "不计入个人预算" }));
+    fireEvent.click(screen.getByRole("switch", { name: "不计入预算" }));
     fireEvent.click(screen.getByRole("button", { name: "添加支出" }));
 
     await waitFor(() => {
