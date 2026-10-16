@@ -1,4 +1,5 @@
 import { normalizeEventTag } from "@/lib/event-tags";
+import { defaultDashboardSectionOrder, normalizeDashboardSectionOrder } from "@/lib/dashboard-sections";
 import { normalizeFollowUpStatus } from "@/lib/follow-up";
 import { format } from "date-fns";
 import { normalizeCategoryDefList } from "./categories";
@@ -21,6 +22,8 @@ import type { Achievement } from "@/lib/achievements";
 import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/categories";
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
+  dashboardSectionOrder: defaultDashboardSectionOrder,
+  projectBoardsSectionOpen: true,
   executionSectionOpen: true,
   followUpSectionOpen: true,
   capacityStartHour: 9,
@@ -281,6 +284,8 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
   const utilityPanels = (["projectSectionOpen", "routineCheckinSectionOpen", "achievementSectionOpen", "footprintSectionOpen"] as const).filter((key) => value[key] === true);
   const capacityStartHour = Number.isInteger(value.capacityStartHour) && value.capacityStartHour! >= 0 && value.capacityStartHour! < 24 ? value.capacityStartHour! : 9;
   return {
+    dashboardSectionOrder: normalizeDashboardSectionOrder(value.dashboardSectionOrder),
+    projectBoardsSectionOpen: value.projectBoardsSectionOpen !== false,
     executionSectionOpen: value.executionSectionOpen !== false,
     followUpSectionOpen: value.followUpSectionOpen !== false,
     capacityStartHour,

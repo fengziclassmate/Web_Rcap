@@ -49,10 +49,13 @@ import { DailyTaskPanel } from "@/components/schedule/daily-task-panel";
 import { ShoppingList } from "@/components/schedule/shopping-list";
 import { ResearchProgressPanel } from "@/components/schedule/research-progress-panel";
 import { FollowUpPanel } from "@/components/schedule/follow-up-panel";
+import { SortableDashboardSections } from "@/components/schedule/sortable-dashboard-sections";
 import type { LogComposerInput, LogPostRecord } from "@/lib/logs";
 import { cn } from "@/lib/utils";
 
 type TaskDashboardProps = {
+  projectBoardsPanel?: React.ReactNode;
+  executionPanel?: React.ReactNode;
   userId?: string;
   logsReady?: boolean;
   openCollectionRequest?: { id: string; kind: "annual" | "project" | "shopping"; token: number };
@@ -300,6 +303,8 @@ function isValidTime(value: string) {
 }
 
 export function TaskDashboard({
+  projectBoardsPanel,
+  executionPanel,
   userId,
   logsReady,
   openCollectionRequest,
@@ -1361,7 +1366,11 @@ export function TaskDashboard({
         </DialogContent>
       </Dialog>
 
-      <div>
+      <SortableDashboardSections
+        order={uiPreferences.dashboardSectionOrder}
+        onOrderChange={(dashboardSectionOrder) => patchUiPreferences({ dashboardSectionOrder })}
+        sections={[
+          { id: "daily", content: (
       <DailyTaskPanel
         tasks={tasks}
         events={events}
@@ -1383,10 +1392,8 @@ export function TaskDashboard({
         archivedSectionOpen={uiPreferences.dailyArchiveSectionOpen}
         onArchivedSectionOpenChange={(open) => patchUiPreferences({ dailyArchiveSectionOpen: open })}
       />
-      </div>
-
-
-      <div>
+          ) },
+          { id: "research", content: (
       <ResearchProgressPanel
         userId={userId}
         logsReady={logsReady}
@@ -1396,6 +1403,8 @@ export function TaskDashboard({
         onCreatePost={onCreateLogPost}
         onOpenLogs={onOpenLogs}
       />
+          ) },
+          { id: "followup", content: (
       <FollowUpPanel
         tasks={tasks}
         open={uiPreferences.followUpSectionOpen !== false}
@@ -1406,8 +1415,9 @@ export function TaskDashboard({
         openTaskRequest={openTaskRequest}
         onOpenRequestHandled={onOpenRequestHandled}
       />
-      </div>
-
+          ) },
+          { id: "boards", content: projectBoardsPanel },
+          { id: "taskLists", content: (
       <div className="task-dashboard-section utility-panel-grid" data-testid="task-list-panel-group">
         <div className="dashboard-panel-toolbar">
           <div className="dashboard-panel-switch grid-cols-3" role="group" aria-label="任务与清单">
@@ -1683,6 +1693,8 @@ export function TaskDashboard({
       </div>
 
 
+          ) },
+          { id: "utilities", content: (
       <div className="task-dashboard-section utility-panel-grid" data-testid="utility-panel-group">
         <div className="dashboard-panel-toolbar">
           <div className="dashboard-panel-switch grid-cols-4" role="group" aria-label="项目与生活记录">
@@ -2137,9 +2149,10 @@ export function TaskDashboard({
           </div>
       </section>
       </div>
-
-
-
+          ) },
+          { id: "execution", content: executionPanel },
+        ]}
+      />
       <Dialog open={routineArchiveOpen} onOpenChange={setRoutineArchiveOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>

@@ -7,6 +7,8 @@ import { Check, CloudOff, Loader2, RefreshCw, Undo2, Redo2 } from "lucide-react"
 import { parseISO } from "date-fns";
 import { GlobalSearch, type SearchResult } from "@/components/schedule/global-search";
 import { ExecutionPanel } from "@/components/schedule/execution-panel";
+import { ProjectBoardsPanel } from "@/components/projects/project-boards-panel";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FloatingScheduleCard } from "@/components/schedule/floating-schedule-card";
 import { useScheduleSync } from "@/hooks/useScheduleSync";
 import { useUndoHistory } from "@/hooks/useUndoHistory";
@@ -198,7 +200,7 @@ export function WorkbenchApp() {
     const token = Date.now();
     if (result.boardId) {
       setOpenBoardRequest({ boardId: result.boardId, taskId: result.boardTaskId, token });
-      setActiveModule("projects");
+      setActiveModule("schedule");
     } else if (result.task) {
       setActiveModule("schedule");
       setOpenTaskRequest({ id: result.id, token });
@@ -1066,7 +1068,7 @@ export function WorkbenchApp() {
       </div>
 
       <div className="relative z-10 mx-auto flex max-w-[1880px] flex-col gap-4 px-4 py-3">
-        <MonitoringSidebar active={activeModule} onChange={(module) => { setOpenBoardRequest(undefined); setActiveModule(module); }} />
+        <MonitoringSidebar active={activeModule} onChange={setActiveModule} />
 
         <div key={activeModule} className="workbench-module min-h-0 w-full">
           {activeModule === "schedule" ? (
@@ -1107,6 +1109,12 @@ export function WorkbenchApp() {
               </section>
               <section className="min-h-0 space-y-4">
                 <TaskDashboard
+                  projectBoardsPanel={(
+                    <ProjectBoardsPanel boards={projectBoards} open={dashboardUiPreferences.projectBoardsSectionOpen !== false}
+                      onOpenChange={(projectBoardsSectionOpen) => setDashboardUiPreferences((previous) => ({ ...previous, projectBoardsSectionOpen }))}
+                      onOpenWorkspace={(boardId) => setOpenBoardRequest({ boardId: boardId ?? "", token: Date.now() })} />
+                  )}
+                  executionPanel={<ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />}
                   userId={user.id}
                   logsReady={logReady && logHistoryAvailable}
                   openCollectionRequest={openCollectionRequest}
@@ -1159,11 +1167,8 @@ export function WorkbenchApp() {
                   uiPreferences={dashboardUiPreferences}
                   onUiPreferencesChange={setDashboardUiPreferences}
                 />
-                <ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />
               </section>
             </div>
-          ) : activeModule === "projects" ? (
-            <ProjectWorkspace key={`${user.id}:${openBoardRequest?.token ?? "default"}`} boards={projectBoards} onChange={setProjectBoards} onCopyToToday={copyBoardTaskToToday} initialSelection={openBoardRequest} />
           ) : (
             logReady ? (
               <LogPage
@@ -1186,6 +1191,17 @@ export function WorkbenchApp() {
           )}
         </div>
       </div>
+      <Dialog open={Boolean(openBoardRequest)} onOpenChange={(open) => { if (!open) setOpenBoardRequest(undefined); }}>
+        <DialogContent className="h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] sm:max-w-[1800px] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0">
+          <DialogHeader className="border-b border-stone-200 px-5 py-3 pr-12">
+            <DialogTitle>科研与自学任务表</DialogTitle>
+            <DialogDescription>按项目安排任务、标注内容与记录成果。关闭后回到任务控制台。</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 overflow-auto">
+            {openBoardRequest && <ProjectWorkspace key={`${user.id}:${openBoardRequest.token}`} boards={projectBoards} onChange={setProjectBoards} onCopyToToday={copyBoardTaskToToday} initialSelection={openBoardRequest} />}
+          </div>
+        </DialogContent>
+      </Dialog>
       <FloatingScheduleCard
         key={user.id}
         userId={user.id}

@@ -8,7 +8,7 @@ describe("MonitoringSidebar", () => {
     window.localStorage.clear();
   });
 
-  it("exposes the schedule, project workspace and log modules", () => {
+  it("keeps project boards inside the task console instead of the top navigation", () => {
     const onChange = vi.fn();
     const { container } = render(<MonitoringSidebar active="schedule" onChange={onChange} />);
 
@@ -23,8 +23,7 @@ describe("MonitoringSidebar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /动态日志/ }));
     expect(onChange).toHaveBeenCalledWith("logs");
-    fireEvent.click(screen.getByRole("button", { name: /科研与自学/ }));
-    expect(onChange).toHaveBeenCalledWith("projects");
+    expect(screen.queryByRole("button", { name: /科研与自学/ })).toBeNull();
   });
 
   it("restores and saves the centered reminder", async () => {

@@ -99,6 +99,17 @@ function ControlledProjectDashboard({ today, initiallyCollapsed = false, archive
 }
 
 describe("TaskDashboard task list sections", () => {
+  it("moves research above daily tasks without discarding its current input", async () => {
+    render(<ControlledProjectDashboard today={format(new Date(), "yyyy-MM-dd")} />);
+    const input = await screen.findByRole("textbox", { name: "今日完成" });
+    fireEvent.change(input, { target: { value: "刚整理的科研进展" } });
+    fireEvent.click(screen.getByRole("button", { name: "调整顺序" }));
+    fireEvent.click(screen.getByRole("button", { name: "上移今日科研进展" }));
+    fireEvent.click(screen.getByRole("button", { name: "完成排序" }));
+    expect(screen.getByTestId("dashboard-section-list").firstElementChild?.getAttribute("data-dashboard-section")).toBe("research");
+    expect((screen.getByRole("textbox", { name: "今日完成" }) as HTMLTextAreaElement).value).toBe("刚整理的科研进展");
+  });
+
   it("toggles the routine entry form and keeps unfinished values when reopened", () => {
     render(<ControlledProjectDashboard today="2026-10-13" />);
     fireEvent.click(screen.getByRole("button", { name: "日常打卡" }));
