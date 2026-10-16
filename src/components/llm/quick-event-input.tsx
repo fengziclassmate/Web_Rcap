@@ -87,7 +87,7 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
 
   return (
     <>
-      <div className="flex min-w-0 items-center gap-2" aria-label="智能快速创建">
+      <div className="flex min-w-0 items-center gap-2" role="group" aria-label="智能快速创建">
         <span
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-stone-950 text-white shadow-sm"
           role="img"

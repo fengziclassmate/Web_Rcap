@@ -37,8 +37,10 @@ export type ScheduleCategoryDef = {
   hex?: string;
   icon?: ScheduleCategoryIcon;
   sortOrder: number;
+  paletteVersion?: number;
 };
 
+export const CATEGORY_PALETTE_VERSION = 2;
 const DEFAULT_CATEGORY_ID_PREFIX = "__default__";
 const CATEGORY_STORAGE_KEY = "schedule-user-categories";
 
@@ -162,7 +164,7 @@ const paletteSources: Partial<Record<ScheduleCategoryGroup, string>> = {
   health: names.running,
   other: names.chores,
 };
-export const CATEGORY_VISUALS = LEGACY_CATEGORY_VISUALS.map((item) => {
+const PREVIOUS_CATEGORY_VISUALS = LEGACY_CATEGORY_VISUALS.map((item) => {
   const sourceName = item.name === names.rest ? names.sleep
     : item.name === names.shower ? names.wash
     : item.name === names.study ? names.privateStudy
@@ -172,7 +174,24 @@ export const CATEGORY_VISUALS = LEGACY_CATEGORY_VISUALS.map((item) => {
   if (item.name === names.paperWriting) return visual(item.name, "bg-rose-50 border-rose-400 text-rose-950", "bg-rose-600", "#e11d48", "warm", item.group, item.icon);
   return source ? { ...item, color: source.color, accent: source.accent, twClass: source.twClass, twAccent: source.twAccent, hex: source.hex, hue: source.hue } : item;
 });
-export const CATEGORY_COLOR_OPTIONS = [...new Map([...CATEGORY_VISUALS, ...LEGACY_CATEGORY_VISUALS].map((item) => [item.hex, item])).values()];
+export const CATEGORY_VISUALS = PREVIOUS_CATEGORY_VISUALS.map((item) => {
+  let swatch: ScheduleCategoryVisual;
+  if (item.name === names.sleep || item.name === names.rest) swatch = visual(item.name, "bg-slate-50 border-slate-600 text-slate-950", "bg-slate-600", "#475569", "neutral", item.group, item.icon);
+  else if (item.group === "meals") swatch = visual(item.name, "bg-orange-100 border-orange-500 text-orange-950", "bg-orange-600", "#ea580c", "warm", item.group, item.icon);
+  else if (item.group === "health") swatch = visual(item.name, "bg-green-100 border-green-500 text-green-950", "bg-green-600", "#16a34a", "cold", item.group, item.icon);
+  else if (item.group === "social") swatch = LEGACY_CATEGORY_VISUALS.find((candidate) => candidate.name === names.gathering)!;
+  else if (item.name === names.wash || item.name === names.shower) swatch = LEGACY_CATEGORY_VISUALS.find((candidate) => candidate.name === names.shower)!;
+  else if (item.name === names.meeting) swatch = LEGACY_CATEGORY_VISUALS[0];
+  else if (item.name === names.literatureReading) swatch = LEGACY_CATEGORY_VISUALS.find((candidate) => candidate.name === names.experiment)!;
+  else if (item.name === names.projectWork) swatch = visual(item.name, "bg-yellow-50 border-yellow-500 text-yellow-950", "bg-yellow-600", "#ca8a04", "warm", item.group, item.icon);
+  else if (item.name === names.experiment) swatch = visual(item.name, "bg-red-50 border-red-400 text-red-950", "bg-red-600", "#dc2626", "warm", item.group, item.icon);
+  else if (item.name === names.paperWriting) swatch = LEGACY_CATEGORY_VISUALS.find((candidate) => candidate.name === names.shopping)!;
+  else if (item.name === names.commute) swatch = visual(item.name, "bg-amber-50 border-amber-600 text-amber-950", "bg-amber-800", "#92400e", "warm", item.group, item.icon);
+  else if (item.group === "other") swatch = LEGACY_CATEGORY_VISUALS.find((candidate) => candidate.name === names.other)!;
+  else swatch = item;
+  return { ...item, color: swatch.color, accent: swatch.accent, twClass: swatch.twClass, twAccent: swatch.twAccent, hex: swatch.hex, hue: swatch.hue };
+});
+export const CATEGORY_COLOR_OPTIONS = [...new Map([...CATEGORY_VISUALS, ...PREVIOUS_CATEGORY_VISUALS, ...LEGACY_CATEGORY_VISUALS].map((item) => [item.hex, item])).values()];
 export const CATEGORY_COLORS = CATEGORY_COLOR_OPTIONS.map((item) => item.twClass);
 const SCHEDULE_CATEGORY_NAMES = CATEGORY_VISUALS.map((item) => item.name);
 export const SCHEDULE_CATEGORY_PROMPT_LIST = SCHEDULE_CATEGORY_NAMES.join("、");
@@ -299,7 +318,9 @@ function createDefaultCategoryDefs(): ScheduleCategoryDef[] {
     id: `${DEFAULT_CATEGORY_ID_PREFIX}${index}`,
     name: item.name,
     color: item.twClass,
+    hex: item.hex,
     sortOrder: index,
+    paletteVersion: CATEGORY_PALETTE_VERSION,
   }));
 }
 
@@ -307,24 +328,24 @@ export function normalizeCategoryDefList(value: unknown): ScheduleCategoryDef[] 
   if (!Array.isArray(value) || value.length === 0) return createDefaultCategoryDefs();
   const defaults = createDefaultCategoryDefs();
   const custom = value
-    .map((item, index) => {
+    .map((item, index): ScheduleCategoryDef | null => {
       if (!item || typeof item !== "object") return null;
       const raw = item as Partial<ScheduleCategoryDef>;
       const rawName = typeof raw.name === "string" ? raw.name.trim() : "";
       const name = normalizeScheduleCategory(rawName);
       if (!name) return null;
-      const legacy = LEGACY_CATEGORY_VISUALS.find((item) => item.name === name);
-      const migrateDefault = typeof raw.id === "string" && raw.id.startsWith(DEFAULT_CATEGORY_ID_PREFIX)
-        && legacy !== undefined && raw.color === legacy.twClass
-        && (raw.hex === undefined || typeof raw.hex === "string" && raw.hex.toLowerCase() === legacy.hex);
-      const visual = migrateDefault ? getCategoryVisualByName(name) : getCategoryVisualByClass(typeof raw.color === "string" ? raw.color : "");
+      // Old saved overrides also need the unified palette, regardless of their ID or swatch.
+      const migratePalette = (typeof raw.paletteVersion !== "number" || raw.paletteVersion < CATEGORY_PALETTE_VERSION)
+        && CATEGORY_VISUALS.some((item) => item.name === name);
+      const visual = migratePalette ? getCategoryVisualByName(name) : getCategoryVisualByClass(typeof raw.color === "string" ? raw.color : "");
       return {
         id: typeof raw.id === "string" ? raw.id : createCategoryId(),
         name,
         color: visual.twClass,
-        ...(typeof raw.hex === "string" && /^#[0-9a-f]{6}$/i.test(raw.hex) ? { hex: migrateDefault ? visual.hex : raw.hex } : {}),
+        ...(migratePalette ? { hex: visual.hex } : typeof raw.hex === "string" && /^#[0-9a-f]{6}$/i.test(raw.hex) ? { hex: raw.hex } : {}),
         ...(CATEGORY_VISUALS.some((item) => item.icon === raw.icon) ? { icon: raw.icon } : {}),
         sortOrder: typeof raw.sortOrder === "number" ? raw.sortOrder : defaults.length + index,
+        paletteVersion: typeof raw.paletteVersion === "number" && raw.paletteVersion > CATEGORY_PALETTE_VERSION ? raw.paletteVersion : CATEGORY_PALETTE_VERSION,
       } satisfies ScheduleCategoryDef;
     })
     .filter((item): item is ScheduleCategoryDef => Boolean(item));
@@ -410,8 +431,8 @@ export function resolveCategoryVisual(def: Pick<ScheduleCategoryDef, "name" | "c
 
 export function categoryCardStyle(hex: string) {
   return {
-    backgroundColor: `color-mix(in srgb, ${hex} 18%, white)`,
-    borderColor: `color-mix(in srgb, ${hex} 55%, white)`,
+    backgroundColor: `color-mix(in srgb, ${hex} 32%, white)`,
+    borderColor: `color-mix(in srgb, ${hex} 72%, white)`,
     color: `color-mix(in srgb, ${hex} 28%, black)`,
   };
 }

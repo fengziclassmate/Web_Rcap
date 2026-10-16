@@ -1849,7 +1849,7 @@ export function WeeklyTimeGrid({
                     aria-current={day.dateIso === todayIso ? "date" : undefined}
                     className={`border-r border-gray-200 px-3 py-2 text-center text-xs font-medium last:border-r-0 ${day.dateIso === todayIso ? "bg-emerald-50 text-emerald-900 shadow-[inset_0_-2px_0_#047857]" : "bg-stone-50 text-stone-600"}`}
                   >
-                    <div className="flex flex-wrap items-center justify-center gap-1"><span>{format(day.date, "EEE", { locale: zhCN })}<span className="mt-1 block text-[11px] tabular-nums opacity-80">{format(day.date, "MM/dd")}</span></span>{day.dateIso === todayIso ? <span className="inline-flex shrink-0 whitespace-nowrap rounded bg-emerald-800 px-1 py-0.5 text-[9px] text-white">今天</span> : null}</div>
+                    <div className="flex flex-wrap items-center justify-center gap-1"><span>{format(day.date, "EEE", { locale: zhCN })}<span className="mt-1 block text-[11px] tabular-nums">{format(day.date, "MM/dd")}</span></span>{day.dateIso === todayIso ? <span className="inline-flex shrink-0 whitespace-nowrap rounded bg-emerald-800 px-1 py-0.5 text-[9px] text-white">今天</span> : null}</div>
                     {day.laneCount > 1 ? (
                       <div className="mt-0.5 text-[10px] font-medium text-gray-500">
                         {day.laneCount} 个并行

@@ -167,6 +167,22 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("shows saved fitness and exercise overrides in the same color after reload", () => {
+    localStorage.setItem("schedule-user-categories", JSON.stringify([
+      { id: "fitness-old", name: "健身", color: "bg-lime-50 border-lime-200 text-lime-950", hex: "#a3e635", sortOrder: 0 },
+      { id: "exercise-old", name: "运动", color: "bg-emerald-50 border-emerald-400 text-emerald-950", hex: "#059669", sortOrder: 1 },
+    ]));
+    renderGrid({ events: [
+      { ...scheduleEvent, id: "fitness", title: "健身测试", category: "健身", isCompleted: false },
+      { ...scheduleEvent, id: "exercise", title: "运动测试", category: "运动", startHour: 10, endHour: 11, isCompleted: false },
+    ] });
+    const fitness = screen.getByRole("button", { name: "打开 健身测试 编辑窗口" }).closest<HTMLElement>("[data-schedule-card]")!;
+    const exercise = screen.getByRole("button", { name: "打开 运动测试 编辑窗口" }).closest<HTMLElement>("[data-schedule-card]")!;
+    expect(fitness.style.backgroundColor).toBe(exercise.style.backgroundColor);
+    expect(fitness.style.backgroundColor).not.toBe("");
+    expect(JSON.parse(localStorage.getItem("schedule-user-categories")!).filter((item: { name: string }) => ["健身", "运动"].includes(item.name)).every((item: { hex: string; paletteVersion: number }) => item.hex === "#16a34a" && item.paletteVersion === 2)).toBe(true);
+  });
+
   it("drops inside a 45-minute grid slot at the pointer time rather than the slot start", () => {
     const onUpdateEvent = vi.fn();
     const { container, rerenderGrid } = renderGrid({ events: [{ ...scheduleEvent, startHour: 6.75, endHour: 7 }], onUpdateEvent });
@@ -284,7 +300,7 @@ describe("WeeklyTimeGrid interactions", () => {
     expect(stored.find((item: { name: string }) => item.name === "睡眠")).toMatchObject({ hex: "#123456", icon: "coffee" });
     fireEvent.click(screen.getAllByTitle("编辑分类")[0]);
     fireEvent.click(screen.getByRole("button", { name: "恢复默认" }));
-    expect((screen.getByLabelText("分类 HEX 颜色") as HTMLInputElement).value).toBe("#6366f1");
+    expect((screen.getByLabelText("分类 HEX 颜色") as HTMLInputElement).value).toBe("#475569");
     expect(screen.getByRole("button", { name: "图标 moon" }).getAttribute("aria-pressed")).toBe("true");
   }, 15000);
 

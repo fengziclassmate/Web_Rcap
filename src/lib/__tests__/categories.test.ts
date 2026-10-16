@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CATEGORY_COLORS,
   CATEGORY_COLOR_OPTIONS,
+  CATEGORY_PALETTE_VERSION,
   CATEGORY_VISUALS,
   SCHEDULE_CATEGORY_GROUP_LABELS,
   getScheduleCategoryAccentColor,
@@ -15,7 +16,7 @@ import {
 
 describe("schedule categories", () => {
   it("preserves built-in appearance overrides through persistence normalization", () => {
-    const defs = normalizeCategoryDefList([{ id: "__default__0", name: "睡眠", color: CATEGORY_COLORS[0], hex: "#123456", icon: "coffee", sortOrder: 0 }]);
+    const defs = normalizeCategoryDefList([{ id: "__default__0", name: "睡眠", color: CATEGORY_COLORS[0], hex: "#123456", icon: "coffee", sortOrder: 0, paletteVersion: CATEGORY_PALETTE_VERSION }]);
     const restored = normalizeCategoryDefList(JSON.parse(JSON.stringify(defs)));
     expect(resolveCategoryVisual(restored.find((item) => item.name === "睡眠")!)).toMatchObject({ hex: "#123456", icon: "coffee" });
     expect(restored.filter((item) => item.name === "睡眠")).toHaveLength(1);
@@ -71,7 +72,7 @@ describe("schedule categories", () => {
     const requestedCategories = ["夜宵", "洗澡", "打游戏", "看比赛", "逛街", "私人学习", "项目工作", "健身", "球类运动", "买菜"];
     const visuals = requestedCategories.map((name) => getScheduleCategoryVisual(name));
     expect(visuals.map((item) => item.name)).toEqual(requestedCategories);
-    for (const names of [["睡眠", "休息"], ["早餐", "中餐", "晚餐", "夜宵", "买菜"], ["朋友聚会", "打游戏", "看比赛", "逛街", "娱乐"], ["健身", "球类运动", "跑步"]]) {
+    for (const names of [["睡眠", "休息"], ["洗漱", "洗澡"], ["早餐", "中餐", "晚餐", "夜宵", "买菜"], ["朋友聚会", "打游戏", "看比赛", "逛街", "娱乐", "社交"], ["健身", "球类运动", "跑步", "户外运动", "运动"]]) {
       expect(new Set(names.map((name) => getScheduleCategoryVisual(name).hex)).size).toBe(1);
     }
     expect(new Set(["会议", "文献阅读", "项目工作", "实验研究", "论文写作", "科研"].map((name) => getScheduleCategoryVisual(name).hex)).size).toBe(6);
@@ -89,16 +90,22 @@ describe("schedule categories", () => {
     });
   });
 
-  it("migrates untouched old defaults once while retaining custom appearances and identities", () => {
+  it("unifies old saved overrides once regardless of ID and keeps later color edits", () => {
     const old = [
       { id: "__default__5", name: "中餐", color: "bg-orange-50 border-orange-300 text-orange-950", hex: "#f97316", sortOrder: 5 },
       { id: "__default__6", name: "晚餐", color: "bg-rose-50 border-rose-300 text-rose-950", hex: "#123456", sortOrder: 6 },
       { id: "custom-food", name: "工作午餐", color: "bg-orange-50 border-orange-300 text-orange-950", sortOrder: 99 },
+      { id: "custom-fitness", name: "健身", color: "bg-lime-50 border-lime-200 text-lime-950", hex: "#a3e635", icon: "dumbbell", sortOrder: 100 },
+      { id: "__default__27", name: "运动", color: "bg-emerald-50 border-emerald-400 text-emerald-950", sortOrder: 101 },
     ];
     const normalized = normalizeCategoryDefList(old);
     expect(resolveCategoryVisual(normalized.find((item) => item.id === "__default__5")!).hex).toBe(getScheduleCategoryVisual("早餐").hex);
-    expect(resolveCategoryVisual(normalized.find((item) => item.id === "__default__6")!).hex).toBe("#123456");
+    expect(resolveCategoryVisual(normalized.find((item) => item.id === "__default__6")!).hex).toBe(getScheduleCategoryVisual("早餐").hex);
     expect(resolveCategoryVisual(normalized.find((item) => item.id === "custom-food")!).hex).toBe("#f97316");
+    const fitness = normalized.find((item) => item.id === "custom-fitness")!;
+    expect(fitness).toMatchObject({ name: "健身", sortOrder: 100, icon: "dumbbell", paletteVersion: CATEGORY_PALETTE_VERSION });
+    expect(resolveCategoryVisual(fitness).hex).toBe(resolveCategoryVisual(normalized.find((item) => item.name === "运动")!).hex);
+    fitness.hex = "#123456";
     expect(normalizeCategoryDefList(JSON.parse(JSON.stringify(normalized)))).toEqual(normalized);
   });
 
@@ -110,7 +117,7 @@ describe("schedule categories", () => {
     expect(normalizeScheduleCategory("论文写作")).toBe("论文写作");
   });
 
-  it("preserves existing custom categories when a new built-in or alias uses the same name", () => {
+  it("keeps existing IDs and names while applying semantic colors to legacy named categories", () => {
     window.localStorage.setItem("schedule-user-categories", JSON.stringify([
       {
         id: "custom-fitness",
@@ -129,11 +136,11 @@ describe("schedule categories", () => {
     const definitions = loadCategoryDefs();
     expect(definitions.find((item) => item.name === "健身")).toMatchObject({
       id: "custom-fitness",
-      color: "bg-rose-50 border-rose-300 text-rose-950",
+      color: getScheduleCategoryVisual("健身").color,
     });
     expect(definitions.find((item) => item.name === "打游戏")).toMatchObject({
       id: "custom-gaming",
-      color: "bg-sky-50 border-sky-300 text-sky-950",
+      color: getScheduleCategoryVisual("打游戏").color,
     });
     expect(definitions.filter((item) => item.name === "健身")).toHaveLength(1);
     window.localStorage.clear();
@@ -141,7 +148,7 @@ describe("schedule categories", () => {
 
   it("returns visual styles for known categories", () => {
     const visual = getScheduleCategoryVisual("\u6587\u732e\u9605\u8bfb");
-    expect(visual.color).toContain("cyan");
+    expect(visual.color).toContain("teal");
     expect(getScheduleCategoryColor("\u6587\u732e\u9605\u8bfb")).toBe(visual.color);
     expect(getScheduleCategoryAccentColor("\u6587\u732e\u9605\u8bfb")).toBe(visual.accent);
   });

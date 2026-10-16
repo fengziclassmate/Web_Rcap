@@ -286,7 +286,7 @@ export function DailyReflectionPanel({
             <div className="flex items-center gap-2">
               <span className="w-16 shrink-0 text-[11px] font-medium text-stone-600">
                 <span className="block">生活日志</span>
-                <span className="mt-0.5 block font-normal text-stone-400">{selectedDay.weekday} {selectedDay.shortDate}</span>
+                <span className="mt-0.5 block font-normal text-stone-500">{selectedDay.weekday} {selectedDay.shortDate}</span>
               </span>
               <div className="relative">
               <Button type="button" size="sm" variant="outline" disabled={submitting || saving} aria-expanded={moodOpen} onClick={() => setMoodOpen(!moodOpen)}>{mood ? `${moodEmoji[mood]} ${moodLabel(mood)}` : customExpression ? "图片表情" : "选择表情"} <ChevronDown className="h-3 w-3" /></Button>
