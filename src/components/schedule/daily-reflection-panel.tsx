@@ -286,7 +286,7 @@ export function DailyReflectionPanel({
             </div>
 
             {selectedDay ? (
-              <div className="mt-3 grid gap-3 rounded-lg border border-stone-200 bg-stone-50/80 p-2.5 xl:grid-cols-[auto_minmax(12rem,1fr)_auto] xl:items-center">
+              <div className="reflection-entry mt-3 rounded-lg border border-stone-200 bg-stone-50/80 p-2.5">
             <div className="flex items-center gap-2">
               <span className="w-16 shrink-0 text-[11px] font-medium text-stone-600">
                 <span className="block">生活日志</span>
@@ -336,20 +336,20 @@ export function DailyReflectionPanel({
               disabled={submitting || saving}
               className="min-h-16 resize-y border-stone-200 bg-white text-xs"
             />
-            <div className="flex flex-wrap items-center gap-2 xl:col-span-full">
-              <label className="text-xs text-stone-600">添加图片（最多9张，单张10MB）<input aria-label="添加日志图片" type="file" accept="image/*" multiple disabled={submitting || saving} onChange={(event) => { addImages(event.target.files); event.target.value = ""; }} className="block max-w-64 text-xs" /></label>
+            <div className="reflection-attachments flex flex-wrap items-center gap-2">
+              <label className="inline-flex h-8 cursor-pointer items-center rounded-md border border-stone-200 bg-white px-2.5 text-xs text-stone-600 focus-within:ring-2 focus-within:ring-primary" title="最多9张，单张10MB">添加图片<input aria-label="添加日志图片" type="file" accept="image/*" multiple disabled={submitting || saving} onChange={(event) => { addImages(event.target.files); event.target.value = ""; }} className="sr-only" /></label>
               {imagePreviews.map((url, index) => <button key={url} type="button" disabled={submitting || saving} aria-label={`移除图片 ${index + 1}`} title="点击移除" className="h-14 w-14 rounded border bg-cover bg-center" style={{ backgroundImage: `url("${url}")` }} onClick={() => { setImages((previous) => previous.filter((_, i) => i !== index)); if (index === 0) setCustomExpression(false); }} />)}
-            </div>
             <Button
               type="button"
               size="sm"
               onClick={() => void handleSubmit()}
               disabled={!canSubmit || submitting || saving}
-              className="bg-emerald-950 text-white hover:bg-emerald-900"
+              className="ml-auto bg-emerald-950 text-white hover:bg-emerald-900"
             >
               <Send className="h-3.5 w-3.5" aria-hidden />
               {submitting || saving ? "写入中…" : "记入动态"}
             </Button>
+            </div>
               </div>
             ) : null}
           </CollapsibleContent>

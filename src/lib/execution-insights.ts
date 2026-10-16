@@ -14,19 +14,44 @@ export type FocusState = {
 export const EMPTY_FOCUS: FocusState = { active: null, sessions: [] };
 
 export function elapsedFocusMs(state: FocusState, now: number) {
+  if (state.active?.runId) {
+    const recorded = state.sessions.filter((session) => session.runId === state.active!.runId);
+    if (recorded.length) return occupiedMinutes([...recorded.map((session): [number, number] => [session.startedAt, session.endedAt]), ...(state.active.startedAt === null ? [] : [[state.active.startedAt, Math.max(state.active.startedAt, now)] as [number, number]])]);
+  }
   return state.active ? state.active.elapsedMs + (state.active.startedAt === null ? 0 : Math.max(0, now - state.active.startedAt)) : 0;
+}
+
+/** Pause records are append-only; retrying or merging another device must not duplicate them. */
+export function mergeFocusSessions(sessions: FocusSession[]) {
+  const unique = new Map<string, FocusSession>();
+  for (const session of sessions) {
+    const previous = unique.get(session.sessionId);
+    if (!previous || session.endedAt > previous.endedAt) unique.set(session.sessionId, session);
+  }
+  return [...unique.values()].sort((a, b) => a.startedAt - b.startedAt || a.sessionId.localeCompare(b.sessionId));
+}
+
+function focusDuration(sessions: FocusSession[], start = 0, end = Infinity) {
+  const runs = new Map<string, Array<[number, number]>>();
+  for (const session of sessions) {
+    const key = session.runId ?? session.sessionId;
+    const intervals = runs.get(key) ?? [];
+    intervals.push([Math.max(start, session.startedAt), Math.min(end, session.endedAt)]);
+    runs.set(key, intervals);
+  }
+  return [...runs.values()].reduce((total, intervals) => total + occupiedMinutes(intervals), 0);
 }
 
 export function pauseFocus(state: FocusState, now: number, sessionId: string): FocusState {
   const active = state.active;
   if (!active || active.startedAt === null) return state;
   const endedAt = Math.max(active.startedAt, now);
-  return {
+  return normalizeFocusState({
     active: { ...active, startedAt: null, elapsedMs: elapsedFocusMs(state, endedAt) },
     sessions: endedAt > active.startedAt
       ? [...state.sessions, { id: active.id, title: active.title, category: active.category, startedAt: active.startedAt, endedAt, sessionId, ...(active.runId ? { runId: active.runId } : {}), ...(active.goalMinutes ? { goalMinutes: active.goalMinutes } : {}) }]
       : state.sessions,
-  };
+  });
 }
 
 export function normalizeFocusState(value: unknown): FocusState {
@@ -34,18 +59,20 @@ export function normalizeFocusState(value: unknown): FocusState {
   const state = value as FocusState;
   const targetValid = (target: FocusTarget) => target && typeof target.id === "string" && typeof target.title === "string" && typeof target.category === "string";
   const timeValid = (time: unknown): time is number => typeof time === "number" && Number.isFinite(time) && time >= 0;
-  function clean<T extends FocusTarget & { runId?: string }>(target: T): T {
-    const { goalMinutes, runId, ...rest } = target;
-    return { ...rest,
-      ...(Number.isInteger(goalMinutes) && goalMinutes! > 0 && goalMinutes! <= 240 ? { goalMinutes } : {}),
+  function metadata(target: FocusTarget & { runId?: string }) {
+    const { goalMinutes, runId } = target;
+    // JSONB does not preserve object key order; canonical fields also stabilize sync acknowledgements.
+    return { id: target.id, title: target.title, category: target.category,
+      ...(typeof goalMinutes === "number" && Number.isInteger(goalMinutes) && goalMinutes > 0 && goalMinutes <= 240 ? { goalMinutes } : {}),
       ...(typeof runId === "string" && runId ? { runId } : {}),
-    } as T;
+    };
   }
   return {
     active: state.active && targetValid(state.active) && timeValid(state.active.elapsedMs)
-      && (state.active.startedAt === null || timeValid(state.active.startedAt)) ? clean(state.active) : null,
+      && (state.active.startedAt === null || timeValid(state.active.startedAt)) ? { ...metadata(state.active), startedAt: state.active.startedAt, elapsedMs: state.active.elapsedMs } : null,
     sessions: Array.isArray(state.sessions) ? state.sessions.filter((session) => targetValid(session)
-      && typeof session.sessionId === "string" && timeValid(session.startedAt) && timeValid(session.endedAt) && session.endedAt > session.startedAt).map(clean) : [],
+      && typeof session.sessionId === "string" && timeValid(session.startedAt) && timeValid(session.endedAt) && session.endedAt > session.startedAt)
+      .map((session) => ({ ...metadata(session), startedAt: session.startedAt, endedAt: session.endedAt, sessionId: session.sessionId })) : [],
   };
 }
 
@@ -69,21 +96,24 @@ export function focusTargets(events: ScheduleEvent[], tasks: LongTask[], boards:
 }
 
 export function focusHistory(sessions: FocusSession[]) {
-  const runs = new Map<string, FocusSession & { durationMs: number }>();
+  const runs = new Map<string, FocusSession & { intervals: Array<[number, number]> }>();
   for (const session of sessions) {
     const key = session.runId ?? session.sessionId;
     const previous = runs.get(key);
-    runs.set(key, previous ? { ...previous, endedAt: Math.max(previous.endedAt, session.endedAt), startedAt: Math.min(previous.startedAt, session.startedAt), durationMs: previous.durationMs + session.endedAt - session.startedAt }
-      : { ...session, durationMs: session.endedAt - session.startedAt });
+    if (previous) {
+      previous.endedAt = Math.max(previous.endedAt, session.endedAt);
+      previous.startedAt = Math.min(previous.startedAt, session.startedAt);
+      previous.intervals.push([session.startedAt, session.endedAt]);
+    } else runs.set(key, { ...session, intervals: [[session.startedAt, session.endedAt]] });
   }
-  return [...runs.values()].sort((a, b) => b.endedAt - a.endedAt);
+  return [...runs.values()].map(({ intervals, ...run }) => ({ ...run, durationMs: occupiedMinutes(intervals) })).sort((a, b) => b.endedAt - a.endedAt);
 }
 
 export function focusDaySummary(state: FocusState, now: Date) {
   const start = parseISO(format(now, "yyyy-MM-dd")).getTime();
   const end = addDays(new Date(start), 1).getTime();
-  let durationMs = state.sessions.reduce((total, session) => total + Math.max(0, Math.min(end, session.endedAt) - Math.max(start, session.startedAt)), 0);
-  if (state.active?.startedAt != null) durationMs += Math.max(0, now.getTime() - Math.max(start, state.active.startedAt));
+  const live = state.active?.startedAt != null && now.getTime() > state.active.startedAt ? [{ ...state.active, startedAt: state.active.startedAt, endedAt: now.getTime(), sessionId: "current" }] : [];
+  const durationMs = focusDuration([...state.sessions, ...live], start, end);
   const completed = focusHistory(state.sessions).filter((run) => run.endedAt >= start && run.endedAt < end && (!state.active?.runId || run.runId !== state.active.runId)).length;
   return { minutes: durationMs / 60000, completed };
 }
@@ -143,20 +173,17 @@ export function weeklyInsights(events: ScheduleEvent[], tasks: LongTask[], sessi
     return categories.get(key)!;
   };
   for (const event of segments) category(event.category).planned += Math.max(0, event.endHour - event.startHour) * 60;
+  for (const session of sessions) category(session.category);
   const days = Array.from({ length: 7 }, (_, i) => {
     const day = addDays(first, i);
     const date = format(day, "yyyy-MM-dd");
     const start = parseISO(date).getTime();
     const end = addDays(parseISO(date), 1).getTime();
-    let actual = 0;
-    for (const session of sessions) {
-      const minutes = Math.max(0, Math.min(end, session.endedAt) - Math.max(start, session.startedAt)) / 60000;
-      actual += minutes;
-      category(session.category).actual += minutes;
-    }
+    const actual = focusDuration(sessions, start, end) / 60000;
     return { date, planned: segments.filter((event) => event.displayDate === date).reduce((total, event) => total + Math.max(0, event.endHour - event.startHour) * 60, 0), actual };
   });
   const today = format(now, "yyyy-MM-dd");
+  for (const [name, value] of categories) value.actual = focusDuration(sessions.filter((session) => session.category === name), parseISO(from).getTime(), addDays(parseISO(to), 1).getTime()) / 60000;
   const completed = tasks.filter((task) => {
     if (!task.done || !task.completedAt) return false;
     const completedAt = parseISO(task.completedAt);

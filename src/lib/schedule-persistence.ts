@@ -1,6 +1,7 @@
 import type { FootprintItem, AnnualTask, DashboardUiPreferences, LongTask, ProjectCheckin, ScheduleEvent, ShoppingItem } from "@/lib/types";
 import type { Achievement } from "@/lib/achievements";
 import { normalizeProjectBoards, type ProjectBoard } from "@/lib/project-boards";
+import { normalizeFocusState, type FocusState } from "@/lib/execution-insights";
 import {
   defaultDashboardUiPreferences,
   normalizeAchievements,
@@ -25,6 +26,7 @@ export type PersistedSchedulePayload = {
   footprints: FootprintItem[];
   achievements: Achievement[];
   project_boards?: ProjectBoard[];
+  focus_state?: FocusState;
   ui_preferences: DashboardUiPreferences;
 };
 
@@ -46,6 +48,7 @@ export function normalizePersistedSchedulePayload(
     footprints: normalizeFootprints(value.footprints),
     achievements: normalizeAchievements(value.achievements),
     project_boards: normalizeProjectBoards(value.project_boards),
+    focus_state: normalizeFocusState(value.focus_state),
     ui_preferences: normalizeDashboardUiPreferences(value.ui_preferences),
   };
 }

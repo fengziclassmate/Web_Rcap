@@ -1,4 +1,4 @@
-import { addDays } from "date-fns";
+import { addDays, differenceInCalendarDays } from "date-fns";
 
 type RecurrenceKind = "daily" | "weekly";
 
@@ -112,6 +112,9 @@ export function updateRecurrenceFuture<T extends ExpandableScheduleEvent>(
     if (event.id !== parsed.masterId || !event.recurrence?.kind) return event;
 
     const splitDate = parsed.occurrenceDate;
+    const targetDate = patch.date ?? splitDate;
+    const shift = differenceInCalendarDays(parseISODateLocal(targetDate), parseISODateLocal(splitDate));
+    const shifted = (date: string) => formatISODateLocal(addDays(parseISODateLocal(date), shift));
     const selectedOverride = event.recurrenceOverrides?.[splitDate] ?? {};
     const appliedPatch = pickRecurrenceOverridePatch(patch);
     const selectedRemainder = { ...selectedOverride };
@@ -123,23 +126,24 @@ export function updateRecurrenceFuture<T extends ExpandableScheduleEvent>(
     const futureOverrides: Record<string, RecurrenceInstanceOverride> = {};
     for (const [date, override] of Object.entries(event.recurrenceOverrides ?? {})) {
       if (date < splitDate) pastOverrides[date] = override;
-      if (date > splitDate) futureOverrides[date] = override;
+      if (date > splitDate) futureOverrides[shifted(date)] = override;
     }
     if (Object.keys(selectedRemainder).length > 0) {
-      futureOverrides[splitDate] = selectedRemainder;
+      futureOverrides[targetDate] = selectedRemainder;
     }
 
     const pastExceptions = (event.exceptionDates ?? []).filter((date) => date < splitDate);
-    const futureExceptions = (event.exceptionDates ?? []).filter((date) => date >= splitDate);
+    const futureExceptions = (event.exceptionDates ?? []).filter((date) => date >= splitDate).map(shifted);
     const nextFutureSeries = {
       ...event,
       ...patch,
       id: splitDate === event.date ? event.id : futureSeriesId,
-      date: splitDate,
-      recurrence: event.recurrence,
+      date: targetDate,
+      ...(event.endDate && !Object.hasOwn(patch, "endDate") ? { endDate: formatISODateLocal(addDays(parseISODateLocal(targetDate), differenceInCalendarDays(parseISODateLocal(event.endDate), parseISODateLocal(event.date)))) } : {}),
+      recurrence: event.recurrence.kind === "weekly" && shift ? { ...event.recurrence, weekdays: (event.recurrence.weekdays?.length ? event.recurrence.weekdays : [parseISODateLocal(event.date).getDay()]).map((day) => ((day + shift) % 7 + 7) % 7).sort((a, b) => a - b) } : event.recurrence,
       exceptionDates: futureExceptions,
       recurrenceOverrides: futureOverrides,
-      recurrenceEndExclusive: event.recurrenceEndExclusive,
+      recurrenceEndExclusive: event.recurrenceEndExclusive ? shifted(event.recurrenceEndExclusive) : event.recurrenceEndExclusive,
     } as T;
 
     if (splitDate === event.date) return nextFutureSeries;
@@ -228,6 +232,7 @@ export function expandScheduleEvents(
         ...e,
         ...ov,
         date: d,
+        ...(e.endDate ? { endDate: formatISODateLocal(addDays(parseISODateLocal(d), differenceInCalendarDays(parseISODateLocal(e.endDate), parseISODateLocal(e.date)))) } : {}),
         id: `${e.id}__${d}`,
         recurrence: undefined,
         exceptionDates: undefined,
@@ -332,7 +337,7 @@ type LinkedScheduleTask = {
 export function updateTasksLinkedToScheduleEvent<T extends LinkedScheduleTask>(
   tasks: T[],
   linkedTaskIds: ReadonlySet<string>,
-  patch: Partial<Pick<ExpandableScheduleEvent, "title" | "date" | "isCompleted">>,
+  patch: Partial<Pick<ExpandableScheduleEvent, "title" | "date" | "isCompleted">> & { dateShift?: { from: string; days: number } },
   completedAt: string,
 ): T[] {
   const hasTitleUpdate = typeof patch.title === "string";
@@ -345,7 +350,9 @@ export function updateTasksLinkedToScheduleEvent<T extends LinkedScheduleTask>(
     return {
       ...task,
       ...(hasTitleUpdate ? { name: patch.title } : {}),
-      ...(hasDateUpdate ? { dueDate: patch.date } : {}),
+      ...(hasDateUpdate ? { dueDate: patch.dateShift
+        ? task.dueDate >= patch.dateShift.from && ISO_DATE.test(task.dueDate) ? formatISODateLocal(addDays(parseISODateLocal(task.dueDate), patch.dateShift.days)) : task.dueDate
+        : patch.date } : {}),
       ...(hasCompletionUpdate
         ? {
             done: patch.isCompleted,

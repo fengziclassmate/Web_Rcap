@@ -7,6 +7,25 @@ import { EMPTY_FOCUS, normalizeFocusState, pauseFocus, type FocusState, type Foc
 
 const changed = "workbench-focus-changed";
 const cache = new Map<string, { raw: string | null; state: FocusState }>();
+export const focusStorageKey = (userId: string) => `workbench-focus-v1:${userId}`;
+export function readStoredFocusState(userId: string): FocusState | null {
+  try { return localStorage.getItem(focusStorageKey(userId)) === null ? null : read(focusStorageKey(userId)); }
+  catch { return null; }
+}
+export function hydrateFocusState(userId: string, state: FocusState) {
+  const key = focusStorageKey(userId);
+  const next = normalizeFocusState(state);
+  const raw = JSON.stringify(next);
+  if (JSON.stringify(read(key)) === raw) return;
+  // Keep the cloud snapshot usable even if this browser cannot persist its cache.
+  try { localStorage.setItem(key, raw); cache.set(key, { raw, state: next }); }
+  catch {
+    let previousRaw: string | null = null;
+    try { previousRaw = localStorage.getItem(key); } catch { /* Storage may be disabled. */ }
+    cache.set(key, { raw: previousRaw, state: next });
+  }
+  window.dispatchEvent(new Event(changed));
+}
 function read(key: string) {
   try {
     const raw = localStorage.getItem(key);
@@ -24,13 +43,14 @@ function subscribe(callback: () => void) {
 }
 
 export function useFocusTimer(userId: string) {
-  const key = `workbench-focus-v1:${userId}`;
+  const key = focusStorageKey(userId);
   const snapshot = useCallback(() => read(key), [key]);
   const state = useSyncExternalStore(subscribe, snapshot, () => EMPTY_FOCUS);
   function update(transform: (current: FocusState) => FocusState) {
     const current = read(key);
-    const next = transform(current);
-    if (next === current) return false;
+    const transformed = transform(current);
+    if (transformed === current) return false;
+    const next = normalizeFocusState(transformed);
     try {
       const raw = JSON.stringify(next);
       localStorage.setItem(key, raw);

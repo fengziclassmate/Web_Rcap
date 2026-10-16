@@ -1053,6 +1053,34 @@
 
 /* Desktop workbench: calm surfaces, readable controls, one primary color. */
 [hidden] { display: none !important; }
+.event-editor-dialog { border: 1px solid #e4eae5; border-radius: 12px; background: #fff; padding: 20px; }
+.event-editor-dialog [data-slot="dialog-header"] { padding-right: 24px; }
+.event-editor-body > [data-slot="collapsible"] { border-color: #e6ebe7; background: #f8faf8; }
+.event-editor-body [data-slot="collapsible-trigger"] { padding: 9px 12px; }
+.event-editor-body [data-slot="label"] { font-size: 12px; }
+.event-time-group { min-width: 0; border-block: 1px solid #e8ede9; padding: 10px 0; }
+.event-time-group > div:first-child { justify-content: flex-start; gap: 8px; }
+.event-time-group input[type="date"] { width: 132px; flex-shrink: 0; }
+.event-time-group > div:nth-child(2) [data-slot="select-trigger"] { height: 32px; font-size: 14px; }
+.event-time-group > div:last-child { max-width: 190px; }
+.expense-workspace { display: flex; flex-direction: column; }
+.expense-entry { order: 0; }
+.expense-list { order: 1; }
+.expense-budget-settings { order: 2; }
+.expense-entry-grid, .expense-edit-grid { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.expense-field-amount { flex: 0 0 96px; }
+.expense-entry-grid > .contents > div { flex: 0 0 104px; }
+.expense-field-note { min-width: 140px; max-width: 340px; flex: 1; }
+.expense-budget-toggle { flex: 0 0 auto; }
+.expense-edit-grid > input[type="number"] { width: 96px; }
+.expense-edit-grid > [data-slot="select-trigger"] { width: 104px; }
+.expense-edit-grid > input:not([type="number"]) { width: 180px; flex: 1; }
+.expense-budget-grid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 28px; }
+.expense-budget-grid > div { display: grid; grid-template-columns: auto auto; align-items: center; gap: 6px 8px; }
+.expense-budget-grid input { width: 96px; }
+.expense-budget-grid p { grid-column: 1 / -1; max-width: 260px; }
+.reflection-entry { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 10px; }
+.reflection-attachments { grid-column: 1 / -1; }
 .task-console { position: relative; }
 .dashboard-layout-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--border); padding: 8px 16px; }
 .dashboard-layout-toolbar[data-arranging=false] { position: absolute; top: 12px; right: 12px; justify-content: flex-end; border: 0; padding: 0; }

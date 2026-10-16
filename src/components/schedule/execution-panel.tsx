@@ -116,7 +116,7 @@ export function ExecutionPanel({ userId, events, tasks, boards = emptyBoards, pr
 
     <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
       <DialogContent className="focus-report-dialog sm:max-w-3xl">
-        <DialogHeader><DialogTitle className="flex items-center gap-2"><Timer className="size-4 text-primary" />专注记录<span className="ml-1 rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-normal text-stone-500" title="记录按账号保存在当前浏览器">本机</span></DialogTitle><DialogDescription className="sr-only">专注历史及每周计划与实际统计</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><Timer className="size-4 text-primary" />专注记录</DialogTitle><DialogDescription className="sr-only">专注历史及每周计划与实际统计</DialogDescription></DialogHeader>
         <div className="flex items-center gap-2 border-y border-stone-100 py-3">
           <Button size="icon-sm" variant="ghost" aria-label="上一周" onClick={() => setWeek(addDays(week, -7))}><ChevronLeft className="size-4" /></Button>
           <span className="flex-1 text-sm tabular-nums">{format(week, "M月d日")} – {format(addDays(week, 6), "M月d日")}</span>

@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { readStoredFocusState } from "./useFocusTimer";
+import { mergeFocusSessions, pauseFocus } from "@/lib/execution-insights";
+import { createId } from "@/lib/id";
 import { mergeScheduleChanges } from "@/lib/schedule-merge";
 import { withScheduleDraftLock } from "@/lib/schedule-lock";
 import { clearAcknowledgedScheduleDraft, getScheduleBackupStorageKey, getScheduleDraftKey, normalizePersistedSchedulePayload, readPendingScheduleDrafts, readScheduleSyncBackup, writePendingScheduleDraft, writeScheduleBackupToLocal, type PersistedSchedulePayload } from "@/lib/schedule-persistence";
@@ -10,7 +13,7 @@ export type ScheduleSyncStatus = "loading" | "saved" | "pending" | "saving" | "o
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const empty = () => normalizePersistedSchedulePayload({})!;
 const legacyColumns = "events,tasks,annual_tasks,shopping_items,project_checkins,footprints,ui_preferences,achievements,updated_at";
-const columns = `${legacyColumns},project_boards`;
+const columns = `${legacyColumns},project_boards,focus_state`;
 type SyncView = { owner: string | null; ready: boolean; status: ScheduleSyncStatus; message: string };
 type Controls = {
   owner: string;
@@ -40,8 +43,10 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
     let running: Promise<void> | null = null;
     let dirty = backup?.pending ?? false;
     let conflict = false;
+    let focusConflict = false;
     let ready = Boolean(backup);
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let remoteRevision: string | null | undefined;
     const controller = new AbortController();
 
     function show(status: ScheduleSyncStatus, message = "") {
@@ -51,7 +56,7 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
     function apply(value: PersistedSchedulePayload) {
       desired = value;
       expectedHydration = equal(value, lastObserved) ? null : JSON.stringify(value);
-      if (expectedHydration !== null) hydrate(value, !equal(normalizePersistedSchedulePayload(lastObserved), normalizePersistedSchedulePayload(value)));
+      if (expectedHydration !== null) hydrate(value, !equal({ ...normalizePersistedSchedulePayload(lastObserved), focus_state: undefined }, { ...value, focus_state: undefined }));
     }
     function recognizeDraftHandoff() {
       if (!lastDraft) return;
@@ -88,18 +93,22 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
         for (let attempt = 0; attempt < 4 && !disposed; attempt++) {
           const read = (selection: string) => supabase.from("schedule_data").select(selection).eq("user_id", owner).abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)])).maybeSingle<Partial<PersistedSchedulePayload> & { updated_at: string }>();
           let result = await read(columns);
-          let boardsAvailable = true;
+          const unavailable = new Set<"project_boards" | "focus_state">();
           // A code deployment may precede its database migration. Keep the existing
           // workbench usable and retain unsynced project data in the normal draft.
-          if (result.error?.message.includes("project_boards") && (result.error.message.includes("column") || result.error.message.includes("schema cache"))) {
-            boardsAvailable = false;
-            result = await read(legacyColumns);
+          for (let fallback = 0; fallback < 2; fallback++) {
+            const missing = (["project_boards", "focus_state"] as const).find((column) => !unavailable.has(column) && result.error?.message.includes(column) && (result.error.message.includes("column") || result.error.message.includes("schema cache")));
+            if (!missing) break;
+            unavailable.add(missing);
+            result = await read(columns.split(",").filter((column) => !unavailable.has(column as "project_boards" | "focus_state")).join(","));
           }
           if (disposed) return false;
           if (result.error) throw new Error(result.error.message);
           recognizeDraftHandoff();
           const remote = normalizePersistedSchedulePayload(result.data) ?? empty();
-          if (!boardsAvailable) remote.project_boards = base?.project_boards ?? [];
+          let acknowledgedRevision = result.data?.updated_at ?? null;
+          if (unavailable.has("project_boards")) remote.project_boards = base?.project_boards ?? [];
+          if (unavailable.has("focus_state")) remote.focus_state = base?.focus_state ?? empty().focus_state;
           const otherDrafts = readPendingScheduleDrafts(owner).filter((draft) => draft.key !== draftKey);
           let incoming = remote;
           const draftConflicts: string[] = [];
@@ -113,6 +122,10 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
             incoming = combined.value;
             draftConflicts.push(...combined.conflicts);
           }
+          if (prefer === "local" && focusConflict && incoming.focus_state?.active && !equal(incoming.focus_state.active, desired.focus_state?.active)) {
+            const paused = pauseFocus(incoming.focus_state, Date.now(), createId("focus"));
+            incoming = { ...incoming, focus_state: { ...incoming.focus_state, sessions: mergeFocusSessions(paused.sessions) } };
+          }
           const local = desired;
           let merged: PersistedSchedulePayload;
           let conflicts: string[];
@@ -125,6 +138,7 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
           conflicts.push(...draftConflicts);
           if (conflicts.length && !prefer) {
             conflict = true;
+            focusConflict = conflicts.includes("schedule.focus_state.active");
             dirty = true;
             preserve();
             show("conflict", base === undefined ? "旧版本本机备份与云端不同，请选择保留本机或云端版本。" : `发现 ${conflicts.length} 处不同修改，请选择保留哪一方的冲突内容。其他修改会合并。`);
@@ -133,25 +147,31 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
           if (!equal(merged, remote) || (!result.data && dirty)) {
             const updatedAt = new Date(Math.max(Date.now(), Date.parse(result.data?.updated_at ?? "") + 1 || 0)).toISOString();
             const write = { ...merged, user_id: owner, updated_at: updatedAt };
-            if (!boardsAvailable) delete write.project_boards;
+            for (const column of unavailable) delete write[column];
             const saved = result.data
               ? await supabase.from("schedule_data").update(write).eq("user_id", owner).eq("updated_at", result.data.updated_at).select("updated_at").abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)])).maybeSingle()
               : await supabase.from("schedule_data").insert(write).select("updated_at").abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)])).maybeSingle();
             if (disposed) return false;
             if (saved.error?.code === "23505" || (!saved.error && !saved.data)) continue;
             if (saved.error) throw new Error(saved.error.message);
+            acknowledgedRevision = saved.data?.updated_at ?? updatedAt;
           }
           // A user may continue typing while the request is in flight.
           const next = mergeScheduleChanges(local, desired, merged).value;
-          base = boardsAvailable ? merged : { ...merged, project_boards: base?.project_boards ?? [] };
+          base = { ...merged,
+            ...(unavailable.has("project_boards") ? { project_boards: base?.project_boards ?? [] } : {}),
+            ...(unavailable.has("focus_state") ? { focus_state: base?.focus_state ?? empty().focus_state } : {}),
+          };
           dirty = !equal(next, base);
           conflict = false;
+          focusConflict = false;
+          remoteRevision = acknowledgedRevision;
           apply(next);
           for (const draft of otherDrafts) clearAcknowledgedScheduleDraft(draft.key, draft.raw);
           if (!dirty) { clearAcknowledgedScheduleDraft(draftKey); lastDraft = undefined; }
           if (preserve()) {
-            if (!boardsAvailable && dirty) {
-              show("error", "科研与自学项目已保存在本机，云端同步需要执行项目任务表迁移。其他日程修改已同步；迁移后点击重试。");
+            if (unavailable.size && dirty) {
+              show("error", `${unavailable.has("focus_state") ? "专注记录" : "科研与自学项目"}已保存在本机，云端同步需要执行数据库迁移。其他日程修改已同步；迁移后点击重试。`);
               return false;
             }
             show(dirty ? "pending" : "saved");
@@ -199,7 +219,13 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
         if (!conflict) { if (backedUp) show("pending"); schedule(); }
       },
       retry: () => run(),
-      resolve: (prefer) => { void run(prefer); },
+      resolve: (prefer) => {
+        if (prefer === "remote" && focusConflict && desired.focus_state?.active) {
+          apply({ ...desired, focus_state: pauseFocus(desired.focus_state, Date.now(), createId("focus")) });
+          dirty = true; preserve();
+        }
+        void run(prefer);
+      },
     };
     controls.current = api;
     function start() {
@@ -207,8 +233,9 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
       // Re-read inside the lock: two newly opened pages must not inherit the same ancestor.
       backup = readScheduleSyncBackup(owner);
       base = backup ? backup.base : empty();
-      desired = backup?.payload ?? empty();
-      dirty = backup?.pending ?? false;
+      const cached = backup?.payload ?? empty();
+      desired = { ...cached, focus_state: readStoredFocusState(owner) ?? cached.focus_state };
+      dirty = (backup?.pending ?? false) || !equal(desired, cached);
       inheritedDraft = dirty ? readPendingScheduleDrafts(owner).find((draft) =>
         (!backup?.draftKey || draft.key === backup.draftKey) && equal(draft.payload, desired) && equal(draft.base, base)) : undefined;
       started = true;
@@ -218,6 +245,20 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
       void run();
     }
     const online = () => { void run(); };
+    let lastPoll = 0;
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "hidden" || !navigator.onLine || conflict || running || disposed || !started) return;
+      if (Date.now() - lastPoll < (desired.focus_state?.active ? 10_000 : 30_000)) return;
+      lastPoll = Date.now();
+      if (dirty) { void run(); return; }
+      // Check only the revision while idle; download the full workspace only after a remote edit.
+      void supabase.from("schedule_data").select("updated_at").eq("user_id", owner)
+        .abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]))
+        .maybeSingle<{ updated_at: string }>().then((result) => {
+          if (!disposed && !result.error && (result.data?.updated_at ?? null) !== remoteRevision) void run();
+        }, () => { /* Poll again when the connection recovers. */ });
+    }, 10_000);
+    const visibility = () => { if (document.visibilityState === "visible") void run(); };
     const offline = () => { if (dirty) show("offline", "修改已保存在本机，联网后自动同步。"); };
     const storage = (event: StorageEvent) => {
       if (event.key !== getScheduleBackupStorageKey(owner) || conflict || !event.newValue) return;
@@ -233,6 +274,7 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
     window.addEventListener("focus", online);
     window.addEventListener("storage", storage);
     window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("visibilitychange", visibility);
     void withScheduleDraftLock(owner, start).catch(() => {
       show("error", "无法协调本机草稿，请启用浏览器存储或关闭其他工作台标签页后刷新。");
     });
@@ -240,11 +282,13 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
       disposed = true;
       controller.abort();
       clearTimeout(timer);
+      window.clearInterval(poll);
       window.removeEventListener("online", online);
       window.removeEventListener("offline", offline);
       window.removeEventListener("focus", online);
       window.removeEventListener("storage", storage);
       window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("visibilitychange", visibility);
       if (controls.current === api) controls.current = null;
     };
   }, [userId, hydrate]);

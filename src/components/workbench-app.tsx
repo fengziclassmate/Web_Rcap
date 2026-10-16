@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { AccountScope } from "@/components/account-scope";
 import { Check, CloudOff, Loader2, RefreshCw, Undo2, Redo2 } from "lucide-react";
-import { parseISO } from "date-fns";
+import { differenceInCalendarDays, parseISO } from "date-fns";
 import { GlobalSearch, type SearchResult } from "@/components/schedule/global-search";
 import { ExecutionPanel } from "@/components/schedule/execution-panel";
 import { ProjectBoardsPanel } from "@/components/projects/project-boards-panel";
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { FloatingScheduleCard } from "@/components/schedule/floating-schedule-card";
 import { useScheduleSync } from "@/hooks/useScheduleSync";
 import { useUndoHistory } from "@/hooks/useUndoHistory";
-import { useFocusTimer } from "@/hooks/useFocusTimer";
+import { hydrateFocusState, useFocusTimer } from "@/hooks/useFocusTimer";
 import { projectFocusTarget, type FocusTarget } from "@/lib/execution-insights";
 import { expandScheduleEvents } from "@/lib/recurrence";
 
@@ -159,11 +159,13 @@ export function WorkbenchApp() {
       footprints,
       achievements,
       project_boards: projectBoards,
+      focus_state: focus.state,
       ui_preferences: dashboardUiPreferences,
     }),
     [
       achievements,
       projectBoards,
+      focus.state,
       annualTasks,
       dashboardUiPreferences,
       events,
@@ -180,8 +182,9 @@ export function WorkbenchApp() {
     setShoppingItems(value.shopping_items); setProjectCheckins(value.project_checkins);
     setFootprints(value.footprints); setAchievements(value.achievements);
     setProjectBoards(value.project_boards ?? []);
+    if (user?.id && value.focus_state) hydrateFocusState(user.id, value.focus_state);
     setDashboardUiPreferences(value.ui_preferences);
-  }, []);
+  }, [user?.id]);
   const sync = useScheduleSync(user?.id ?? null, persistedPayload, hydrateSchedule);
   const dataReady = sync.ready;
   const currentUserId = useRef<string | null>(null);
@@ -876,6 +879,7 @@ export function WorkbenchApp() {
     const isCompleted = patch.isCompleted;
     const title = patch.title;
     const date = patch.date;
+    const parsed = parseSyntheticEventId(eventId);
     if (
       typeof isCompleted === "boolean"
       || typeof title === "string"
@@ -894,14 +898,13 @@ export function WorkbenchApp() {
           updateTasksLinkedToScheduleEvent(
             prev,
             linkedTaskIds,
-            { title, date, isCompleted },
+            { title, date, isCompleted, ...(parsed && date && options?.scope === "future" ? { dateShift: { from: parsed.occurrenceDate, days: differenceInCalendarDays(parseISO(date), parseISO(parsed.occurrenceDate)) } } : {}) },
             new Date().toISOString(),
           ),
         );
       }
     }
 
-    const parsed = parseSyntheticEventId(eventId);
     if (parsed) {
       const scope = options?.scope ?? "occurrence";
       if (scope === "future") {

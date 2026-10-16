@@ -4,7 +4,7 @@ import { useAccountId } from "@/components/account-scope";
 
 import React, { useEffectEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { addDays, format, parse } from "date-fns";
+import { addDays, differenceInCalendarDays, format, parse } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import {
   Check,
@@ -1148,7 +1148,7 @@ export function WeeklyTimeGrid({
 
   function handleOpenEdit(event: ScheduleEvent) {
     setEditStartDate(event.date);
-    setEditEndDate(event.endDate ?? (parseSyntheticEventId(event.id) || event.recurrence ? "" : format(addDays(parse(event.date, "yyyy-MM-dd", new Date()), event.endHour < event.startHour ? 1 : 0), "yyyy-MM-dd")));
+    setEditEndDate(event.endDate ?? format(addDays(parse(event.date, "yyyy-MM-dd", new Date()), event.endHour < event.startHour ? 1 : 0), "yyyy-MM-dd"));
     setEditingEventId(event.id);
     setEditDetailsOpen(false);
     setEditRecurrenceOpen(false);
@@ -1236,8 +1236,12 @@ export function WeeklyTimeGrid({
 
   function buildEditPatch(): Partial<ScheduleEvent> {
     const { startHour, endHour } = resolveFormTimeRange(editForm.startHour, editForm.endHour);
+    const recurring = Boolean(parseSyntheticEventId(selectedEvent?.id ?? "") || selectedEvent?.recurrence);
+    const daySpan = differenceInCalendarDays(parse(editEndDate, "yyyy-MM-dd", new Date()), parse(editStartDate, "yyyy-MM-dd", new Date()));
+    const explicitEnd = editEndDate > editStartDate && (!recurring || daySpan * 24 + editForm.endHour - editForm.startHour >= 24);
     return {
-      ...(!parseSyntheticEventId(selectedEvent?.id ?? "") ? { endDate: editEndDate > editStartDate ? editEndDate : undefined, ...(selectedEvent && editStartDate !== selectedEvent.date ? { date: editStartDate } : {}) } : {}),
+      endDate: explicitEnd ? editEndDate : undefined,
+      ...(selectedEvent && (editStartDate !== selectedEvent.date || (recurring && explicitEnd)) ? { date: editStartDate } : {}),
       title: editForm.title.trim(),
       startHour,
       endHour: editEndDate > editStartDate ? editForm.endHour : endHour,
@@ -1253,7 +1257,7 @@ export function WeeklyTimeGrid({
 
   function handleSaveEdit() {
     if (!selectedEvent || !editForm.title.trim()) return;
-    if (!parseSyntheticEventId(selectedEvent.id) && !selectedEvent.recurrence && (!editStartDate || !editEndDate)) {
+    if (!editStartDate || !editEndDate) {
       toast.error("请选择开始日期和结束日期"); return;
     }
     if (editEndDate && (!editStartDate || editEndDate < editStartDate || (editEndDate === editStartDate && editForm.endHour <= editForm.startHour))) {
@@ -2420,14 +2424,14 @@ export function WeeklyTimeGrid({
           ) : null}
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             {selectedCell ? (
-              <DialogContent className="max-h-[92vh] overflow-y-auto rounded-lg border-gray-200 shadow-lg sm:max-w-lg">
+              <DialogContent className="event-editor-dialog max-h-[92vh] overflow-y-auto sm:max-w-[560px]">
                 <DialogHeader>
                   <DialogTitle className="text-lg font-semibold text-gray-900">
                     新建行程 - {selectedCell.date} {formatHour(selectedCell.startHour)}
                   </DialogTitle>
                 </DialogHeader>
-                <div className="mt-3 space-y-3">
-                  <div className="space-y-3">
+                <div className="event-editor-body space-y-3">
+                  <div className="space-y-1.5">
                     <Label htmlFor="create-title">标题</Label>
                     <Input
                       id="create-title"
@@ -2436,7 +2440,7 @@ export function WeeklyTimeGrid({
                       placeholder="输入行程标题"
                     />
                   </div>
-                  <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] items-end gap-3">
+                  <div className="flex flex-wrap items-end gap-3 [&>div:first-child]:w-44 [&>div:nth-child(2)]:w-32">
                     <div className="flex min-w-0 flex-col gap-2">
                       <Label>分类</Label>
                       <Select
@@ -2620,7 +2624,8 @@ export function WeeklyTimeGrid({
                   <TimeRangeEditor
                     startHour={createForm.startHour}
                     endHour={createForm.endHour}
-                    endDateControl={<Input aria-label="新建行程结束日期" title="结束日期" type="date" min={selectedCell.date} value={createEndDate || selectedCell.date} onChange={(event) => setCreateEndDate(event.target.value)} className="h-6 w-[112px] min-w-0 shrink-0 rounded border-stone-200 bg-white px-1 py-0 text-[10px] md:text-[10px]" />}
+                    startDateControl={<time className="text-xs tabular-nums text-stone-500">{selectedCell.date}</time>}
+                    endDateControl={<Input aria-label="新建行程结束日期" title="结束日期" type="date" min={selectedCell.date} value={createEndDate || selectedCell.date} onChange={(event) => setCreateEndDate(event.target.value)} className="h-7 w-[132px] min-w-0 shrink-0 rounded border-stone-200 bg-white px-1.5 py-0 text-xs md:text-xs" />}
                     onStartHourChange={(value) => setCreateForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setCreateForm((prev) => ({ ...prev, endHour: value }))}
                   />
@@ -2663,7 +2668,7 @@ export function WeeklyTimeGrid({
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
-                  <div className="flex items-center gap-3 rounded-lg bg-stone-50 px-3 py-2">
+                  <div className="flex items-center gap-2 py-1">
                     <Switch
                       id="create-completed"
                       checked={createForm.isCompleted}
@@ -2673,7 +2678,7 @@ export function WeeklyTimeGrid({
                     />
                     <Label htmlFor="create-completed">标记为已完成</Label>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="flex flex-wrap justify-end gap-2 border-t border-stone-100 pt-3">
                     <Button
                       type="button"
                       variant="outline"
@@ -2694,7 +2699,7 @@ export function WeeklyTimeGrid({
           <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => !open && setEditingEventId(null)}>
             {selectedEvent ? (
               <DialogContent
-                className="max-h-[92vh] overflow-y-auto rounded-lg border-gray-200 shadow-lg sm:max-w-lg"
+                className="event-editor-dialog max-h-[92vh] overflow-y-auto sm:max-w-[560px]"
                 onKeyDown={(event) => {
                   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                     event.preventDefault();
@@ -2705,8 +2710,8 @@ export function WeeklyTimeGrid({
                 <DialogHeader>
                   <DialogTitle className="text-lg font-semibold text-gray-900">编辑行程详情</DialogTitle>
                 </DialogHeader>
-                <div className="mt-3 space-y-3">
-                  <div className="space-y-3">
+                <div className="event-editor-body space-y-3">
+                  <div className="space-y-1.5">
                     <Label htmlFor="edit-title">标题</Label>
                     <Input
                       id="edit-title"
@@ -2715,7 +2720,7 @@ export function WeeklyTimeGrid({
                       placeholder="输入行程标题"
                     />
                   </div>
-                  <div className="grid grid-cols-[minmax(0,3fr)_minmax(7rem,2fr)] gap-3">
+                  <div className="flex flex-wrap items-end gap-3 [&>div:first-child]:w-44 [&>div:last-child]:w-32">
                     <div className="min-w-0 space-y-2">
                       <Label>分类</Label>
                       <Select
@@ -2757,8 +2762,8 @@ export function WeeklyTimeGrid({
                   <TimeRangeEditor
                     startHour={editForm.startHour}
                     endHour={editForm.endHour}
-                    startDateControl={!parseSyntheticEventId(selectedEvent.id) && !selectedEvent.recurrence ? <Input aria-label="编辑行程开始日期" title="开始日期" type="date" value={editStartDate} onChange={(event) => setEditStartDate(event.target.value)} className="h-6 w-[112px] min-w-0 shrink-0 px-1 py-0 text-[10px] md:text-[10px]" /> : undefined}
-                    endDateControl={!parseSyntheticEventId(selectedEvent.id) && !selectedEvent.recurrence ? <Input aria-label="编辑行程结束日期" title="结束日期" type="date" min={editStartDate} value={editEndDate || editStartDate} onChange={(event) => setEditEndDate(event.target.value)} className="h-6 w-[112px] min-w-0 shrink-0 px-1 py-0 text-[10px] md:text-[10px]" /> : undefined}
+                    startDateControl={<Input aria-label="编辑行程开始日期" title="开始日期" type="date" value={editStartDate} onChange={(event) => setEditStartDate(event.target.value)} className="h-7 w-[132px] min-w-0 shrink-0 px-1.5 py-0 text-xs md:text-xs" />}
+                    endDateControl={<Input aria-label="编辑行程结束日期" title="结束日期" type="date" min={editStartDate} value={editEndDate || editStartDate} onChange={(event) => setEditEndDate(event.target.value)} className="h-7 w-[132px] min-w-0 shrink-0 px-1.5 py-0 text-xs md:text-xs" />}
                     onStartHourChange={(value) => setEditForm((prev) => ({ ...prev, startHour: value }))}
                     onEndHourChange={(value) => setEditForm((prev) => ({ ...prev, endHour: value }))}
                   />
@@ -2801,7 +2806,8 @@ export function WeeklyTimeGrid({
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
-                  <div className="flex items-center gap-3 rounded-lg bg-stone-50 px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 py-1">
                     <Switch
                       id="edit-completed"
                       checked={editForm.isCompleted}
@@ -2813,16 +2819,17 @@ export function WeeklyTimeGrid({
                   </div>
 
                   {selectedEvent.linkedDailyTaskId ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-800">
                       <Check className="h-4 w-4" aria-hidden />
                       已加入当日日常任务
                     </div>
                   ) : (
-                    <Button type="button" variant="outline" className="w-full" onClick={handleAddSelectedEventToDailyTask}>
+                    <Button type="button" variant="ghost" size="sm" onClick={handleAddSelectedEventToDailyTask}>
                       <Plus className="h-4 w-4" />
                       加入当日任务
                     </Button>
                   )}
+                  </div>
 
                   {parseSyntheticEventId(selectedEvent.id) ? (
                     <Collapsible
@@ -2841,7 +2848,7 @@ export function WeeklyTimeGrid({
                         />
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <div className="space-y-4 border-t border-amber-100 px-4 py-4">
+                        <div className="space-y-3 border-t border-stone-100 px-3 py-3">
                           <div className="space-y-2">
                         <Label className="text-xs font-medium uppercase tracking-wide text-gray-600">保存范围</Label>
                         <div className="flex flex-wrap gap-2">
@@ -2865,7 +2872,7 @@ export function WeeklyTimeGrid({
                           </div>
                           <div className="space-y-2 border-t border-amber-200/80 pt-3">
                         <Label className="text-xs font-medium uppercase tracking-wide text-gray-600">删除</Label>
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             type="button"
                             variant="outline"
@@ -2903,12 +2910,12 @@ export function WeeklyTimeGrid({
                     </Collapsible>
                   ) : null}
 
-                  <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+                  <div className="flex justify-end gap-2 border-t border-stone-100 pt-3">
                     {parseSyntheticEventId(selectedEvent.id) ? null : (
                       <Button
                         type="button"
                         variant="destructive"
-                        className="flex-1"
+                        className="mr-auto"
                         onClick={() => {
                           onDeleteEvent(selectedEvent.id, { mode: "all" });
                           setEditingEventId(null);
@@ -2917,7 +2924,7 @@ export function WeeklyTimeGrid({
                         删除行程
                       </Button>
                     )}
-                    <Button type="button" className="flex-1" onClick={handleSaveEdit}>
+                    <Button type="button" onClick={handleSaveEdit}>
                       保存修改
                     </Button>
                   </div>
@@ -3591,14 +3598,14 @@ function TimeRangeEditor({
 
   return (
     <div className="grid grid-cols-1 gap-2 min-[440px]:grid-cols-2 [&_[data-slot=select-trigger]]:h-7">
-      <div className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
+      <div role="group" aria-label="开始时间" className="event-time-group">
         <div className="flex min-h-6 items-center justify-between gap-1">
           <Label className="shrink-0 whitespace-nowrap text-xs font-semibold text-stone-600">
             开始时间
           </Label>
           {startDateControl}
         </div>
-        <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-1 [&_label]:hidden">
+        <div className="mt-2 grid grid-cols-[64px_auto_64px] items-end justify-start gap-2 [&_label]:hidden">
           <CenteredTimePartSelect
             value={startParts.hours}
             options={hourOptions}
@@ -3626,7 +3633,7 @@ function TimeRangeEditor({
         />
       </div>
 
-      <div className="rounded-lg border border-stone-200 bg-stone-50/70 p-2">
+      <div role="group" aria-label="结束时间" className="event-time-group">
         <div className="flex min-h-6 items-center justify-between gap-1">
           <Label className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-stone-600">
             结束时间
@@ -3638,7 +3645,7 @@ function TimeRangeEditor({
           </Label>
           {endDateControl}
         </div>
-        <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-1 [&_label]:hidden">
+        <div className="mt-2 grid grid-cols-[64px_auto_64px] items-end justify-start gap-2 [&_label]:hidden">
           <CenteredTimePartSelect
             value={endParts.hours}
             options={endHourOptions}

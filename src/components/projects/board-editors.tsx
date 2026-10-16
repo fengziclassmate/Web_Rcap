@@ -32,11 +32,11 @@ export function BoardTaskEditor({ task, projectName, onSave, onClose }: { task: 
   const patch = (value: Partial<BoardTask>) => setDraft((previous) => ({ ...previous, ...value }));
   return <>
     <Dialog open onOpenChange={(open) => { if (!open) close(); }}>
-      <DialogContent className="sm:max-w-5xl">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader><DialogTitle>任务详情</DialogTitle><DialogDescription className="sr-only">{projectName}</DialogDescription></DialogHeader>
         <form onSubmit={(event) => { event.preventDefault(); if (draft.title.trim()) onSave({ ...draft, title: draft.title.trim(), tags: [...new Set(tags.split(/[,，、]/).map((tag) => tag.trim()).filter(Boolean))] }); }}>
           <Input aria-label="任务名称" autoFocus required value={draft.title} onChange={(event) => patch({ title: event.target.value })} placeholder="任务名称" className="mb-5 h-12 text-lg font-semibold" />
-          <div className="grid grid-cols-[minmax(0,1fr)_220px] gap-6">
+          <div className="grid grid-cols-[minmax(0,1fr)_200px] gap-5">
             <div className="min-w-0">
               <div className="mb-3 flex gap-1 border-b border-stone-200" role="tablist" aria-label="任务信息">
                 {([['content', '任务内容'], ['notes', '备注与资料'], ['review', '成果与复盘']] as const).map(([id, name]) => <button key={id} id={`task-tab-${id}`} type="button" role="tab" aria-selected={tab === id} aria-controls={`task-panel-${id}`} tabIndex={tab === id ? 0 : -1} onKeyDown={(event) => { const tabs = ['content', 'notes', 'review'] as const; if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return; event.preventDefault(); const next = tabs[(tabs.indexOf(tab) + (event.key === 'ArrowRight' ? 1 : 2)) % 3]; setTab(next); document.getElementById(`task-tab-${next}`)?.focus(); }} onClick={() => setTab(id)} className={`border-b-2 px-3 py-2 text-sm ${tab === id ? "border-emerald-800 font-semibold text-emerald-900" : "border-transparent text-stone-500"}`}>{name}</button>)}

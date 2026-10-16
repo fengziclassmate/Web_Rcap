@@ -2548,6 +2548,7 @@ export function TaskDashboard({
                   }}
                 />
               </div>
+              <div className="grid grid-cols-[minmax(0,1fr)_160px] gap-3">
               <div className="space-y-1">
                 <Label htmlFor="task-edit-name">任务名称</Label>
                 <Input
@@ -2571,9 +2572,10 @@ export function TaskDashboard({
                   className="rounded-sm border-stone-200"
                 />
               </div>
+              </div>
               <div className="space-y-1">
                 <Label>任务优先级</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {[
                     { value: "紧急且重要" as Priority, label: "紧急且重要" },
                     { value: "紧急不重要" as Priority, label: "紧急不重要" },
@@ -2601,7 +2603,7 @@ export function TaskDashboard({
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <Label>不确定性任务模型</Label>
-                    <p className="mt-0.5 text-xs text-stone-500">用于研究、分析和写作等无法精确估时的任务</p>
+                    <p className="sr-only">用于研究、分析和写作等无法精确估时的任务</p>
                   </div>
                   <Switch
                     checked={taskDraft.uncertaintyEnabled}
@@ -2636,9 +2638,9 @@ export function TaskDashboard({
                         </select>
                       </div>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-1"><Label htmlFor="task-estimate-min">最少时间（分钟）</Label><Input id="task-estimate-min" type="number" min="0" value={taskDraft.estimateMinMinutes} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, estimateMinMinutes: event.target.value } : prev)} /></div>
-                      <div className="space-y-1"><Label htmlFor="task-estimate-max">最多时间（分钟）</Label><Input id="task-estimate-max" type="number" min="0" value={taskDraft.estimateMaxMinutes} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, estimateMaxMinutes: event.target.value } : prev)} /></div>
+                    <div className="flex flex-wrap gap-3">
+                      <div className="w-36 space-y-1"><Label htmlFor="task-estimate-min">最少时间（分钟）</Label><Input id="task-estimate-min" type="number" min="0" value={taskDraft.estimateMinMinutes} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, estimateMinMinutes: event.target.value } : prev)} /></div>
+                      <div className="w-36 space-y-1"><Label htmlFor="task-estimate-max">最多时间（分钟）</Label><Input id="task-estimate-max" type="number" min="0" value={taskDraft.estimateMaxMinutes} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, estimateMaxMinutes: event.target.value } : prev)} /></div>
                     </div>
                     <div className="space-y-1"><Label htmlFor="task-min-validation">最小验证步骤</Label><Input id="task-min-validation" value={taskDraft.minimumValidationStep} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, minimumValidationStep: event.target.value } : prev)} placeholder="先用最小样本验证最关键的未知项" /></div>
                     <div className="space-y-1"><Label htmlFor="task-success-criteria">成功判定标准</Label><Textarea id="task-success-criteria" className="min-h-16 bg-white" value={taskDraft.successCriteria} onChange={(event) => setTaskDraft((prev) => prev ? { ...prev, successCriteria: event.target.value } : prev)} /></div>

@@ -489,6 +489,36 @@ describe("WeeklyTimeGrid interactions", () => {
     );
   });
 
+  it("retains the occurrence date when giving a recurring event an explicit multi-day end", () => {
+    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
+    renderGrid({ events: [{ ...scheduleEvent, id: "sleep", title: "跨日行程", date: "2026-07-27", startHour: 22, endHour: 6, recurrence: { kind: "daily" } }], onUpdateEvent });
+    fireEvent.click(screen.getAllByRole("button", { name: "打开 跨日行程 编辑窗口" })[0]);
+    fireEvent.change(screen.getByLabelText("编辑行程结束日期"), { target: { value: "2026-07-29" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    expect(onUpdateEvent).toHaveBeenCalledWith("sleep__2026-07-27", expect.objectContaining({ date: "2026-07-27", endDate: "2026-07-29" }), { scope: "occurrence" });
+  });
+
+  it("moves an overnight recurring occurrence to the following morning", () => {
+    const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
+    renderGrid({ events: [{ ...scheduleEvent, id: "sleep", title: "睡眠", date: "2026-07-27", startHour: 22, endHour: 6, recurrence: { kind: "daily" } }], onUpdateEvent });
+    fireEvent.click(screen.getAllByRole("button", { name: "打开 睡眠 编辑窗口" })[0]);
+    const editor = within(screen.getByRole("dialog"));
+    expect((editor.getByLabelText("编辑行程结束日期") as HTMLInputElement).value).toBe("2026-07-28");
+    fireEvent.change(editor.getByLabelText("编辑行程开始日期"), { target: { value: "2026-07-28" } });
+    const startSelect = within(editor.getByRole("group", { name: "开始时间" })).getByRole("combobox", { name: "小时" });
+    fireEvent.click(startSelect);
+    const startOption = within(document.getElementById(startSelect.getAttribute("aria-controls")!)!).getByRole("option", { name: "02" });
+    fireEvent.mouseMove(startOption); fireEvent.click(startOption);
+    expect(startSelect.textContent).toContain("02");
+    const endSelect = within(editor.getByRole("group", { name: "结束时间" })).getByRole("combobox", { name: "小时" });
+    fireEvent.click(endSelect);
+    const endOption = within(document.getElementById(endSelect.getAttribute("aria-controls")!)!).getByRole("option", { name: "08" });
+    fireEvent.mouseMove(endOption); fireEvent.click(endOption);
+    expect(endSelect.textContent).toContain("08");
+    fireEvent.click(editor.getByRole("button", { name: "保存修改" }));
+    expect(onUpdateEvent).toHaveBeenCalledWith("sleep__2026-07-27", expect.objectContaining({ date: "2026-07-28", startHour: 2, endHour: 8 }), { scope: "occurrence" });
+  });
+
   it("folds edit details and defaults every recurring edit to the selected day", () => {
     const onUpdateEvent = vi.fn<WeeklyTimeGridProps["onUpdateEvent"]>();
     window.localStorage.setItem("recurrence-edit-scope", "future");

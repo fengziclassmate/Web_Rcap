@@ -1,4 +1,5 @@
 import type { PersistedSchedulePayload } from "./schedule-persistence";
+import { mergeFocusSessions, type FocusSession } from "./execution-insights";
 
 const same = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -19,9 +20,11 @@ export function mergeScheduleChanges(
 ) {
   const conflicts: string[] = [];
   function merge(before: unknown, ours: unknown, theirs: unknown, path: string): unknown {
+    if (path === "schedule.focus_state.sessions") return mergeFocusSessions([...(ours as FocusSession[] ?? []), ...(theirs as FocusSession[] ?? [])]);
     if (same(ours, before)) return theirs;
     if (same(theirs, before) || same(ours, theirs)) return ours;
-    if (object(before) && object(ours) && object(theirs)) {
+    // A running timer is one choice: never combine the task from one device with another device's clock.
+    if (path !== "schedule.focus_state.active" && object(before) && object(ours) && object(theirs)) {
       const keys = new Set([...Object.keys(before), ...Object.keys(ours), ...Object.keys(theirs)]);
       const panelValues: Record<string, boolean> = {};
       if (path === "schedule.ui_preferences") {
