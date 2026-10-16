@@ -20,7 +20,7 @@ function inline(text: string, depth = 0): ReactNode {
     else if (match[3]) parts.push(<del key={key} className="text-stone-500">{inner}</del>);
     else if (match[4]) parts.push(<u key={key}>{inner}</u>);
     else if (match[5]) parts.push(<span key={key} className={{ red: "text-red-700", blue: "text-blue-700", green: "text-emerald-700" }[match[5]]}>{inner}</span>);
-    else parts.push(<a key={key} href={match[8]} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline underline-offset-2">{inner}</a>);
+    else parts.push(<a key={key} href={match[8]} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">{inner}</a>);
     cursor = match.index + match[0].length;
   }
   parts.push(text.slice(cursor));
@@ -28,7 +28,7 @@ function inline(text: string, depth = 0): ReactNode {
 }
 
 export function AnnotatedContent({ value, onChange, compact = false }: { value: string; onChange?: (value: string) => void; compact?: boolean }) {
-  if (!value.trim()) return <span className="text-stone-400">尚未填写内容</span>;
+  if (!value.trim()) return null;
   return <div className={`space-y-1.5 whitespace-pre-wrap break-words text-sm leading-6 ${compact ? "line-clamp-3" : ""}`}>
     {value.split("\n").map((line, index) => {
       const item = line.match(/^\s*- \[([ xX])\] (.*)$/);
@@ -78,14 +78,13 @@ export function AnnotatedEditor({ label, value, onChange, placeholder }: { label
         <span className="mx-1 h-4 border-l border-stone-200" />
         {([['red', '红色', 'bg-red-600'], ['blue', '蓝色', 'bg-blue-600'], ['green', '绿色', 'bg-emerald-700']] as const).map(([color, name, style]) => <button key={color} type="button" aria-label={`${name}文字`} title={`${name}文字`} onMouseDown={(event) => event.preventDefault()} onClick={() => wrap(`{${color}}`, `{/${color}}`)} className="flex size-7 items-center justify-center rounded hover:bg-stone-200 focus-visible:outline-2"><span className={`size-3 rounded-full ${style}`} /></button>)}
         <Button type="button" variant="ghost" size="sm" onMouseDown={(event) => event.preventDefault()} onClick={checklist}><CheckSquare className="size-4" />子任务</Button>
-        <span className="ml-auto pr-2 text-xs text-stone-500">选中文字后标注</span>
       </div>
       <textarea ref={editor} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") { event.preventDefault(); wrap("**", "**"); } }} className="min-h-48 w-full resize-y bg-transparent p-3 text-sm leading-7 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700/40" />
     </div>
-    <div className="rounded-lg border border-dashed border-stone-200 bg-stone-50/60 p-3">
-      <p className="mb-3 text-[11px] font-semibold tracking-wide text-stone-500">实时预览 · 可直接勾选子任务</p>
+    {value.trim() && <div className="rounded-lg border border-stone-100 bg-stone-50/60 p-3">
+      <p className="mb-2 text-[11px] font-medium text-stone-400">预览</p>
       <AnnotatedContent value={value} onChange={onChange} />
-    </div>
+    </div>}
     <details className="text-xs text-stone-500"><summary className="cursor-pointer">查看符号用法</summary><p className="mt-2 leading-6">**加粗**　==高亮==　~~已完成的文字~~　__下划线__<br />{'{red}红色{/red}　{blue}蓝色{/blue}　{green}绿色{/green}'}<br />- [ ] 待办子任务　- [x] 已完成子任务<br />[资料名称](https://example.com)　# 小标题</p></details>
   </div>;
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { Archive, ArrowDownToLine, BookOpen, CalendarDays, Check, ChevronDown, ChevronRight, CircleAlert, Flag, FlaskConical, FolderOpen, LayoutGrid, ListTodo, Plus, Search, Settings2, Table2, Trash2, Upload } from "lucide-react";
+import { useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { Archive, ArrowDownToLine, ArrowUpDown, BookOpen, CalendarDays, ChevronDown, ChevronRight, CircleAlert, Flag, FlaskConical, FolderOpen, LayoutGrid, ListTodo, Play, Plus, Search, Settings2, SlidersHorizontal, Table2, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { AnnotatedContent } from "./annotated-content";
 import { BoardTaskEditor, ProjectBoardEditor, selectClass } from "./board-editors";
 import { createId } from "@/lib/id";
 import { todayISO } from "@/lib/date-utils";
-import { boardPriorities, boardStatuses, boardTasksToCsv, checklistProgress, createBoardTask, getBoardProgress, isBoardTaskOverdue, matchesBoardScope, normalizeProjectBoards, setBoardTaskStatus, type BoardPriority, type BoardScope, type BoardStatus, type BoardTask, type ProjectBoard } from "@/lib/project-boards";
+import { boardPriorities, boardStatuses, boardTasksToCsv, checklistProgress, createBoardTask, isBoardTaskOverdue, matchesBoardScope, normalizeProjectBoards, setBoardTaskStatus, type BoardPriority, type BoardScope, type BoardStatus, type BoardTask, type ProjectBoard } from "@/lib/project-boards";
 
 type TaskRow = { board: ProjectBoard; task: BoardTask };
 const kinds = { research: "科研", learning: "自学", other: "其他" };
@@ -31,19 +31,20 @@ function download(content: string, name: string, type: string) {
 
 function PriorityBadge({ priority }: { priority: BoardPriority }) {
   const item = boardPriorities[priority];
-  return <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-2 py-1 text-[11px] font-medium ${item.className}`} title={item.label}>{item.short}<span>{item.label}</span></span>;
+  return <span className={`project-priority-badge priority-${priority}`} title={item.label}>{item.short}<span>{item.label}</span></span>;
 }
 
 function TaskProgress({ task }: { task: BoardTask }) {
   const progress = checklistProgress(task.content);
-  if (!progress.total) return <span className="text-xs text-stone-400">未拆分</span>;
+  if (!progress.total) return null;
   return <span className="inline-flex items-center gap-2 text-xs tabular-nums text-stone-500" title="已完成子任务 / 全部子任务"><span className="h-1 w-12 overflow-hidden rounded-full bg-stone-200"><span className="block h-full rounded-full bg-emerald-700" style={{ width: `${progress.done / progress.total * 100}%` }} /></span>{progress.done}/{progress.total}</span>;
 }
 
-export function ProjectWorkspace({ boards, onChange, onCopyToToday, initialSelection }: {
+export function ProjectWorkspace({ boards, onChange, onCopyToToday, onStartFocus, initialSelection }: {
   boards: ProjectBoard[];
   onChange: Dispatch<SetStateAction<ProjectBoard[]>>;
   onCopyToToday: (board: ProjectBoard, task: BoardTask) => void;
+  onStartFocus?: (board: ProjectBoard, task: BoardTask) => void;
   initialSelection?: { boardId: string; taskId?: string; token: number };
 }) {
   const today = todayISO();
@@ -55,6 +56,7 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, initialSelec
   const [priority, setPriority] = useState("all");
   const [phase, setPhase] = useState("all");
   const [sort, setSort] = useState("priority");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [quickTitle, setQuickTitle] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
   const [projectEditor, setProjectEditor] = useState<{ board?: ProjectBoard; template?: "blank" | "research" | "learning" } | null>(null);
@@ -71,10 +73,10 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, initialSelec
   const allRows = boards.filter((board) => !board.archived).flatMap((board) => board.tasks.map((task) => ({ board, task })));
   const sourceRows = sourceBoards.flatMap((board) => board.tasks.map((task) => ({ board, task })));
   const phases = [...new Set(sourceRows.map(({ task }) => task.phase).filter(Boolean))];
-  const rows = useMemo(() => sourceRows.filter(({ task, board }) => {
+  const rows = sourceRows.filter(({ task, board }) => {
     const searchText = [board.name, task.title, task.content, task.notes, task.review, task.phase, ...task.tags].join(" ").toLocaleLowerCase();
     return matchesBoardScope(task, selected ? "all" : scope, today) && (status === "all" || task.status === status) && (priority === "all" || task.priority === priority) && (phase === "all" || task.phase === phase) && query.trim().toLocaleLowerCase().split(/\s+/).every((word) => searchText.includes(word));
-  }).sort((a, b) => sort === "priority" ? a.task.priority.localeCompare(b.task.priority) || (a.task.dueDate || "9999").localeCompare(b.task.dueDate || "9999") : sort === "due" ? (a.task.dueDate || "9999").localeCompare(b.task.dueDate || "9999") : a.task.createdAt.localeCompare(b.task.createdAt)), [sourceRows, selected, scope, today, status, priority, phase, query, sort]);
+  }).sort((a, b) => sort === "priority" ? a.task.priority.localeCompare(b.task.priority) || (a.task.dueDate || "9999").localeCompare(b.task.dueDate || "9999") : sort === "due" ? (a.task.dueDate || "9999").localeCompare(b.task.dueDate || "9999") : a.task.createdAt.localeCompare(b.task.createdAt));
   const doneCount = sourceRows.filter(({ task }) => task.status === "done").length;
   const overdueCount = sourceRows.filter(({ task }) => isBoardTaskOverdue(task, today)).length;
   const blockedCount = sourceRows.filter(({ task }) => task.status === "blocked").length;
@@ -132,85 +134,116 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, initialSelec
     finally { if (importInput.current) importInput.current.value = ""; }
   }
 
+  const filterCount = [status, priority, phase].filter((value) => value !== "all").length;
+
+  function quickAdd() {
+    if (!selected || !quickTitle.trim() || selected.archived) return;
+    const task = createBoardTask(quickTitle.trim());
+    onChange((previous) => previous.map((board) => board.id === selected.id ? { ...board, tasks: [...board.tasks, task] } : board));
+    setQuickTitle("");
+  }
+
   function rowActions({ board, task }: TaskRow) {
-    return <div className="flex items-center justify-end gap-1">
-      <Button size="icon-sm" variant="ghost" aria-label={`复制到今日：${task.title}`} title="复制到今日待办" disabled={board.archived || task.status === "done"} onClick={() => onCopyToToday(board, task)}><CalendarDays className="size-3.5" /></Button>
-      <Button size="icon-sm" variant="ghost" aria-label={`删除任务：${task.title}`} title="删除任务" onClick={() => setDeletion({ boardId: board.id, taskId: task.id, name: task.title })}><Trash2 className="size-3.5" /></Button>
+    const disabled = board.archived || task.status === "done";
+    return <div className="project-row-actions">
+      {onStartFocus && <Button className="size-6" size="icon-sm" variant="ghost" aria-label={`专注任务：${task.title}`} title="开始 25 分钟专注" disabled={disabled} onClick={() => onStartFocus(board, task)}><Play className="size-3.5" /></Button>}
+      <Button className="size-6" size="icon-sm" variant="ghost" aria-label={`复制到今日：${task.title}`} title="复制到今日" disabled={disabled} onClick={() => onCopyToToday(board, task)}><CalendarDays className="size-3.5" /></Button>
+      <Button className="size-6" size="icon-sm" variant="ghost" aria-label={`删除任务：${task.title}`} title="删除任务" onClick={() => setDeletion({ boardId: board.id, taskId: task.id, name: task.title })}><Trash2 className="size-3.5" /></Button>
     </div>;
   }
 
-  return <section className="project-workspace module-shell" aria-label="科研与自学工作台">
+  return <section className="project-workspace" aria-label="科研与自学工作台">
     <aside className="project-navigation">
-      <div className="flex items-center gap-2 px-3 pb-5 pt-2"><span className="flex size-9 items-center justify-center rounded-xl bg-emerald-900 text-white"><BookOpen className="size-4" /></span><div><h2 className="text-sm font-semibold">科研与自学</h2><p className="mt-0.5 text-[11px] text-stone-500">从计划到成果</p></div></div>
+      <div className="project-brand"><span><BookOpen className="size-4" /></span><h2>科研与自学</h2></div>
       <nav className="space-y-1" aria-label="项目视图">
-        {scopes.map(({ id, label, icon: Icon }) => <button type="button" key={id} aria-pressed={!selected && scope === id} onClick={() => { setSelectedId(""); setScope(id); clearFilters(); }} className={`project-nav-item ${!selected && scope === id ? "is-active" : ""}`}><Icon className="size-4" /><span className="flex-1 text-left">{label}</span><span className="text-xs tabular-nums text-stone-500">{id === "archived" ? boards.filter((board) => board.archived).length : allRows.filter(({ task }) => matchesBoardScope(task, id, today)).length}</span></button>)}
-      </nav>
-      <div className="mb-2 mt-7 flex items-center justify-between px-3"><p className="text-[11px] font-semibold tracking-widest text-stone-500">我的项目 · {activeBoards.length}</p><Button variant="ghost" size="icon-sm" aria-label="新建项目" onClick={() => setProjectEditor({})}><Plus className="size-4" /></Button></div>
-      <nav className="space-y-1" aria-label="项目列表">
-        {activeBoards.map((board) => <button key={board.id} type="button" aria-pressed={selected?.id === board.id} onClick={() => openProject(board.id)} className={`project-nav-item ${selected?.id === board.id ? "is-active" : ""}`}>
-          {board.kind === "research" ? <FlaskConical className="size-4 shrink-0 text-sky-700" /> : board.kind === "learning" ? <BookOpen className="size-4 shrink-0 text-emerald-800" /> : <FolderOpen className="size-4 shrink-0" />}
-          <span className="min-w-0 flex-1 truncate text-left" title={board.name}>{board.name}</span><span className="text-xs tabular-nums text-stone-500">{getBoardProgress(board).done}/{board.tasks.length}</span>
+        {scopes.map(({ id, label, icon: Icon }) => <button type="button" key={id} aria-pressed={!selected && scope === id} onClick={() => { setSelectedId(""); setScope(id); clearFilters(); }} className={`project-nav-item ${!selected && scope === id ? "is-active" : ""}`}>
+          <Icon className="size-4 shrink-0" /><span className="flex-1 text-left">{label}</span><span className="project-nav-count">{id === "archived" ? boards.filter((board) => board.archived).length : allRows.filter(({ task }) => matchesBoardScope(task, id, today)).length}</span>
         </button>)}
-        {!activeBoards.length && <p className="px-3 py-3 text-xs leading-6 text-stone-400">{scope === "archived" ? "还没有归档项目" : "把一个长期目标建成项目，再拆成可执行的任务。"}</p>}
       </nav>
-      <div className="mt-auto space-y-2 border-t border-stone-200 px-2 pt-5">
-        <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => download(JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), project_boards: boards }, null, 2), `科研自学项目-${today}.json`, "application/json")} disabled={!boards.length}><ArrowDownToLine className="size-3.5" />备份全部项目</Button>
-        <Button variant="ghost" className="w-full justify-start text-stone-500" size="sm" onClick={() => importInput.current?.click()}><Upload className="size-3.5" />从备份导入</Button>
+      <div className="project-list-label"><span>项目 <span className="ml-1 font-normal text-stone-400">{activeBoards.length}</span></span><Button variant="ghost" size="icon-sm" aria-label="新建项目" title="新建项目" onClick={() => setProjectEditor({})}><Plus className="size-3.5" /></Button></div>
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto" aria-label="项目列表">
+        {activeBoards.map((board) => <button key={board.id} type="button" aria-pressed={selected?.id === board.id} onClick={() => openProject(board.id)} className={`project-nav-item ${selected?.id === board.id ? "is-active" : ""}`}>
+          {board.kind === "research" ? <FlaskConical className="size-4 shrink-0" /> : board.kind === "learning" ? <BookOpen className="size-4 shrink-0" /> : <FolderOpen className="size-4 shrink-0" />}
+          <span className="min-w-0 flex-1 truncate text-left" title={board.name}>{board.name}</span><span className="project-nav-count">{board.tasks.filter((task) => task.status !== "done").length}</span>
+        </button>)}
+      </nav>
+      <div className="project-backup-actions">
+        <Button variant="ghost" size="sm" aria-label="备份全部项目" onClick={() => download(JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), project_boards: boards }, null, 2), `科研自学项目-${today}.json`, "application/json")} disabled={!boards.length}><ArrowDownToLine className="size-3.5" />备份</Button>
+        <Button variant="ghost" size="sm" aria-label="从备份导入" onClick={() => importInput.current?.click()}><Upload className="size-3.5" />导入</Button>
         <input ref={importInput} type="file" accept=".json,application/json" aria-label="导入项目备份" className="hidden" onChange={(event) => void importBoards(event.target.files?.[0])} />
       </div>
     </aside>
 
-    <div className="min-w-0 flex-1">
-      <header className="border-b border-stone-200 px-7 py-6">
-        <div className="mb-3 flex items-center gap-2 text-xs text-stone-500"><BookOpen className="size-3.5" />科研与自学<ChevronRight className="size-3" /><span>{selected ? kinds[selected.kind] : "项目总览"}</span>{selected?.archived && <span className="rounded bg-stone-100 px-2 py-0.5">已归档</span>}</div>
-        <div className="flex items-start justify-between gap-4"><div className="min-w-0"><h1 className="break-words text-2xl font-semibold tracking-tight text-stone-900">{selected?.name ?? scopeLabel}</h1><p className="mt-2 max-w-3xl whitespace-pre-wrap break-words text-sm leading-6 text-stone-500">{selected?.goal || (selected ? "在项目设置中写下目标与验收标准，让每项任务都有方向。" : "把长期目标拆成清晰的下一步，让每一次投入都留下进展。")}</p>{selected?.targetDate && <p className="mt-2 text-xs text-stone-500">目标日期 · {selected.targetDate}</p>}</div>
-          <div className="flex shrink-0 items-center gap-2">
-            {selected ? <><Button variant="outline" size="sm" aria-label="项目设置" onClick={() => setProjectEditor({ board: selected })}><Settings2 className="size-3.5" />设置</Button><Button size="sm" disabled={selected.archived} onClick={() => newTask()}><Plus className="size-4" />新任务</Button></> : <Button size="sm" onClick={() => setProjectEditor({})}><Plus className="size-4" />新项目</Button>}
+    <div className="project-main">
+      <header className="project-header">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2.5"><h1>{selected?.name ?? scopeLabel}</h1>{selected && <span className="project-kind-label">{selected.archived ? "已归档" : kinds[selected.kind]}</span>}</div>
+          {selected?.goal && <p className="project-goal" title={selected.goal}>{selected.goal}</p>}
+          <div className="project-header-meta" role="group" aria-label="项目统计">
+            <span>{sourceRows.length} 项任务</span><span className="project-completion"><span className="project-mini-track"><i style={{ width: `${sourceRows.length ? doneCount / sourceRows.length * 100 : 0}%` }} /></span>{doneCount} 已完成</span>
+            {selected?.targetDate && <span className="tabular-nums"><CalendarDays className="mr-1 inline size-3" />{selected.targetDate}</span>}
+            {overdueCount > 0 && <span className="text-red-700">{overdueCount} 逾期</span>}{blockedCount > 0 && <span className="text-amber-700">{blockedCount} 阻塞</span>}
           </div>
+          {selected?.description && <details className="mt-2 text-xs text-stone-500"><summary className="cursor-pointer">项目说明</summary><p className="mt-2 max-w-[70ch] whitespace-pre-wrap leading-6">{selected.description}</p></details>}
         </div>
-        {selected?.description && <details className="mt-3 text-xs text-stone-500"><summary className="cursor-pointer">项目说明</summary><p className="mt-2 whitespace-pre-wrap break-words leading-6">{selected.description}</p></details>}
-        <div className="mt-6 grid grid-cols-4 gap-5" aria-label="项目统计">
-          {[{ label: "任务总数", value: sourceRows.length, color: "text-stone-900" }, { label: "已完成", value: doneCount, color: "text-emerald-800" }, { label: "逾期待处理", value: overdueCount, color: overdueCount ? "text-red-700" : "text-stone-900" }, { label: "有阻塞", value: blockedCount, color: blockedCount ? "text-amber-700" : "text-stone-900" }].map((stat) => <div key={stat.label} className="border-l border-stone-200 pl-4 first:border-0 first:pl-0"><p className="text-xs text-stone-500">{stat.label}</p><p className={`mt-1 text-2xl font-semibold tabular-nums ${stat.color}`}>{stat.value}<span className="ml-1 text-xs font-normal text-stone-400">项</span></p></div>)}
+        <div className="flex shrink-0 items-center gap-2">
+          {selected ? <><Button variant="ghost" size="icon-sm" aria-label="项目设置" title="项目设置" onClick={() => setProjectEditor({ board: selected })}><Settings2 className="size-4" /></Button><Button size="sm" disabled={selected.archived} onClick={() => newTask()}><Plus className="size-3.5" />新任务</Button></> : <Button size="sm" onClick={() => setProjectEditor({})}><Plus className="size-3.5" />新项目</Button>}
         </div>
-        {selected && <div className="mt-5 flex items-center gap-3"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-100"><div className="h-full rounded-full bg-emerald-800 transition-all" style={{ width: `${getBoardProgress(selected).percent}%` }} /></div><span className="text-xs tabular-nums text-stone-500">任务完成 {getBoardProgress(selected).percent}%</span></div>}
       </header>
 
-      {!boards.length ? <div className="px-8 py-14"><div className="mx-auto max-w-3xl"><p className="text-xs font-semibold tracking-wider text-emerald-800">开始一个值得持续推进的项目</p><h2 className="mt-3 text-xl font-semibold">研究有线索，学习有路径。</h2><p className="mt-3 text-sm leading-7 text-stone-500">每个项目都有独立任务表。用阶段整理路径，用子任务记录进度，选中文字即可标出重点与完成内容。</p><div className="mt-7 grid grid-cols-3 gap-4">{([{ template: "research", title: "科研项目", detail: "研究问题 → 数据 → 验证 → 成果", icon: FlaskConical }, { template: "learning", title: "自学计划", detail: "学习目标 → 练习 → 检验 → 复盘", icon: BookOpen }, { template: "blank", title: "空白项目", detail: "从自己的方法开始，自由组织任务", icon: FolderOpen }] as const).map(({ template, title, detail, icon: Icon }) => <button type="button" key={template} onClick={() => setProjectEditor({ template })} className="rounded-xl border border-stone-200 bg-stone-50/50 p-5 text-left transition-colors hover:border-emerald-700 hover:bg-emerald-50/50 focus-visible:outline-2 focus-visible:outline-emerald-800"><Icon className="mb-5 size-6 text-emerald-800" /><span className="block text-sm font-semibold">{title}</span><span className="mt-2 block text-xs leading-6 text-stone-500">{detail}</span><span className="mt-5 block text-xs font-medium text-emerald-800">创建任务表 →</span></button>)}</div></div></div> : <>
-        <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 bg-stone-50/50 px-5 py-3">
-          <div className="mr-2 inline-flex rounded-lg border border-stone-200 bg-white p-0.5" aria-label="展示方式"><Button size="sm" variant={view === "table" ? "secondary" : "ghost"} aria-pressed={view === "table"} onClick={() => setView("table")}><Table2 className="size-3.5" />任务表</Button><Button size="sm" variant={view === "board" ? "secondary" : "ghost"} aria-pressed={view === "board"} onClick={() => setView("board")}><LayoutGrid className="size-3.5" />看板</Button></div>
-          <div className="relative min-w-40 flex-1"><Search className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-stone-400" /><Input aria-label="搜索项目任务" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索任务、内容、备注、标签…" className="h-9 bg-white pl-8" /></div>
-          <select aria-label="筛选任务状态" className={`${selectClass} !w-auto`} value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">全部状态</option>{Object.entries(boardStatuses).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
-          <select aria-label="筛选任务优先级" className={`${selectClass} !w-auto`} value={priority} onChange={(event) => setPriority(event.target.value)}><option value="all">全部优先级</option>{Object.entries(boardPriorities).map(([id, item]) => <option key={id} value={id}>{item.short} · {item.label}</option>)}</select>
-          <select aria-label="筛选任务阶段" className={`${selectClass} !w-auto max-w-36`} value={phase} onChange={(event) => setPhase(event.target.value)}><option value="all">全部阶段</option>{phases.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-          <select aria-label="任务排序" className={`${selectClass} !w-auto`} value={sort} onChange={(event) => setSort(event.target.value)}><option value="priority">按优先级</option><option value="due">按截止日期</option><option value="created">按创建顺序</option></select>
-          <Button size="icon-sm" variant="ghost" aria-label="导出当前任务为 CSV" title="导出当前筛选结果为 CSV" disabled={!rows.length} onClick={() => download(boardTasksToCsv(rows), `${selected?.name ?? scopeLabel}-${today}.csv`, "text/csv;charset=utf-8")}><ArrowDownToLine className="size-4" /></Button>
+      {!boards.length ? <div className="project-empty-start"><FolderOpen className="mb-4 size-8 text-stone-300" /><h2 className="text-base font-medium text-stone-700">新建项目</h2><div className="mt-5 flex gap-3">
+        {([{ template: "blank", title: "空白项目", icon: Plus }, { template: "research", title: "科研项目", icon: FlaskConical }, { template: "learning", title: "自学计划", icon: BookOpen }] as const).map(({ template, title, icon: Icon }) => <Button key={template} variant="outline" onClick={() => setProjectEditor({ template })}><Icon className="size-4" />{title}</Button>)}
+      </div></div> : <>
+        <div className="project-toolbar">
+          <div className="project-view-switch" role="group" aria-label="展示方式"><button type="button" aria-pressed={view === "table"} onClick={() => setView("table")}><Table2 className="size-3.5" />任务表</button><button type="button" aria-pressed={view === "board"} onClick={() => setView("board")}><LayoutGrid className="size-3.5" />看板</button></div>
+          <div className="project-search"><Search className="size-3.5" /><Input aria-label="搜索项目任务" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索任务" className="h-8 rounded-md border-[#e6ebe7] pl-8 pr-7 text-xs shadow-none" />{query && <button type="button" aria-label="清空搜索" onClick={() => setQuery("")}><X className="size-3" /></button>}</div>
+          <div className="ml-auto flex items-center gap-1.5">
+            <Button size="sm" variant={filtersOpen || filterCount ? "secondary" : "ghost"} aria-label="筛选" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal className="size-3.5" />筛选{filterCount > 0 && <span className="project-filter-count">{filterCount}</span>}</Button>
+            <label className="project-sort"><ArrowUpDown className="size-3.5" /><select aria-label="任务排序" value={sort} onChange={(event) => setSort(event.target.value)}><option value="priority">优先级</option><option value="due">截止日期</option><option value="created">创建顺序</option></select></label>
+            <Button size="icon-sm" variant="ghost" aria-label="导出当前任务为 CSV" title="导出 CSV" disabled={!rows.length} onClick={() => download(boardTasksToCsv(rows), `${selected?.name ?? scopeLabel}-${today}.csv`, "text/csv;charset=utf-8")}><ArrowDownToLine className="size-3.5" /></Button>
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-3 px-6 py-3 text-xs text-stone-500"><span>显示 {rows.length} / {sourceRows.length} 项{(query || status !== "all" || priority !== "all" || phase !== "all") && <button type="button" className="ml-3 text-emerald-800 underline" onClick={clearFilters}>清除筛选</button>}</span><span>展开行可直接勾选子任务 · 点击名称编辑标注</span></div>
-        {view === "table" ? <div className="overflow-x-auto"><table className="project-task-table"><thead><tr><th className="w-8"><span className="sr-only">完成状态</span></th><th className="min-w-64">任务名称 / 子任务进度</th><th>阶段 / 标签</th><th>轻重缓急</th><th>状态</th><th>计划 / 截止</th><th className="w-20"><span className="sr-only">操作</span></th></tr></thead><tbody>
-          {rows.map(({ board, task }) => <TaskTableRow key={`${board.id}:${task.id}`} board={board} task={task} today={today} expanded={expanded.includes(task.id)} showProject={!selected} onExpand={() => setExpanded((previous) => previous.includes(task.id) ? previous.filter((id) => id !== task.id) : [...previous, task.id])} onEdit={() => setTaskEditor({ boardId: board.id, task })} onUpdate={(update) => updateTask(board.id, task.id, update)} actions={rowActions({ board, task })} />)}
-        </tbody></table></div> : <div className="grid grid-cols-4 gap-3 px-5 pb-5">{Object.entries(boardStatuses).map(([id, label]) => <section key={id} className="min-w-0 rounded-xl border border-stone-200 bg-stone-50/70 p-3"><h3 className="mb-3 flex justify-between text-xs font-semibold text-stone-700">{label}<span className="font-normal text-stone-400">{rows.filter(({ task }) => task.status === id).length}</span></h3><div className="space-y-3">{rows.filter(({ task }) => task.status === id).map(({ board, task }) => <article key={`${board.id}:${task.id}`} className="rounded-lg border border-stone-200 bg-white p-3 shadow-xs"><p className="mb-2 text-[11px] text-stone-400">{selected ? task.phase || "未设置阶段" : board.name}</p><button type="button" onClick={() => setTaskEditor({ boardId: board.id, task })} className="text-left text-sm font-medium leading-6 hover:text-emerald-800">{task.milestone && <Flag className="mr-1 inline size-3 text-amber-700" />}{task.title}</button><div className="mt-3"><PriorityBadge priority={task.priority} /></div><div className="mt-3 flex items-center justify-between"><TaskProgress task={task} /><span className={`text-[11px] ${isBoardTaskOverdue(task, today) ? "text-red-700" : "text-stone-400"}`}>{task.dueDate || "无截止日"}</span></div><div className="mt-3 flex items-center gap-1 border-t border-stone-100 pt-2"><select aria-label={`状态：${task.title}`} className="min-w-0 flex-1 bg-transparent text-xs text-stone-600" value={task.status} onChange={(event) => updateTask(board.id, task.id, (previous) => setBoardTaskStatus(previous, event.target.value as BoardStatus))}>{Object.entries(boardStatuses).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select>{rowActions({ board, task })}</div></article>)}{!rows.some(({ task }) => task.status === id) && <p className="py-6 text-center text-xs text-stone-400">暂无任务</p>}</div></section>)}</div>}
-        {!rows.length && <div className="px-6 py-12 text-center"><Check className="mx-auto mb-3 size-7 text-stone-300" /><p className="text-sm text-stone-500">{sourceRows.length ? "当前视图没有匹配的任务" : selected ? "还没有任务，从一个具体的下一步开始。" : scope === "archived" ? "归档后的项目会出现在这里。" : "选择左侧项目查看任务，或创建一个新项目。"}</p></div>}
-        {selected && !selected.archived && <form className="mx-5 mb-5 flex gap-2 rounded-lg border border-dashed border-stone-300 px-3 py-2" onSubmit={(event) => { event.preventDefault(); if (quickTitle.trim()) newTask(quickTitle.trim()); }}><Plus className="mt-2 size-4 shrink-0 text-stone-400" /><Input aria-label="快速添加任务" value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder="写下下一步，按 Enter 补充详情…" className="border-0 shadow-none focus-visible:ring-0" /><Button type="submit" size="sm" variant="ghost" disabled={!quickTitle.trim()}>添加任务</Button></form>}
-        {selected && <footer className="flex items-center justify-between border-t border-stone-200 px-6 py-4 text-xs text-stone-400"><span>完成任务后记录成果与复盘，让进度可以回顾。</span><div className="flex gap-3"><button type="button" className="hover:text-emerald-800" onClick={() => { onChange((previous) => previous.map((board) => board.id === selected.id ? { ...board, archived: !board.archived } : board)); setSelectedId(""); setScope(selected.archived ? "all" : "archived"); clearFilters(); }}>{selected.archived ? "恢复项目" : "归档项目"}</button><button type="button" className="hover:text-red-700" onClick={() => setDeletion({ boardId: selected.id, name: selected.name })}>删除项目</button></div></footer>}
+        <div hidden={!filtersOpen} className="project-filter-row">
+          <select aria-label="筛选任务状态" className={selectClass} value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">全部状态</option>{Object.entries(boardStatuses).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
+          <select aria-label="筛选任务优先级" className={selectClass} value={priority} onChange={(event) => setPriority(event.target.value)}><option value="all">全部优先级</option>{Object.entries(boardPriorities).map(([id, item]) => <option key={id} value={id}>{item.short} · {item.label}</option>)}</select>
+          <select aria-label="筛选任务阶段" className={selectClass} value={phase} onChange={(event) => setPhase(event.target.value)}><option value="all">全部阶段</option>{phases.map((item) => <option key={item} value={item}>{item}</option>)}</select>
+          {filterCount > 0 && <Button variant="ghost" size="sm" onClick={clearFilters}>清除</Button>}
+        </div>
+
+        <div className="project-content-scroll">
+          {view === "table" ? <table className="project-task-table"><thead><tr><th className="w-9"><span className="sr-only">完成状态</span></th><th>任务</th><th className="w-44">阶段</th><th className="w-40">优先级</th><th className="w-28">状态</th><th className="w-32">日期</th><th className="w-28"><span className="sr-only">操作</span></th></tr></thead><tbody>
+            {rows.map(({ board, task }) => <TaskTableRow key={`${board.id}:${task.id}`} board={board} task={task} today={today} expanded={expanded.includes(task.id)} showProject={!selected} onExpand={() => setExpanded((previous) => previous.includes(task.id) ? previous.filter((id) => id !== task.id) : [...previous, task.id])} onEdit={() => setTaskEditor({ boardId: board.id, task })} onUpdate={(update) => updateTask(board.id, task.id, update)} actions={rowActions({ board, task })} />)}
+          </tbody></table> : <div className="project-kanban">{Object.entries(boardStatuses).map(([id, label]) => <section key={id} className="project-kanban-column"><h3><span className={`project-status-dot status-${id}`} />{label}<span className="ml-auto font-normal text-stone-400">{rows.filter(({ task }) => task.status === id).length}</span></h3>
+            {rows.filter(({ task }) => task.status === id).map(({ board, task }) => <article key={`${board.id}:${task.id}`} className="project-kanban-card"><p className="mb-2 truncate text-[11px] text-stone-400">{selected ? task.phase || "\u00a0" : board.name}</p><button type="button" onClick={() => setTaskEditor({ boardId: board.id, task })} className="text-left text-sm font-medium leading-6 hover:text-primary">{task.milestone && <Flag className="mr-1 inline size-3 text-amber-700" />}{task.title}</button><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><PriorityBadge priority={task.priority} /><TaskProgress task={task} /></div>{task.dueDate && <p className={`mt-3 text-xs tabular-nums ${isBoardTaskOverdue(task, today) ? "text-red-700" : "text-stone-400"}`}>{task.dueDate}</p>}<div className="mt-3 flex items-center gap-1 border-t border-stone-100 pt-2"><StatusControl task={task} onChange={(next) => updateTask(board.id, task.id, (previous) => setBoardTaskStatus(previous, next))} />{rowActions({ board, task })}</div></article>)}
+          </section>)}</div>}
+          {!rows.length && <div className="project-empty-tasks"><ListTodo className="mb-3 size-6 text-stone-300" /><p>{sourceRows.length ? "没有匹配任务" : "暂无任务"}</p>{(query || filterCount > 0) && <Button variant="ghost" size="sm" onClick={clearFilters}>清除筛选</Button>}</div>}
+          {selected && !selected.archived && <form className="project-quick-add" onSubmit={(event) => { event.preventDefault(); quickAdd(); }}><Plus className="size-4 text-stone-400" /><Input aria-label="快速添加任务" value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder="添加任务…" className="h-8 rounded-none border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0" /><Button type="submit" size="icon-sm" variant="ghost" aria-label="添加任务" disabled={!quickTitle.trim()}><Plus className="size-4" /></Button></form>}
+        </div>
+        <footer className="project-footer"><span>{rows.length} 项{filterCount > 0 || query ? ` / ${sourceRows.length}` : ""}</span>{selected && <div className="ml-auto flex gap-4"><button type="button" onClick={() => { onChange((previous) => previous.map((board) => board.id === selected.id ? { ...board, archived: !board.archived } : board)); setSelectedId(""); setScope(selected.archived ? "all" : "archived"); clearFilters(); }}>{selected.archived ? "恢复项目" : "归档项目"}</button><button type="button" onClick={() => setDeletion({ boardId: selected.id, name: selected.name })}>删除项目</button></div>}</footer>
       </>}
     </div>
     {projectEditor && <ProjectBoardEditor key={projectEditor.board?.id ?? projectEditor.template ?? "new"} {...projectEditor} onSave={saveProject} onClose={() => setProjectEditor(null)} />}
     {taskEditor && <BoardTaskEditor key={taskEditor.task.id} task={taskEditor.task} projectName={boards.find((board) => board.id === taskEditor.boardId)?.name ?? "项目"} onSave={saveTask} onClose={() => setTaskEditor(null)} />}
-    <ConfirmDialog open={Boolean(deletion)} onOpenChange={(open) => { if (!open) setDeletion(null); }} title={deletion?.taskId ? "删除这项任务？" : "删除整个项目？"} description={`“${deletion?.name ?? ""}”${deletion?.taskId ? "将从任务表移除。" : "及其全部任务将被移除。暂时结束的项目可以使用归档保留记录。"}可使用工作台顶部的撤销恢复。`} confirmLabel="确认删除" onConfirm={() => { if (!deletion) return; onChange((previous) => deletion.taskId ? previous.map((board) => board.id === deletion.boardId ? { ...board, tasks: board.tasks.filter((task) => task.id !== deletion.taskId) } : board) : previous.filter((board) => board.id !== deletion.boardId)); setDeletion(null); }} />
+    <ConfirmDialog open={Boolean(deletion)} onOpenChange={(open) => { if (!open) setDeletion(null); }} title={deletion?.taskId ? "删除这项任务？" : "删除整个项目？"} description={`“${deletion?.name ?? ""}”${deletion?.taskId ? "将被删除。" : "及其全部任务将被删除。"}`} confirmLabel="确认删除" onConfirm={() => { if (!deletion) return; onChange((previous) => deletion.taskId ? previous.map((board) => board.id === deletion.boardId ? { ...board, tasks: board.tasks.filter((task) => task.id !== deletion.taskId) } : board) : previous.filter((board) => board.id !== deletion.boardId)); setDeletion(null); }} />
   </section>;
 }
 
+function StatusControl({ task, onChange }: { task: BoardTask; onChange: (status: BoardStatus) => void }) {
+  return <span className="project-status-control"><span className={`project-status-dot status-${task.status}`} /><select aria-label={`状态：${task.title}`} value={task.status} onChange={(event) => onChange(event.target.value as BoardStatus)}>{Object.entries(boardStatuses).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select><ChevronDown className="size-3 text-stone-400" /></span>;
+}
+
 function TaskTableRow({ board, task, today, expanded, showProject, onExpand, onEdit, onUpdate, actions }: TaskRow & { today: string; expanded: boolean; showProject: boolean; onExpand: () => void; onEdit: () => void; onUpdate: (update: (task: BoardTask) => BoardTask) => void; actions: React.ReactNode }) {
+  const details = ([['content', '内容'], ['notes', '备注与资料'], ['review', '成果与复盘']] as const).filter(([field]) => task[field].trim());
   return <>
     <tr className={task.status === "done" ? "is-completed" : ""}>
-      <td><input type="checkbox" aria-label={`完成任务：${task.title}`} checked={task.status === "done"} onChange={(event) => onUpdate((previous) => setBoardTaskStatus(previous, event.target.checked ? "done" : "todo"))} className="size-4 accent-emerald-800" /></td>
-      <td><div className="flex items-start gap-1.5"><button type="button" aria-label={`${expanded ? "收起" : "展开"}任务：${task.title}`} aria-expanded={expanded} onClick={onExpand} className="mt-0.5 rounded p-0.5 text-stone-400 hover:bg-stone-100">{expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}</button><div className="min-w-0"><button type="button" className={`break-words text-left text-sm font-medium leading-6 hover:text-emerald-800 ${task.status === "done" ? "text-stone-500 line-through" : "text-stone-800"}`} onClick={onEdit}>{task.milestone && <Flag aria-label="里程碑" className="mr-1 inline size-3 text-amber-700" />}{task.title}</button><div className="mt-1 flex flex-wrap items-center gap-2">{showProject && <span className="max-w-32 truncate text-[11px] text-stone-400" title={board.name}>{board.name}</span>}<TaskProgress task={task} /></div></div></div></td>
-      <td><p className="max-w-40 truncate text-xs text-stone-600" title={task.phase}>{task.phase || "—"}</p><div className="mt-1 flex max-w-44 flex-wrap gap-1">{task.tags.slice(0, 3).map((tag) => <span key={tag} className="max-w-28 truncate rounded bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-500" title={tag}>{tag}</span>)}{task.tags.length > 3 && <span className="text-[10px] text-stone-400" title={task.tags.slice(3).join("、")}>+{task.tags.length - 3}</span>}</div></td>
-      <td><select aria-label={`优先级：${task.title}`} className={`max-w-40 rounded-md border px-1.5 py-1.5 text-[11px] ${boardPriorities[task.priority].className}`} value={task.priority} onChange={(event) => onUpdate((previous) => ({ ...previous, priority: event.target.value as BoardPriority }))}>{Object.entries(boardPriorities).map(([id, item]) => <option key={id} value={id}>{item.short} · {item.label}</option>)}</select></td>
-      <td><select aria-label={`状态：${task.title}`} value={task.status} onChange={(event) => onUpdate((previous) => setBoardTaskStatus(previous, event.target.value as BoardStatus))} className={`rounded-md border border-transparent bg-transparent p-1 text-xs ${task.status === "done" ? "text-emerald-700" : task.status === "blocked" ? "text-amber-700" : task.status === "doing" ? "text-blue-700" : "text-stone-500"}`}>{Object.entries(boardStatuses).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></td>
-      <td className="whitespace-nowrap text-[11px] tabular-nums"><p className="text-stone-400">{task.plannedDate ? `计划 ${task.plannedDate.slice(5).replace("-", "/")}` : "未安排"}</p><p className={`mt-1 ${isBoardTaskOverdue(task, today) ? "font-medium text-red-700" : "text-stone-500"}`}>{task.dueDate ? `${isBoardTaskOverdue(task, today) ? "逾期" : "截止"} ${task.dueDate}` : "无截止日期"}</p></td>
+      <td><input type="checkbox" aria-label={`完成任务：${task.title}`} checked={task.status === "done"} onChange={(event) => onUpdate((previous) => setBoardTaskStatus(previous, event.target.checked ? "done" : "todo"))} className="size-3.5 accent-emerald-800" /></td>
+      <td><div className="flex items-start gap-2"><button type="button" aria-label={`${expanded ? "收起" : "展开"}任务：${task.title}`} aria-expanded={expanded} onClick={onExpand} className="project-expand-button">{expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}</button><div className="min-w-0"><button type="button" className={`project-task-title ${task.status === "done" ? "line-through" : ""}`} onClick={onEdit}>{task.milestone && <Flag aria-label="里程碑" className="mr-1.5 inline size-3 text-amber-700" />}{task.title}</button><div className="mt-1 flex flex-wrap items-center gap-2 empty:hidden">{showProject && <span className="max-w-40 truncate text-[11px] text-stone-400">{board.name}</span>}<TaskProgress task={task} /></div></div></div></td>
+      <td><span className="block max-w-40 truncate text-xs text-stone-500" title={task.phase}>{task.phase || "—"}</span>{task.tags.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{task.tags.slice(0, 2).map((tag) => <span key={tag} className="project-tag" title={tag}>{tag}</span>)}{task.tags.length > 2 && <span className="text-[10px] text-stone-400" title={task.tags.slice(2).join("、")}>+{task.tags.length - 2}</span>}</div>}</td>
+      <td><span className={`project-priority-control priority-${task.priority}`}><select aria-label={`优先级：${task.title}`} value={task.priority} onChange={(event) => onUpdate((previous) => ({ ...previous, priority: event.target.value as BoardPriority }))}>{Object.entries(boardPriorities).map(([id, item]) => <option key={id} value={id}>{item.short} · {item.label}</option>)}</select><ChevronDown className="size-3" /></span></td>
+      <td><StatusControl task={task} onChange={(next) => onUpdate((previous) => setBoardTaskStatus(previous, next))} /></td>
+      <td className="whitespace-nowrap text-xs tabular-nums"><span title="截止日期" className={isBoardTaskOverdue(task, today) ? "text-red-700" : "text-stone-500"}>{task.dueDate ? task.dueDate.slice(5).replace("-", "/") : "—"}</span>{task.plannedDate && <span className="mt-1 block text-[10px] text-stone-400" title="计划执行日期">计划 {task.plannedDate.slice(5).replace("-", "/")}</span>}</td>
       <td>{actions}</td>
     </tr>
-    {expanded && <tr><td colSpan={7} className="!bg-stone-50/70 !px-8 !py-5"><div className="grid grid-cols-3 gap-6">{([['content', '任务内容'], ['notes', '备注与资料'], ['review', '成果与复盘']] as const).map(([field, label]) => <div key={field} className="min-w-0"><p className="mb-3 text-[11px] font-semibold text-stone-500">{label}</p><AnnotatedContent value={task[field]} onChange={(value) => onUpdate((previous) => ({ ...previous, [field]: value }))} /></div>)}</div><Button size="sm" variant="ghost" className="mt-4 text-emerald-800" onClick={onEdit}>编辑内容与标注 →</Button></td></tr>}
+    {expanded && <tr><td colSpan={7} className="project-expanded-cell">{details.length ? <div className="project-task-details" style={{ gridTemplateColumns: `repeat(${details.length}, minmax(0, 1fr))` }}>{details.map(([field, label]) => <div key={field} className="min-w-0"><span className="project-detail-label">{label}</span><AnnotatedContent value={task[field]} onChange={(value) => onUpdate((previous) => ({ ...previous, [field]: value }))} /></div>)}</div> : null}<Button size="sm" variant="ghost" className="mt-1 text-primary" onClick={onEdit}>{details.length ? "编辑" : "添加内容"}</Button></td></tr>}
   </>;
 }

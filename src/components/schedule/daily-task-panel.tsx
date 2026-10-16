@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CalendarDays, CheckCircle, ChevronDown, GripVertical, ListTodo, Plus, RotateCcw } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle, ChevronDown, GripVertical, ListTodo, Play, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import type { DailyTaskSortMode, LongTask, ScheduleEvent, TaskType } from "@/lib/types";
 
 type DailyTaskPanelProps = {
+  onStartFocus?: (task: LongTask) => void;
   tasks: LongTask[];
   events: ScheduleEvent[];
   onAddTask: (name: string, dueDate: string, taskType: TaskType) => void;
@@ -92,6 +93,7 @@ function formatProcessedTime(task: LongTask) {
 }
 
 export function DailyTaskPanel({
+  onStartFocus,
   tasks,
   events,
   onAddTask,
@@ -521,11 +523,12 @@ export function DailyTaskPanel({
                   {task.plannedTime ? ` ${task.plannedTime}` : ""}
                 </button>
               </div>
+              {onStartFocus && <Button type="button" variant="ghost" size="icon-sm" aria-label={`专注任务：${task.name}`} title="开始 25 分钟专注" onClick={() => onStartFocus(task)}><Play className="size-3.5 text-stone-500" /></Button>}
             </article>
           ))
         ) : (
           <p className="rounded-lg border border-dashed border-stone-200 px-3 py-3 text-xs text-stone-500">
-            暂无日常任务。把今天需要落地执行的事放在这里。
+            暂无日常任务
           </p>
         )}
       </div>

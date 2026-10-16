@@ -26,8 +26,8 @@ export function SortableDashboardSections({ sections, order, onOrderChange }: {
   }
 
   return <>
-    <div className="flex items-center justify-between gap-2 border-b border-stone-200 px-4 py-2">
-      <p className="text-[11px] text-stone-500">{arranging ? "拖动手柄排序，也可用上下按钮" : "按自己的习惯安排模块顺序"}</p>
+    <div className="dashboard-layout-toolbar" data-arranging={arranging}>
+      {arranging && <span className="text-xs text-stone-500">模块顺序</span>}
       <div className="flex shrink-0 gap-1">
         {arranging && <Button size="icon-sm" variant="ghost" title="恢复默认顺序" aria-label="恢复默认模块顺序" onClick={() => { onOrderChange([...defaultDashboardSectionOrder]); setAnnouncement("已恢复默认模块顺序"); }}><RotateCcw className="size-3.5" /></Button>}
         <Button size="sm" variant={arranging ? "secondary" : "ghost"} aria-pressed={arranging} onClick={() => { setArranging(!arranging); dragging.current = null; setDropTarget(null); }}>{arranging ? <Check className="size-3.5" /> : <Settings2 className="size-3.5" />}{arranging ? "完成排序" : "调整顺序"}</Button>

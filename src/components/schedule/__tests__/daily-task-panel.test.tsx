@@ -39,6 +39,15 @@ describe("DailyTaskPanel completion archive", () => {
     return { ...render(<DailyTaskPanel {...props} />), onUpdateTask, item, props };
   }
 
+  it("starts focus from the daily task without completing it", () => {
+    const { props, item, rerender } = renderDateEditor(false);
+    const onStartFocus = vi.fn();
+    rerender(<DailyTaskPanel {...props} onStartFocus={onStartFocus} />);
+    fireEvent.click(screen.getByRole("button", { name: "专注任务：准备汇报" }));
+    expect(onStartFocus).toHaveBeenCalledWith(item);
+    expect(props.onToggleTask).not.toHaveBeenCalled();
+  });
+
   it("reschedules a today-focus task to an arbitrary date two weeks later", () => {
     const { onUpdateTask, rerender, item, props } = renderDateEditor();
     const focus = screen.getByText("今日三件事").parentElement!.parentElement!;

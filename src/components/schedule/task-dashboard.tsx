@@ -56,6 +56,7 @@ import { cn } from "@/lib/utils";
 type TaskDashboardProps = {
   projectBoardsPanel?: React.ReactNode;
   executionPanel?: React.ReactNode;
+  onStartTaskFocus?: (task: LongTask) => void;
   userId?: string;
   logsReady?: boolean;
   openCollectionRequest?: { id: string; kind: "annual" | "project" | "shopping"; token: number };
@@ -305,6 +306,7 @@ function isValidTime(value: string) {
 export function TaskDashboard({
   projectBoardsPanel,
   executionPanel,
+  onStartTaskFocus,
   userId,
   logsReady,
   openCollectionRequest,
@@ -1147,7 +1149,7 @@ export function TaskDashboard({
   }
 
   return (
-    <aside className="module-shell">
+    <aside className="module-shell task-console">
       <div className="module-header px-6 py-5">
         <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-stone-900">
           <ListTodo className="h-5 w-5 text-primary" />
@@ -1372,6 +1374,7 @@ export function TaskDashboard({
         sections={[
           { id: "daily", content: (
       <DailyTaskPanel
+        onStartFocus={onStartTaskFocus}
         tasks={tasks}
         events={events}
         onAddTask={(name, dueDate, taskType) => onAddTask(name, dueDate, taskType)}

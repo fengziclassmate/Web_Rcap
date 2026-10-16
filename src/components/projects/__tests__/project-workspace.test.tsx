@@ -62,6 +62,7 @@ describe("research and learning workspace", () => {
     const board = createProjectBoard("research", "城市用地诊断");
     board.tasks[0].status = "blocked";
     render(<Workspace initial={[board]} />);
+    fireEvent.click(screen.getByRole("button", { name: "筛选" }));
     fireEvent.change(screen.getByLabelText("筛选任务状态"), { target: { value: "blocked" } });
     expect(screen.getByRole("button", { name: board.tasks[0].title })).toBeTruthy();
     expect(screen.queryByRole("button", { name: board.tasks[1].title })).toBeNull();
@@ -82,6 +83,28 @@ describe("research and learning workspace", () => {
     expect(input.value).toBe("先==分析==，再实现");
     await waitFor(() => expect(input.selectionStart).toBe(3));
     expect(screen.getByText("分析").tagName).toBe("MARK");
+  });
+
+  it("quickly adds a task and shows only filled detail fields", () => {
+    const board = createProjectBoard("blank", "城市用地诊断");
+    render(<Workspace initial={[board]} />);
+    fireEvent.click(within(screen.getByRole("navigation", { name: "项目列表" })).getByRole("button", { name: /城市用地诊断/ }));
+    const input = screen.getByRole("textbox", { name: "快速添加任务" });
+    fireEvent.change(input, { target: { value: "核对分类口径" } });
+    fireEvent.submit(input.closest("form")!);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "展开任务：核对分类口径" }));
+    expect(screen.getByRole("button", { name: "添加内容" })).toBeTruthy();
+    expect(screen.queryByText("尚未填写内容")).toBeNull();
+    expect(screen.queryByText("未拆分")).toBeNull();
+  });
+
+  it("starts focus from the project task action", () => {
+    const board = createProjectBoard("research", "城市用地诊断");
+    const onStartFocus = vi.fn();
+    render(<ProjectWorkspace boards={[board]} onChange={vi.fn()} onCopyToToday={vi.fn()} onStartFocus={onStartFocus} />);
+    fireEvent.click(screen.getByRole("button", { name: `专注任务：${board.tasks[0].title}` }));
+    expect(onStartFocus).toHaveBeenCalledWith(board, board.tasks[0]);
   });
 
   it("renders raw HTML and unsafe links as text while allowing safe resource links", () => {

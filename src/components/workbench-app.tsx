@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { FloatingScheduleCard } from "@/components/schedule/floating-schedule-card";
 import { useScheduleSync } from "@/hooks/useScheduleSync";
 import { useUndoHistory } from "@/hooks/useUndoHistory";
+import { useFocusTimer } from "@/hooks/useFocusTimer";
+import { projectFocusTarget, type FocusTarget } from "@/lib/execution-insights";
 import { expandScheduleEvents } from "@/lib/recurrence";
 
 /**
@@ -132,6 +134,7 @@ export function WorkbenchApp() {
 
   const timeGranularity = dashboardUiPreferences.timeGranularity;
   const [user, setUser] = useState<User | null>(null);
+  const focus = useFocusTimer(user?.id ?? "");
   const [authEmail, setAuthEmail] = useState("");
   const [sendingLink, setSendingLink] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
@@ -228,14 +231,23 @@ export function WorkbenchApp() {
 
   function copyBoardTaskToToday(board: ProjectBoard, task: BoardTask) {
     const id = `board-copy:${task.id}`;
-    if (tasks.some((existing) => existing.id === id)) { toast.info("此任务已复制到待办，可在个人日程中查看。"); return; }
+    if (tasks.some((existing) => existing.id === id)) { toast.info("已在今日待办中"); return; }
     const priority = { p1: "紧急且重要", p2: "不紧急重要", p3: "紧急不重要", p4: "不紧急不重要" } as const;
     setTasks((previous) => [...previous, {
       id, name: task.title, dueDate: todayISO(), createdAt: new Date().toISOString(), done: false,
       notes: `来源：${board.name} · ${boardPriorities[task.priority].label}\n${task.content}\n${task.notes}`,
       precautions: [], completionLog: "", priority: priority[task.priority], subtasks: [], taskType: "daily", isTodayFocus: true,
     }]);
-    toast.success("已复制到今日待办。两处记录可分别编辑和完成。");
+    toast.success("已复制到今日待办");
+  }
+
+  function startTaskFocus(target: FocusTarget) {
+    if (focus.state.active) toast.info("当前专注尚未结束");
+    else if (!focus.start({ ...target, goalMinutes: 25 })) return;
+    setDashboardUiPreferences((previous) => ({ ...previous, executionSectionOpen: true }));
+    setActiveModule("schedule");
+    setOpenBoardRequest(undefined);
+    requestAnimationFrame(() => document.querySelector('[aria-label="时间与专注"]')?.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" }));
   }
 
   async function refreshLogs(currentUser: User) {
@@ -1114,7 +1126,8 @@ export function WorkbenchApp() {
                       onOpenChange={(projectBoardsSectionOpen) => setDashboardUiPreferences((previous) => ({ ...previous, projectBoardsSectionOpen }))}
                       onOpenWorkspace={(boardId) => setOpenBoardRequest({ boardId: boardId ?? "", token: Date.now() })} />
                   )}
-                  executionPanel={<ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />}
+                  executionPanel={<ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} boards={projectBoards} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />}
+                  onStartTaskFocus={(task) => startTaskFocus({ id: `task:${task.id}`, title: task.name, category: "任务" })}
                   userId={user.id}
                   logsReady={logReady && logHistoryAvailable}
                   openCollectionRequest={openCollectionRequest}
@@ -1192,13 +1205,13 @@ export function WorkbenchApp() {
         </div>
       </div>
       <Dialog open={Boolean(openBoardRequest)} onOpenChange={(open) => { if (!open) setOpenBoardRequest(undefined); }}>
-        <DialogContent className="h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] sm:max-w-[1800px] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0">
-          <DialogHeader className="border-b border-stone-200 px-5 py-3 pr-12">
+        <DialogContent className="project-dialog h-[calc(100dvh-3rem)] w-[calc(100vw-3rem)] sm:max-w-[1680px] grid-rows-[minmax(0,1fr)] gap-0 overflow-hidden p-0">
+          <DialogHeader className="sr-only">
             <DialogTitle>科研与自学任务表</DialogTitle>
             <DialogDescription>按项目安排任务、标注内容与记录成果。关闭后回到任务控制台。</DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 overflow-auto">
-            {openBoardRequest && <ProjectWorkspace key={`${user.id}:${openBoardRequest.token}`} boards={projectBoards} onChange={setProjectBoards} onCopyToToday={copyBoardTaskToToday} initialSelection={openBoardRequest} />}
+          <div className="h-full min-h-0 overflow-hidden">
+            {openBoardRequest && <ProjectWorkspace key={`${user.id}:${openBoardRequest.token}`} boards={projectBoards} onChange={setProjectBoards} onCopyToToday={copyBoardTaskToToday} onStartFocus={(board, task) => startTaskFocus(projectFocusTarget(board, task))} initialSelection={openBoardRequest} />}
           </div>
         </DialogContent>
       </Dialog>

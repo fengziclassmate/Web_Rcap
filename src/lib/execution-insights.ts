@@ -3,11 +3,12 @@ import { expandScheduleEvents } from "@/lib/recurrence";
 import { splitScheduleEventByDay } from "@/lib/schedule-layout";
 import { eventTimingsInRange } from "@/lib/event-timing";
 import type { LongTask, ScheduleEvent } from "@/lib/types";
+import type { BoardTask, ProjectBoard } from "@/lib/project-boards";
 
-export type FocusTarget = { id: string; title: string; category: string };
-export type FocusSession = FocusTarget & { startedAt: number; endedAt: number; sessionId: string };
+export type FocusTarget = { id: string; title: string; category: string; goalMinutes?: number };
+export type FocusSession = FocusTarget & { startedAt: number; endedAt: number; sessionId: string; runId?: string };
 export type FocusState = {
-  active: (FocusTarget & { startedAt: number | null; elapsedMs: number }) | null;
+  active: (FocusTarget & { startedAt: number | null; elapsedMs: number; runId?: string }) | null;
   sessions: FocusSession[];
 };
 export const EMPTY_FOCUS: FocusState = { active: null, sessions: [] };
@@ -23,7 +24,7 @@ export function pauseFocus(state: FocusState, now: number, sessionId: string): F
   return {
     active: { ...active, startedAt: null, elapsedMs: elapsedFocusMs(state, endedAt) },
     sessions: endedAt > active.startedAt
-      ? [...state.sessions, { id: active.id, title: active.title, category: active.category, startedAt: active.startedAt, endedAt, sessionId }]
+      ? [...state.sessions, { id: active.id, title: active.title, category: active.category, startedAt: active.startedAt, endedAt, sessionId, ...(active.runId ? { runId: active.runId } : {}), ...(active.goalMinutes ? { goalMinutes: active.goalMinutes } : {}) }]
       : state.sessions,
   };
 }
@@ -33,12 +34,58 @@ export function normalizeFocusState(value: unknown): FocusState {
   const state = value as FocusState;
   const targetValid = (target: FocusTarget) => target && typeof target.id === "string" && typeof target.title === "string" && typeof target.category === "string";
   const timeValid = (time: unknown): time is number => typeof time === "number" && Number.isFinite(time) && time >= 0;
+  function clean<T extends FocusTarget & { runId?: string }>(target: T): T {
+    const { goalMinutes, runId, ...rest } = target;
+    return { ...rest,
+      ...(Number.isInteger(goalMinutes) && goalMinutes! > 0 && goalMinutes! <= 240 ? { goalMinutes } : {}),
+      ...(typeof runId === "string" && runId ? { runId } : {}),
+    } as T;
+  }
   return {
     active: state.active && targetValid(state.active) && timeValid(state.active.elapsedMs)
-      && (state.active.startedAt === null || timeValid(state.active.startedAt)) ? state.active : null,
+      && (state.active.startedAt === null || timeValid(state.active.startedAt)) ? clean(state.active) : null,
     sessions: Array.isArray(state.sessions) ? state.sessions.filter((session) => targetValid(session)
-      && typeof session.sessionId === "string" && timeValid(session.startedAt) && timeValid(session.endedAt) && session.endedAt > session.startedAt) : [],
+      && typeof session.sessionId === "string" && timeValid(session.startedAt) && timeValid(session.endedAt) && session.endedAt > session.startedAt).map(clean) : [],
   };
+}
+
+export function projectFocusTarget(board: ProjectBoard, task: BoardTask): FocusTarget {
+  return { id: `board:${board.id}:${task.id}`, title: task.title, category: board.name };
+}
+
+export function focusTargets(events: ScheduleEvent[], tasks: LongTask[], boards: ProjectBoard[], today: string) {
+  return [
+    ...tasks.filter((task) => task.taskType === "daily" && !task.done && !task.abandonedAt && task.dueDate <= today)
+      .sort((a, b) => Number(b.isTodayFocus) - Number(a.isTodayFocus))
+      .map((task) => ({ id: `task:${task.id}`, title: task.name, category: "任务", group: "今日待办" })),
+    ...eventsInDays(events, today, today).filter((event) => !event.isCompleted)
+      .map((event) => ({ id: `event:${event.id}`, title: event.title, category: event.category, group: "今日日程" })),
+    ...boards.filter((board) => !board.archived).flatMap((board) => board.tasks.filter((task) => task.status !== "done")
+      .map((task) => ({ ...projectFocusTarget(board, task), group: "项目任务" }))),
+    ...tasks.filter((task) => task.taskType !== "daily" && !task.done && !task.abandonedAt)
+      .map((task) => ({ id: `task:${task.id}`, title: task.name, category: "任务", group: "其他任务" })),
+    { id: "free", title: "自由专注", category: "自由专注", group: "自由专注" },
+  ];
+}
+
+export function focusHistory(sessions: FocusSession[]) {
+  const runs = new Map<string, FocusSession & { durationMs: number }>();
+  for (const session of sessions) {
+    const key = session.runId ?? session.sessionId;
+    const previous = runs.get(key);
+    runs.set(key, previous ? { ...previous, endedAt: Math.max(previous.endedAt, session.endedAt), startedAt: Math.min(previous.startedAt, session.startedAt), durationMs: previous.durationMs + session.endedAt - session.startedAt }
+      : { ...session, durationMs: session.endedAt - session.startedAt });
+  }
+  return [...runs.values()].sort((a, b) => b.endedAt - a.endedAt);
+}
+
+export function focusDaySummary(state: FocusState, now: Date) {
+  const start = parseISO(format(now, "yyyy-MM-dd")).getTime();
+  const end = addDays(new Date(start), 1).getTime();
+  let durationMs = state.sessions.reduce((total, session) => total + Math.max(0, Math.min(end, session.endedAt) - Math.max(start, session.startedAt)), 0);
+  if (state.active?.startedAt != null) durationMs += Math.max(0, now.getTime() - Math.max(start, state.active.startedAt));
+  const completed = focusHistory(state.sessions).filter((run) => run.endedAt >= start && run.endedAt < end && (!state.active?.runId || run.runId !== state.active.runId)).length;
+  return { minutes: durationMs / 60000, completed };
 }
 
 // Include the previous day so overnight occurrences contribute to today's capacity.

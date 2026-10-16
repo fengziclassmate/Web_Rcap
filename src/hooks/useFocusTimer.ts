@@ -28,17 +28,20 @@ export function useFocusTimer(userId: string) {
   const snapshot = useCallback(() => read(key), [key]);
   const state = useSyncExternalStore(subscribe, snapshot, () => EMPTY_FOCUS);
   function update(transform: (current: FocusState) => FocusState) {
-    const next = transform(read(key));
+    const current = read(key);
+    const next = transform(current);
+    if (next === current) return false;
     try {
       const raw = JSON.stringify(next);
       localStorage.setItem(key, raw);
       cache.set(key, { raw, state: next });
       window.dispatchEvent(new Event(changed));
-    } catch { toast.error("专注记录保存失败，请检查浏览器存储空间后重试"); }
+      return true;
+    } catch { toast.error("专注记录保存失败，请检查浏览器存储空间后重试"); return false; }
   }
   return {
     state,
-    start: (target: FocusTarget) => update((current) => current.active ? current : { ...current, active: { ...target, startedAt: Date.now(), elapsedMs: 0 } }),
+    start: (target: FocusTarget) => update((current) => current.active ? current : { ...current, active: { ...target, runId: createId("focus-run"), startedAt: Date.now(), elapsedMs: 0 } }),
     pause: () => update((current) => pauseFocus(current, Date.now(), createId("focus"))),
     resume: () => update((current) => current.active && current.active.startedAt === null ? { ...current, active: { ...current.active, startedAt: Date.now() } } : current),
     finish: () => update((current) => ({ ...pauseFocus(current, Date.now(), createId("focus")), active: null })),
