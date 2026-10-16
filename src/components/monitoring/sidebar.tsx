@@ -7,12 +7,14 @@ import {
   CalendarDays,
   LayoutDashboard,
   NotebookPen,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
 export type MonitoringModuleId =
   | "schedule"
+  | "projects"
   | "logs";
 
 const items: Array<{
@@ -22,6 +24,7 @@ const items: Array<{
   icon: ReactNode;
 }> = [
   { id: "schedule", label: "个人日程", group: "Today", icon: <CalendarDays className="h-4 w-4" aria-hidden /> },
+  { id: "projects", label: "科研与自学", group: "Projects", icon: <BookOpen className="h-4 w-4" aria-hidden /> },
   { id: "logs", label: "动态日志", group: "Journal", icon: <NotebookPen className="h-4 w-4" aria-hidden /> },
 ];
 

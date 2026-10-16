@@ -39,3 +39,16 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=你的 anon public key
 - 重新部署。
 
 完成后，每个用户通过邮箱登录，都会只读写自己的 `schedule_data` 行，账号彼此隔离。
+
+## 科研与自学任务表（2026-10-16）
+
+现有项目需执行 `supabase/migrations/20261016090000_add_project_boards.sql`，为 `schedule_data` 增加 `project_boards` JSONB 字段，继续使用现有 RLS 策略。建议先迁移数据库再部署代码。
+
+若使用 SQL Editor，本次增量迁移为：
+
+```sql
+alter table public.schedule_data
+  add column if not exists project_boards jsonb not null default '[]'::jsonb;
+```
+
+代码先上线时会兼容尚未迁移的数据库：保留项目本机草稿、显示迁移提示，并继续同步原有日程字段。执行迁移后点击工作台顶部的重试，即可提交待同步项目。首次本机登录与真实云端同步需要在配置环境变量和测试账号后验收。

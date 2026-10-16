@@ -1,5 +1,6 @@
 import type { FootprintItem, AnnualTask, DashboardUiPreferences, LongTask, ProjectCheckin, ScheduleEvent, ShoppingItem } from "@/lib/types";
 import type { Achievement } from "@/lib/achievements";
+import { normalizeProjectBoards, type ProjectBoard } from "@/lib/project-boards";
 import {
   defaultDashboardUiPreferences,
   normalizeAchievements,
@@ -23,6 +24,7 @@ export type PersistedSchedulePayload = {
   project_checkins: ProjectCheckin[];
   footprints: FootprintItem[];
   achievements: Achievement[];
+  project_boards?: ProjectBoard[];
   ui_preferences: DashboardUiPreferences;
 };
 
@@ -43,6 +45,7 @@ export function normalizePersistedSchedulePayload(
     project_checkins: normalizeProjectCheckins(value.project_checkins),
     footprints: normalizeFootprints(value.footprints),
     achievements: normalizeAchievements(value.achievements),
+    project_boards: normalizeProjectBoards(value.project_boards),
     ui_preferences: normalizeDashboardUiPreferences(value.ui_preferences),
   };
 }

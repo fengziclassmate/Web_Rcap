@@ -8,7 +8,7 @@ describe("MonitoringSidebar", () => {
     window.localStorage.clear();
   });
 
-  it("only exposes the maintained schedule and log modules", () => {
+  it("exposes the schedule, project workspace and log modules", () => {
     const onChange = vi.fn();
     const { container } = render(<MonitoringSidebar active="schedule" onChange={onChange} />);
 
@@ -23,6 +23,8 @@ describe("MonitoringSidebar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /动态日志/ }));
     expect(onChange).toHaveBeenCalledWith("logs");
+    fireEvent.click(screen.getByRole("button", { name: /科研与自学/ }));
+    expect(onChange).toHaveBeenCalledWith("projects");
   });
 
   it("restores and saves the centered reminder", async () => {

@@ -67,6 +67,7 @@ import { supabase } from "@/lib/supabase";
 import { saveLogPost, deleteLogPost, retryLogImageCleanup } from "@/lib/log-mutations";
 import { toast } from "sonner";
 import { todayISO } from "@/lib/date-utils";
+import { boardPriorities, type ProjectBoard, type BoardTask } from "@/lib/project-boards";
 import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
 import type { Achievement } from "@/lib/achievements";
 import { EfficiencyAnalysisDialog } from "@/components/llm/analysis-dialog";
@@ -85,6 +86,7 @@ const LogPage = dynamic(() => import("@/components/logs/log-page").then((module)
   ssr: false,
   loading: ModuleLoadingState,
 });
+const ProjectWorkspace = dynamic(() => import("@/components/projects/project-workspace").then((module) => module.ProjectWorkspace), { loading: ModuleLoadingState });
 function ModuleLoadingState() {
   return (
     <section className="min-h-[520px] animate-pulse rounded-2xl border border-stone-200 bg-white/70 p-6">
@@ -100,6 +102,8 @@ function getCurrentWeekStart() {
 }
 
 export function WorkbenchApp() {
+  const [projectBoards, setProjectBoards] = useState<ProjectBoard[]>([]);
+  const [openBoardRequest, setOpenBoardRequest] = useState<{ boardId: string; taskId?: string; token: number }>();
   const [openCollectionRequest, setOpenCollectionRequest] = useState<{ id: string; kind: "annual" | "project" | "shopping"; token: number }>();
   const [openTaskRequest, setOpenTaskRequest] = useState<{ id: string; token: number }>();
   const [openEventRequest, setOpenEventRequest] = useState<{ id: string; token: number }>();
@@ -149,10 +153,12 @@ export function WorkbenchApp() {
       project_checkins: projectCheckins,
       footprints,
       achievements,
+      project_boards: projectBoards,
       ui_preferences: dashboardUiPreferences,
     }),
     [
       achievements,
+      projectBoards,
       annualTasks,
       dashboardUiPreferences,
       events,
@@ -168,6 +174,7 @@ export function WorkbenchApp() {
     setEvents(value.events); setTasks(value.tasks); setAnnualTasks(value.annual_tasks);
     setShoppingItems(value.shopping_items); setProjectCheckins(value.project_checkins);
     setFootprints(value.footprints); setAchievements(value.achievements);
+    setProjectBoards(value.project_boards ?? []);
     setDashboardUiPreferences(value.ui_preferences);
   }, []);
   const sync = useScheduleSync(user?.id ?? null, persistedPayload, hydrateSchedule);
@@ -176,19 +183,23 @@ export function WorkbenchApp() {
   useEffect(() => { currentUserId.current = user?.id ?? null; }, [user?.id]);
 
   const undoSnapshot = useMemo(() => {
-    const value = normalizePersistedSchedulePayload({ events, tasks, annual_tasks: annualTasks, shopping_items: shoppingItems, project_checkins: projectCheckins, footprints, achievements })!;
-    return { events: value.events, tasks: value.tasks, annualTasks: value.annual_tasks, shoppingItems: value.shopping_items, projectCheckins: value.project_checkins, footprints: value.footprints, achievements: value.achievements };
-  }, [events, tasks, annualTasks, shoppingItems, projectCheckins, footprints, achievements]);
+    const value = normalizePersistedSchedulePayload({ events, tasks, annual_tasks: annualTasks, shopping_items: shoppingItems, project_checkins: projectCheckins, footprints, achievements, project_boards: projectBoards })!;
+    return { events: value.events, tasks: value.tasks, annualTasks: value.annual_tasks, shoppingItems: value.shopping_items, projectCheckins: value.project_checkins, footprints: value.footprints, achievements: value.achievements, projectBoards: value.project_boards ?? [] };
+  }, [events, tasks, annualTasks, shoppingItems, projectCheckins, footprints, achievements, projectBoards]);
   const restoreSnapshot = useCallback((snapshot: typeof undoSnapshot) => {
     setEvents(snapshot.events); setTasks(snapshot.tasks); setAnnualTasks(snapshot.annualTasks);
     setShoppingItems(snapshot.shoppingItems); setProjectCheckins(snapshot.projectCheckins);
     setFootprints(snapshot.footprints); setAchievements(snapshot.achievements);
+    setProjectBoards(snapshot.projectBoards);
   }, []);
   const history = useUndoHistory(undoSnapshot, restoreSnapshot, dataReady && user ? `${user.id}:${historyRevision}` : null);
 
   function locateSearchResult(result: SearchResult) {
     const token = Date.now();
-    if (result.task) {
+    if (result.boardId) {
+      setOpenBoardRequest({ boardId: result.boardId, taskId: result.boardTaskId, token });
+      setActiveModule("projects");
+    } else if (result.task) {
       setActiveModule("schedule");
       setOpenTaskRequest({ id: result.id, token });
     } else if (result.event) {
@@ -211,6 +222,18 @@ export function WorkbenchApp() {
     } else if (result.log) {
       setActiveModule("logs"); setOpenLogRequest({ id: result.id, token });
     }
+  }
+
+  function copyBoardTaskToToday(board: ProjectBoard, task: BoardTask) {
+    const id = `board-copy:${task.id}`;
+    if (tasks.some((existing) => existing.id === id)) { toast.info("此任务已复制到待办，可在个人日程中查看。"); return; }
+    const priority = { p1: "紧急且重要", p2: "不紧急重要", p3: "紧急不重要", p4: "不紧急不重要" } as const;
+    setTasks((previous) => [...previous, {
+      id, name: task.title, dueDate: todayISO(), createdAt: new Date().toISOString(), done: false,
+      notes: `来源：${board.name} · ${boardPriorities[task.priority].label}\n${task.content}\n${task.notes}`,
+      precautions: [], completionLog: "", priority: priority[task.priority], subtasks: [], taskType: "daily", isTodayFocus: true,
+    }]);
+    toast.success("已复制到今日待办。两处记录可分别编辑和完成。");
   }
 
   async function refreshLogs(currentUser: User) {
@@ -1005,7 +1028,7 @@ export function WorkbenchApp() {
         </div>
         </div>
         <div className="flex items-center gap-2">
-          <GlobalSearch events={events} tasks={tasks} logs={logPosts} annualTasks={annualTasks} projects={projectCheckins} shopping={shoppingItems} logsReady={logReady} onLocate={locateSearchResult} />
+          <GlobalSearch events={events} tasks={tasks} logs={logPosts} annualTasks={annualTasks} projects={projectCheckins} shopping={shoppingItems} boards={projectBoards} logsReady={logReady} onLocate={locateSearchResult} />
           <Button variant="outline" size="icon-sm" disabled={!history.canUndo} onClick={history.undo} aria-label="撤销上一步" title="撤销任务、日程与清单操作（Ctrl+Z）"><Undo2 /></Button>
           <Button variant="outline" size="icon-sm" disabled={!history.canRedo} onClick={history.redo} aria-label="重做上一步" title="重做（Ctrl+Shift+Z）"><Redo2 /></Button>
           <WeeklyReportDialog
@@ -1043,7 +1066,7 @@ export function WorkbenchApp() {
       </div>
 
       <div className="relative z-10 mx-auto flex max-w-[1880px] flex-col gap-4 px-4 py-3">
-        <MonitoringSidebar active={activeModule} onChange={setActiveModule} />
+        <MonitoringSidebar active={activeModule} onChange={(module) => { setOpenBoardRequest(undefined); setActiveModule(module); }} />
 
         <div key={activeModule} className="workbench-module min-h-0 w-full">
           {activeModule === "schedule" ? (
@@ -1139,6 +1162,8 @@ export function WorkbenchApp() {
                 <ExecutionPanel key={user.id} userId={user.id} events={events} tasks={tasks} preferences={dashboardUiPreferences} onPreferencesChange={setDashboardUiPreferences} />
               </section>
             </div>
+          ) : activeModule === "projects" ? (
+            <ProjectWorkspace key={`${user.id}:${openBoardRequest?.token ?? "default"}`} boards={projectBoards} onChange={setProjectBoards} onCopyToToday={copyBoardTaskToToday} initialSelection={openBoardRequest} />
           ) : (
             logReady ? (
               <LogPage

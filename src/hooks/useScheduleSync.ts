@@ -9,7 +9,8 @@ import { clearAcknowledgedScheduleDraft, getScheduleBackupStorageKey, getSchedul
 export type ScheduleSyncStatus = "loading" | "saved" | "pending" | "saving" | "offline" | "error" | "conflict";
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const empty = () => normalizePersistedSchedulePayload({})!;
-const columns = "events,tasks,annual_tasks,shopping_items,project_checkins,footprints,ui_preferences,achievements,updated_at";
+const legacyColumns = "events,tasks,annual_tasks,shopping_items,project_checkins,footprints,ui_preferences,achievements,updated_at";
+const columns = `${legacyColumns},project_boards`;
 type SyncView = { owner: string | null; ready: boolean; status: ScheduleSyncStatus; message: string };
 type Controls = {
   owner: string;
@@ -85,11 +86,20 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
       show("saving");
       try {
         for (let attempt = 0; attempt < 4 && !disposed; attempt++) {
-          const result = await supabase.from("schedule_data").select(columns).eq("user_id", owner).abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)])).maybeSingle();
+          const read = (selection: string) => supabase.from("schedule_data").select(selection).eq("user_id", owner).abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)])).maybeSingle<Partial<PersistedSchedulePayload> & { updated_at: string }>();
+          let result = await read(columns);
+          let boardsAvailable = true;
+          // A code deployment may precede its database migration. Keep the existing
+          // workbench usable and retain unsynced project data in the normal draft.
+          if (result.error?.message.includes("project_boards") && (result.error.message.includes("column") || result.error.message.includes("schema cache"))) {
+            boardsAvailable = false;
+            result = await read(legacyColumns);
+          }
           if (disposed) return false;
           if (result.error) throw new Error(result.error.message);
           recognizeDraftHandoff();
           const remote = normalizePersistedSchedulePayload(result.data) ?? empty();
+          if (!boardsAvailable) remote.project_boards = base?.project_boards ?? [];
           const otherDrafts = readPendingScheduleDrafts(owner).filter((draft) => draft.key !== draftKey);
           let incoming = remote;
           const draftConflicts: string[] = [];
@@ -123,6 +133,7 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
           if (!equal(merged, remote) || (!result.data && dirty)) {
             const updatedAt = new Date(Math.max(Date.now(), Date.parse(result.data?.updated_at ?? "") + 1 || 0)).toISOString();
             const write = { ...merged, user_id: owner, updated_at: updatedAt };
+            if (!boardsAvailable) delete write.project_boards;
             const saved = result.data
               ? await supabase.from("schedule_data").update(write).eq("user_id", owner).eq("updated_at", result.data.updated_at).select("updated_at").abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)])).maybeSingle()
               : await supabase.from("schedule_data").insert(write).select("updated_at").abortSignal(AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)])).maybeSingle();
@@ -132,13 +143,19 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
           }
           // A user may continue typing while the request is in flight.
           const next = mergeScheduleChanges(local, desired, merged).value;
-          base = merged;
-          dirty = !equal(next, merged);
+          base = boardsAvailable ? merged : { ...merged, project_boards: base?.project_boards ?? [] };
+          dirty = !equal(next, base);
           conflict = false;
           apply(next);
           for (const draft of otherDrafts) clearAcknowledgedScheduleDraft(draft.key, draft.raw);
           if (!dirty) { clearAcknowledgedScheduleDraft(draftKey); lastDraft = undefined; }
-          if (preserve()) show(dirty ? "pending" : "saved");
+          if (preserve()) {
+            if (!boardsAvailable && dirty) {
+              show("error", "科研与自学项目已保存在本机，云端同步需要执行项目任务表迁移。其他日程修改已同步；迁移后点击重试。");
+              return false;
+            }
+            show(dirty ? "pending" : "saved");
+          }
           return true;
         }
         if (!disposed) throw new Error("其他页面正在同时修改记录，请稍后重试。");

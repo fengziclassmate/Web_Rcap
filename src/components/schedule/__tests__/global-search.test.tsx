@@ -2,8 +2,20 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { normalizeEvents, normalizeTasks } from "@/lib/normalizers";
 import { buildSearchIndex, GlobalSearch } from "../global-search";
+import { createProjectBoard } from "@/lib/project-boards";
 
 describe("global search", () => {
+  it("locates an annotated project task by its research notes", () => {
+    const board = createProjectBoard("research", "城市用地诊断");
+    board.tasks[0].notes = "核对土地分类口径";
+    const onLocate = vi.fn();
+    render(<GlobalSearch tasks={[]} events={[]} logs={[]} annualTasks={[]} projects={[]} shopping={[]} boards={[board]} logsReady onLocate={onLocate} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    fireEvent.change(screen.getByLabelText("搜索工作台内容"), { target: { value: "土地分类口径" } });
+    fireEvent.click(screen.getByRole("button", { name: /明确研究问题与评价指标/ }));
+    fireEvent.click(screen.getByRole("button", { name: "打开项目任务" }));
+    expect(onLocate).toHaveBeenCalledWith(expect.objectContaining({ boardId: board.id, boardTaskId: board.tasks[0].id }));
+  });
   it("opens with the keyboard, searches notes, and locates the selected task", () => {
     const task = normalizeTasks([{ id: "task", name: "实验记录", notes: "检查对照组参数" }])[0];
     const onLocate = vi.fn();

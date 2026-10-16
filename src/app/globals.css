@@ -137,6 +137,44 @@
 }
 
 @layer components {
+  .project-workspace {
+    display: flex;
+    min-height: 740px;
+    align-items: stretch;
+    background: var(--card);
+  }
+
+  .project-navigation {
+    display: flex;
+    width: 228px;
+    flex-shrink: 0;
+    flex-direction: column;
+    padding: 18px 12px;
+    border-right: 1px solid var(--border);
+    background: color-mix(in oklch, var(--secondary) 52%, white);
+  }
+
+  .project-nav-item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    border-radius: 7px;
+    padding: 10px 12px;
+    color: #57534e;
+    font-size: 12px;
+    transition: background-color 140ms ease;
+  }
+
+  .project-nav-item:hover { background: #eeede8; }
+  .project-nav-item.is-active { background: #e4ede6; color: #14523e; font-weight: 600; }
+  .project-nav-item:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .project-task-table { width: 100%; min-width: 1000px; border-collapse: collapse; text-align: left; }
+  .project-task-table th { padding: 10px 12px; border-block: 1px solid #e7e5e4; background: #fafaf9; font-size: 11px; font-weight: 500; color: #78716c; }
+  .project-task-table td { padding: 15px 12px; border-bottom: 1px solid #eeedeb; vertical-align: top; }
+  .project-task-table th:first-child, .project-task-table td:first-child { padding-left: 22px; }
+  .project-task-table tbody tr:hover { background: #fafbf9; }
+  .project-task-table .is-completed { background: #fafbf9; }
   .workbench-shell {
     position: relative;
     overflow-x: clip;

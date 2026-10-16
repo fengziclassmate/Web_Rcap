@@ -3,19 +3,22 @@ import { useCallback, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useScheduleSync } from "../useScheduleSync";
 import { getScheduleDraftKey, normalizePersistedSchedulePayload, readPendingScheduleDrafts, writePendingScheduleDraft, type PersistedSchedulePayload } from "@/lib/schedule-persistence";
+import { createProjectBoard } from "@/lib/project-boards";
 
 type Row = PersistedSchedulePayload & { updated_at: string; user_id: string };
-const remote = vi.hoisted(() => ({ row: null as Row | null, fail: false, failRead: false, writes: 0, race: false }));
+const remote = vi.hoisted(() => ({ row: null as Row | null, fail: false, failRead: false, writes: 0, race: false, missingBoards: false }));
 vi.mock("@/lib/supabase", () => ({ supabase: { from: () => {
   let write: Row | undefined;
   let revision: string | undefined;
+  let selection = "";
   const query = {
-    select: () => query,
+    select: (columns: string) => { selection = columns; return query; },
     eq: (key: string, value: string) => { if (key === "updated_at") revision = value; return query; },
     abortSignal: () => query,
     update: (value: Row) => { write = value; return query; },
     insert: (value: Row) => { write = value; return query; },
     maybeSingle: async () => {
+      if (!write && remote.missingBoards && selection.includes("project_boards")) return { data: null, error: { message: "column schedule_data.project_boards does not exist" } };
       if (!write && remote.failRead) return { data: null, error: { message: "read failed" } };
       if (!write) return { data: structuredClone(remote.row), error: null };
       remote.writes++;
@@ -41,9 +44,33 @@ function useWorkspace() {
   const sync = useScheduleSync("test-owner", payload, hydrate);
   return { ...sync, payload, remove: (id: string) => setPayload((prev) => ({ ...prev, annual_tasks: prev.annual_tasks.filter(item => item.id !== id) })), add: (id: string) => setPayload((prev) => ({ ...prev, annual_tasks: [...prev.annual_tasks, { id, name: id, done: false }] })) };
 }
-beforeEach(() => { localStorage.clear(); remote.row = null; remote.fail = false; remote.failRead = false; remote.writes = 0; remote.race = false; });
+beforeEach(() => { localStorage.clear(); remote.row = null; remote.fail = false; remote.failRead = false; remote.writes = 0; remote.race = false; remote.missingBoards = false; });
 
 describe("schedule persistence lifecycle", () => {
+  it("keeps legacy schedules usable before migration and syncs retained board drafts afterwards", async () => {
+    remote.missingBoards = true;
+    const board = createProjectBoard("research", "城市用地诊断");
+    function useBoards() {
+      const [payload, setPayload] = useState(empty);
+      const hydrate = useCallback((value: PersistedSchedulePayload) => setPayload(value), []);
+      return { ...useScheduleSync("test-owner", payload, hydrate), payload, edit: () => setPayload((previous) => ({ ...previous, project_boards: [board], annual_tasks: [{ id: "goal", name: "目标", done: false }] })) };
+    }
+    const hook = renderHook(useBoards);
+    await waitFor(() => expect(hook.result.current.status).toBe("saved"));
+    act(() => hook.result.current.edit());
+    await waitFor(() => expect(hook.result.current.status).toBe("error"));
+    expect(hook.result.current.ready).toBe(true);
+    expect(hook.result.current.message).toContain("迁移");
+    expect(remote.row?.annual_tasks[0].id).toBe("goal");
+    expect(remote.row?.project_boards).toBeUndefined();
+    expect(readPendingScheduleDrafts("test-owner")[0].payload.project_boards).toEqual([board]);
+    remote.missingBoards = false;
+    await act(async () => { await hook.result.current.retry(); });
+    expect(hook.result.current.status).toBe("saved");
+    expect(remote.row?.project_boards).toEqual([board]);
+    expect(readPendingScheduleDrafts("test-owner")).toHaveLength(0);
+    hook.unmount();
+  });
   it("does not resurrect an inherited offline addition deleted after reload", async () => {
     remote.row = { ...empty(), user_id: "test-owner", updated_at: "2026-01-01T00:00:00Z" };
     const first = renderHook(useWorkspace);
