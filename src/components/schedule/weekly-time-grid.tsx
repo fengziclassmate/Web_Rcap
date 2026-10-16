@@ -75,6 +75,7 @@ import {
 } from "@/lib/schedule-layout";
 import {
   CATEGORY_VISUALS,
+  CATEGORY_COLOR_OPTIONS,
   DEFAULT_SCHEDULE_CATEGORY,
   SCHEDULE_CATEGORY_GROUP_LABELS,
   SCHEDULE_CATEGORY_GROUP_ORDER,
@@ -253,7 +254,7 @@ const contextMenuViewportPadding = 12;
 const hourOptions = Array.from({ length: 24 }, (_, hour) => hour);
 const endHourOptions = Array.from({ length: 25 }, (_, hour) => hour);
 const minuteOptions = Array.from({ length: 60 }, (_, minute) => minute);
-const quickMinuteOptions = [0, 10, 15, 30, 45, 50];
+const quickMinuteOptions = Array.from({ length: 12 }, (_, index) => index * 5);
 const emptySelectedEventIds = new Set<string>();
 const emptyLogPosts: LogPostRecord[] = [];
 const compactMoneyFormatter = new Intl.NumberFormat("zh-CN", {
@@ -2430,7 +2431,7 @@ export function WeeklyTimeGrid({
                       placeholder="输入行程标题"
                     />
                   </div>
-                  <div className="flex flex-wrap items-end gap-3 [&>div:first-child]:w-44 [&>div:nth-child(2)]:w-32">
+                  <div className="event-create-meta flex flex-wrap items-end gap-3 [&>div:first-child]:w-44 [&>div:nth-child(2)]:w-32">
                     <div className="flex min-w-0 flex-col gap-2">
                       <Label>分类</Label>
                       <Select
@@ -2491,8 +2492,14 @@ export function WeeklyTimeGrid({
                         />
                         </div>
                       </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="create-completed" className="whitespace-nowrap">标记为已完成</Label>
+                        <div className="flex h-8 items-center justify-center rounded-md border border-stone-200 bg-stone-50/80 px-3">
+                          <Switch id="create-completed" checked={createForm.isCompleted} onCheckedChange={(checked) => setCreateForm((prev) => ({ ...prev, isCompleted: checked }))} />
+                        </div>
+                      </div>
                       {createRecurrence.enabled ? (
-                        <div className="col-span-3 space-y-4 rounded-xl border border-stone-200 bg-stone-50/80 p-3">
+                        <div className="w-full space-y-4 rounded-xl border border-stone-200 bg-stone-50/80 p-3">
                           <div className="space-y-2">
                             <Label>重复方式</Label>
                             <Select
@@ -2658,16 +2665,6 @@ export function WeeklyTimeGrid({
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
-                  <div className="flex items-center gap-2 py-1">
-                    <Switch
-                      id="create-completed"
-                      checked={createForm.isCompleted}
-                      onCheckedChange={(checked) =>
-                        setCreateForm((prev) => ({ ...prev, isCompleted: checked }))
-                      }
-                    />
-                    <Label htmlFor="create-completed">标记为已完成</Label>
-                  </div>
                   <div className="flex flex-wrap justify-end gap-2 border-t border-stone-100 pt-3">
                     <Button
                       type="button"
@@ -3252,7 +3249,7 @@ export function WeeklyTimeGrid({
                                   autoFocus
                                 />
                                 <div className="flex flex-wrap gap-1.5">
-                                  {CATEGORY_VISUALS.map((item) => (
+                                  {CATEGORY_COLOR_OPTIONS.map((item) => (
                                     <ColorSwatch
                                       key={item.hex}
                                       visual={item}
@@ -3389,7 +3386,7 @@ export function WeeklyTimeGrid({
                             {hue === "cold" ? "冷色 · 作息学术健康" : hue === "warm" ? "暖色 · 饮食社交出行" : "中性色 · 事务缓冲"}
                           </p>
                           <div className="flex flex-wrap gap-2">
-                            {CATEGORY_VISUALS.filter((item) => item.hue === hue).map((item) => (
+                            {CATEGORY_COLOR_OPTIONS.filter((item) => item.hue === hue).map((item) => (
                               <ColorSwatch
                                 key={item.hex}
                                 visual={item}
@@ -3545,7 +3542,7 @@ function MinuteQuickPick({
   onChange: (value: number) => void;
 }) {
   return (
-    <div className="mt-2 grid grid-cols-6 gap-1" aria-label={label}>
+    <div className="mt-2 grid grid-cols-6 gap-1" role="group" aria-label={label}>
       {quickMinuteOptions.map((minute) => (
         <button
           key={minute}

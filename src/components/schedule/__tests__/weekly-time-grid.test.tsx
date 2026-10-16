@@ -826,7 +826,7 @@ describe("WeeklyTimeGrid interactions", () => {
     expect(quickPick).toBeTruthy();
     expect(
       Array.from(quickPick!.querySelectorAll("button")).map((button) => button.textContent),
-    ).toEqual(["00", "10", "15", "30", "45", "50"]);
+    ).toEqual(["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"]);
   });
 
   it("keeps optional details folded and applies quick event templates", () => {

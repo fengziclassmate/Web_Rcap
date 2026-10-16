@@ -121,7 +121,8 @@ export const SCHEDULE_CATEGORY_GROUP_LABELS: Record<ScheduleCategoryGroup, strin
   other: "出行与事务",
 };
 
-export const CATEGORY_VISUALS: ScheduleCategoryVisual[] = [
+// Keep legacy swatches available so saved custom appearances retain their color.
+const LEGACY_CATEGORY_VISUALS: ScheduleCategoryVisual[] = [
   visual(names.sleep, "bg-indigo-50 border-indigo-300 text-indigo-950", "bg-indigo-500", "#6366f1", "cold", "routine", "moon"),
   visual(names.wash, "bg-sky-50 border-sky-300 text-sky-950", "bg-sky-500", "#0ea5e9", "cold", "routine", "droplets"),
   visual(names.shower, "bg-cyan-50 border-cyan-300 text-cyan-950", "bg-cyan-500", "#06b6d4", "cold", "routine", "droplets"),
@@ -155,7 +156,24 @@ export const CATEGORY_VISUALS: ScheduleCategoryVisual[] = [
   visual(names.other, "bg-zinc-50 border-zinc-300 text-zinc-950", "bg-zinc-400", "#a1a1aa", "neutral", "other", "circle"),
 ];
 
-export const CATEGORY_COLORS = CATEGORY_VISUALS.map((item) => item.twClass);
+const paletteSources: Partial<Record<ScheduleCategoryGroup, string>> = {
+  meals: names.breakfast,
+  social: names.watchingSports,
+  health: names.running,
+  other: names.chores,
+};
+export const CATEGORY_VISUALS = LEGACY_CATEGORY_VISUALS.map((item) => {
+  const sourceName = item.name === names.rest ? names.sleep
+    : item.name === names.shower ? names.wash
+    : item.name === names.study ? names.privateStudy
+    : paletteSources[item.group];
+  const source = LEGACY_CATEGORY_VISUALS.find((candidate) => candidate.name === sourceName);
+  if (item.name === names.meeting) return visual(item.name, "bg-slate-50 border-slate-400 text-slate-950", "bg-slate-500", "#64748b", "neutral", item.group, item.icon);
+  if (item.name === names.paperWriting) return visual(item.name, "bg-rose-50 border-rose-400 text-rose-950", "bg-rose-600", "#e11d48", "warm", item.group, item.icon);
+  return source ? { ...item, color: source.color, accent: source.accent, twClass: source.twClass, twAccent: source.twAccent, hex: source.hex, hue: source.hue } : item;
+});
+export const CATEGORY_COLOR_OPTIONS = [...new Map([...CATEGORY_VISUALS, ...LEGACY_CATEGORY_VISUALS].map((item) => [item.hex, item])).values()];
+export const CATEGORY_COLORS = CATEGORY_COLOR_OPTIONS.map((item) => item.twClass);
 const SCHEDULE_CATEGORY_NAMES = CATEGORY_VISUALS.map((item) => item.name);
 export const SCHEDULE_CATEGORY_PROMPT_LIST = SCHEDULE_CATEGORY_NAMES.join("、");
 
@@ -295,12 +313,16 @@ export function normalizeCategoryDefList(value: unknown): ScheduleCategoryDef[] 
       const rawName = typeof raw.name === "string" ? raw.name.trim() : "";
       const name = normalizeScheduleCategory(rawName);
       if (!name) return null;
-      const visual = getCategoryVisualByClass(typeof raw.color === "string" ? raw.color : "");
+      const legacy = LEGACY_CATEGORY_VISUALS.find((item) => item.name === name);
+      const migrateDefault = typeof raw.id === "string" && raw.id.startsWith(DEFAULT_CATEGORY_ID_PREFIX)
+        && legacy !== undefined && raw.color === legacy.twClass
+        && (raw.hex === undefined || typeof raw.hex === "string" && raw.hex.toLowerCase() === legacy.hex);
+      const visual = migrateDefault ? getCategoryVisualByName(name) : getCategoryVisualByClass(typeof raw.color === "string" ? raw.color : "");
       return {
         id: typeof raw.id === "string" ? raw.id : createCategoryId(),
         name,
         color: visual.twClass,
-        ...(typeof raw.hex === "string" && /^#[0-9a-f]{6}$/i.test(raw.hex) ? { hex: raw.hex } : {}),
+        ...(typeof raw.hex === "string" && /^#[0-9a-f]{6}$/i.test(raw.hex) ? { hex: migrateDefault ? visual.hex : raw.hex } : {}),
         ...(CATEGORY_VISUALS.some((item) => item.icon === raw.icon) ? { icon: raw.icon } : {}),
         sortOrder: typeof raw.sortOrder === "number" ? raw.sortOrder : defaults.length + index,
       } satisfies ScheduleCategoryDef;
@@ -367,7 +389,7 @@ export function normalizeScheduleCategory(value: string) {
 }
 
 export function getCategoryVisualByClass(twClass: string) {
-  return CATEGORY_VISUALS.find((item) => item.twClass === twClass || item.color === twClass) ?? CATEGORY_VISUALS[0];
+  return CATEGORY_COLOR_OPTIONS.find((item) => item.twClass === twClass || item.color === twClass) ?? CATEGORY_VISUALS[0];
 }
 
 export function getCategoryVisualByName(name: string) {

@@ -222,8 +222,26 @@
   .project-task-table .project-row-actions { opacity: 0; }
   .project-task-table tr:hover .project-row-actions, .project-row-actions:focus-within { opacity: 1; }
   .project-task-table td.project-expanded-cell { background: #f7f9f7; padding: 12px 24px 12px 60px; }
-  .project-task-details { display: grid; gap: 28px; padding: 6px 0; }
-  .project-task-details > div { max-width: 75ch; }
+  .project-task-details { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 6px 0; }
+  .project-task-details > div { min-width: 0; }
+  .project-task-details > div:not(.project-detail-content) { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; border-top: 1px solid #e5ebe7; padding-top: 10px; }
+  .project-detail-content .annotated-content { max-width: 95ch; }
+  .project-phase-input { width: 100%; min-width: 0; border: 1px solid transparent; border-radius: 5px; background: transparent; padding: 4px 5px; color: #53695b; font-size: 12px; }
+  .project-phase-input:hover, .project-date-controls input:hover { border-color: #d9e2db; background: #fff; }
+  .project-phase-input:focus-visible, .project-date-controls input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; background: #fff; }
+  .project-phase-input::placeholder { color: #768278; }
+  .project-date-controls { display: grid; gap: 2px; }
+  .project-date-controls label { display: flex; align-items: center; gap: 4px; color: #68776d; font-size: 10px; }
+  .project-date-controls label > span { flex-shrink: 0; white-space: nowrap; }
+  .project-task-table th:nth-child(6), .project-task-table td:nth-child(6) { min-width: 180px; }
+  .project-date-controls input { width: 132px; min-width: 0; border: 1px solid #e7ece8; border-radius: 5px; background: transparent; padding: 3px 4px; color: #53695b; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .project-date-controls .is-overdue, .project-date-controls .is-overdue input { color: #ae4c42; }
+  .annotated-content > * + * { margin-top: 4px; }
+  .annotated-content { overflow-wrap: anywhere; }
+  .annotated-checklist-item { display: flex; align-items: flex-start; gap: 10px; border-radius: 5px; padding: 5px 8px; line-height: 1.65; }
+  .annotated-checklist-item:has(input:not(:disabled)):hover { background: #edf2ee; cursor: pointer; }
+  .annotated-checklist-item:focus-within { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .annotated-checklist-item[data-completed="true"] { color: #728078; }
   .project-detail-label { display: block; margin-bottom: 8px; color: #637568; font-size: 12px; font-weight: 500; }
   .project-quick-add { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #eef1ef; padding: 6px 20px; }
   .project-quick-add input { height: 32px; border: 0; padding-left: 0; font-size: 12px; box-shadow: none; }
@@ -1059,13 +1077,13 @@
 .event-editor-body [data-slot="collapsible-trigger"] { padding: 9px 12px; }
 .event-editor-body [data-slot="label"] { font-size: 12px; }
 .event-time-group { min-width: 0; border: 1px solid #e5ebe7; border-radius: 8px; background: #f8faf8; padding: 10px; }
-.event-time-group > div:first-child { justify-content: space-between; gap: 8px; }
+.event-time-group > div:first-child { min-height: 28px; justify-content: space-between; gap: 8px; }
 .event-time-group input[type="date"] { width: 132px; flex-shrink: 0; }
 .event-time-group > div:nth-child(2) { display: flex; width: max-content; align-items: center; gap: 0; overflow: hidden; border: 1px solid #dfe6e1; border-radius: 6px; background: #fff; }
 .event-time-group > div:nth-child(2) [data-slot="select-trigger"] { width: 64px; height: 32px; border: 0; border-radius: 0; background: transparent; padding-inline: 8px; font-size: 14px; font-weight: 500; box-shadow: none; }
 .event-time-group > div:nth-child(2):focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
 .event-time-group > div:nth-child(2) > span { align-self: center; padding: 0; }
-.event-time-group > div:last-child { max-width: 190px; }
+.event-time-group > div:last-child { width: 100%; }
 .event-time-group > div:last-child button[aria-pressed="true"] { background: var(--primary); color: #fff; }
 .expense-workspace { display: flex; flex-direction: column; }
 .expense-entry { order: 0; }

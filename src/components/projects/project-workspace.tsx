@@ -211,10 +211,10 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, onStartFocus
         </div>
 
         <div className="project-content-scroll">
-          {view === "table" ? <table className="project-task-table"><thead><tr><th className="w-9"><span className="sr-only">完成状态</span></th><th>任务</th><th className="w-44">阶段</th><th className="w-40">优先级</th><th className="w-28">状态</th><th className="w-32">日期</th><th className="w-28"><span className="sr-only">操作</span></th></tr></thead><tbody>
+          {view === "table" ? <table className="project-task-table"><thead><tr><th className="w-9"><span className="sr-only">完成状态</span></th><th>任务</th><th className="w-40">阶段</th><th className="w-40">优先级</th><th className="w-28">状态</th><th className="w-44">日期</th><th className="w-28"><span className="sr-only">操作</span></th></tr></thead><tbody>
             {rows.map(({ board, task }) => <TaskTableRow key={`${board.id}:${task.id}`} board={board} task={task} today={today} expanded={expanded.includes(task.id)} showProject={!selected} onExpand={() => setExpanded((previous) => previous.includes(task.id) ? previous.filter((id) => id !== task.id) : [...previous, task.id])} onEdit={() => setTaskEditor({ boardId: board.id, task })} onUpdate={(update) => updateTask(board.id, task.id, update)} actions={rowActions({ board, task })} />)}
           </tbody></table> : <div className="project-kanban">{Object.entries(boardStatuses).map(([id, label]) => <section key={id} className="project-kanban-column"><h3><span className={`project-status-dot status-${id}`} />{label}<span className="ml-auto font-normal text-stone-400">{rows.filter(({ task }) => task.status === id).length}</span></h3>
-            {rows.filter(({ task }) => task.status === id).map(({ board, task }) => <article key={`${board.id}:${task.id}`} className="project-kanban-card"><p className="mb-2 truncate text-[11px] text-stone-400">{selected ? task.phase || "\u00a0" : board.name}</p><button type="button" onClick={() => setTaskEditor({ boardId: board.id, task })} className="text-left text-sm font-medium leading-6 hover:text-primary">{task.milestone && <Flag className="mr-1 inline size-3 text-amber-700" />}{task.title}</button><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><PriorityBadge priority={task.priority} /><TaskProgress task={task} /></div>{task.dueDate && <p className={`mt-3 text-xs tabular-nums ${isBoardTaskOverdue(task, today) ? "text-red-700" : "text-stone-400"}`}>{task.dueDate}</p>}<div className="mt-3 flex items-center gap-1 border-t border-stone-100 pt-2"><StatusControl task={task} onChange={(next) => updateTask(board.id, task.id, (previous) => setBoardTaskStatus(previous, next))} />{rowActions({ board, task })}</div></article>)}
+            {rows.filter(({ task }) => task.status === id).map(({ board, task }) => <article key={`${board.id}:${task.id}`} className="project-kanban-card"><div className="mb-2">{!selected && <p className="mb-1 truncate text-[11px] text-stone-500">{board.name}</p>}<PhaseControl task={task} onChange={(phase) => updateTask(board.id, task.id, (previous) => ({ ...previous, phase }))} /></div><button type="button" onClick={() => setTaskEditor({ boardId: board.id, task })} className="text-left text-sm font-medium leading-6 hover:text-primary">{task.milestone && <Flag className="mr-1 inline size-3 text-amber-700" />}{task.title}</button><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><PriorityBadge priority={task.priority} /><TaskProgress task={task} /></div><div className="mt-2"><TaskDateControls task={task} today={today} onUpdate={(update) => updateTask(board.id, task.id, update)} /></div><div className="mt-3 flex items-center gap-1 border-t border-stone-100 pt-2"><StatusControl task={task} onChange={(next) => updateTask(board.id, task.id, (previous) => setBoardTaskStatus(previous, next))} />{rowActions({ board, task })}</div></article>)}
           </section>)}</div>}
           {!rows.length && <div className="project-empty-tasks"><ListTodo className="mb-3 size-6 text-stone-300" /><p>{sourceRows.length ? "没有匹配任务" : "暂无任务"}</p>{(query || filterCount > 0) && <Button variant="ghost" size="sm" onClick={clearFilters}>清除筛选</Button>}</div>}
           {selected && !selected.archived && <form className="project-quick-add" onSubmit={(event) => { event.preventDefault(); quickAdd(); }}><Plus className="size-4 text-stone-400" /><Input aria-label="快速添加任务" value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder="添加任务…" className="h-8 rounded-none border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0" /><Button type="submit" size="icon-sm" variant="ghost" aria-label="添加任务" disabled={!quickTitle.trim()}><Plus className="size-4" /></Button></form>}
@@ -232,18 +232,43 @@ function StatusControl({ task, onChange }: { task: BoardTask; onChange: (status:
   return <span className="project-status-control"><span className={`project-status-dot status-${task.status}`} /><select aria-label={`状态：${task.title}`} value={task.status} onChange={(event) => onChange(event.target.value as BoardStatus)}>{Object.entries(boardStatuses).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select><ChevronDown className="size-3 text-stone-400" /></span>;
 }
 
+function PhaseControl({ task, onChange }: { task: BoardTask; onChange: (phase: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const baseline = useRef(task.phase);
+  const cancelled = useRef(false);
+  return <input className="project-phase-input" aria-label={`阶段：${task.title}`} placeholder="添加阶段" maxLength={100} value={draft ?? task.phase}
+    onFocus={() => { baseline.current = task.phase; cancelled.current = false; }}
+    onChange={(event) => setDraft(event.target.value)}
+    onBlur={() => {
+      if (cancelled.current || draft === null) return;
+      const next = draft.trim();
+      if (next !== task.phase && baseline.current !== task.phase) { toast.error("阶段已在其他页面更新，请核对后重新提交。"); return; }
+      if (next !== task.phase) onChange(next);
+      setDraft(null);
+    }}
+    onKeyDown={(event) => {
+      if (event.nativeEvent.isComposing) return;
+      if (event.key === "Escape") { cancelled.current = true; setDraft(null); event.currentTarget.blur(); }
+      if (event.key === "Enter") event.currentTarget.blur();
+    }} />;
+}
+
+function TaskDateControls({ task, today, onUpdate }: { task: BoardTask; today: string; onUpdate: (update: (task: BoardTask) => BoardTask) => void }) {
+  return <div className="project-date-controls">{([['plannedDate', '计划'], ['dueDate', '截止']] as const).map(([field, label]) => <label key={field} className={field === "dueDate" && isBoardTaskOverdue(task, today) ? "is-overdue" : ""}><span>{label}</span><input type="date" aria-label={`${label}日期：${task.title}`} value={task[field]} onChange={(event) => { const value = event.target.value; onUpdate((previous) => ({ ...previous, [field]: value })); }} /></label>)}</div>;
+}
+
 function TaskTableRow({ board, task, today, expanded, showProject, onExpand, onEdit, onUpdate, actions }: TaskRow & { today: string; expanded: boolean; showProject: boolean; onExpand: () => void; onEdit: () => void; onUpdate: (update: (task: BoardTask) => BoardTask) => void; actions: React.ReactNode }) {
   const details = ([['content', '内容'], ['notes', '备注与资料'], ['review', '成果与复盘']] as const).filter(([field]) => task[field].trim());
   return <>
     <tr className={task.status === "done" ? "is-completed" : ""}>
       <td><input type="checkbox" aria-label={`完成任务：${task.title}`} checked={task.status === "done"} onChange={(event) => onUpdate((previous) => setBoardTaskStatus(previous, event.target.checked ? "done" : "todo"))} className="size-3.5 accent-emerald-800" /></td>
       <td><div className="flex items-start gap-2"><button type="button" aria-label={`${expanded ? "收起" : "展开"}任务：${task.title}`} aria-expanded={expanded} onClick={onExpand} className="project-expand-button">{expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}</button><div className="min-w-0"><button type="button" className={`project-task-title ${task.status === "done" ? "line-through" : ""}`} onClick={onEdit}>{task.milestone && <Flag aria-label="里程碑" className="mr-1.5 inline size-3 text-amber-700" />}{task.title}</button><div className="mt-1 flex flex-wrap items-center gap-2 empty:hidden">{showProject && <span className="max-w-40 truncate text-[11px] text-stone-400">{board.name}</span>}<TaskProgress task={task} /></div></div></div></td>
-      <td><span className="block max-w-40 truncate text-xs text-stone-500" title={task.phase}>{task.phase || "—"}</span>{task.tags.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{task.tags.slice(0, 2).map((tag) => <span key={tag} className="project-tag" title={tag}>{tag}</span>)}{task.tags.length > 2 && <span className="text-[10px] text-stone-400" title={task.tags.slice(2).join("、")}>+{task.tags.length - 2}</span>}</div>}</td>
+      <td><PhaseControl task={task} onChange={(phase) => onUpdate((previous) => ({ ...previous, phase }))} />{task.tags.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{task.tags.slice(0, 2).map((tag) => <span key={tag} className="project-tag" title={tag}>{tag}</span>)}{task.tags.length > 2 && <span className="text-[10px] text-stone-400" title={task.tags.slice(2).join("、")}>+{task.tags.length - 2}</span>}</div>}</td>
       <td><span className={`project-priority-control priority-${task.priority}`}><select aria-label={`优先级：${task.title}`} value={task.priority} onChange={(event) => onUpdate((previous) => ({ ...previous, priority: event.target.value as BoardPriority }))}>{Object.entries(boardPriorities).map(([id, item]) => <option key={id} value={id}>{item.short} · {item.label}</option>)}</select><ChevronDown className="size-3" /></span></td>
       <td><StatusControl task={task} onChange={(next) => onUpdate((previous) => setBoardTaskStatus(previous, next))} /></td>
-      <td className="whitespace-nowrap text-xs tabular-nums"><span title="截止日期" className={isBoardTaskOverdue(task, today) ? "text-red-700" : "text-stone-500"}>{task.dueDate ? task.dueDate.slice(5).replace("-", "/") : "—"}</span>{task.plannedDate && <span className="mt-1 block text-[10px] text-stone-400" title="计划执行日期">计划 {task.plannedDate.slice(5).replace("-", "/")}</span>}</td>
+      <td><TaskDateControls task={task} today={today} onUpdate={onUpdate} /></td>
       <td>{actions}</td>
     </tr>
-    {expanded && <tr><td colSpan={7} className="project-expanded-cell">{details.length ? <div className="project-task-details" style={{ gridTemplateColumns: `repeat(${details.length}, minmax(0, 1fr))` }}>{details.map(([field, label]) => <div key={field} className="min-w-0"><span className="project-detail-label">{label}</span><AnnotatedContent value={task[field]} onChange={(value) => onUpdate((previous) => ({ ...previous, [field]: value }))} /></div>)}</div> : null}<Button size="sm" variant="ghost" className="mt-1 text-primary" onClick={onEdit}>{details.length ? "编辑" : "添加内容"}</Button></td></tr>}
+    {expanded && <tr><td colSpan={7} className="project-expanded-cell">{details.length ? <div className="project-task-details">{details.map(([field, label]) => <div key={field} className={`project-detail-${field}`}><span className="project-detail-label">{label}</span><AnnotatedContent value={task[field]} onChange={(value) => onUpdate((previous) => ({ ...previous, [field]: value }))} /></div>)}</div> : null}<Button size="sm" variant="ghost" className="mt-1 text-primary" onClick={onEdit}>{details.length ? "编辑" : "添加内容"}</Button></td></tr>}
   </>;
 }

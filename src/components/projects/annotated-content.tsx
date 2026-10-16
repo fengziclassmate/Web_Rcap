@@ -29,12 +29,12 @@ function inline(text: string, depth = 0): ReactNode {
 
 export function AnnotatedContent({ value, onChange, compact = false }: { value: string; onChange?: (value: string) => void; compact?: boolean }) {
   if (!value.trim()) return null;
-  return <div className={`space-y-1.5 whitespace-pre-wrap break-words text-sm leading-6 ${compact ? "line-clamp-3" : ""}`}>
+  return <div className={`annotated-content whitespace-pre-wrap break-words text-sm leading-6 ${compact ? "line-clamp-3" : ""}`}>
     {value.split("\n").map((line, index) => {
       const item = line.match(/^\s*- \[([ xX])\] (.*)$/);
-      if (item) return <label key={index} className="flex items-start gap-2">
+      if (item) return <label key={index} className="annotated-checklist-item" data-completed={item[1] !== " "}>
         <input type="checkbox" checked={item[1] !== " "} disabled={!onChange} aria-label={`子任务：${item[2]}`} onChange={() => onChange?.(toggleChecklistLine(value, index))} className="mt-1.5 size-3.5 shrink-0 accent-emerald-800" />
-        <span className={item[1] !== " " ? "text-stone-500 line-through" : ""}>{inline(item[2])}</span>
+        <span className={`min-w-0 ${item[1] !== " " ? "text-stone-500 line-through" : ""}`}>{inline(item[2])}</span>
       </label>;
       if (/^#{1,3} /.test(line)) return <p key={index} className="pt-1 font-semibold text-stone-900">{inline(line.replace(/^#{1,3} /, ""))}</p>;
       if (/^- /.test(line)) return <div key={index} className="flex gap-2"><span aria-hidden>·</span><span>{inline(line.slice(2))}</span></div>;

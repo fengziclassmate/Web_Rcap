@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CATEGORY_COLORS,
+  CATEGORY_COLOR_OPTIONS,
   CATEGORY_VISUALS,
   SCHEDULE_CATEGORY_GROUP_LABELS,
   getScheduleCategoryAccentColor,
@@ -21,7 +22,8 @@ describe("schedule categories", () => {
   });
 
   it("keeps category visuals and color options aligned", () => {
-    expect(CATEGORY_COLORS).toHaveLength(CATEGORY_VISUALS.length);
+    expect(CATEGORY_COLORS).toHaveLength(CATEGORY_COLOR_OPTIONS.length);
+    expect(new Set(CATEGORY_COLOR_OPTIONS.map((item) => item.hex)).size).toBe(CATEGORY_COLOR_OPTIONS.length);
     expect(CATEGORY_COLORS[0]).toBe(CATEGORY_VISUALS[0].color);
     expect(CATEGORY_VISUALS.map((item) => item.name)).toEqual([
       "睡眠",
@@ -58,7 +60,7 @@ describe("schedule categories", () => {
     ]);
   });
 
-  it("groups detailed categories by activity domain with distinct visual accents", () => {
+  it("shares life colors by purpose and distinguishes research stages", () => {
     expect(SCHEDULE_CATEGORY_GROUP_LABELS).toMatchObject({
       meals: "饮食与采购",
       social: "休闲社交",
@@ -69,7 +71,10 @@ describe("schedule categories", () => {
     const requestedCategories = ["夜宵", "洗澡", "打游戏", "看比赛", "逛街", "私人学习", "项目工作", "健身", "球类运动", "买菜"];
     const visuals = requestedCategories.map((name) => getScheduleCategoryVisual(name));
     expect(visuals.map((item) => item.name)).toEqual(requestedCategories);
-    expect(new Set(visuals.map((item) => item.hex)).size).toBe(requestedCategories.length);
+    for (const names of [["睡眠", "休息"], ["早餐", "中餐", "晚餐", "夜宵", "买菜"], ["朋友聚会", "打游戏", "看比赛", "逛街", "娱乐"], ["健身", "球类运动", "跑步"]]) {
+      expect(new Set(names.map((name) => getScheduleCategoryVisual(name).hex)).size).toBe(1);
+    }
+    expect(new Set(["会议", "文献阅读", "项目工作", "实验研究", "论文写作", "科研"].map((name) => getScheduleCategoryVisual(name).hex)).size).toBe(6);
     expect(Object.fromEntries(visuals.map((item) => [item.name, item.group]))).toMatchObject({
       夜宵: "meals",
       买菜: "meals",
@@ -82,6 +87,19 @@ describe("schedule categories", () => {
       健身: "health",
       球类运动: "health",
     });
+  });
+
+  it("migrates untouched old defaults once while retaining custom appearances and identities", () => {
+    const old = [
+      { id: "__default__5", name: "中餐", color: "bg-orange-50 border-orange-300 text-orange-950", hex: "#f97316", sortOrder: 5 },
+      { id: "__default__6", name: "晚餐", color: "bg-rose-50 border-rose-300 text-rose-950", hex: "#123456", sortOrder: 6 },
+      { id: "custom-food", name: "工作午餐", color: "bg-orange-50 border-orange-300 text-orange-950", sortOrder: 99 },
+    ];
+    const normalized = normalizeCategoryDefList(old);
+    expect(resolveCategoryVisual(normalized.find((item) => item.id === "__default__5")!).hex).toBe(getScheduleCategoryVisual("早餐").hex);
+    expect(resolveCategoryVisual(normalized.find((item) => item.id === "__default__6")!).hex).toBe("#123456");
+    expect(resolveCategoryVisual(normalized.find((item) => item.id === "custom-food")!).hex).toBe("#f97316");
+    expect(normalizeCategoryDefList(JSON.parse(JSON.stringify(normalized)))).toEqual(normalized);
   });
 
   it("normalizes legacy category aliases", () => {

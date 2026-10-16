@@ -11,6 +11,48 @@ function Workspace({ initial = [] }: { initial?: ProjectBoard[] }) {
 }
 
 describe("research and learning workspace", () => {
+  it("edits phase, status and dates directly in table and board without opening details", () => {
+    const board = createProjectBoard("research", "直接编辑");
+    render(<Workspace initial={[board]} />);
+    const title = board.tasks[0].title;
+    const phase = screen.getByLabelText(`阶段：${title}`) as HTMLInputElement;
+    fireEvent.focus(phase);
+    fireEvent.change(phase, { target: { value: "结果验证" } });
+    fireEvent.blur(phase);
+    fireEvent.change(screen.getByLabelText(`计划日期：${title}`), { target: { value: "2026-10-18" } });
+    fireEvent.change(screen.getByLabelText(`截止日期：${title}`), { target: { value: "2026-10-25" } });
+    fireEvent.change(screen.getByLabelText(`状态：${title}`), { target: { value: "doing" } });
+    fireEvent.click(screen.getByRole("button", { name: "看板" }));
+    expect((screen.getByLabelText(`阶段：${title}`) as HTMLInputElement).value).toBe("结果验证");
+    expect((screen.getByLabelText(`计划日期：${title}`) as HTMLInputElement).value).toBe("2026-10-18");
+    expect((screen.getByLabelText(`截止日期：${title}`) as HTMLInputElement).value).toBe("2026-10-25");
+    expect((screen.getByLabelText(`状态：${title}`) as HTMLSelectElement).value).toBe("doing");
+    fireEvent.change(screen.getByLabelText(`计划日期：${title}`), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "任务表" }));
+    expect((screen.getByLabelText(`计划日期：${title}`) as HTMLInputElement).value).toBe("");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("keeps a phase draft when its field changes remotely and preserves unrelated updates on commit", () => {
+    const board = createProjectBoard("research", "并发编辑");
+    const title = board.tasks[0].title;
+    const onChange = vi.fn();
+    const { rerender } = render(<ProjectWorkspace boards={[board]} onChange={onChange} onCopyToToday={vi.fn()} />);
+    const phase = screen.getByLabelText(`阶段：${title}`) as HTMLInputElement;
+    fireEvent.focus(phase);
+    fireEvent.change(phase, { target: { value: "本机阶段" } });
+    const incoming = structuredClone(board);
+    incoming.tasks[0].phase = "远端阶段";
+    incoming.tasks[0].notes = "远端资料";
+    rerender(<ProjectWorkspace boards={[incoming]} onChange={onChange} onCopyToToday={vi.fn()} />);
+    fireEvent.blur(phase);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(phase.value).toBe("本机阶段");
+    fireEvent.focus(phase);
+    fireEvent.blur(phase);
+    expect(onChange.mock.calls[0][0]([incoming])[0].tasks[0]).toMatchObject({ phase: "本机阶段", notes: "远端资料" });
+  });
+
   it("saves only edited fields when another device updates a different field", () => {
     const board = createProjectBoard("research", "并发项目");
     const onChange = vi.fn();

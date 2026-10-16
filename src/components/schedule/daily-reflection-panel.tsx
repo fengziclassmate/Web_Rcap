@@ -8,7 +8,6 @@ import {
   FlaskConical,
   Heart,
   NotebookPen,
-  PenLine,
   Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -173,7 +172,7 @@ export function DailyReflectionPanel({
   }
 
   return (
-    <section className="border-t border-gray-200 bg-stone-50/80 px-4 py-3 sm:px-6">
+    <section className="weekly-reflection border-t border-gray-200 bg-white px-3 py-3 sm:px-4">
       <Collapsible open={panelOpen} onOpenChange={setPanelOpen}>
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -229,7 +228,7 @@ export function DailyReflectionPanel({
                 aria-pressed={selected}
                 disabled={submitting || saving}
                 onClick={() => selectDay(day.date)}
-                className={`group relative min-h-24 min-w-0 border-r border-stone-200 bg-white p-2 text-left transition last:border-r-0 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700 disabled:cursor-wait disabled:opacity-70 ${
+                className={`group relative min-h-16 min-w-0 border-r border-stone-200 bg-white p-2 text-left transition last:border-r-0 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-700 disabled:cursor-wait disabled:opacity-70 ${
                   selected ? "z-[1] bg-emerald-50/80 ring-2 ring-inset ring-emerald-800" : "hover:bg-emerald-50/40"
                 }`}
               >
@@ -275,10 +274,7 @@ export function DailyReflectionPanel({
                     ) : null}
                   </span>
                 ) : (
-                  <span className="mt-3 flex items-center gap-1 text-[10px] text-stone-400 group-hover:text-emerald-700">
-                    <PenLine className="h-3 w-3" aria-hidden />
-                    点击记录
-                  </span>
+                  <span aria-hidden className="mt-2 block h-1 w-1 rounded-full bg-stone-200" />
                 )}
               </button>
             );

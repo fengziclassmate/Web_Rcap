@@ -1611,7 +1611,7 @@ export function TaskDashboard({
         </section>
 
         <section id="task-panel-annual" aria-labelledby="task-panel-trigger-annual" hidden={activeTaskListPanel !== "annual"} className="utility-panel utility-panel-annual">
-          <div className="utility-panel-content mt-3 space-y-3">
+          <div className="utility-panel-content mt-2 space-y-2">
               {annualTasks.length > 0 ? (
                 <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-sm">
                   {annualTasks.map((item) => (
@@ -1724,8 +1724,8 @@ export function TaskDashboard({
           </div> : null}
         </div>
       <section id="utility-panel-project" aria-labelledby="utility-panel-trigger-project" hidden={activeUtilityPanel !== "project"} className="utility-panel utility-panel-project">
-          <div className="utility-panel-content mt-3 space-y-3">
-            <div className="space-y-3">
+          <div className="utility-panel-content mt-2 space-y-2">
+            <div className="space-y-2">
               {visibleProjectCheckins.map((project) => {
                 const projectExpanded = expandedProjects.has(project.id);
                 const checkedInToday = hasProjectCheckinOnDate(project, todayDate);
@@ -1824,6 +1824,7 @@ export function TaskDashboard({
                       type="button"
                       size="icon"
                       variant="ghost"
+                      aria-label={`删除打卡项：${project.name}`}
                       onClick={() =>
                         withOptionalConfirm("确认删除这个项目以及其全部打卡记录吗？", () =>
                           handleDeleteProject(project.id),
@@ -1838,8 +1839,8 @@ export function TaskDashboard({
                   <>
                     <ProjectCheckinCalendar project={project} today={todayDate} />
                     {project.description ? <p className="mb-2 text-xs text-stone-500">{project.description}</p> : null}
-                    <div className="mb-2 h-2 rounded bg-stone-100">
-                      <div className="h-2 rounded bg-black" style={{ width: `${percent}%` }} />
+                    <div className="mb-2 h-1 rounded bg-stone-100">
+                      <div className="h-1 rounded bg-emerald-700" style={{ width: `${percent}%` }} />
                     </div>
                     <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-stone-600">
                       <span>本阶段：{doneCount}/{totalDays}（{percent}%）</span>
@@ -1849,7 +1850,7 @@ export function TaskDashboard({
                         </Badge>
                       ) : null}
                     </div>
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-t border-stone-100 pt-2 items-end">
+                    <div className="project-checkin-entry grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-t border-stone-100 pt-2 items-end">
                       <div className="space-y-1">
                         <Label className="text-xs font-medium text-stone-600">打卡日期</Label>
                         <Input
@@ -1861,7 +1862,7 @@ export function TaskDashboard({
                             setProjectDateDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
                           }
                           aria-label={`${project.name} 打卡日期`}
-                          className="h-9 bg-white"
+                          className="h-8 w-40 max-w-full bg-white"
                         />
                       </div>
                       <div className="col-span-2 row-start-2 space-y-1">
@@ -1872,18 +1873,18 @@ export function TaskDashboard({
                             setProjectNoteDraft((prev) => ({ ...prev, [project.id]: event.target.value }))
                           }
                           placeholder="可选"
-                          rows={2}
+                          rows={1}
                           aria-label={`${project.name} 打卡描述`}
-                          className="min-h-[60px] field-sizing-fixed resize-y bg-white text-sm leading-5"
+                          className="min-h-10 field-sizing-fixed resize-y bg-white text-xs leading-5"
                         />
                       </div>
-                      <Button type="button" size="sm" className="h-9" onClick={() => handleProjectCheckin(project.id)}>
+                      <Button type="button" size="sm" className="h-8" onClick={() => handleProjectCheckin(project.id)}>
                         {(projectDateDraft[project.id] ?? todayDate) === todayDate ? "打卡" : "补打"}
                       </Button>
                     </div>
 
-                    <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-2">
-                      <p className="mb-1 text-xs font-medium text-stone-600">最近打卡记录</p>
+                    <details className="mt-2 border-t border-stone-100 pt-2">
+                      <summary className="cursor-pointer text-xs text-stone-600">最近记录 · {recentCheckins.length}</summary><div className="mt-2">
                       {recentCheckins.length === 0 ? (
                         <p className="text-xs text-stone-500">暂无记录</p>
                       ) : (
@@ -1899,8 +1900,8 @@ export function TaskDashboard({
                           ))}
                         </ul>
                       )}
-                    </div>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    </div></details>
+                    <div className="mt-2 flex flex-wrap gap-2">
                       <Button
                         type="button"
                         size="sm"
@@ -1945,13 +1946,13 @@ export function TaskDashboard({
       </section>
 
       <section id="utility-panel-routine" aria-labelledby="utility-panel-trigger-routine" hidden={activeUtilityPanel !== "routine"} className="utility-panel utility-panel-routine" data-project-checkin-id={ROUTINE_CHECKIN_PROJECT_ID}>
-          <div className="utility-panel-content mt-3 space-y-3">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+          <div className="utility-panel-content mt-2 space-y-2">
+            <div className="routine-checkin-list">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                <p className="text-xs font-medium text-stone-600">
                   今日打卡
                 </p>
-                <span className="rounded-full bg-white px-2 py-1 text-xs font-medium text-emerald-700">
+                <span className="text-xs font-medium tabular-nums text-emerald-800">
                   {completedDailyCheckinCount}/{dailyCheckinEntries.length}
                 </span>
               </div>
@@ -1985,7 +1986,7 @@ export function TaskDashboard({
                   </Button>
                 </div>
               {dailyCheckinEntries.length > 0 ? (
-                <div className="mt-3 grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+                <div className="mt-2 grid max-h-80 overflow-y-auto">
                   {dailyCheckinEntries.map(({ project, slot }) => {
                     const checked = (project.dailyCompletions ?? []).some(
                       (completion) => completion.date === todayDate && completion.slotId === slot.id,
@@ -1994,7 +1995,7 @@ export function TaskDashboard({
                     return (
                       <div
                         key={`${project.id}-${slot.id}`}
-                        className="flex items-center gap-2 rounded-lg border border-white/80 bg-white/70 px-2 py-2"
+                        className="flex items-center gap-2 border-b border-stone-100 py-2"
                       >
                         <Checkbox
                           checked={checked}
@@ -2004,11 +2005,8 @@ export function TaskDashboard({
                           aria-label={`${slot.time} ${slot.label} 打卡状态`}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-stone-900">{slot.label}</p>
-                          <p className="text-xs tabular-nums text-stone-500">
-                            {slot.time}
-                            {fromProject ? ` · 来自 ${project.name}` : ""}
-                          </p>
+                          <div className="flex items-start gap-2"><p className="min-w-0 flex-1 break-words text-sm font-medium text-stone-900">{slot.label}</p><time className="shrink-0 text-xs leading-5 tabular-nums text-stone-500">{slot.time}</time></div>
+                          {fromProject && <p className="truncate text-[11px] text-stone-500" title={project.name}>{project.name}</p>}
                         </div>
                         <Button
                           type="button"
@@ -2029,7 +2027,7 @@ export function TaskDashboard({
                   })}
                 </div>
               ) : (
-                <p className="mt-3 rounded-lg border border-dashed border-emerald-200 bg-white/60 px-3 py-2 text-xs text-emerald-700">
+                <p className="py-3 text-xs text-stone-500">
                   暂无打卡任务
                 </p>
               )}
@@ -2040,21 +2038,21 @@ export function TaskDashboard({
       </section>
 
       <section id="utility-panel-achievement" aria-labelledby="utility-panel-trigger-achievement" hidden={activeUtilityPanel !== "achievement"} className="utility-panel utility-panel-achievement">
-          <div className="utility-panel-content mt-3 space-y-3">
+          <div className="utility-panel-content mt-2 space-y-2">
             {groupedAchievements.length === 0 ? (
-              <p className="rounded-lg border border-stone-200 p-4 text-sm text-stone-500">
+              <p className="py-3 text-xs text-stone-500">
                 暂无成就记录
               </p>
             ) : (
-              <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
+              <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
                 {groupedAchievements.map(([date, items]) => (
-                  <div key={date} className="rounded-lg border border-stone-200 bg-white/70">
-                    <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-xs font-medium text-stone-700">
+                  <div key={date} className="achievement-day-group">
+                    <div className="border-b border-stone-200 pb-1.5 text-[11px] font-medium tabular-nums text-stone-500">
                       {date}
                     </div>
                     <ul className="divide-y divide-gray-100">
                       {items.map((item) => (
-                        <li key={item.id} className="flex items-start justify-between gap-2 px-3 py-3">
+                        <li key={item.id} className="flex items-start justify-between gap-2 py-2">
                           <div className="min-w-0 flex-1">
                             <p className="break-words text-sm font-medium text-stone-900">
                               {item.title}
@@ -2102,34 +2100,34 @@ export function TaskDashboard({
       </section>
 
       <section id="utility-panel-footprint" aria-labelledby="utility-panel-trigger-footprint" hidden={activeUtilityPanel !== "footprint"} className="utility-panel utility-panel-footprint">
-          <div className="utility-panel-content mt-3 space-y-3">
+          <div className="utility-panel-content mt-2 space-y-2">
             {footprints.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-stone-200 bg-white/70 px-3 py-4 text-sm text-stone-500">
+              <p className="py-3 text-xs text-stone-500">
                 暂无足迹项目
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="footprint-list divide-y divide-stone-100">
                 {footprints.map((item) => {
                   const itemExpanded = expandedFootprints.has(item.id);
                   const days = daysSince(item.lastDate);
                   const dayLabel = days === 0 ? "今天" : `${days} 天`;
                   return (
-                    <div key={item.id} className="rounded-xl border border-stone-200 bg-white/80 p-3 text-center">
+                    <div key={item.id} className="footprint-row py-2">
                       <button
                         type="button"
+                        aria-expanded={itemExpanded}
                         className="flex w-full items-center justify-between gap-2 text-left"
                         onClick={() => patchUiPreferences({
                           expandedFootprints: toggleStoredId(uiPreferences.expandedFootprints, item.id),
                         })}
                       >
-                        <p className="truncate text-sm font-medium" title={item.name}>{item.name}</p>
+                        <p className="min-w-0 flex-1 truncate text-sm font-medium" title={item.name}>{item.name}</p><span className="shrink-0 text-xs tabular-nums text-emerald-800" title={`上次记录 ${item.lastDate}`}>{dayLabel}</span>
                         <ChevronDown className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${itemExpanded ? "" : "-rotate-90"}`} />
                       </button>
                       {itemExpanded ? (
-                        <div className="mt-3 space-y-2">
-                          <p className="text-lg font-semibold">{dayLabel}</p>
-                          <p className="text-xs text-stone-500">距上次记录</p>
-                          <div className="flex flex-wrap justify-center gap-1">
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <time className="mr-auto text-xs tabular-nums text-stone-500">{item.lastDate}</time>
+                          <div className="flex flex-wrap gap-1">
                             <Button type="button" size="sm" variant="outline" onClick={() => handleResetFootprint(item.id)}>今天重置</Button>
                             <Button type="button" size="sm" variant="ghost" onClick={() => openEditFootprint(item)}>编辑</Button>
                             <Button
