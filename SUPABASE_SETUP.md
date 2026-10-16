@@ -2,9 +2,9 @@
 
 ## 1. 创建 Supabase 项目
 - 在 [Supabase](https://supabase.com/) 新建项目。
-- 进入 `Project Settings -> API`，复制：
+- 从项目的 `Connect` 窗口获取 URL 和公开 key；全部 API key 可在 `Settings -> API Keys` 中查看。复制：
   - `Project URL`
-  - `anon public key`
+  - publishable key（或现有项目仍在使用的 `anon public key`）
 
 ## 2. 创建数据表和 RLS 策略
 
@@ -42,7 +42,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=你的 anon public key
 
 ## 科研与自学任务表（2026-10-16）
 
-现有项目需执行 `supabase/migrations/20261016090000_add_project_boards.sql`，为 `schedule_data` 增加 `project_boards` JSONB 字段，继续使用现有 RLS 策略。建议先迁移数据库再部署代码。
+现有项目需执行 `supabase/migrations/20261016082720_add_project_boards.sql`，为 `schedule_data` 增加 `project_boards` JSONB 字段，继续使用现有 RLS 策略。建议先迁移数据库再部署代码。
 
 若使用 SQL Editor，本次增量迁移为：
 
@@ -52,3 +52,5 @@ alter table public.schedule_data
 ```
 
 代码先上线时会兼容尚未迁移的数据库：保留项目本机草稿、显示迁移提示，并继续同步原有日程字段。执行迁移后点击工作台顶部的重试，即可提交待同步项目。首次本机登录与真实云端同步需要在配置环境变量和测试账号后验收。
+
+本次迁移已于 2026-10-16 应用到线上 `webRcap` 项目，云端记录版本为 `20261016082720`，仓库文件名与此保持一致。验证结果：新增字段为非空 JSONB，默认值为空数组；原有日程数据行数及 RLS 策略保持不变；线上 Data API 已能读取该字段。
