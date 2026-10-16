@@ -263,15 +263,25 @@
   .project-inline-text:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
   .project-inline-title { resize: none; border-color: transparent; background: transparent; }
   .project-inline-title:hover { border-color: #dfe6e1; background: #fff; }
+  .project-task-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin-bottom: 16px; border-bottom: 1px solid #e7ece8; padding-bottom: 16px; }
+  .project-task-fields > label { width: 132px; flex-shrink: 0; }
+  .project-task-fields > label:nth-child(1) { width: 88px; }
+  .project-task-fields > label:nth-child(2) { width: 144px; }
+  .project-task-fields > label:nth-child(3) { width: 128px; }
+  .project-task-fields > label:nth-child(6) { width: 140px; }
+  .project-task-fields > label:last-child { width: 112px; height: 32px; }
+  .project-task-fields > label > input, .project-task-fields > label > select { height: 32px; }
+  .project-task-fields > label > div { display: flex; height: 32px; align-items: center; }
   .project-subtasks { margin-top: 10px; border: 1px solid #dfe6e1; border-radius: 7px; background: #fff; }
   .project-subtasks:first-child { margin-top: 0; }
   .project-subtask-count { margin-left: 5px; color: #66766b; font-size: 10px; font-variant-numeric: tabular-nums; }
   .project-subtask-scroll { overflow-x: auto; }
-  .project-subtask-table { width: 100%; min-width: 520px; border-collapse: collapse; text-align: left; }
+  .project-subtask-table { width: 100%; min-width: 960px; border-collapse: collapse; text-align: left; }
   .project-subtask-table th { border-bottom: 1px solid #e7ece8; background: #fafbfa; padding: 6px 10px; color: #637568; font-size: 11px; font-weight: 400; }
-  .project-subtask-table td { border-bottom: 1px solid #edf0ee; padding: 7px 10px; vertical-align: top; }
-  .project-subtask-table td:first-child { padding-top: 11px; }
-  .project-subtask-table th:nth-child(2) { min-width: 160px; }
+  .project-subtask-table td { border-bottom: 1px solid #edf0ee; padding: 7px 10px; vertical-align: middle; }
+  .project-subtask-table th:nth-child(2) { min-width: 180px; }
+  .project-subtask-table td:nth-child(5) { min-width: 180px; }
+  .project-subtask-table td:nth-child(6) { min-width: 190px; }
   .project-subtask-add { display: flex; align-items: center; gap: 6px; padding: 5px 10px; color: #728177; }
   .project-subtask-add input { height: 28px; min-width: 0; flex: 1; padding-inline: 3px; color: #374a3e; font-size: 12px; }
   .project-subtask-add input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }

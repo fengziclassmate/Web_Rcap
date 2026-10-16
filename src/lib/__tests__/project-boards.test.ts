@@ -4,6 +4,44 @@ import { normalizePersistedSchedulePayload } from "../schedule-persistence";
 import { mergeScheduleChanges } from "../schedule-merge";
 
 describe("project board records", () => {
+  it("upgrades old subtask fields and validates priority and dates without changing identity or order", () => {
+    const source = [{ id: "board", tasks: [{ id: "task", subtasks: [
+      { id: "old", title: "旧子任务", notes: "保留备注", status: "done" },
+      { id: "valid", title: "已安排", status: "doing", priority: "p1", plannedDate: "2026-10-18", dueDate: "2026-10-25" },
+      { id: "invalid", title: "异常字段", priority: "__proto__", plannedDate: "2026-02-30", dueDate: "tomorrow" },
+    ] }] }];
+    const normalized = normalizeProjectBoards(source);
+    expect(normalized[0].tasks[0].subtasks).toEqual([
+      { id: "old", title: "旧子任务", notes: "保留备注", status: "done", priority: "p2", plannedDate: "", dueDate: "" },
+      { id: "valid", title: "已安排", notes: "", status: "doing", priority: "p1", plannedDate: "2026-10-18", dueDate: "2026-10-25" },
+      { id: "invalid", title: "异常字段", notes: "", status: "todo", priority: "p2", plannedDate: "", dueDate: "" },
+    ]);
+    expect(normalizeProjectBoards(JSON.parse(JSON.stringify(normalized)))).toEqual(normalized);
+  });
+
+  it("merges subtask date and priority edits from different devices and keeps new fields in backup and CSV", () => {
+    const board = createProjectBoard("research", "子任务规划");
+    board.tasks[0].subtasks[0].notes = "保留原始备注";
+    const base = normalizePersistedSchedulePayload({ project_boards: [board] })!;
+    const local = structuredClone(base);
+    const remote = structuredClone(base);
+    const localChild = local.project_boards![0].tasks[0].subtasks[0];
+    localChild.priority = "p1";
+    localChild.dueDate = "2026-10-25";
+    remote.project_boards![0].tasks[0].subtasks[0].plannedDate = "2026-10-18";
+    const merged = mergeScheduleChanges(base, local, remote);
+    expect(merged.conflicts).toEqual([]);
+    const task = merged.value.project_boards![0].tasks[0];
+    expect(task.subtasks[0]).toMatchObject({ notes: "保留原始备注", priority: "p1", plannedDate: "2026-10-18", dueDate: "2026-10-25" });
+    expect(normalizePersistedSchedulePayload(JSON.parse(JSON.stringify(merged.value)))).toEqual(merged.value);
+    const csv = boardTasksToCsv([{ board, task }]);
+    expect(csv).toContain('"重要且紧急","未开始","2026-10-18","2026-10-25"');
+    const cleared = structuredClone(merged.value);
+    cleared.project_boards![0].tasks[0].subtasks[0].plannedDate = "";
+    cleared.project_boards![0].tasks[0].subtasks[0].dueDate = "";
+    expect(normalizePersistedSchedulePayload(JSON.parse(JSON.stringify(cleared)))?.project_boards?.[0].tasks[0].subtasks[0]).toMatchObject({ plannedDate: "", dueDate: "", priority: "p1" });
+  });
+
   it("reorders visible records without moving hidden rows or resurrecting removed records", () => {
     const items = ["a", "hidden", "b", "c", "new"].map((id) => ({ id, notes: `最新备注 ${id}` }));
     const reordered = reorderVisibleRecords(items, "c", "b", ["b", "c", "a"]);

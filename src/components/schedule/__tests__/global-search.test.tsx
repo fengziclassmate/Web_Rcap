@@ -5,13 +5,16 @@ import { buildSearchIndex, GlobalSearch } from "../global-search";
 import { createProjectBoard } from "@/lib/project-boards";
 
 describe("global search", () => {
-  it("locates a project task through its subtask notes", () => {
+  it("locates a project task through its subtask notes, priority and dates", () => {
     const board = createProjectBoard("research", "城市用地诊断");
     board.tasks[0].subtasks[0].notes = "核对土地分类口径";
+    board.tasks[0].subtasks[0].priority = "p1";
+    board.tasks[0].subtasks[0].plannedDate = "2026-10-18";
+    board.tasks[0].subtasks[0].dueDate = "2026-10-25";
     const onLocate = vi.fn();
     render(<GlobalSearch tasks={[]} events={[]} logs={[]} annualTasks={[]} projects={[]} shopping={[]} boards={[board]} logsReady onLocate={onLocate} />);
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-    fireEvent.change(screen.getByLabelText("搜索工作台内容"), { target: { value: "土地分类口径" } });
+    fireEvent.change(screen.getByLabelText("搜索工作台内容"), { target: { value: "土地分类口径 重要且紧急 2026-10-18 2026-10-25" } });
     fireEvent.click(screen.getByRole("button", { name: /明确研究问题与评价指标/ }));
     fireEvent.click(screen.getByRole("button", { name: "打开项目任务" }));
     expect(onLocate).toHaveBeenCalledWith(expect.objectContaining({ boardId: board.id, boardTaskId: board.tasks[0].id }));

@@ -12,6 +12,46 @@ function Workspace({ initial = [] }: { initial?: ProjectBoard[] }) {
 }
 
 describe("research and learning workspace", () => {
+  it("edits subtask priority and dates inline, clears a date and retains fields while reordering", () => {
+    const board = createProjectBoard("research", "子任务日期");
+    const task = board.tasks[0];
+    const child = task.subtasks[0];
+    const { container } = render(<Workspace initial={[board]} />);
+    fireEvent.click(screen.getByRole("button", { name: `展开任务：${task.title}` }));
+    fireEvent.change(screen.getByLabelText(`子任务优先级：${child.title}`), { target: { value: "p1" } });
+    fireEvent.change(screen.getByLabelText(`子任务计划日期：${child.title}`), { target: { value: "2026-10-18" } });
+    fireEvent.change(screen.getByLabelText(`子任务截止日期：${child.title}`), { target: { value: "2026-10-25" } });
+    fireEvent.keyDown(screen.getByRole("button", { name: `移动子任务：${child.title}` }), { key: "ArrowDown" });
+    expect(Array.from(container.querySelectorAll("[data-subtask-id]")).map((row) => row.getAttribute("data-subtask-id"))).toEqual(task.subtasks.map((item) => item.id).reverse());
+    expect((screen.getByLabelText(`子任务优先级：${child.title}`) as HTMLSelectElement).value).toBe("p1");
+    expect((screen.getByLabelText(`子任务计划日期：${child.title}`) as HTMLInputElement).value).toBe("2026-10-18");
+    expect((screen.getByLabelText(`子任务截止日期：${child.title}`) as HTMLInputElement).value).toBe("2026-10-25");
+    fireEvent.change(screen.getByLabelText(`子任务计划日期：${child.title}`), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: `收起任务：${task.title}` }));
+    fireEvent.click(screen.getByRole("button", { name: `展开任务：${task.title}` }));
+    expect((screen.getByLabelText(`子任务计划日期：${child.title}`) as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText(`子任务截止日期：${child.title}`) as HTMLInputElement).value).toBe("2026-10-25");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("saves subtask priority and dates from task details", async () => {
+    const board = createProjectBoard("learning", "详情规划");
+    const task = board.tasks[0];
+    const title = task.subtasks[0].title;
+    render(<Workspace initial={[board]} />);
+    fireEvent.click(screen.getByRole("button", { name: task.title }));
+    const editor = within(screen.getByRole("dialog"));
+    fireEvent.change(editor.getByLabelText(`子任务优先级：${title}`), { target: { value: "p3" } });
+    fireEvent.change(editor.getByLabelText(`子任务计划日期：${title}`), { target: { value: "2026-10-19" } });
+    fireEvent.change(editor.getByLabelText(`子任务截止日期：${title}`), { target: { value: "2026-10-26" } });
+    fireEvent.click(editor.getByRole("button", { name: "保存任务" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: `展开任务：${task.title}` }));
+    expect((screen.getByLabelText(`子任务优先级：${title}`) as HTMLSelectElement).value).toBe("p3");
+    expect((screen.getByLabelText(`子任务计划日期：${title}`) as HTMLInputElement).value).toBe("2026-10-19");
+    expect((screen.getByLabelText(`子任务截止日期：${title}`) as HTMLInputElement).value).toBe("2026-10-26");
+  });
+
   it("drags tasks from priority view into manual order and keeps that order when switching views", () => {
     const board = createProjectBoard("research", "手动排序");
     board.tasks.forEach((task, index) => { task.priority = (["p3", "p1", "p2", "p4"] as const)[index]; });

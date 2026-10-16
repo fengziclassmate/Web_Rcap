@@ -238,7 +238,7 @@ export function WorkbenchApp() {
     const priority = { p1: "紧急且重要", p2: "不紧急重要", p3: "紧急不重要", p4: "不紧急不重要" } as const;
     setTasks((previous) => [...previous, {
       id, name: task.title, dueDate: todayISO(), createdAt: new Date().toISOString(), done: false,
-      notes: `来源：${board.name} · ${boardPriorities[task.priority].label}\n${task.content}\n${task.notes}\n${task.subtasks.map((item) => `${item.status === "done" ? "☑" : "☐"} ${item.title}${item.notes ? ` · ${item.notes}` : ""}`).join("\n")}`,
+      notes: `来源：${board.name} · ${boardPriorities[task.priority].label}\n${task.content}\n${task.notes}\n${task.subtasks.map((item) => [`${item.status === "done" ? "☑" : "☐"} ${item.title}`, boardPriorities[item.priority].short, item.plannedDate && `计划 ${item.plannedDate}`, item.dueDate && `截止 ${item.dueDate}`, item.notes].filter(Boolean).join(" · ")).join("\n")}`,
       precautions: [], completionLog: "", priority: priority[task.priority], subtasks: [], taskType: "daily", isTodayFocus: true,
     }]);
     toast.success("已复制到今日待办");

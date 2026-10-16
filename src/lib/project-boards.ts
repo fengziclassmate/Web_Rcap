@@ -11,7 +11,7 @@ export const boardStatuses = { todo: "未开始", doing: "进行中", blocked: "
 export type BoardPriority = keyof typeof boardPriorities;
 export type BoardStatus = keyof typeof boardStatuses;
 export type BoardScope = "all" | "today" | "week" | "overdue" | "archived";
-export type BoardSubtask = { id: string; title: string; notes: string; status: BoardStatus };
+export type BoardSubtask = { id: string; title: string; notes: string; status: BoardStatus; priority: BoardPriority; plannedDate: string; dueDate: string };
 export type BoardTask = {
   id: string;
   title: string;
@@ -62,7 +62,7 @@ function normalizeTaskSubtasks(task: Record<string, unknown>): { content: string
     const content = text(task.content).split("\n").filter((line, index) => {
       const match = line.match(/^\s*- \[([ xX])\] (.*)$/);
       if (!match) return true;
-      subtasks.push({ id: `${task.id}:subtask:${index}`, title: plainChecklistTitle(match[2]), notes: "", status: match[1] === " " ? "todo" : "done" });
+      subtasks.push({ id: `${task.id}:subtask:${index}`, title: plainChecklistTitle(match[2]), notes: "", status: match[1] === " " ? "todo" : "done", priority: "p2", plannedDate: "", dueDate: "" });
       return false;
     }).join("\n");
     return { content, subtasks };
@@ -72,7 +72,7 @@ function normalizeTaskSubtasks(task: Record<string, unknown>): { content: string
     if (typeof item.id !== "string" || !item.id || ids.has(item.id)) return false;
     ids.add(item.id);
     return true;
-  }).map((item): BoardSubtask => ({ id: item.id as string, title: text(item.title) || "未命名子任务", notes: text(item.notes), status: Object.hasOwn(boardStatuses, text(item.status)) ? item.status as BoardStatus : "todo" }));
+  }).map((item): BoardSubtask => ({ id: item.id as string, title: text(item.title) || "未命名子任务", notes: text(item.notes), status: Object.hasOwn(boardStatuses, text(item.status)) ? item.status as BoardStatus : "todo", priority: Object.hasOwn(boardPriorities, text(item.priority)) ? item.priority as BoardPriority : "p2", plannedDate: date(item.plannedDate), dueDate: date(item.dueDate) }));
   return { content: text(task.content), subtasks };
 }
 
@@ -112,7 +112,7 @@ export function createBoardTask(title = ""): BoardTask {
 }
 
 export function createBoardSubtask(title = ""): BoardSubtask {
-  return { id: createId("board-subtask"), title, notes: "", status: "todo" };
+  return { id: createId("board-subtask"), title, notes: "", status: "todo", priority: "p2", plannedDate: "", dueDate: "" };
 }
 
 export function createProjectBoard(template: "blank" | "research" | "learning", name: string): ProjectBoard {
@@ -137,7 +137,7 @@ export function toggleChecklistLine(content: string, index: number) {
     ? line.replace(/^(\s*- \[)([ xX])(\] )/, (_, before: string, state: string, after: string) => `${before}${state === " " ? "x" : " "}${after}`) : line).join("\n");
 }
 
-export function isBoardTaskOverdue(task: BoardTask, today: string) {
+export function isBoardTaskOverdue(task: Pick<BoardTask, "status" | "dueDate">, today: string) {
   return task.status !== "done" && Boolean(task.dueDate) && task.dueDate < today;
 }
 
@@ -189,5 +189,5 @@ export function setBoardTaskStatus(task: BoardTask, status: BoardStatus): BoardT
 
 export function boardTasksToCsv(rows: { board: ProjectBoard; task: BoardTask }[]) {
   const escape = (value: string) => `"${value.replace(/^[\s]*[=+\-@]/, (match) => `'${match}`).replaceAll('"', '""')}"`;
-  return "\uFEFF" + [["项目", "任务", "阶段", "优先级", "状态", "计划日期", "截止日期", "标签", "里程碑", "任务内容", "备注与资料", "成果与复盘", "类型", "父任务"], ...rows.flatMap(({ board, task }) => [[board.name, task.title, task.phase, boardPriorities[task.priority].label, boardStatuses[task.status], task.plannedDate, task.dueDate, task.tags.join("、"), task.milestone ? "是" : "否", task.content, task.notes, task.review, "任务", ""], ...task.subtasks.map((item) => [board.name, item.title, task.phase, "", boardStatuses[item.status], "", "", "", "", "", item.notes, "", "子任务", task.title])])].map((row) => row.map(escape).join(",")).join("\r\n");
+  return "\uFEFF" + [["项目", "任务", "阶段", "优先级", "状态", "计划日期", "截止日期", "标签", "里程碑", "任务内容", "备注与资料", "成果与复盘", "类型", "父任务"], ...rows.flatMap(({ board, task }) => [[board.name, task.title, task.phase, boardPriorities[task.priority].label, boardStatuses[task.status], task.plannedDate, task.dueDate, task.tags.join("、"), task.milestone ? "是" : "否", task.content, task.notes, task.review, "任务", ""], ...task.subtasks.map((item) => [board.name, item.title, task.phase, boardPriorities[item.priority].label, boardStatuses[item.status], item.plannedDate, item.dueDate, "", "", "", item.notes, "", "子任务", task.title])])].map((row) => row.map(escape).join(",")).join("\r\n");
 }

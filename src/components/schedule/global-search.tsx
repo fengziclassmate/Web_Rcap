@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import type { LogPostRecord } from "@/lib/logs";
 import { followUpStatuses, getFollowUpStatus } from "@/lib/follow-up";
 import type { AnnualTask, LongTask, ProjectCheckin, ScheduleEvent, ShoppingItem } from "@/lib/types";
-import { boardStatuses, type ProjectBoard } from "@/lib/project-boards";
+import { boardPriorities, boardStatuses, type ProjectBoard } from "@/lib/project-boards";
 
 export type SearchResult = { boardId?: string; boardTaskId?: string; collection?: "annual" | "project" | "shopping"; id: string; kind: string; title: string; detail: string; date?: string; task?: LongTask; log?: LogPostRecord; event?: ScheduleEvent };
 export function buildSearchIndex(events: ScheduleEvent[], tasks: LongTask[], logs: LogPostRecord[], annualTasks: AnnualTask[], projects: ProjectCheckin[], shopping: ShoppingItem[], boards: ProjectBoard[] = []): SearchResult[] {
@@ -21,7 +21,7 @@ export function buildSearchIndex(events: ScheduleEvent[], tasks: LongTask[], log
     ...shopping.map((item) => ({ id: item.id, kind: "购物", collection: "shopping" as const, title: item.name, detail: item.done ? "已购" : "待购" })),
     ...boards.flatMap((board) => [
       { id: board.id, boardId: board.id, kind: "项目任务表", title: board.name, detail: [board.archived ? "已归档" : "进行中", board.goal, board.description].join("\n"), date: board.targetDate },
-      ...board.tasks.map((task) => ({ id: `${board.id}:${task.id}`, boardId: board.id, boardTaskId: task.id, kind: "项目任务", title: task.title, detail: [board.name, boardStatuses[task.status], task.phase, ...task.tags, task.content, task.notes, task.review, ...task.subtasks.map((item) => `${item.title} · ${boardStatuses[item.status]}\n${item.notes}`)].join("\n"), date: task.dueDate })),
+      ...board.tasks.map((task) => ({ id: `${board.id}:${task.id}`, boardId: board.id, boardTaskId: task.id, kind: "项目任务", title: task.title, detail: [board.name, boardStatuses[task.status], task.phase, ...task.tags, task.content, task.notes, task.review, ...task.subtasks.map((item) => [item.title, boardStatuses[item.status], boardPriorities[item.priority].label, item.plannedDate && `计划 ${item.plannedDate}`, item.dueDate && `截止 ${item.dueDate}`, item.notes].filter(Boolean).join(" · "))].join("\n"), date: task.dueDate })),
     ]),
   ];
 }
