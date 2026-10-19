@@ -12,6 +12,84 @@ function Workspace({ initial = [] }: { initial?: ProjectBoard[] }) {
 }
 
 describe("research and learning workspace", () => {
+  it("remembers expanded rows on reopen and supports expanding and collapsing the visible list", () => {
+    const board = createProjectBoard("research", "展开记忆");
+    function Remembered() {
+      const [boards, setBoards] = useState([board]);
+      const [expanded, setExpanded] = useState<string[]>([]);
+      const [open, setOpen] = useState(true);
+      return <><button onClick={() => setOpen(!open)}>{open ? "关闭工作台" : "打开工作台"}</button>{open && <ProjectWorkspace boards={boards} onChange={setBoards} onCopyToToday={vi.fn()} expandedTasks={expanded} onExpandedTasksChange={setExpanded} />}</>;
+    }
+    render(<Remembered />);
+    fireEvent.click(screen.getByRole("button", { name: `展开任务：${board.tasks[0].title}` }));
+    fireEvent.click(screen.getByRole("button", { name: `展开任务：${board.tasks[1].title}` }));
+    fireEvent.click(screen.getByRole("button", { name: "关闭工作台" }));
+    fireEvent.click(screen.getByRole("button", { name: "打开工作台" }));
+    expect(screen.getByRole("button", { name: `收起任务：${board.tasks[0].title}` })).toBeTruthy();
+    expect(screen.getByRole("button", { name: `收起任务：${board.tasks[1].title}` })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "筛选" }));
+    fireEvent.change(screen.getByLabelText("筛选任务阶段"), { target: { value: board.tasks[0].phase } });
+    fireEvent.click(screen.getByRole("button", { name: "全部折叠" }));
+    fireEvent.change(screen.getByLabelText("筛选任务阶段"), { target: { value: "all" } });
+    expect(screen.getByRole("button", { name: `展开任务：${board.tasks[0].title}` })).toBeTruthy();
+    expect(screen.getByRole("button", { name: `收起任务：${board.tasks[1].title}` })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "全部展开" }));
+    expect(screen.getAllByRole("table").length).toBe(5);
+    fireEvent.click(screen.getByRole("button", { name: "全部折叠" }));
+    expect(screen.getAllByRole("table").length).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "关闭工作台" }));
+    fireEvent.click(screen.getByRole("button", { name: "打开工作台" }));
+    expect(screen.getAllByRole("table").length).toBe(1);
+  });
+
+  it("scopes expansion by project even when tasks share an ID, and leaves content cells without placeholders", () => {
+    const first = createProjectBoard("research", "甲");
+    const second = createProjectBoard("research", "乙");
+    first.tasks[0].title = "甲任务";
+    second.tasks[0].title = "乙任务";
+    second.tasks[0].id = first.tasks[0].id;
+    render(<Workspace initial={[first, second]} />);
+    fireEvent.click(screen.getByRole("button", { name: "展开任务：甲任务" }));
+    expect(screen.getByRole("button", { name: "展开任务：乙任务" })).toBeTruthy();
+    expect(screen.getByLabelText("阶段：甲任务").getAttribute("placeholder")).toBeNull();
+    expect(screen.getByLabelText("任务备注：甲任务").getAttribute("placeholder")).toBeNull();
+    expect(screen.getByLabelText(`子任务备注：${first.tasks[0].subtasks[0].title}`).getAttribute("placeholder")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "甲任务" }));
+    expect(screen.getByRole("textbox", { name: "任务内容" }).getAttribute("placeholder")).toBeNull();
+    expect(screen.getByRole("textbox", { name: "任务名称" }).getAttribute("placeholder")).toBeNull();
+  });
+
+  it("moves completed tasks below active tasks while retaining manual rank when reopened", () => {
+    const board = createProjectBoard("research", "完成下移");
+    board.tasks[0].priority = board.tasks[1].priority = "p1";
+    board.tasks[1].status = "done";
+    const { container } = render(<Workspace initial={[board]} />);
+    const order = () => Array.from(container.querySelectorAll(".project-task-table > tbody > tr[data-task-order-id]")).map((row) => row.getAttribute("data-task-order-id"));
+    expect(order()).toEqual([0, 2, 3, 1].map((index) => board.tasks[index].id));
+    fireEvent.click(screen.getByRole("checkbox", { name: `完成任务：${board.tasks[0].title}` }));
+    expect(order()).toEqual([2, 3, 0, 1].map((index) => board.tasks[index].id));
+    const dataTransfer = { setData: vi.fn(), effectAllowed: "move", dropEffect: "move" };
+    fireEvent.dragStart(screen.getByRole("button", { name: `移动任务：${board.tasks[3].title}` }), { dataTransfer });
+    fireEvent.drop(container.querySelector(`[data-task-order-id="${board.tasks[0].id}"]`)!, { dataTransfer });
+    expect(order()).toEqual([2, 3, 0, 1].map((index) => board.tasks[index].id));
+    fireEvent.click(screen.getByRole("checkbox", { name: `完成任务：${board.tasks[0].title}` }));
+    expect(order()).toEqual([0, 2, 3, 1].map((index) => board.tasks[index].id));
+    fireEvent.change(screen.getByLabelText("任务排序"), { target: { value: "priority" } });
+    expect(order().at(-1)).toBe(board.tasks[1].id);
+  });
+
+  it("moves checked subtasks down and restores their manual position when unchecked", () => {
+    const board = createProjectBoard("research", "子任务完成");
+    const task = board.tasks[0];
+    const { container } = render(<Workspace initial={[board]} />);
+    fireEvent.click(screen.getByRole("button", { name: `展开任务：${task.title}` }));
+    const order = () => Array.from(container.querySelectorAll("[data-subtask-id]")).map((row) => row.getAttribute("data-subtask-id"));
+    fireEvent.click(screen.getByRole("checkbox", { name: `完成子任务：${task.subtasks[0].title}` }));
+    expect(order()).toEqual(task.subtasks.map((item) => item.id).reverse());
+    fireEvent.click(screen.getByRole("checkbox", { name: `完成子任务：${task.subtasks[0].title}` }));
+    expect(order()).toEqual(task.subtasks.map((item) => item.id));
+  });
+
   it("edits subtask priority and dates inline, clears a date and retains fields while reordering", () => {
     const board = createProjectBoard("research", "子任务日期");
     const task = board.tasks[0];
@@ -109,9 +187,9 @@ describe("research and learning workspace", () => {
     const target = table.querySelectorAll("[data-subtask-id]")[0];
     fireEvent.dragOver(target, { dataTransfer });
     fireEvent.drop(target, { dataTransfer });
-    expect(order()).toEqual([2, 0, 1].map((index) => task.subtasks[index].id));
+    expect(order()).toEqual([2, 1, 0].map((index) => task.subtasks[index].id));
     fireEvent.keyDown(screen.getByRole("button", { name: "移动子任务：第三个子任务" }), { key: "ArrowDown" });
-    expect(order()).toEqual([0, 2, 1].map((index) => task.subtasks[index].id));
+    expect(order()).toEqual([1, 2, 0].map((index) => task.subtasks[index].id));
     expect((screen.getByLabelText(`子任务备注：${task.subtasks[0].title}`) as HTMLTextAreaElement).value).toBe("保留备注");
     expect((screen.getByLabelText(`完成子任务：${task.subtasks[0].title}`) as HTMLInputElement).checked).toBe(true);
     expect(Array.from(container.querySelectorAll(".project-task-table > tbody > tr[data-task-order-id]")).map((row) => row.getAttribute("data-task-order-id"))).toEqual(board.tasks.map((item) => item.id));

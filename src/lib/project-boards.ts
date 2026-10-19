@@ -159,6 +159,10 @@ export function getTaskSubtaskProgress(task: BoardTask) {
   return { total: task.subtasks.length, done: task.subtasks.filter((item) => item.status === "done").length };
 }
 
+export function compareCompletion(a: { status: BoardStatus }, b: { status: BoardStatus }) {
+  return Number(a.status === "done") - Number(b.status === "done");
+}
+
 export function reorderVisibleRecords<T extends { id: string }>(items: T[], sourceId: string, targetId: string, visibleIds = items.map((item) => item.id)): T[] {
   const latest = new Map(items.map((item) => [item.id, item]));
   const order = [...new Set(visibleIds.filter((id) => latest.has(id)))];

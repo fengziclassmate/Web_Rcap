@@ -142,6 +142,7 @@ export type FootprintItem = {
 export type DashboardUiPreferences = {
   dashboardSectionOrder?: import("./dashboard-sections").DashboardSectionId[];
   projectBoardsSectionOpen?: boolean;
+  projectWorkspaceExpandedTasks?: string[];
   executionSectionOpen?: boolean;
   followUpSectionOpen?: boolean;
   capacityStartHour?: number;

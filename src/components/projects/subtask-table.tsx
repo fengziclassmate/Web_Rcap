@@ -5,7 +5,7 @@ import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { boardPriorities, boardStatuses, createBoardSubtask, isBoardTaskOverdue, reorderVisibleRecords, type BoardPriority, type BoardStatus, type BoardSubtask, type BoardTask } from "@/lib/project-boards";
+import { boardPriorities, boardStatuses, compareCompletion, createBoardSubtask, isBoardTaskOverdue, reorderVisibleRecords, type BoardPriority, type BoardStatus, type BoardSubtask, type BoardTask } from "@/lib/project-boards";
 import { todayISO } from "@/lib/date-utils";
 import { useRowReorder } from "./use-row-reorder";
 
@@ -46,7 +46,13 @@ export function InlineProjectText({ value, label, placeholder, required = false,
 export function SubtaskTable({ title, subtasks, onChange }: { title: string; subtasks: BoardSubtask[]; onChange: (update: (previous: BoardSubtask[]) => BoardSubtask[]) => void }) {
   const [newTitle, setNewTitle] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
-  const sorting = useRowReorder(subtasks.map((item) => ({ id: item.id, group: "subtasks", label: `子任务：${item.title}` })), (sourceId, targetId) => onChange((previous) => reorderVisibleRecords(previous, sourceId, targetId)));
+  const rows = [...subtasks].sort(compareCompletion);
+  const sorting = useRowReorder(rows.map((item) => ({ id: item.id, group: item.status === "done" ? "done" : "active", label: `子任务：${item.title}` })), (sourceId, targetId) => {
+    const source = rows.find((item) => item.id === sourceId);
+    if (!source) return;
+    const visibleIds = rows.filter((item) => !compareCompletion(item, source)).map((item) => item.id);
+    onChange((previous) => reorderVisibleRecords(previous, sourceId, targetId, visibleIds));
+  });
   function patch(id: string, changes: Partial<BoardSubtask>) { onChange((previous) => previous.map((item) => item.id === id ? { ...item, ...changes } : item)); }
   function add() {
     if (!newTitle.trim()) return;
@@ -56,13 +62,13 @@ export function SubtaskTable({ title, subtasks, onChange }: { title: string; sub
   }
   return <section className="project-subtasks" aria-label={`${title}的子任务`}>
     <div className="project-subtask-scroll"><table className="project-subtask-table"><caption className="sr-only">{title}的子任务表</caption><thead><tr><th className="w-16"><span className="sr-only">排序及完成状态</span></th><th>子任务 <span className="project-subtask-count">{subtasks.filter((item) => item.status === "done").length}/{subtasks.length}</span></th><th className="w-36">优先级</th><th className="w-24">状态</th><th className="w-44">日期</th><th className="w-[28%]">备注</th><th className="w-10"><span className="sr-only">操作</span></th></tr></thead><tbody>
-      {subtasks.map((item) => <tr key={item.id} data-subtask-id={item.id} className="project-sortable-row" {...sorting.rowProps(item.id)}>
+      {rows.map((item) => <tr key={item.id} data-subtask-id={item.id} className="project-sortable-row" {...sorting.rowProps(item.id)}>
         <td><div className="flex items-center gap-1">{sorting.handle(item.id)}<input type="checkbox" checked={item.status === "done"} aria-label={`完成子任务：${item.title}`} onChange={(event) => patch(item.id, { status: event.target.checked ? "done" : "todo" })} className="size-3.5 shrink-0 accent-emerald-800" /></div></td>
         <td><InlineProjectText required value={item.title} label={`子任务名称：${item.title}`} onChange={(title) => patch(item.id, { title })} /></td>
         <td><TaskPriorityControl priority={item.priority} label={`子任务优先级：${item.title}`} onChange={(priority) => patch(item.id, { priority })} /></td>
         <td><TaskStatusControl status={item.status} label={`子任务状态：${item.title}`} onChange={(status) => patch(item.id, { status })} /></td>
         <td><TaskDateControls task={item} labelPrefix="子任务" onChange={(field, value) => patch(item.id, { [field]: value })} /></td>
-        <td><InlineProjectText multiline value={item.notes} label={`子任务备注：${item.title}`} placeholder="添加备注" onChange={(notes) => patch(item.id, { notes })} /></td>
+        <td><InlineProjectText multiline value={item.notes} label={`子任务备注：${item.title}`} onChange={(notes) => patch(item.id, { notes })} /></td>
         <td><Button type="button" size="icon-sm" variant="ghost" aria-label={`删除子任务：${item.title}`} title="删除子任务" onClick={() => setDeleting(item.id)}><Trash2 className="size-3.5" /></Button></td>
       </tr>)}
     </tbody></table></div>

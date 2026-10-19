@@ -1214,7 +1214,7 @@ export function WorkbenchApp() {
             <DialogDescription>按项目安排任务、标注内容与记录成果。关闭后回到任务控制台。</DialogDescription>
           </DialogHeader>
           <div className="h-full min-h-0 overflow-hidden">
-            {openBoardRequest && <ProjectWorkspace key={`${user.id}:${openBoardRequest.token}`} boards={projectBoards} onChange={setProjectBoards} onCopyToToday={copyBoardTaskToToday} onStartFocus={(board, task) => startTaskFocus(projectFocusTarget(board, task))} initialSelection={openBoardRequest} />}
+            {openBoardRequest && <ProjectWorkspace key={`${user.id}:${openBoardRequest.token}`} boards={projectBoards} onChange={setProjectBoards} onCopyToToday={copyBoardTaskToToday} onStartFocus={(board, task) => startTaskFocus(projectFocusTarget(board, task))} initialSelection={openBoardRequest} expandedTasks={dashboardUiPreferences.projectWorkspaceExpandedTasks ?? []} onExpandedTasksChange={(update) => setDashboardUiPreferences((previous) => ({ ...previous, projectWorkspaceExpandedTasks: typeof update === "function" ? update(previous.projectWorkspaceExpandedTasks ?? []) : update }))} />}
           </div>
         </DialogContent>
       </Dialog>

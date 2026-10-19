@@ -24,6 +24,7 @@ import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/cate
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   dashboardSectionOrder: defaultDashboardSectionOrder,
   projectBoardsSectionOpen: true,
+  projectWorkspaceExpandedTasks: [],
   executionSectionOpen: true,
   followUpSectionOpen: true,
   capacityStartHour: 9,
@@ -286,6 +287,9 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
   return {
     dashboardSectionOrder: normalizeDashboardSectionOrder(value.dashboardSectionOrder),
     projectBoardsSectionOpen: value.projectBoardsSectionOpen !== false,
+    projectWorkspaceExpandedTasks: Array.isArray(value.projectWorkspaceExpandedTasks)
+      ? [...new Set(value.projectWorkspaceExpandedTasks.filter((item): item is string => typeof item === "string" && item.length > 0))].sort()
+      : [],
     executionSectionOpen: value.executionSectionOpen !== false,
     followUpSectionOpen: value.followUpSectionOpen !== false,
     capacityStartHour,

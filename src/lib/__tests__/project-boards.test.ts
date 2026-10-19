@@ -2,8 +2,27 @@ import { describe, expect, it } from "vitest";
 import { boardTasksToCsv, checklistProgress, createBoardTask, createBoardSubtask, createProjectBoard, getTaskSubtaskProgress, matchesBoardScope, normalizeProjectBoards, reorderProjectBoards, reorderVisibleRecords, setBoardTaskStatus, toggleChecklistLine } from "../project-boards";
 import { normalizePersistedSchedulePayload } from "../schedule-persistence";
 import { mergeScheduleChanges } from "../schedule-merge";
+import { normalizeDashboardUiPreferences } from "../normalizers";
 
 describe("project board records", () => {
+  it("persists scoped expansion preferences through backup and merges them with remote task edits", () => {
+    const board = createProjectBoard("research", "展开偏好");
+    const key = JSON.stringify([board.id, board.tasks[0].id]);
+    expect(normalizeDashboardUiPreferences({ projectWorkspaceExpandedTasks: [key, key, 1, ""] }).projectWorkspaceExpandedTasks).toEqual([key]);
+    const other = JSON.stringify([board.id, board.tasks[1].id]);
+    expect(normalizeDashboardUiPreferences({ projectWorkspaceExpandedTasks: [key, other] }).projectWorkspaceExpandedTasks).toEqual(normalizeDashboardUiPreferences({ projectWorkspaceExpandedTasks: [other, key] }).projectWorkspaceExpandedTasks);
+    const base = normalizePersistedSchedulePayload({ project_boards: [board] })!;
+    const local = structuredClone(base);
+    const remote = structuredClone(base);
+    local.ui_preferences.projectWorkspaceExpandedTasks = [key];
+    remote.project_boards![0].tasks[0].notes = "远端资料";
+    const merged = mergeScheduleChanges(base, local, remote);
+    expect(merged.conflicts).toEqual([]);
+    const restored = normalizePersistedSchedulePayload(JSON.parse(JSON.stringify(merged.value)))!;
+    expect(restored.ui_preferences.projectWorkspaceExpandedTasks).toEqual([key]);
+    expect(restored.project_boards![0].tasks[0].notes).toBe("远端资料");
+  });
+
   it("upgrades old subtask fields and validates priority and dates without changing identity or order", () => {
     const source = [{ id: "board", tasks: [{ id: "task", subtasks: [
       { id: "old", title: "旧子任务", notes: "保留备注", status: "done" },
