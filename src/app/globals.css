@@ -172,6 +172,8 @@
   .project-row-drag-handle:disabled { cursor: default; opacity: .35; }
   .project-row-drag-handle:not(:disabled):hover { background: #e7efe9; color: #235b3c; }
   .project-sortable-row[data-sort-over="true"] > td { background: #eaf3ec; box-shadow: inset 0 2px 0 #3c7654; }
+  .project-sortable-row:focus { outline: 2px solid #56866a; outline-offset: -2px; }
+  .project-sortable-row:focus > td { background: #f0f6f2; }
   .project-kanban-card[data-sort-over="true"] { outline: 2px solid #3c7654; }
   .project-nav-count { color: #637568; font-size: 13px; font-variant-numeric: tabular-nums; }
   .project-list-label { display: flex; align-items: center; justify-content: space-between; margin: 26px 8px 7px 10px; color: #637568; font-size: 12px; font-weight: 500; }

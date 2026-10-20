@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Archive, ArrowDownToLine, ArrowUpDown, BookOpen, CalendarDays, CalendarPlus, ChevronDown, ChevronRight, CircleAlert, Flag, FlaskConical, FolderOpen, GripVertical, LayoutGrid, ListTodo, Play, Plus, Search, Settings2, SlidersHorizontal, Table2, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,7 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, onStartFocus
   onChange: Dispatch<SetStateAction<ProjectBoard[]>>;
   onCopyToToday: (board: ProjectBoard, task: BoardTask) => void;
   onStartFocus?: (board: ProjectBoard, task: BoardTask) => void;
-  initialSelection?: { boardId: string; taskId?: string; token: number };
+  initialSelection?: { boardId: string; taskId?: string; subtaskId?: string; intent?: "edit" | "reveal"; token: number };
   expandedTasks?: string[];
   onExpandedTasksChange?: Dispatch<SetStateAction<string[]>>;
   events?: ScheduleEvent[];
@@ -71,15 +71,34 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, onStartFocus
   const [sort, setSort] = useState("manual");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [quickTitle, setQuickTitle] = useState("");
-  const [localExpanded, setLocalExpanded] = useState<string[]>([]);
+  const [localExpanded, setLocalExpanded] = useState<string[]>(() => initialSelection?.intent === "reveal" && initialSelection.taskId ? [JSON.stringify([initialSelection.boardId, initialSelection.taskId])] : []);
   const expanded = expandedTasks ?? localExpanded;
   const setExpanded = onExpandedTasksChange ?? setLocalExpanded;
   const [projectEditor, setProjectEditor] = useState<{ board?: ProjectBoard; template?: "blank" | "research" | "learning" } | null>(null);
   const [taskEditor, setTaskEditor] = useState<{ boardId: string; task: BoardTask; isNew?: boolean } | null>(() => {
+    if (initialSelection?.intent === "reveal") return null;
     const board = boards.find((item) => item.id === initialSelection?.boardId);
     const task = board?.tasks.find((item) => item.id === initialSelection?.taskId);
     return board && task ? { boardId: board.id, task } : null;
   });
+  const workspaceRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (initialSelection?.intent !== "reveal" || !initialSelection.taskId) return;
+    const frame = requestAnimationFrame(() => {
+      const row = Array.from(workspaceRef.current?.querySelectorAll<HTMLElement>("tr[data-task-order-id]") ?? []).find((node) => node.dataset.taskBoardId === initialSelection.boardId && node.dataset.taskOrderId === initialSelection.taskId);
+      if (!row) return;
+      const child = initialSelection.subtaskId ? Array.from(row.nextElementSibling?.querySelectorAll<HTMLElement>("tr[data-subtask-id]") ?? []).find((node) => node.dataset.subtaskId === initialSelection.subtaskId) : undefined;
+      const target = child ?? row;
+      target.tabIndex = -1;
+      target.focus({ preventScroll: true });
+      const scroller = workspaceRef.current?.querySelector<HTMLElement>(".project-content-scroll");
+      if (scroller) {
+        const targetRect = target.getBoundingClientRect();
+        scroller.scrollTo({ top: Math.max(0, scroller.scrollTop + targetRect.top - scroller.getBoundingClientRect().top - (scroller.clientHeight - targetRect.height) / 2) });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [initialSelection]);
   const [deletion, setDeletion] = useState<{ boardId: string; taskId?: string; name: string } | null>(null);
   const [scheduleLink, setScheduleLink] = useState<ProjectTaskLink | null>(null);
   const scheduleTarget = scheduleLink ? resolveProjectTask(boards, scheduleLink) : undefined;
@@ -187,7 +206,7 @@ export function ProjectWorkspace({ boards, onChange, onCopyToToday, onStartFocus
     </div>;
   }
 
-  return <section className="project-workspace" aria-label="科研与自学工作台">
+  return <section ref={workspaceRef} className="project-workspace" aria-label="科研与自学工作台">
     <aside className="project-navigation">
       <div className="project-brand"><span><BookOpen className="size-4" /></span><h2>科研与自学</h2></div>
       <nav className="space-y-1" aria-label="项目视图">

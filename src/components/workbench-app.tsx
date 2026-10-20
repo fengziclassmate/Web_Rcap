@@ -108,7 +108,7 @@ function getCurrentWeekStart() {
 
 export function WorkbenchApp() {
   const [projectBoards, setProjectBoards] = useState<ProjectBoard[]>([]);
-  const [openBoardRequest, setOpenBoardRequest] = useState<{ boardId: string; taskId?: string; token: number }>();
+  const [openBoardRequest, setOpenBoardRequest] = useState<{ boardId: string; taskId?: string; subtaskId?: string; intent?: "edit" | "reveal"; token: number }>();
   const [openCollectionRequest, setOpenCollectionRequest] = useState<{ id: string; kind: "annual" | "project" | "shopping"; token: number }>();
   const [openTaskRequest, setOpenTaskRequest] = useState<{ id: string; token: number }>();
   const [openEventRequest, setOpenEventRequest] = useState<{ id: string; token: number }>();
@@ -1122,7 +1122,7 @@ export function WorkbenchApp() {
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(340px,380px)] gap-4">
               <section className="min-h-0">
                 <WeeklyTimeGrid
-                  onOpenProjectTask={(link) => { setOpenBoardRequest({ boardId: link.boardId, taskId: link.taskId, token: Date.now() }); setDashboardUiPreferences((previous) => ({ ...previous, projectWorkspaceExpandedTasks: [...new Set([...(previous.projectWorkspaceExpandedTasks ?? []), JSON.stringify([link.boardId, link.taskId])])] })); }}
+                  onOpenProjectTask={(link) => { setOpenBoardRequest({ ...link, intent: "reveal", token: Date.now() }); setDashboardUiPreferences((previous) => ({ ...previous, projectWorkspaceExpandedTasks: [...new Set([...(previous.projectWorkspaceExpandedTasks ?? []), JSON.stringify([link.boardId, link.taskId])])] })); }}
                   openEventRequest={openEventRequest}
                   onOpenRequestHandled={() => setOpenEventRequest(undefined)}
                   savedCategoryDefs={dashboardUiPreferences.categoryDefs}
@@ -1241,7 +1241,7 @@ export function WorkbenchApp() {
         </div>
       </div>
       <Dialog open={Boolean(openBoardRequest)} onOpenChange={(open) => { if (!open) setOpenBoardRequest(undefined); }}>
-        <DialogContent className="project-dialog h-[calc(100dvh-3rem)] w-[calc(100vw-3rem)] sm:max-w-[1680px] grid-rows-[minmax(0,1fr)] gap-0 overflow-hidden p-0">
+        <DialogContent initialFocus={openBoardRequest?.intent === "reveal" ? false : undefined} className="project-dialog h-[calc(100dvh-3rem)] w-[calc(100vw-3rem)] sm:max-w-[1680px] grid-rows-[minmax(0,1fr)] gap-0 overflow-hidden p-0">
           <DialogHeader className="sr-only">
             <DialogTitle>科研与自学任务表</DialogTitle>
             <DialogDescription>按项目安排任务、标注内容与记录成果。关闭后回到任务控制台。</DialogDescription>

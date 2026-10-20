@@ -12,6 +12,32 @@ function Workspace({ initial = [] }: { initial?: ProjectBoard[] }) {
 }
 
 describe("research and learning workspace", () => {
+  it.each([false, true])("reveals the linked row without opening a task editor (subtask: %s)", async (child) => {
+    const board = createProjectBoard("research", "日程返回定位");
+    const task = board.tasks[2];
+    const item = child ? task.subtasks[1] : task;
+    const originalScroll = HTMLElement.prototype.scrollTo;
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollTo = scroll;
+    try {
+      render(<ProjectWorkspace boards={[board]} onChange={vi.fn()} onCopyToToday={vi.fn()} initialSelection={{ boardId: board.id, taskId: task.id, ...(child ? { subtaskId: item.id } : {}), intent: "reveal", token: 1 }} />);
+      expect(screen.queryByRole("dialog", { name: "任务详情" })).toBeNull();
+      expect(screen.getByRole("heading", { name: board.name })).toBeTruthy();
+      const target = child ? screen.getByLabelText(`子任务名称：${item.title}`).closest("tr") : screen.getByRole("button", { name: task.title }).closest("tr");
+      await waitFor(() => expect(document.activeElement).toBe(target));
+      expect(scroll).toHaveBeenCalledOnce();
+      expect(scroll.mock.contexts[0]).toBe(screen.getByRole("region", { name: "科研与自学工作台" }).querySelector(".project-content-scroll"));
+      fireEvent.click(screen.getByRole("button", { name: `收起任务：${task.title}` }));
+      expect(screen.queryByRole("table", { name: `${task.title}的子任务表` })).toBeNull();
+    } finally { HTMLElement.prototype.scrollTo = originalScroll; }
+  });
+
+  it("still opens task details for an edit selection", () => {
+    const board = createProjectBoard("research", "搜索编辑");
+    render(<ProjectWorkspace boards={[board]} onChange={vi.fn()} onCopyToToday={vi.fn()} initialSelection={{ boardId: board.id, taskId: board.tasks[0].id, token: 1 }} />);
+    expect(screen.getByRole("dialog", { name: "任务详情" })).toBeTruthy();
+  });
+
   it("remembers expanded rows on reopen and supports expanding and collapsing the visible list", () => {
     const board = createProjectBoard("research", "展开记忆");
     function Remembered() {

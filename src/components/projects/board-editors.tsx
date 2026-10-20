@@ -33,9 +33,9 @@ export function BoardTaskEditor({ task, projectName, onSave, onClose }: { task: 
   const patch = (value: Partial<BoardTask>) => setDraft((previous) => ({ ...previous, ...value }));
   return <>
     <Dialog open onOpenChange={(open) => { if (!open) close(); }}>
-      <DialogContent className="sm:max-w-5xl">
+      <DialogContent className="overflow-x-hidden sm:max-w-5xl">
         <DialogHeader><DialogTitle>任务详情</DialogTitle><DialogDescription className="sr-only">{projectName}</DialogDescription></DialogHeader>
-        <form onSubmit={(event) => { event.preventDefault(); if (draft.title.trim()) onSave({ ...draft, title: draft.title.trim(), tags: [...new Set(tags.split(/[,，、]/).map((tag) => tag.trim()).filter(Boolean))] }); }}>
+        <form className="min-w-0" onSubmit={(event) => { event.preventDefault(); if (draft.title.trim()) onSave({ ...draft, title: draft.title.trim(), tags: [...new Set(tags.split(/[,，、]/).map((tag) => tag.trim()).filter(Boolean))] }); }}>
           <label className="mb-4 block text-sm font-medium text-stone-600">任务名称<Input aria-label="任务名称" autoFocus required value={draft.title} onChange={(event) => patch({ title: event.target.value })} className="mt-1.5 h-11 text-lg font-semibold" /></label>
           <div className="project-task-fields">
               <label className={fieldClass}>任务状态<div><TaskStatusControl label="任务状态" status={draft.status} onChange={(status) => setDraft((previous) => setBoardTaskStatus(previous, status))} /></div></label>
