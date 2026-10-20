@@ -11,6 +11,7 @@ export const boardStatuses = { todo: "未开始", doing: "进行中", blocked: "
 export type BoardPriority = keyof typeof boardPriorities;
 export type BoardStatus = keyof typeof boardStatuses;
 export type BoardScope = "all" | "today" | "week" | "overdue" | "archived";
+export type ProjectTaskLink = { boardId: string; taskId: string; subtaskId?: string };
 export type BoardSubtask = { id: string; title: string; notes: string; status: BoardStatus; priority: BoardPriority; plannedDate: string; dueDate: string };
 export type BoardTask = {
   id: string;

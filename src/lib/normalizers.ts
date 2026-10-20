@@ -1,4 +1,5 @@
 import { normalizeEventTag } from "@/lib/event-tags";
+import { normalizeProjectTaskLink } from "./project-schedule";
 import { defaultDashboardSectionOrder, normalizeDashboardSectionOrder } from "@/lib/dashboard-sections";
 import { normalizeFollowUpStatus } from "@/lib/follow-up";
 import { format } from "date-fns";
@@ -414,6 +415,7 @@ export function normalizeEvents(payload: unknown): ScheduleEvent[] {
       isCompleted: Boolean(value.isCompleted),
       category: normalizeScheduleCategory(value.category ?? DEFAULT_SCHEDULE_CATEGORY),
       tag: normalizeEventTag(value.tag),
+      linkedProjectTask: normalizeProjectTaskLink(value.linkedProjectTask),
       linkedDailyTaskId:
         typeof value.linkedDailyTaskId === "string" && value.linkedDailyTaskId.length > 0
           ? value.linkedDailyTaskId

@@ -71,7 +71,8 @@ import { supabase } from "@/lib/supabase";
 import { saveLogPost, deleteLogPost, retryLogImageCleanup } from "@/lib/log-mutations";
 import { toast } from "sonner";
 import { todayISO } from "@/lib/date-utils";
-import { boardPriorities, type ProjectBoard, type BoardTask } from "@/lib/project-boards";
+import { boardPriorities, type ProjectBoard, type BoardTask, type ProjectTaskLink } from "@/lib/project-boards";
+import { findProjectSchedule, projectBoardsFromSchedule, saveProjectSchedule, schedulesFromProjectChanges, type ProjectScheduleTime } from "@/lib/project-schedule";
 import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
 import type { Achievement } from "@/lib/achievements";
 import { EfficiencyAnalysisDialog } from "@/components/llm/analysis-dialog";
@@ -242,6 +243,33 @@ export function WorkbenchApp() {
       precautions: [], completionLog: "", priority: priority[task.priority], subtasks: [], taskType: "daily", isTodayFocus: true,
     }]);
     toast.success("已复制到今日待办");
+  }
+
+  function handleProjectBoardsChange(update: React.SetStateAction<ProjectBoard[]>) {
+    const next = typeof update === "function" ? update(projectBoards) : update;
+    setProjectBoards(next);
+    setEvents((previous) => schedulesFromProjectChanges(previous, projectBoards, next));
+  }
+
+  function handleProjectSchedule(link: ProjectTaskLink, time: ProjectScheduleTime) {
+    try {
+      const next = saveProjectSchedule(projectBoards, events, link, time);
+      setProjectBoards(next.boards); setEvents(next.events);
+      return true;
+    } catch (error) { toast.error(error instanceof Error ? error.message : "安排失败，请重试。"); return false; }
+  }
+
+  function handleRemoveProjectSchedule(link: ProjectTaskLink) {
+    const event = findProjectSchedule(events, link);
+    if (!event) return;
+    setProjectBoards((previous) => projectBoardsFromSchedule(previous, event, { date: "" }));
+    setEvents((previous) => previous.filter((item) => item.id !== event.id));
+  }
+
+  function viewProjectSchedule(event: ScheduleEvent) {
+    setOpenBoardRequest(undefined); setActiveModule("schedule"); setViewMode("week");
+    setCurrentWeekStart(startOfWeek(parseISO(event.date), { weekStartsOn: 1 }));
+    setOpenEventRequest({ id: event.id, token: Date.now() });
   }
 
   function startTaskFocus(target: FocusTarget) {
@@ -876,6 +904,8 @@ export function WorkbenchApp() {
     patch: Partial<ScheduleEvent>,
     options?: { scope?: "occurrence" | "future" },
   ) {
+    const projectEvent = events.find((event) => event.id === eventId && event.linkedProjectTask);
+    if (projectEvent) setProjectBoards((previous) => projectBoardsFromSchedule(previous, projectEvent, patch));
     const isCompleted = patch.isCompleted;
     const title = patch.title;
     const date = patch.date;
@@ -938,6 +968,8 @@ export function WorkbenchApp() {
     eventId: string,
     options?: { mode?: "single" | "future" | "all" },
   ) {
+    const projectEvent = events.find((event) => event.id === eventId && event.linkedProjectTask);
+    if (projectEvent) setProjectBoards((previous) => projectBoardsFromSchedule(previous, projectEvent, { date: "" }));
     const mode = options?.mode ?? "all";
     const parsed = parseSyntheticEventId(eventId);
     if (parsed) {
@@ -1090,6 +1122,7 @@ export function WorkbenchApp() {
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(340px,380px)] gap-4">
               <section className="min-h-0">
                 <WeeklyTimeGrid
+                  onOpenProjectTask={(link) => { setOpenBoardRequest({ boardId: link.boardId, taskId: link.taskId, token: Date.now() }); setDashboardUiPreferences((previous) => ({ ...previous, projectWorkspaceExpandedTasks: [...new Set([...(previous.projectWorkspaceExpandedTasks ?? []), JSON.stringify([link.boardId, link.taskId])])] })); }}
                   openEventRequest={openEventRequest}
                   onOpenRequestHandled={() => setOpenEventRequest(undefined)}
                   savedCategoryDefs={dashboardUiPreferences.categoryDefs}
@@ -1214,7 +1247,7 @@ export function WorkbenchApp() {
             <DialogDescription>按项目安排任务、标注内容与记录成果。关闭后回到任务控制台。</DialogDescription>
           </DialogHeader>
           <div className="h-full min-h-0 overflow-hidden">
-            {openBoardRequest && <ProjectWorkspace key={`${user.id}:${openBoardRequest.token}`} boards={projectBoards} onChange={setProjectBoards} onCopyToToday={copyBoardTaskToToday} onStartFocus={(board, task) => startTaskFocus(projectFocusTarget(board, task))} initialSelection={openBoardRequest} expandedTasks={dashboardUiPreferences.projectWorkspaceExpandedTasks ?? []} onExpandedTasksChange={(update) => setDashboardUiPreferences((previous) => ({ ...previous, projectWorkspaceExpandedTasks: typeof update === "function" ? update(previous.projectWorkspaceExpandedTasks ?? []) : update }))} />}
+            {openBoardRequest && <ProjectWorkspace key={`${user.id}:${openBoardRequest.token}`} boards={projectBoards} onChange={handleProjectBoardsChange} events={events} onSaveSchedule={handleProjectSchedule} onRemoveSchedule={handleRemoveProjectSchedule} onViewSchedule={viewProjectSchedule} onCopyToToday={copyBoardTaskToToday} onStartFocus={(board, task) => startTaskFocus(projectFocusTarget(board, task))} initialSelection={openBoardRequest} expandedTasks={dashboardUiPreferences.projectWorkspaceExpandedTasks ?? []} onExpandedTasksChange={(update) => setDashboardUiPreferences((previous) => ({ ...previous, projectWorkspaceExpandedTasks: typeof update === "function" ? update(previous.projectWorkspaceExpandedTasks ?? []) : update }))} />}
           </div>
         </DialogContent>
       </Dialog>

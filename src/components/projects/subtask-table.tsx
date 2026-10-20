@@ -1,24 +1,31 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarPlus, ChevronDown, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { boardPriorities, boardStatuses, compareCompletion, createBoardSubtask, isBoardTaskOverdue, reorderVisibleRecords, type BoardPriority, type BoardStatus, type BoardSubtask, type BoardTask } from "@/lib/project-boards";
 import { todayISO } from "@/lib/date-utils";
 import { useRowReorder } from "./use-row-reorder";
+import type { ScheduleEvent } from "@/lib/types";
+import { projectScheduleLabel } from "@/lib/project-schedule";
+
+export function ProjectTableColumns() {
+  return <colgroup><col className="project-col-check" /><col /><col className="project-col-priority" /><col className="project-col-status" /><col className="project-col-date" /><col className="project-col-date" /><col className="project-col-notes" /><col className="project-col-actions" /></colgroup>;
+}
 
 export function TaskStatusControl({ status, label, onChange }: { status: BoardStatus; label: string; onChange: (status: BoardStatus) => void }) {
   return <span className={`project-status-control status-${status}`}><span className={`project-status-dot status-${status}`} /><select aria-label={label} title="修改状态" value={status} onChange={(event) => onChange(event.target.value as BoardStatus)}>{Object.entries(boardStatuses).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></span>;
 }
 
 export function TaskPriorityControl({ priority, label, onChange }: { priority: BoardPriority; label: string; onChange: (priority: BoardPriority) => void }) {
-  return <span className={`project-priority-control priority-${priority}`}><select aria-label={label} value={priority} onChange={(event) => onChange(event.target.value as BoardPriority)}>{Object.entries(boardPriorities).map(([id, item]) => <option key={id} value={id}>{item.short} · {item.label}</option>)}</select><ChevronDown className="size-3" /></span>;
+  const compact = { p1: "紧急重要", p2: "重要不急", p3: "紧急次要", p4: "稍后处理" };
+  return <span className={`project-priority-control priority-${priority}`}><select aria-label={label} title={boardPriorities[priority].label} value={priority} onChange={(event) => onChange(event.target.value as BoardPriority)}>{Object.entries(boardPriorities).map(([id, item]) => <option key={id} value={id}>{item.short} · {compact[id as BoardPriority]}</option>)}</select><ChevronDown className="size-3" /></span>;
 }
 
-export function TaskDateControls({ task, today = todayISO(), labelPrefix = "", onChange }: { task: Pick<BoardTask, "title" | "status" | "plannedDate" | "dueDate">; today?: string; labelPrefix?: string; onChange: (field: "plannedDate" | "dueDate", value: string) => void }) {
-  return <div className="project-date-controls">{([['plannedDate', '计划'], ['dueDate', '截止']] as const).map(([field, label]) => <label key={field} className={field === "dueDate" && isBoardTaskOverdue(task, today) ? "is-overdue" : ""}><span>{label}</span><input type="date" aria-label={`${labelPrefix}${label}日期：${task.title}`} value={task[field]} onChange={(event) => onChange(field, event.target.value)} /></label>)}</div>;
+export function TaskDateControls({ task, today = todayISO(), labelPrefix = "", fields = ["plannedDate", "dueDate"], schedule, onSchedule, onChange }: { task: Pick<BoardTask, "title" | "status" | "plannedDate" | "dueDate">; today?: string; labelPrefix?: string; fields?: ("plannedDate" | "dueDate")[]; schedule?: ScheduleEvent; onSchedule?: () => void; onChange: (field: "plannedDate" | "dueDate", value: string) => void }) {
+  return <div className="project-date-controls" data-single={fields.length === 1}>{([['plannedDate', '计划'], ['dueDate', '截止']] as const).filter(([field]) => fields.includes(field)).map(([field, label]) => <label key={field} className={field === "dueDate" && isBoardTaskOverdue(task, today) ? "is-overdue" : ""}><span>{label}</span><span className="project-date-value" data-empty={!task[field]}><input type="date" aria-label={`${labelPrefix}${label}日期：${task.title}`} title={field === "plannedDate" && schedule ? "清空计划日期会取消对应日程" : undefined} value={task[field]} onChange={(event) => onChange(field, event.target.value)} />{!task[field] && <span aria-hidden>—</span>}</span></label>)}{fields.includes("plannedDate") && schedule && onSchedule && <button type="button" className="project-schedule-chip" aria-label={`修改日程安排：${task.title}`} title={`${schedule.date} ${projectScheduleLabel(schedule)}`} onClick={onSchedule}><CalendarClock className="size-3" />{projectScheduleLabel(schedule)}</button>}</div>;
 }
 
 export function InlineProjectText({ value, label, placeholder, required = false, multiline = false, onChange }: { value: string; label: string; placeholder?: string; required?: boolean; multiline?: boolean; onChange: (value: string) => void }) {
@@ -43,7 +50,7 @@ export function InlineProjectText({ value, label, placeholder, required = false,
     }} />;
 }
 
-export function SubtaskTable({ title, subtasks, onChange }: { title: string; subtasks: BoardSubtask[]; onChange: (update: (previous: BoardSubtask[]) => BoardSubtask[]) => void }) {
+export function SubtaskTable({ title, subtasks, onChange, scheduleFor, onSchedule }: { title: string; subtasks: BoardSubtask[]; onChange: (update: (previous: BoardSubtask[]) => BoardSubtask[]) => void; scheduleFor?: (id: string) => ScheduleEvent | undefined; onSchedule?: (id: string) => void }) {
   const [newTitle, setNewTitle] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
   const rows = [...subtasks].sort(compareCompletion);
@@ -61,15 +68,15 @@ export function SubtaskTable({ title, subtasks, onChange }: { title: string; sub
     setNewTitle("");
   }
   return <section className="project-subtasks" aria-label={`${title}的子任务`}>
-    <div className="project-subtask-scroll"><table className="project-subtask-table"><caption className="sr-only">{title}的子任务表</caption><thead><tr><th className="w-16"><span className="sr-only">排序及完成状态</span></th><th>子任务 <span className="project-subtask-count">{subtasks.filter((item) => item.status === "done").length}/{subtasks.length}</span></th><th className="w-36">优先级</th><th className="w-24">状态</th><th className="w-44">日期</th><th className="w-[28%]">备注</th><th className="w-10"><span className="sr-only">操作</span></th></tr></thead><tbody>
+    <div className="project-subtask-scroll"><table className="project-subtask-table"><caption className="sr-only">{title}的子任务表</caption><ProjectTableColumns /><thead><tr><th><span className="sr-only">排序及完成状态</span></th><th>子任务 <span className="project-subtask-count">{subtasks.filter((item) => item.status === "done").length}/{subtasks.length}</span></th><th>优先级</th><th>状态</th><th>计划 / 日程</th><th>截止</th><th>备注</th><th><span className="sr-only">操作</span></th></tr></thead><tbody>
       {rows.map((item) => <tr key={item.id} data-subtask-id={item.id} className="project-sortable-row" {...sorting.rowProps(item.id)}>
         <td><div className="flex items-center gap-1">{sorting.handle(item.id)}<input type="checkbox" checked={item.status === "done"} aria-label={`完成子任务：${item.title}`} onChange={(event) => patch(item.id, { status: event.target.checked ? "done" : "todo" })} className="size-3.5 shrink-0 accent-emerald-800" /></div></td>
         <td><InlineProjectText required value={item.title} label={`子任务名称：${item.title}`} onChange={(title) => patch(item.id, { title })} /></td>
         <td><TaskPriorityControl priority={item.priority} label={`子任务优先级：${item.title}`} onChange={(priority) => patch(item.id, { priority })} /></td>
         <td><TaskStatusControl status={item.status} label={`子任务状态：${item.title}`} onChange={(status) => patch(item.id, { status })} /></td>
-        <td><TaskDateControls task={item} labelPrefix="子任务" onChange={(field, value) => patch(item.id, { [field]: value })} /></td>
+        <td><TaskDateControls task={item} labelPrefix="子任务" fields={["plannedDate"]} schedule={scheduleFor?.(item.id)} onSchedule={onSchedule ? () => onSchedule(item.id) : undefined} onChange={(field, value) => patch(item.id, { [field]: value })} /></td><td><TaskDateControls task={item} labelPrefix="子任务" fields={["dueDate"]} onChange={(field, value) => patch(item.id, { [field]: value })} /></td>
         <td><InlineProjectText multiline value={item.notes} label={`子任务备注：${item.title}`} onChange={(notes) => patch(item.id, { notes })} /></td>
-        <td><Button type="button" size="icon-sm" variant="ghost" aria-label={`删除子任务：${item.title}`} title="删除子任务" onClick={() => setDeleting(item.id)}><Trash2 className="size-3.5" /></Button></td>
+        <td><div className="project-row-actions">{onSchedule && <Button type="button" size="icon-sm" variant="ghost" aria-label={`安排子任务日程：${item.title}`} title="日程安排" onClick={() => onSchedule(item.id)}><CalendarPlus className="size-3.5" /></Button>}<Button type="button" size="icon-sm" variant="ghost" aria-label={`删除子任务：${item.title}`} title="删除子任务" onClick={() => setDeleting(item.id)}><Trash2 className="size-3.5" /></Button></div></td>
       </tr>)}
     </tbody></table></div>
     <span role="status" className="sr-only">{sorting.announcement}</span>

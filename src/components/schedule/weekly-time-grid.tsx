@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { EventTag, ScheduleEvent } from "@/lib/types";
+import type { ProjectTaskLink } from "@/lib/project-boards";
 import { eventTagOptions, getEventTagInfo as getTagInfo, normalizeEventTag } from "@/lib/event-tags";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -198,6 +199,7 @@ type WeeklyTimeGridProps = {
   onCreateLogPost?: (input: LogComposerInput) => Promise<boolean>;
   logPosts?: LogPostRecord[];
   onOpenLogs?: () => void;
+  onOpenProjectTask?: (link: ProjectTaskLink) => void;
   logSaving?: boolean;
   toolbarContent?: React.ReactNode;
   viewMode?: ViewMode;
@@ -525,6 +527,7 @@ export function WeeklyTimeGrid({
   onCreateLogPost,
   logPosts,
   onOpenLogs,
+  onOpenProjectTask,
   logSaving = false,
   toolbarContent,
   viewMode = "week",
@@ -1288,6 +1291,11 @@ export function WeeklyTimeGrid({
   function handleAddEventToDailyTask(eventId: string) {
     const target = expandedEvents.find((event) => event.id === eventId);
     if (!target) return;
+    if (target.linkedProjectTask) {
+      setEditingEventId(null); closeContextMenu();
+      onOpenProjectTask?.(target.linkedProjectTask);
+      return;
+    }
     if (target.linkedDailyTaskId) {
       toast.info("该行程已加入当日日常任务");
       closeContextMenu();
@@ -2805,7 +2813,11 @@ export function WeeklyTimeGrid({
                     <Label htmlFor="edit-completed">标记为已完成</Label>
                   </div>
 
-                  {selectedEvent.linkedDailyTaskId ? (
+                  {selectedEvent.linkedProjectTask ? (
+                    <Button type="button" variant="ghost" size="sm" onClick={handleAddSelectedEventToDailyTask}>
+                      <BookOpen className="size-3.5" />打开科研与自学任务
+                    </Button>
+                  ) : selectedEvent.linkedDailyTaskId ? (
                     <div className="flex items-center gap-1.5 text-xs text-emerald-800">
                       <Check className="h-4 w-4" aria-hidden />
                       已加入当日日常任务
@@ -3443,7 +3455,7 @@ export function WeeklyTimeGrid({
               disabled={Boolean(contextMenuEvent?.linkedDailyTaskId)}
               onClick={() => handleAddEventToDailyTask(contextMenu.eventId)}
             >
-              {contextMenuEvent?.linkedDailyTaskId ? "已加入日常任务" : "加入日常任务"}
+              {contextMenuEvent?.linkedProjectTask ? "打开科研与自学任务" : contextMenuEvent?.linkedDailyTaskId ? "已加入日常任务" : "加入日常任务"}
             </button>
             <div className="my-1 border-t border-stone-100" />
             <button className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50" onClick={() => handleDeleteFromContext(contextMenu.eventId)}>

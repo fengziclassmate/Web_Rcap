@@ -410,7 +410,7 @@ describe("research and learning workspace", () => {
     fireEvent.submit(input.closest("form")!);
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "展开任务：核对分类口径" }));
-    expect(screen.getByRole("button", { name: "添加内容" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "核对分类口径" })).toBeTruthy();
     expect(screen.queryByText("尚未填写内容")).toBeNull();
     expect(screen.queryByText("未拆分")).toBeNull();
   });

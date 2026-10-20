@@ -18,6 +18,7 @@ export type ScheduleEvent = {
   category: string;
   tag: EventTag;
   linkedDailyTaskId?: string;
+  linkedProjectTask?: import("./project-boards").ProjectTaskLink;
   recurrence?: RecurrenceConfig | null;
   exceptionDates?: string[];
   recurrenceOverrides?: Record<string, RecurrenceInstanceOverride>;
