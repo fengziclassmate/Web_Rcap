@@ -342,6 +342,18 @@
   .project-schedule-time-fields legend { margin-bottom: 8px; color: #55635a; font-size: 13px; }
   .project-schedule-time-fields input { width: 100%; min-width: 0; height: 36px; font-size: 14px; font-variant-numeric: tabular-nums; }
   .project-schedule-dialog-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 20px; border-top: 1px solid #edf0ee; padding-top: 16px; }
+  .project-schedule-count { margin-left: 2px; border-left: 1px solid #cbded1; padding-left: 4px; }
+  .project-schedule-list-heading { display: flex; justify-content: space-between; color: #5b6c61; font-size: 12px; }
+  .project-schedule-list { max-height: 320px; overflow-y: auto; }
+  .project-schedule-list-row { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #edf0ee; padding: 10px 0; }
+  .project-schedule-list-edit { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; gap: 2px 10px; border-radius: 4px; text-align: left; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .project-schedule-list-edit > span:first-child { color: #5b6c61; }
+  .project-schedule-list-edit > strong { color: #2c4a37; font-weight: 500; }
+  .project-schedule-list-edit:hover > strong { text-decoration: underline; }
+  .project-schedule-custom-title { width: 100%; overflow-wrap: anywhere; color: #5b6c61; }
+  .project-schedule-session-status { flex-shrink: 0; color: #5b6c61; font-size: 12px; }
+  .project-schedule-list-row.is-completed .project-schedule-session-status { color: #2b7050; }
+  .project-schedule-list-edit:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 
   .workbench-shell {
     position: relative;

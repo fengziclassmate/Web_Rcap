@@ -2810,7 +2810,7 @@ export function WeeklyTimeGrid({
                         setEditForm((prev) => ({ ...prev, isCompleted: checked }))
                       }
                     />
-                    <Label htmlFor="edit-completed">标记为已完成</Label>
+                    <Label htmlFor="edit-completed">{selectedEvent.linkedProjectTask ? "本时段已完成" : "标记为已完成"}</Label>
                   </div>
 
                   {selectedEvent.linkedProjectTask ? (
@@ -3448,7 +3448,7 @@ export function WeeklyTimeGrid({
               加时
             </button>
             <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleToggleComplete(contextMenu.eventId)}>
-              {contextMenuEvent?.isCompleted ? "标记为未完成" : "标记为已完成"}
+              {contextMenuEvent?.linkedProjectTask ? (contextMenuEvent.isCompleted ? "标记此时段未完成" : "完成此时段") : contextMenuEvent?.isCompleted ? "标记为未完成" : "标记为已完成"}
             </button>
             <button
               className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent"

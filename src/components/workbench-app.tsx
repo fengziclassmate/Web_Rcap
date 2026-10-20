@@ -72,7 +72,7 @@ import { saveLogPost, deleteLogPost, retryLogImageCleanup } from "@/lib/log-muta
 import { toast } from "sonner";
 import { todayISO } from "@/lib/date-utils";
 import { boardPriorities, type ProjectBoard, type BoardTask, type ProjectTaskLink } from "@/lib/project-boards";
-import { findProjectSchedule, projectBoardsFromSchedule, saveProjectSchedule, schedulesFromProjectChanges, type ProjectScheduleTime } from "@/lib/project-schedule";
+import { reconcileProjectPlans, removeProjectSchedule, saveProjectSchedule, schedulesFromProjectChanges, type ProjectScheduleTime } from "@/lib/project-schedule";
 import { MonitoringSidebar, type MonitoringModuleId } from "@/components/monitoring/sidebar";
 import type { Achievement } from "@/lib/achievements";
 import { EfficiencyAnalysisDialog } from "@/components/llm/analysis-dialog";
@@ -107,7 +107,9 @@ function getCurrentWeekStart() {
 }
 
 export function WorkbenchApp() {
-  const [projectBoards, setProjectBoards] = useState<ProjectBoard[]>([]);
+  const [{ projectBoards, events }, setProjectScheduleData] = useState<{ projectBoards: ProjectBoard[]; events: ScheduleEvent[] }>({ projectBoards: [], events: defaultEvents });
+  const setProjectBoards = useCallback((update: React.SetStateAction<ProjectBoard[]>) => setProjectScheduleData((previous) => ({ ...previous, projectBoards: typeof update === "function" ? update(previous.projectBoards) : update })), []);
+  const setEvents = useCallback((update: React.SetStateAction<ScheduleEvent[]>) => setProjectScheduleData((previous) => ({ ...previous, events: typeof update === "function" ? update(previous.events) : update })), []);
   const [openBoardRequest, setOpenBoardRequest] = useState<{ boardId: string; taskId?: string; subtaskId?: string; intent?: "edit" | "reveal"; token: number }>();
   const [openCollectionRequest, setOpenCollectionRequest] = useState<{ id: string; kind: "annual" | "project" | "shopping"; token: number }>();
   const [openTaskRequest, setOpenTaskRequest] = useState<{ id: string; token: number }>();
@@ -116,7 +118,6 @@ export function WorkbenchApp() {
   const [isBooted, setIsBooted] = useState(false);
   const [activeModule, setActiveModule] = useState<MonitoringModuleId>("schedule");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getCurrentWeekStart);
-  const [events, setEvents] = useState<ScheduleEvent[]>(defaultEvents);
   const [tasks, setTasks] = useState<LongTask[]>(defaultTasks);
   const [annualTasks, setAnnualTasks] = useState<AnnualTask[]>([]);
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
@@ -151,7 +152,7 @@ export function WorkbenchApp() {
     return weekRange;
   }, [currentWeekStart, viewMode, weekRange]);
   const persistedPayload = useMemo<PersistedSchedulePayload>(
-    () => ({
+    () => normalizePersistedSchedulePayload({
       events,
       tasks,
       annual_tasks: annualTasks,
@@ -162,7 +163,7 @@ export function WorkbenchApp() {
       project_boards: projectBoards,
       focus_state: focus.state,
       ui_preferences: dashboardUiPreferences,
-    }),
+    })!,
     [
       achievements,
       projectBoards,
@@ -185,7 +186,7 @@ export function WorkbenchApp() {
     setProjectBoards(value.project_boards ?? []);
     if (user?.id && value.focus_state) hydrateFocusState(user.id, value.focus_state);
     setDashboardUiPreferences(value.ui_preferences);
-  }, [user?.id]);
+  }, [user?.id, setEvents, setProjectBoards]);
   const sync = useScheduleSync(user?.id ?? null, persistedPayload, hydrateSchedule);
   const dataReady = sync.ready;
   const currentUserId = useRef<string | null>(null);
@@ -200,7 +201,7 @@ export function WorkbenchApp() {
     setShoppingItems(snapshot.shoppingItems); setProjectCheckins(snapshot.projectCheckins);
     setFootprints(snapshot.footprints); setAchievements(snapshot.achievements);
     setProjectBoards(snapshot.projectBoards);
-  }, []);
+  }, [setEvents, setProjectBoards]);
   const history = useUndoHistory(undoSnapshot, restoreSnapshot, dataReady && user ? `${user.id}:${historyRevision}` : null);
 
   function locateSearchResult(result: SearchResult) {
@@ -246,24 +247,26 @@ export function WorkbenchApp() {
   }
 
   function handleProjectBoardsChange(update: React.SetStateAction<ProjectBoard[]>) {
-    const next = typeof update === "function" ? update(projectBoards) : update;
-    setProjectBoards(next);
-    setEvents((previous) => schedulesFromProjectChanges(previous, projectBoards, next));
+    setProjectScheduleData((previous) => {
+      const boards = typeof update === "function" ? update(previous.projectBoards) : update;
+      const nextEvents = schedulesFromProjectChanges(previous.events, previous.projectBoards, boards);
+      return { events: nextEvents, projectBoards: reconcileProjectPlans(boards, previous.events, nextEvents) };
+    });
   }
 
-  function handleProjectSchedule(link: ProjectTaskLink, time: ProjectScheduleTime) {
+  function handleProjectSchedule(link: ProjectTaskLink, time: ProjectScheduleTime, eventId?: string) {
     try {
-      const next = saveProjectSchedule(projectBoards, events, link, time);
-      setProjectBoards(next.boards); setEvents(next.events);
+      const next = saveProjectSchedule(projectBoards, events, link, time, eventId);
+      setProjectScheduleData({ projectBoards: next.boards, events: next.events });
       return true;
     } catch (error) { toast.error(error instanceof Error ? error.message : "安排失败，请重试。"); return false; }
   }
 
-  function handleRemoveProjectSchedule(link: ProjectTaskLink) {
-    const event = findProjectSchedule(events, link);
-    if (!event) return;
-    setProjectBoards((previous) => projectBoardsFromSchedule(previous, event, { date: "" }));
-    setEvents((previous) => previous.filter((item) => item.id !== event.id));
+  function handleRemoveProjectSchedule(link: ProjectTaskLink, eventId: string) {
+    setProjectScheduleData((previous) => {
+      const next = removeProjectSchedule(previous.projectBoards, previous.events, link, eventId);
+      return { projectBoards: next.boards, events: next.events };
+    });
   }
 
   function viewProjectSchedule(event: ScheduleEvent) {
@@ -905,7 +908,13 @@ export function WorkbenchApp() {
     options?: { scope?: "occurrence" | "future" },
   ) {
     const projectEvent = events.find((event) => event.id === eventId && event.linkedProjectTask);
-    if (projectEvent) setProjectBoards((previous) => projectBoardsFromSchedule(previous, projectEvent, patch));
+    if (projectEvent) {
+      setProjectScheduleData((previous) => {
+        const nextEvents = previous.events.map((event) => event.id === eventId ? { ...event, ...patch } : event);
+        return { events: nextEvents, projectBoards: reconcileProjectPlans(previous.projectBoards, previous.events, nextEvents) };
+      });
+      return;
+    }
     const isCompleted = patch.isCompleted;
     const title = patch.title;
     const date = patch.date;
@@ -969,7 +978,7 @@ export function WorkbenchApp() {
     options?: { mode?: "single" | "future" | "all" },
   ) {
     const projectEvent = events.find((event) => event.id === eventId && event.linkedProjectTask);
-    if (projectEvent) setProjectBoards((previous) => projectBoardsFromSchedule(previous, projectEvent, { date: "" }));
+    if (projectEvent?.linkedProjectTask) { handleRemoveProjectSchedule(projectEvent.linkedProjectTask, eventId); return; }
     const mode = options?.mode ?? "all";
     const parsed = parseSyntheticEventId(eventId);
     if (parsed) {
