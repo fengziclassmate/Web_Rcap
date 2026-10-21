@@ -106,6 +106,7 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
           if (result.error) throw new Error(result.error.message);
           recognizeDraftHandoff();
           const remote = normalizePersistedSchedulePayload(result.data) ?? empty();
+          const needsEventCleanup = Array.isArray(result.data?.events) && result.data.events.length > remote.events.length;
           let acknowledgedRevision = result.data?.updated_at ?? null;
           if (unavailable.has("project_boards")) remote.project_boards = base?.project_boards ?? [];
           if (unavailable.has("focus_state")) remote.focus_state = base?.focus_state ?? empty().focus_state;
@@ -144,7 +145,7 @@ export function useScheduleSync(userId: string | null, payload: PersistedSchedul
             show("conflict", base === undefined ? "旧版本本机备份与云端不同，请选择保留本机或云端版本。" : `发现 ${conflicts.length} 处不同修改，请选择保留哪一方的冲突内容。其他修改会合并。`);
             return false;
           }
-          if (!equal(merged, remote) || (!result.data && dirty)) {
+          if (needsEventCleanup || !equal(merged, remote) || (!result.data && dirty)) {
             const updatedAt = new Date(Math.max(Date.now(), Date.parse(result.data?.updated_at ?? "") + 1 || 0)).toISOString();
             const write = { ...merged, user_id: owner, updated_at: updatedAt };
             for (const column of unavailable) delete write[column];

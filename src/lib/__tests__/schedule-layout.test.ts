@@ -30,6 +30,13 @@ function event(patch: Partial<ScheduleEvent> = {}): ScheduleEvent {
 }
 
 describe("schedule event layout", () => {
+  it("does not display zero-minute events left by floating-point time values", () => {
+    expect(splitScheduleEventByDay(event({ startHour: 20.416666666666664, endHour: 20.416666666666668 }))).toEqual([]);
+    expect(splitScheduleEventByDay(event({ startHour: 9, endHour: 9 }))).toEqual([]);
+    expect(splitScheduleEventByDay(event({ startHour: 9, endHour: 9 + 1 / 60 }))).toHaveLength(1);
+    expect(splitScheduleEventByDay(event({ startHour: 0, endHour: 24 }))).toHaveLength(1);
+  });
+
   it("moves a group by the grabbed continuation and preserves every interval", () => {
     const events = [
       event({ id: "overnight", startHour: 23, endHour: 2 }),

@@ -167,6 +167,15 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("shows the daily completion mark when only a zero-minute phantom remains unfinished", () => {
+    const { container } = renderGrid({ events: [scheduleEvent, {
+      ...scheduleEvent, id: "zero-minute", title: "零分钟记录", isCompleted: false,
+      startHour: 20.416666666666664, endHour: 20.416666666666668,
+    }] });
+    expect(screen.getByRole("img", { name: "2026-07-27 全部日程已完成" })).toBeTruthy();
+    expect(container.querySelector('[data-schedule-event-id="zero-minute"]')).toBeNull();
+  });
+
   it("automatically marks only nonempty fully completed days and removes the mark on reopening", () => {
     const events = [scheduleEvent, { ...scheduleEvent, id: "pending", title: "未完成行程", startHour: 11, endHour: 12, isCompleted: false }];
     const { rerenderGrid } = renderGrid({ events });

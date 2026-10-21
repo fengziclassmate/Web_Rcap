@@ -8,6 +8,20 @@ import {
 } from "../normalizers";
 
 describe("normalizers", () => {
+  it("removes zero-minute remnants while keeping minute-long, overnight and full-day events", () => {
+    const restored = normalizeEvents([
+      { id: "phantom", date: "2026-10-20", startHour: 20.416666666666664, endHour: 20.416666666666668 },
+      { id: "zero", date: "2026-10-20", startHour: 9, endHour: 9 },
+      { id: "minute", date: "2026-10-20", startHour: 9, endHour: 9 + 1 / 60 },
+      { id: "overnight", date: "2026-10-20", startHour: 23, endHour: 7 },
+      { id: "full-day", date: "2026-10-20", startHour: 0, endHour: 24 },
+      { id: "multi-day", date: "2026-10-20", endDate: "2026-10-21", startHour: 9, endHour: 9 },
+      { id: "series", date: "2026-10-20", startHour: 9, endHour: 9, recurrence: { kind: "daily" }, recurrenceOverrides: { "2026-10-21": { endHour: 10 } } },
+    ]);
+    expect(restored.map((event) => event.id)).toEqual(["minute", "overnight", "full-day", "multi-day", "series"]);
+    expect(normalizeEvents(JSON.parse(JSON.stringify(restored)))).toEqual(restored);
+  });
+
   it("preserves chosen daily task times across a JSON round trip", () => {
     const restored = normalizeTasks(JSON.parse(JSON.stringify(normalizeTasks([{ name: "计划任务", plannedTime: "10:30", taskType: "daily" }]))));
     expect(restored[0].plannedTime).toBe("10:30");

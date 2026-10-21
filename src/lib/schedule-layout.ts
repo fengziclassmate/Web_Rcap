@@ -211,6 +211,8 @@ function getSegmentBase<TEvent extends ScheduleEvent>(event: TEvent) {
 export function splitScheduleEventByDay<TEvent extends ScheduleEvent>(
   event: TEvent,
 ): ScheduleEventSegment<TEvent>[] {
+  // Minute precision excludes zero-length remnants caused by floating-point time edits.
+  if (Math.round(getScheduleEventDurationHour(event) * minutesPerHour) <= 0) return [];
   const segmentBase = getSegmentBase(event);
   if (event.endDate && event.endDate > event.date) {
     const segments: ScheduleEventSegment<TEvent>[] = [];

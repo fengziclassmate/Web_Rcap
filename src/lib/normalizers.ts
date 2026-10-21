@@ -1,5 +1,6 @@
 import { normalizeEventTag } from "@/lib/event-tags";
 import { normalizeProjectTaskLink } from "./project-schedule";
+import { getScheduleEventDurationHour } from "./schedule-layout";
 import { defaultDashboardSectionOrder, normalizeDashboardSectionOrder } from "@/lib/dashboard-sections";
 import { normalizeFollowUpStatus } from "@/lib/follow-up";
 import { format } from "date-fns";
@@ -428,5 +429,5 @@ export function normalizeEvents(payload: unknown): ScheduleEvent[] {
       recurrenceEndExclusive:
         typeof value.recurrenceEndExclusive === "string" ? value.recurrenceEndExclusive : null,
     };
-  });
+  }).filter((event) => Boolean(event.recurrence) || Math.round(getScheduleEventDurationHour(event) * 60) !== 0);
 }

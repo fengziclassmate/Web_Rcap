@@ -59,6 +59,22 @@ function useWorkspace() {
 beforeEach(() => { localStorage.clear(); remote.row = null; remote.fail = false; remote.failRead = false; remote.writes = 0; remote.race = false; remote.missingBoards = false; remote.missingFocus = false; remote.jsonbOrder = false; });
 
 describe("schedule persistence lifecycle", () => {
+  it.each([false, true])("cleans zero-minute cloud events without user edits and preserves concurrent changes (race=%s)", async (race) => {
+    const valid = normalizePersistedSchedulePayload({ events: [{ id: "valid", date: "2026-10-20", startHour: 9, endHour: 10, isCompleted: true }] })!.events[0];
+    remote.row = { ...empty(), user_id: "test-owner", updated_at: "2026-01-01T00:00:00Z", events: [valid, {
+      ...valid, id: "phantom", isCompleted: false, startHour: 20.416666666666664, endHour: 20.416666666666668,
+    }] };
+    remote.race = race;
+    const hook = renderHook(useWorkspace);
+    try {
+      await waitFor(() => expect(hook.result.current.status).toBe("saved"));
+      expect(hook.result.current.payload.events.map((event) => event.id)).toEqual(["valid"]);
+      expect(remote.row?.events.map((event) => event.id)).toEqual(["valid"]);
+      expect(remote.writes).toBe(race ? 2 : 1);
+      if (race) expect(remote.row?.annual_tasks[0].id).toBe("other");
+    } finally { hook.unmount(); }
+  });
+
   function useSyncedFocus() {
     const focus = useFocusTimer("test-owner");
     const [payload, setPayload] = useState(empty);
