@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ProjectWorkspace } from "../project-workspace";
 import { AnnotatedContent, AnnotatedEditor } from "../annotated-content";
 import { InlineProjectText } from "../subtask-table";
+import { TaskTagsControl } from "../task-tags-control";
 import { createBoardSubtask, createProjectBoard, type ProjectBoard } from "@/lib/project-boards";
 
 function Workspace({ initial = [] }: { initial?: ProjectBoard[] }) {
@@ -12,6 +13,69 @@ function Workspace({ initial = [] }: { initial?: ProjectBoard[] }) {
 }
 
 describe("research and learning workspace", () => {
+  it("adds, renames and removes tags inline and shares the result with task details", () => {
+    const board = createProjectBoard("research", "标签编辑");
+    const task = board.tasks[0];
+    task.tags = ["中等", "数组", "扫描线"];
+    render(<Workspace initial={[board]} />);
+    const row = within(screen.getByRole("button", { name: task.title }).closest("tr")!);
+    for (const tag of task.tags) expect(row.getByRole("button", { name: `修改标签 ${tag}：${task.title}` })).toBeTruthy();
+    fireEvent.click(row.getByRole("button", { name: `添加标签：${task.title}` }));
+    fireEvent.change(row.getByRole("textbox", { name: `新标签：${task.title}` }), { target: { value: " 双指针，数组、排序 " } });
+    fireEvent.keyDown(row.getByRole("textbox", { name: `新标签：${task.title}` }), { key: "Enter" });
+    expect(row.getAllByRole("button", { name: `修改标签 数组：${task.title}` })).toHaveLength(1);
+    fireEvent.click(row.getByRole("button", { name: `修改标签 扫描线：${task.title}` }));
+    const edit = row.getByRole("textbox", { name: `修改标签 扫描线：${task.title}` });
+    fireEvent.change(edit, { target: { value: "区间合并" } });
+    fireEvent.blur(edit);
+    fireEvent.click(row.getByRole("button", { name: `删除标签 中等：${task.title}` }));
+    expect(document.activeElement).toBe(row.getByRole("button", { name: `添加标签：${task.title}` }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(row.getByRole("button", { name: task.title }));
+    expect((screen.getByLabelText("任务标签") as HTMLInputElement).value).toBe("数组、区间合并、双指针、排序");
+    expect((screen.getByLabelText("任务阶段") as HTMLInputElement).value).toBe(task.phase);
+  });
+
+  it("cancels tag drafts, ignores composition Enter, and keeps an emptied label on blur", () => {
+    const board = createProjectBoard("research", "标签输入");
+    const task = board.tasks[0];
+    task.tags = ["原标签"];
+    render(<Workspace initial={[board]} />);
+    fireEvent.click(screen.getByRole("button", { name: `添加标签：${task.title}` }));
+    const input = screen.getByRole("textbox", { name: `新标签：${task.title}` });
+    fireEvent.change(input, { target: { value: "输入中" } });
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    expect(screen.getByRole("textbox", { name: `新标签：${task.title}` })).toBe(input);
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByRole("button", { name: `修改标签 输入中：${task.title}` })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: `修改标签 原标签：${task.title}` }));
+    const rename = screen.getByRole("textbox", { name: `修改标签 原标签：${task.title}` });
+    fireEvent.change(rename, { target: { value: "   " } });
+    fireEvent.blur(rename);
+    expect(screen.getByRole("button", { name: `修改标签 原标签：${task.title}` })).toBeTruthy();
+  });
+
+  it("preserves concurrent tag additions and does not restore a remotely removed tag", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<TaskTagsControl title="并发修改" tags={["数组"]} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "修改标签 数组：并发修改" }));
+    const input = screen.getByRole("textbox", { name: "修改标签 数组：并发修改" });
+    fireEvent.change(input, { target: { value: "矩阵" } });
+    rerender(<TaskTagsControl title="并发修改" tags={["数组", "远端新增"]} onChange={onChange} />);
+    fireEvent.blur(input);
+    const update = onChange.mock.calls[0][0];
+    expect(update(["数组", "远端新增", "更新的标签"])).toEqual(["矩阵", "远端新增", "更新的标签"]);
+    expect(update(["远端重命名"])).toEqual(["远端重命名"]);
+    onChange.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "修改标签 数组：并发修改" }));
+    const draft = screen.getByRole("textbox", { name: "修改标签 数组：并发修改" });
+    fireEvent.change(draft, { target: { value: "本机草稿" } });
+    rerender(<TaskTagsControl title="并发修改" tags={["远端重命名"]} onChange={onChange} />);
+    fireEvent.blur(draft);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "修改标签 数组：并发修改" })).toBe(draft);
+  });
+
   it.each([false, true])("reveals the linked row without opening a task editor (subtask: %s)", async (child) => {
     const board = createProjectBoard("research", "日程返回定位");
     const task = board.tasks[2];
