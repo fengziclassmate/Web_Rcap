@@ -7,6 +7,7 @@ import {
   getScheduleEventDurationHour,
   layoutOverlappingScheduleEvents,
   moveScheduleEvent,
+  moveScheduleEvents,
   splitScheduleEventByDay,
   toSourceScheduleEvent,
 } from "../schedule-layout";
@@ -29,6 +30,34 @@ function event(patch: Partial<ScheduleEvent> = {}): ScheduleEvent {
 }
 
 describe("schedule event layout", () => {
+  it("moves a group by the grabbed continuation and preserves every interval", () => {
+    const events = [
+      event({ id: "overnight", startHour: 23, endHour: 2 }),
+      event({ id: "next-day", date: "2026-06-12", startHour: 8.25, endHour: 9 }),
+      event({ id: "multi-day", endDate: "2026-06-14", startHour: 9, endHour: 10 }),
+    ];
+    const moved = moveScheduleEvents(events, "overnight", "2026-06-12", "2026-06-13", -0.5);
+
+    expect(moved).toEqual([
+      { ...events[0], date: "2026-06-12", startHour: 22.5, endHour: 1.5 },
+      { ...events[1], date: "2026-06-13", startHour: 7.75, endHour: 8.5 },
+      { ...events[2], date: "2026-06-12", endDate: "2026-06-15", startHour: 8.5, endHour: 9.5 },
+    ]);
+    expect(moved.map(getScheduleEventDurationHour)).toEqual(events.map(getScheduleEventDurationHour));
+    expect(events[0].date).toBe("2026-06-11");
+  });
+
+  it("moves a group backwards across a month boundary with minute precision", () => {
+    const events = [
+      event({ id: "anchor", date: "2026-08-01", startHour: 0.5, endHour: 1 }),
+      event({ id: "earlier", date: "2026-07-31", startHour: 1, endHour: 2 }),
+    ];
+    expect(moveScheduleEvents(events, "anchor", "2026-08-01", "2026-07-31", 23 + 29 / 60)).toEqual([
+      { ...events[0], date: "2026-07-31", startHour: 23 + 29 / 60, endHour: 23 + 59 / 60 },
+      { ...events[1], date: "2026-07-30", startHour: 23 + 59 / 60, endHour: 59 / 60 },
+    ]);
+  });
+
   it("moves a continuation across midnight and preserves the full interval", () => {
     expect(moveScheduleEvent(event({ startHour: 23, endHour: 2 }), "2026-06-12", "2026-06-12", -0.5)).toEqual({ date: "2026-06-11", startHour: 22.5, endHour: 1.5 });
     expect(moveScheduleEvent(event({ endDate: "2026-06-14", startHour: 9, endHour: 10 }), "2026-06-12", "2026-06-13", 2)).toEqual({ date: "2026-06-12", endDate: "2026-06-15", startHour: 11, endHour: 12 });

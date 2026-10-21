@@ -68,7 +68,7 @@ import {
   getScheduleEventDurationHour,
   getScheduleEventVisualMetrics,
   layoutOverlappingScheduleEvents,
-  moveScheduleEvent,
+  moveScheduleEvents,
   type PositionedScheduleEvent,
   type ScheduleEventSegment,
   splitScheduleEventByDay,
@@ -216,7 +216,7 @@ type TimelineDayLayout = {
   date: Date;
   dateIso: string;
   events: PositionedScheduleEvent<TimelineEventSegment>[];
-  laneCount: number;
+  completedCount: number;
 };
 
 type TimelineEventSegment = ScheduleEventSegment<ScheduleEvent>;
@@ -549,7 +549,8 @@ export function WeeklyTimeGrid({
   const draggingSegmentDateRef = useRef<string | null>(null);
   const dragGrabRef = useRef<{ segmentId: string; offsetHour: number } | null>(null);
   const draggingOffsetHourRef = useRef(0);
-  const [dragPreview, setDragPreview] = useState<ScheduleEvent | null>(null);
+  const draggingEventsRef = useRef<ScheduleEvent[]>([]);
+  const [dragPreview, setDragPreview] = useState<ScheduleEvent[]>([]);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
   const resizePreviewRef = useRef<ResizePreview | null>(null);
@@ -667,22 +668,6 @@ export function WeeklyTimeGrid({
     () => displayDates.map((date) => format(date, "yyyy-MM-dd")).join("|"),
     [displayDates],
   );
-  const selectedEventIds =
-    eventSelection.rangeKey === visibleDateRangeKey
-      ? eventSelection.ids
-      : emptySelectedEventIds;
-
-  function setSelectedEventIds(action: React.SetStateAction<Set<string>>) {
-    setEventSelection((previous) => {
-      const current =
-        previous.rangeKey === visibleDateRangeKey
-          ? previous.ids
-          : emptySelectedEventIds;
-      const next = typeof action === "function" ? action(current) : action;
-      return { rangeKey: visibleDateRangeKey, ids: next };
-    });
-  }
-
   useEffect(() => {
     if ((viewMode !== "month" && viewMode !== "week") || displayDates.length === 0) {
       return;
@@ -779,6 +764,20 @@ export function WeeklyTimeGrid({
         .filter((segment) => displayDateKeys.has(segment.displayDate)),
     [displayDateKeys, expandedEvents],
   );
+  const visibleEventIds = useMemo(() => new Set(displayEventSegments.map((event) => event.id)), [displayEventSegments]);
+  const selectedEventIds = useMemo(() => eventSelection.rangeKey === visibleDateRangeKey
+    ? new Set([...eventSelection.ids].filter((id) => visibleEventIds.has(id)))
+    : emptySelectedEventIds, [eventSelection, visibleDateRangeKey, visibleEventIds]);
+
+  function setSelectedEventIds(action: React.SetStateAction<Set<string>>) {
+    setEventSelection((previous) => {
+      const current = previous.rangeKey === visibleDateRangeKey
+        ? new Set([...previous.ids].filter((id) => visibleEventIds.has(id)))
+        : emptySelectedEventIds;
+      const next = typeof action === "function" ? action(current) : action;
+      return { rangeKey: visibleDateRangeKey, ids: next };
+    });
+  }
 
   const splitTemplateGranularity: SplitScheduleGranularity | null =
     timeGranularity === "45-15" || timeGranularity === "50-10" ? timeGranularity : null;
@@ -829,19 +828,27 @@ export function WeeklyTimeGrid({
     return displayDates.map((date) => {
       const dateIso = format(date, "yyyy-MM-dd");
       const positionedEvents = layoutOverlappingScheduleEvents(eventsByDate.get(dateIso) ?? []);
-      const laneCount = positionedEvents.reduce(
-        (maxLaneCount, event) => Math.max(maxLaneCount, event.laneCount),
-        1,
-      );
-
       return {
         date,
         dateIso,
         events: positionedEvents,
-        laneCount,
+        completedCount: positionedEvents.filter((event) => event.isCompleted).length,
       };
     });
   }, [displayDates, displayDateKeys, displayEventSegments, expandedEvents, resizePreview, viewMode]);
+
+  const dragPreviewSegments = useMemo(() => dragPreview.flatMap((event) => splitScheduleEventByDay(event)), [dragPreview]);
+  const dragAnchorPreview = dragPreviewSegments.find((segment) => segment.id === dragPreview[0]?.id && displayDateKeys.has(segment.displayDate));
+  const dragPreviewIds = useMemo(() => new Set(dragPreview.map((event) => event.id)), [dragPreview]);
+  const positionedDragPreviews = useMemo(() => {
+    if (dragPreviewIds.size === 0) return new Map<string, PositionedScheduleEvent<TimelineEventSegment>[]>();
+    return new Map(timelineDayLayouts.map((day) => [day.dateIso,
+      layoutOverlappingScheduleEvents([
+        ...day.events.filter((event) => !dragPreviewIds.has(event.id)),
+        ...dragPreviewSegments.filter((segment) => segment.displayDate === day.dateIso),
+      ]).filter((event) => dragPreviewIds.has(event.id)),
+    ]));
+  }, [timelineDayLayouts, dragPreviewSegments, dragPreviewIds]);
 
   const visibleRangeStart = format(currentWeekStart, "yyyy-MM-dd");
   const timelineGridTemplateColumns = useMemo(
@@ -1319,19 +1326,20 @@ export function WeeklyTimeGrid({
     draggingSegmentDateRef.current = null;
     draggingOffsetHourRef.current = 0;
     dragGrabRef.current = null;
-    setDragPreview(null);
+    draggingEventsRef.current = [];
+    setDragPreview([]);
   }
 
   function getDragTarget(targetDate: string, clientY: number, column: HTMLElement, precise: boolean) {
     const draggingEventId = draggingEventIdRef.current;
     if (!draggingEventId || !Number.isFinite(clientY)) return null;
-    const source = expandedEvents.find((event) => event.id === draggingEventId);
+    const source = draggingEventsRef.current.find((event) => event.id === draggingEventId);
     if (!source) return null;
     const pointerHour = (clientY - column.getBoundingClientRect().top) / hourCellHeight;
     const stepMinutes = precise ? 1 : 5;
     // Subtract the original grab offset before snapping; the pointer is not the card's start.
     const targetHour = Math.round((pointerHour - draggingOffsetHourRef.current) * minutesPerHour / stepMinutes) * stepMinutes / minutesPerHour;
-    return { source, patch: moveScheduleEvent(source, draggingSegmentDateRef.current ?? source.date, targetDate, targetHour) };
+    return moveScheduleEvents(draggingEventsRef.current, source.id, draggingSegmentDateRef.current ?? source.date, targetDate, targetHour);
   }
 
   function handleEventDragOver(event: React.DragEvent<HTMLElement>, targetDate: string) {
@@ -1342,8 +1350,10 @@ export function WeeklyTimeGrid({
     const column = event.currentTarget.closest<HTMLElement>("[data-timeline-date]")!;
     const target = getDragTarget(targetDate, event.clientY, column, event.shiftKey);
     if (target) {
-      const next = { ...target.source, ...target.patch };
-      setDragPreview((previous) => previous?.id === next.id && previous.date === next.date && previous.endDate === next.endDate && previous.startHour === next.startHour && previous.endHour === next.endHour ? previous : next);
+      setDragPreview((previous) => previous.length === target.length && target.every((next, index) => {
+        const current = previous[index];
+        return current.id === next.id && current.date === next.date && current.endDate === next.endDate && current.startHour === next.startHour && current.endHour === next.endHour;
+      }) ? previous : target);
     }
   }
 
@@ -1354,10 +1364,18 @@ export function WeeklyTimeGrid({
     const target = getDragTarget(targetDate, event.clientY, column, event.shiftKey);
     clearEventDrag();
     if (!target) return;
-    const { source, patch } = target;
-    const occurrence = parseSyntheticEventId(source.id);
-    if (source.endDate && source.endDate > source.date && !occurrence) onUpdateEvent(source.id, patch);
-    else onUpdateEvent(source.id, patch, occurrence ? { scope: "occurrence" } : undefined);
+    const changed = target.filter((next) => {
+      const source = expandedEvents.find((event) => event.id === next.id);
+      return source && (source.date !== next.date || source.endDate !== next.endDate || source.startHour !== next.startHour || source.endHour !== next.endHour);
+    });
+    changed.forEach((next) => {
+      const patch = { date: next.date, ...(next.endDate ? { endDate: next.endDate } : {}), startHour: next.startHour, endHour: next.endHour };
+      const occurrence = parseSyntheticEventId(next.id);
+      const source = expandedEvents.find((event) => event.id === next.id)!;
+      if (source.endDate && source.endDate > source.date && !occurrence) onUpdateEvent(next.id, patch);
+      else onUpdateEvent(next.id, patch, occurrence ? { scope: "occurrence" } : undefined);
+    });
+    if (changed.length > 1) toast.success(`已移动 ${changed.length} 个日程`);
   }
 
   function handleContextMenu(event: React.MouseEvent, eventId: string) {
@@ -1762,6 +1780,7 @@ export function WeeklyTimeGrid({
         {selectedEventIds.size > 0 ? (
           <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1">
             <span className="text-xs font-semibold text-sky-800">已选 {selectedEventIds.size} 项</span>
+            {selectedEventIds.size > 1 ? <span className="text-xs text-sky-800" title="保持时长与相对间隔，Shift 精确到分钟">拖动任一所选卡片以整体移动</span> : null}
             <Button
               type="button"
               size="xs"
@@ -1845,7 +1864,11 @@ export function WeeklyTimeGrid({
       <div className="overflow-clip">
         <div className="relative min-w-0">
           {viewMode !== "month" ? (
-            <div className="calendar-grid" role="region" aria-label="全天日程时间网格">
+            <div className="calendar-grid" role="region" aria-label="全天日程时间网格" onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              clearEventDrag();
+              setSelectedEventIds(new Set());
+            }}>
               <div
                 className="sticky top-0 z-[80] grid border-b border-stone-200 bg-white shadow-[0_1px_0_rgba(0,0,0,0.03)]"
                 style={{ gridTemplateColumns: timelineGridTemplateColumns }}
@@ -1854,15 +1877,20 @@ export function WeeklyTimeGrid({
                 {timelineDayLayouts.map((day) => (
                   <div
                     key={day.dateIso}
+                    data-day-header={day.dateIso}
                     aria-current={day.dateIso === todayIso ? "date" : undefined}
                     className={`border-r border-gray-200 px-3 py-2 text-center text-xs font-medium last:border-r-0 ${day.dateIso === todayIso ? "bg-emerald-50 text-emerald-900 shadow-[inset_0_-2px_0_#047857]" : "bg-stone-50 text-stone-600"}`}
                   >
                     <div className="flex flex-wrap items-center justify-center gap-1"><span>{format(day.date, "EEE", { locale: zhCN })}<span className="mt-1 block text-[11px] tabular-nums">{format(day.date, "MM/dd")}</span></span>{day.dateIso === todayIso ? <span className="inline-flex shrink-0 whitespace-nowrap rounded bg-emerald-800 px-1 py-0.5 text-[9px] text-white">今天</span> : null}</div>
-                    {day.laneCount > 1 ? (
-                      <div className="mt-0.5 text-[10px] font-medium text-gray-500">
-                        {day.laneCount} 个并行
-                      </div>
-                    ) : null}
+                    <div className="mt-1 flex h-4 items-center justify-center text-[11px] tabular-nums text-stone-500">
+                      {day.events.length > 0 ? day.completedCount === day.events.length ? (
+                        <span role="img" aria-label={`${day.dateIso} 全部日程已完成`} title={`全部完成 · ${day.events.length} 项日程`} className="inline-flex items-center justify-center text-emerald-700">
+                          <Check className="size-4" strokeWidth={3} aria-hidden />
+                        </span>
+                      ) : (
+                        <span role="progressbar" aria-label={`${day.dateIso} 日程完成进度`} aria-valuemin={0} aria-valuemax={day.events.length} aria-valuenow={day.completedCount} title="已完成 / 全部日程">{day.completedCount}/{day.events.length}</span>
+                      ) : null}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1983,10 +2011,11 @@ export function WeeklyTimeGrid({
                             <div
                               key={event.segmentId}
                               className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden border text-left text-sm shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${microCard ? "rounded-[5px]" : "rounded-lg"} ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""} ${selectedEventIds.has(event.id) ? "z-50 ring-2 ring-sky-500 shadow-[0_8px_20px_rgba(14,165,233,0.2)]" : ""}`}
-                              style={{ ...getEventStyle(visualEvent), ...categoryCardStyle(categoryVisual.hex) }}
+                              style={{ ...getEventStyle(visualEvent), ...categoryCardStyle(categoryVisual.hex), ...(dragPreviewIds.has(event.id) ? { opacity: 0.4 } : {}) }}
                               data-density={microCard ? "micro" : compactCard ? "compact" : "regular"}
                               data-schedule-card
                               data-schedule-event-id={event.id}
+                              data-selected={selectedEventIds.has(event.id) || undefined}
                               draggable={resizeState?.eventId !== event.id}
                               onPointerDown={(pointerEvent) => {
                                 if (pointerEvent.button !== 0 || (pointerEvent.target as HTMLElement).closest("[data-resize-handle]")) return;
@@ -1995,6 +2024,11 @@ export function WeeklyTimeGrid({
                                 dragGrabRef.current = { segmentId: event.segmentId, offsetHour: pointerHour - event.startHour };
                               }}
                               onDragStart={(dragEvent) => {
+                                const draggedEvents = selectedEventIds.has(event.id)
+                                  ? [sourceEvent, ...expandedEvents.filter((item) => item.id !== event.id && selectedEventIds.has(item.id))]
+                                  : [sourceEvent];
+                                draggingEventsRef.current = draggedEvents;
+                                setDragPreview(draggedEvents);
                                 draggingEventIdRef.current = event.id;
                                 draggingSegmentDateRef.current = event.displayDate;
                                 draggingOffsetHourRef.current = dragGrabRef.current?.segmentId === event.segmentId ? dragGrabRef.current.offsetHour : 0;
@@ -2016,8 +2050,11 @@ export function WeeklyTimeGrid({
                               <button
                                 type="button"
                                 aria-label={`打开 ${event.title} 编辑窗口`}
-                                className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-[inherit] text-left outline-none focus-visible:ring-2 focus-visible:ring-stone-900/20 ${
-                                  microCard
+                                title={`${event.title}\n${fullTimeLabel}\n${categoryVisual.name}${event.isCompleted ? " · 已完成" : ""}`}
+                                className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 cursor-grab flex-col overflow-hidden rounded-[inherit] text-left outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-stone-900/20 ${
+                                  denseCard
+                                    ? microCard ? "justify-center py-0 pl-2.5 pr-1" : "justify-start py-1.5 pl-2.5 pr-1"
+                                    : microCard
                                     ? "justify-center py-0 pl-3 pr-1.5"
                                     : compactCard
                                       ? "justify-start pb-1.5 pl-4 pr-6 pt-1.5"
@@ -2040,7 +2077,20 @@ export function WeeklyTimeGrid({
                                 }}
                               >
                                 <div className={`flex min-h-0 min-w-0 flex-col ${microCard ? "h-full justify-center" : compactCard ? "gap-0.5" : mediumCard ? "flex-1 gap-1" : "flex-1 gap-1.5"}`}>
-                                  {microCard ? (
+                                  {denseCard ? (
+                                    <>
+                                      {!microCard ? (
+                                        <div className="flex min-w-0 items-center gap-0.5 text-[10px] tabular-nums text-gray-700">
+                                          <span className="min-w-0 truncate" title={fullTimeLabel}>{formatHour(visualEvent.startHour)}</span>
+                                          {event.isCompleted ? <Check className="size-3 shrink-0 text-emerald-700" aria-label="已完成" /> : null}
+                                          {event.tag ? <span title={getTagInfo(event.tag).label} aria-label={getTagInfo(event.tag).label} className={`shrink-0 font-bold ${getTagInfo(event.tag).color}`}>{getTagInfo(event.tag).icon}</span> : null}
+                                        </div>
+                                      ) : null}
+                                      <p className={`min-w-0 overflow-hidden text-xs font-semibold leading-snug ${microCard ? "truncate" : "break-words [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"}`}>
+                                        {event.title}
+                                      </p>
+                                    </>
+                                  ) : microCard ? (
                                     <div className="flex h-full min-w-0 items-center gap-1 overflow-hidden leading-none">
                                       <span
                                         className="shrink-0 whitespace-nowrap font-mono text-[10px] font-medium tracking-[-0.03em] text-gray-700 [font-variant-numeric:tabular-nums]"
@@ -2133,11 +2183,6 @@ export function WeeklyTimeGrid({
                                           <Repeat className="h-3 w-3 shrink-0 text-gray-600" aria-hidden />
                                         ) : null}
                                         <span className="min-w-0 flex-1" />
-                                        {denseCard ? (
-                                          <span className="shrink-0 rounded-md border border-white/50 bg-white/45 px-1.5 py-0.5 text-[9px] font-medium leading-none text-gray-700">
-                                            {event.lane + 1}/{event.laneCount}
-                                          </span>
-                                        ) : null}
                                         {event.isCompleted ? (
                                           <span
                                             className="inline-flex shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-white/80 p-0.5 text-emerald-700 shadow-sm"
@@ -2232,19 +2277,24 @@ export function WeeklyTimeGrid({
                             </div>
                           );
                         })}
-                        {dragPreview ? splitScheduleEventByDay(dragPreview).filter((segment) => segment.displayDate === dayLayout.dateIso).map((segment) => (
+                        {positionedDragPreviews.get(dayLayout.dateIso)?.map((segment) => (
                           <div
                             key={`drag-preview-${segment.segmentId}`}
                             data-drag-preview
-                            className="pointer-events-none absolute inset-x-1 z-[60] rounded-lg border-2 border-dashed border-sky-500 bg-sky-100/65 shadow-sm"
-                            style={getScheduleEventVisualMetrics(segment, hourCellHeight)}
+                            data-drag-preview-event-id={segment.id}
+                            className="pointer-events-none absolute rounded-lg border-2 border-dashed border-sky-500 bg-sky-100/65"
+                            style={{ ...getEventStyle(segment), zIndex: 60 }}
                           >
-                            <div role="status" aria-label="拖动落点" className="absolute -top-7 left-0 whitespace-nowrap rounded-md bg-sky-700 px-2 py-1 text-[11px] font-semibold text-white shadow-md">
-                              {dragPreview.date} {formatHour(dragPreview.startHour)} - {dragPreview.endDate && dragPreview.endDate !== dragPreview.date ? `${dragPreview.endDate} ` : dragPreview.endHour < dragPreview.startHour ? "次日 " : ""}{formatHour(dragPreview.endHour)}
-                              <span className="ml-2 font-normal opacity-85">Shift 精确到分钟</span>
-                            </div>
+                            {segment.segmentId === dragAnchorPreview?.segmentId ? (
+                              <div role="status" aria-label="拖动落点" className={`absolute -top-7 whitespace-nowrap rounded-md bg-sky-700 px-2 py-1 text-[11px] font-semibold text-white shadow-md ${dayLayout.dateIso === format(displayDates.at(-1)!, "yyyy-MM-dd") ? "right-0" : "left-0"}`}>
+                                {dragPreview.length > 1 ? <span className="mr-2">移动 {dragPreview.length} 项</span> : null}
+                                {segment.sourceDate} {formatHour(segment.sourceStartHour)} - {segment.endDate && segment.endDate !== segment.sourceDate ? `${segment.endDate} ` : segment.sourceEndHour < segment.sourceStartHour ? "次日 " : ""}{formatHour(segment.sourceEndHour)}
+                                <span className="ml-2 font-normal opacity-85">Shift 精确到分钟</span>
+                              </div>
+                            ) : null}
+                            {dragPreview.length > 1 ? <span className="block truncate px-1.5 py-0.5 text-[11px] font-medium text-sky-900">{segment.title}</span> : null}
                           </div>
-                        )) : null}
+                        ))}
                       </div>
                     </div>
                   );

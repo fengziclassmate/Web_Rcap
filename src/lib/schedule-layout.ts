@@ -94,6 +94,25 @@ export function moveScheduleEvent(
   };
 }
 
+/** Applies one snapped offset to the group, preserving durations and spacing. */
+export function moveScheduleEvents(
+  events: ScheduleEvent[],
+  anchorEventId: string,
+  segmentDate: string,
+  targetDate: string,
+  targetSegmentStartHour: number,
+): ScheduleEvent[] {
+  const anchor = events.find((event) => event.id === anchorEventId);
+  if (!anchor) return [];
+  const segmentStartHour = segmentDate === anchor.date ? anchor.startHour : 0;
+  const shiftMinutes = (isoDateToDayNumber(targetDate) - isoDateToDayNumber(segmentDate)) * minutesPerDay
+    + Math.round((targetSegmentStartHour - segmentStartHour) * minutesPerHour);
+  return events.map((event) => ({
+    ...event,
+    ...moveScheduleEvent(event, event.date, event.date, event.startHour + shiftMinutes / minutesPerHour),
+  }));
+}
+
 /**
  * Finds the first interval at or after the requested drop position that does
  * not overlap another event. Minute-based arithmetic keeps adjacent 15-minute

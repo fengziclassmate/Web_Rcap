@@ -167,6 +167,117 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("automatically marks only nonempty fully completed days and removes the mark on reopening", () => {
+    const events = [scheduleEvent, { ...scheduleEvent, id: "pending", title: "未完成行程", startHour: 11, endHour: 12, isCompleted: false }];
+    const { rerenderGrid } = renderGrid({ events });
+    expect(screen.queryByRole("img", { name: "2026-07-27 全部日程已完成" })).toBeNull();
+
+    rerenderGrid({ events: events.map((event) => ({ ...event, isCompleted: true })) });
+    expect(screen.getByRole("img", { name: "2026-07-27 全部日程已完成" })).toBeTruthy();
+    expect(screen.getAllByRole("img", { name: /全部日程已完成/ })).toHaveLength(1);
+
+    rerenderGrid({ events });
+    expect(screen.queryByRole("img", { name: /全部日程已完成/ })).toBeNull();
+  });
+
+  it("includes recurring occurrences and overnight continuations in daily completion", () => {
+    const { rerenderGrid } = renderGrid({ events: [
+      { ...scheduleEvent, date: "2026-07-26", startHour: 23, endHour: 1 },
+      { ...scheduleEvent, id: "recurring", title: "循环日程", recurrence: { kind: "daily" }, isCompleted: false },
+    ] });
+    expect(screen.queryByRole("img", { name: "2026-07-27 全部日程已完成" })).toBeNull();
+    rerenderGrid({ events: [{ ...scheduleEvent, date: "2026-07-26", startHour: 23, endHour: 1 }] });
+    expect(screen.getByRole("img", { name: "2026-07-27 全部日程已完成" })).toBeTruthy();
+  });
+
+  it("moves all marquee-selected cards together and previews every landing", () => {
+    const onUpdateEvent = vi.fn();
+    const events = [scheduleEvent, { ...scheduleEvent, id: "second", title: "第二个行程", date: "2026-07-28", startHour: 11, endHour: 12.5 }];
+    const { container } = renderGrid({ events, onUpdateEvent });
+    marqueeSelectAll(container);
+    const anchor = container.querySelector('[data-schedule-event-id="event-1"]')!;
+    const column = container.querySelector('[data-timeline-date="2026-07-28"]')!;
+    Object.defineProperty(column, "getBoundingClientRect", { value: () => ({ top: 100, height: 1728 }) });
+    fireEvent.dragStart(anchor);
+    fireEvent(column, new MouseEvent("dragover", { bubbles: true, cancelable: true, clientY: 100 + 10 * 72 }));
+    expect(container.querySelectorAll("[data-drag-preview]")).toHaveLength(2);
+    expect(screen.getByRole("status", { name: "拖动落点" }).textContent).toContain("移动 2 项");
+    fireEvent(column, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 100 + 10 * 72 }));
+
+    expect(onUpdateEvent.mock.calls).toEqual([
+      ["event-1", { date: "2026-07-28", startHour: 10, endHour: 11 }, undefined],
+      ["second", { date: "2026-07-29", startHour: 12, endHour: 13.5 }, undefined],
+    ]);
+    expect(container.querySelectorAll("[data-drag-preview]")).toHaveLength(0);
+    expect(screen.getByText("已选 2 项")).toBeTruthy();
+  });
+
+  it("moves only an unselected card and cancels group drags without saving", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [scheduleEvent, { ...scheduleEvent, id: "second", title: "第二个行程", startHour: 11, endHour: 12 }], onUpdateEvent });
+    marqueeSelectAll(container);
+    fireEvent.click(screen.getByRole("button", { name: "打开 第二个行程 编辑窗口" }), { ctrlKey: true });
+    const second = container.querySelector('[data-schedule-event-id="second"]')!;
+    const column = second.closest('[data-timeline-date]')!;
+    fireEvent.dragStart(second);
+    fireEvent(column, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 13 * 72 }));
+    expect(onUpdateEvent).toHaveBeenCalledTimes(1);
+    expect(onUpdateEvent).toHaveBeenCalledWith("second", { date: "2026-07-27", startHour: 13, endHour: 14 }, undefined);
+
+    onUpdateEvent.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "打开 第二个行程 编辑窗口" }), { ctrlKey: true });
+    fireEvent.dragStart(second);
+    fireEvent(column, new MouseEvent("dragover", { bubbles: true, cancelable: true, clientY: 13 * 72 }));
+    fireEvent.dragEnd(second);
+    expect(onUpdateEvent).not.toHaveBeenCalled();
+    expect(container.querySelectorAll("[data-drag-preview]")).toHaveLength(0);
+  });
+
+  it("moves selected recurring occurrences independently and skips unchanged drops", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, recurrence: { kind: "daily" } }], onUpdateEvent });
+    const monday = screen.getAllByRole("button", { name: `打开 ${scheduleEvent.title} 编辑窗口` })[0];
+    const tuesday = screen.getAllByRole("button", { name: `打开 ${scheduleEvent.title} 编辑窗口` })[1];
+    fireEvent.click(monday, { ctrlKey: true });
+    fireEvent.click(tuesday, { ctrlKey: true });
+    const anchor = monday.closest('[data-schedule-card]')!;
+    const column = anchor.closest('[data-timeline-date]')!;
+    fireEvent.dragStart(anchor);
+    fireEvent(column, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 9 * 72 }));
+    expect(onUpdateEvent).not.toHaveBeenCalled();
+    fireEvent.dragStart(anchor);
+    fireEvent(column, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 10 * 72 }));
+    expect(onUpdateEvent.mock.calls).toEqual([
+      ["event-1__2026-07-27", { date: "2026-07-27", startHour: 10, endHour: 11 }, { scope: "occurrence" }],
+      ["event-1__2026-07-28", { date: "2026-07-28", startHour: 10, endHour: 11 }, { scope: "occurrence" }],
+    ]);
+    expect(container.querySelectorAll("[data-drag-preview]")).toHaveLength(0);
+  });
+
+  it("keeps overlapping group previews in separate lanes and lets Escape clear selection", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [scheduleEvent, { ...scheduleEvent, id: "second", title: "并行行程" }], onUpdateEvent });
+    marqueeSelectAll(container);
+    const anchor = container.querySelector('[data-schedule-card]')!;
+    fireEvent.dragStart(anchor);
+    const previews = container.querySelectorAll<HTMLElement>("[data-drag-preview]");
+    expect(previews).toHaveLength(2);
+    expect(previews[0].style.left).not.toBe(previews[1].style.left);
+    expect(screen.queryByText(/个并行/)).toBeNull();
+    fireEvent.keyDown(screen.getByRole("region", { name: "全天日程时间网格" }), { key: "Escape" });
+    expect(screen.queryByText("已选 2 项")).toBeNull();
+    expect(container.querySelectorAll("[data-drag-preview]")).toHaveLength(0);
+    expect(onUpdateEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not leave invisible selections after occurrences detach or events leave the week", () => {
+    const { container, rerenderGrid } = renderGrid({ events: [scheduleEvent] });
+    marqueeSelectAll(container);
+    rerenderGrid({ events: [{ ...scheduleEvent, id: "detached", date: "2026-08-10" }] });
+    expect(screen.queryByText("已选 1 项")).toBeNull();
+    expect(screen.queryByRole("button", { name: "删除所选" })).toBeNull();
+  });
+
   it("shows saved fitness and exercise overrides in the same color after reload", () => {
     localStorage.setItem("schedule-user-categories", JSON.stringify([
       { id: "fitness-old", name: "健身", color: "bg-lime-50 border-lime-200 text-lime-950", hex: "#a3e635", sortOrder: 0 },
