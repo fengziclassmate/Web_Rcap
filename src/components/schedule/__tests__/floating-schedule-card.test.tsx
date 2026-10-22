@@ -28,6 +28,14 @@ function mount() {
 }
 
 describe("floating schedule window", () => {
+  it("shows a future priority task with its original due date", async () => {
+    const upcoming = normalizeTasks([{ id: "priority", name: "提前准备下周汇报", taskType: "daily", dueDate: "2026-10-15", isTodayFocus: true }]);
+    render(<FloatingScheduleCard userId="account-a" events={[]} tasks={upcoming} preferences={defaultDashboardUiPreferences} onOpenEvent={vi.fn()} onOpenTask={vi.fn()} onToggleTask={vi.fn()} />);
+    const panel = within(await screen.findByRole("complementary", { name: "日程悬浮窗口" }));
+    fireEvent.click(panel.getByRole("button", { name: "今日待办" }));
+    expect(panel.getByText("提前准备下周汇报")).toBeTruthy();
+    expect(panel.getByText("重点任务 · 2026-10-15 到期")).toBeTruthy();
+  });
   it("shows chosen task times and orders today's tasks by them", async () => {
     const timedTasks = normalizeTasks([
       { id: "late", name: "下午任务", dueDate: "2026-10-08", taskType: "daily", plannedTime: "15:30" },

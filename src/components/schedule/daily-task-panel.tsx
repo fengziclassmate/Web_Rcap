@@ -208,7 +208,7 @@ export function DailyTaskPanel({
     0,
   );
   const todayTasks = dailyTasks.filter((task) => task.dueDate === today);
-  const focusTasks = todayTasks.filter((task) => task.isTodayFocus);
+  const focusTasks = dailyTasks.filter((task) => task.isTodayFocus);
   const radarTasks = tasks
     .filter((task) => task.taskType === "long" && !task.done)
     .map((task) => ({ task, days: dayDistance(today, task.dueDate) }))
@@ -259,10 +259,6 @@ export function DailyTaskPanel({
   }
 
   function toggleFocus(task: LongTask) {
-    if (!task.isTodayFocus && focusTasks.length >= 3) {
-      toast.error("今日三件事已满，请先取消其中一项");
-      return;
-    }
     onUpdateTask(task.id, { isTodayFocus: !task.isTodayFocus });
   }
 
@@ -292,7 +288,7 @@ export function DailyTaskPanel({
   }
 
   function moveToTomorrow(task: LongTask) {
-    onUpdateTask(task.id, { dueDate: tomorrow, isTodayFocus: false });
+    onUpdateTask(task.id, { dueDate: tomorrow });
   }
 
   function openDateEditor(task: LongTask) {
@@ -316,7 +312,6 @@ export function DailyTaskPanel({
     onUpdateTask(taskForDate.id, {
       dueDate: taskDate,
       plannedTime: taskTime,
-      isTodayFocus: taskDate === today ? taskForDate.isTodayFocus : false,
     });
     setTaskForDate(null);
     toast.success(`任务已改到 ${taskDate}${taskTime ? ` ${taskTime}` : ""}`);
@@ -411,7 +406,7 @@ export function DailyTaskPanel({
         </Button>
       </div>
 
-      {focusTasks.length > 0 && <div className="daily-focus-summary"><span><Star className="size-3" />今日三件事</span><span>{focusTasks.length}/3</span></div>}
+      {focusTasks.length > 0 && <div className="daily-focus-summary"><span><Star className="size-3" />重点任务</span><span>{focusTasks.length} 项</span></div>}
 
       <div className="daily-task-list mt-2 max-h-72 overflow-y-auto overscroll-contain" data-testid="daily-task-scroll-list">
         {dailyTasks.length > 0 ? (
@@ -446,7 +441,7 @@ export function DailyTaskPanel({
                 aria-label={`完成日常任务 ${task.name}`}
               />
               <div className="daily-task-content">
-                <p title={task.name} className="daily-task-name">{task.isTodayFocus && <Star className="mr-1 inline size-3 fill-emerald-700 text-emerald-700" aria-label="今日重点" />}{task.name}</p>
+                <p title={task.name} className="daily-task-name">{task.isTodayFocus && <Star className="mr-1 inline size-3 fill-emerald-700 text-emerald-700" aria-label="重点任务" />}{task.name}</p>
                 <button
                   type="button"
                   className="mt-0.5 inline-flex items-center gap-1 rounded text-xs tabular-nums text-stone-500 transition hover:text-emerald-700 hover:underline focus-visible:outline-2 focus-visible:outline-emerald-700"
@@ -522,16 +517,14 @@ export function DailyTaskPanel({
                 <p className="truncate text-sm font-semibold text-stone-900">{contextMenuTask.name}</p>
                 <p className="mt-0.5 text-xs tabular-nums text-stone-400">{contextMenuTask.dueDate}</p>
               </div>
-              {contextMenuTask.dueDate === today ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100"
-                  onClick={() => runContextAction(() => toggleFocus(contextMenuTask))}
-                >
-                  {contextMenuTask.isTodayFocus ? "不设为重点" : "设为重点"}
-                </button>
-              ) : null}
+              <button
+                type="button"
+                role="menuitem"
+                className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100"
+                onClick={() => runContextAction(() => toggleFocus(contextMenuTask))}
+              >
+                {contextMenuTask.isTodayFocus ? "不设为重点" : "设为重点"}
+              </button>
               <button
                 type="button"
                 role="menuitem"

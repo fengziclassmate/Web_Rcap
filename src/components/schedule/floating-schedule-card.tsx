@@ -205,7 +205,7 @@ export function FloatingScheduleCard({ userId, events, tasks, preferences, onOpe
             {pending.length === 0 ? <div className="floating-empty"><Check className="size-7" /><p>今天的待办已清空</p><span>给自己一点休息时间</span></div> : <ul className="floating-tasks">
               {pending.map((task) => <li key={task.id}>
                 <input type="checkbox" checked={false} aria-label={`完成待办：${task.name}`} onChange={() => onToggleTask(task.id)} />
-                <button type="button" onClick={() => onOpenTask(task)}><span className="block break-words text-sm font-medium">{task.name}</span><span className="mt-1 block text-[11px] text-muted-foreground">{task.isTodayFocus ? "今日重点 · " : ""}{task.taskType === "followup" ? "跟进事项" : task.dueDate < today ? `逾期 · ${task.dueDate}` : task.dueDate === today ? "今天到期" : `${task.dueDate} 到期`}{task.plannedTime ? ` · ${task.plannedTime}` : ""}</span></button>
+                <button type="button" onClick={() => onOpenTask(task)}><span className="block break-words text-sm font-medium">{task.name}</span><span className="mt-1 block text-[11px] text-muted-foreground">{task.isTodayFocus ? "重点任务 · " : ""}{task.taskType === "followup" ? "跟进事项" : task.dueDate < today ? `逾期 · ${task.dueDate}` : task.dueDate === today ? "今天到期" : `${task.dueDate} 到期`}{task.plannedTime ? ` · ${task.plannedTime}` : ""}</span></button>
               </li>)}
             </ul>}
           </>}

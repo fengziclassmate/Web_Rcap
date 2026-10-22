@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dailyCapacity, EMPTY_FOCUS, elapsedFocusMs, eventsInDays, normalizeFocusState, occupiedMinutes, pauseFocus, weeklyInsights } from "../execution-insights";
+import { dailyCapacity, EMPTY_FOCUS, elapsedFocusMs, eventsInDays, focusTargets, normalizeFocusState, occupiedMinutes, pauseFocus, weeklyInsights } from "../execution-insights";
 import { normalizeEvents, normalizeTasks } from "../normalizers";
 
 const now = new Date(2026, 8, 29, 10);
@@ -39,6 +39,17 @@ describe("execution capacity", () => {
 });
 
 describe("focus and review", () => {
+  it("offers future priority tasks for focus without including other future or finished tasks", () => {
+    const result = focusTargets([], [
+      task({ id: "today", name: "今日任务" }),
+      task({ id: "priority", name: "提前准备", dueDate: "2026-10-10", isTodayFocus: true }),
+      task({ id: "later", dueDate: "2026-10-10" }),
+      task({ id: "done", dueDate: "2026-10-10", isTodayFocus: true, done: true }),
+      task({ id: "abandoned", dueDate: "2026-10-10", isTodayFocus: true, abandonedAt: now.toISOString() }),
+    ], [], date);
+    expect(result.map((item) => item.id)).toEqual(["task:priority", "task:today", "free"]);
+    expect(result[0]).toMatchObject({ title: "提前准备", group: "重点任务" });
+  });
   it("records elapsed wall time once and never counts pauses", () => {
     const started = { ...EMPTY_FOCUS, active: { id: "task", title: "论文", category: "任务", startedAt: 1000, elapsedMs: 0 } };
     const paused = pauseFocus(started, 61000, "one");

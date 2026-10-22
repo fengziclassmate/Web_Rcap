@@ -82,9 +82,9 @@ export function projectFocusTarget(board: ProjectBoard, task: BoardTask): FocusT
 
 export function focusTargets(events: ScheduleEvent[], tasks: LongTask[], boards: ProjectBoard[], today: string) {
   return [
-    ...tasks.filter((task) => task.taskType === "daily" && !task.done && !task.abandonedAt && task.dueDate <= today)
+    ...tasks.filter((task) => task.taskType === "daily" && !task.done && !task.abandonedAt && (task.dueDate <= today || task.isTodayFocus))
       .sort((a, b) => Number(b.isTodayFocus) - Number(a.isTodayFocus))
-      .map((task) => ({ id: `task:${task.id}`, title: task.name, category: "任务", group: "今日待办" })),
+      .map((task) => ({ id: `task:${task.id}`, title: task.name, category: "任务", group: task.isTodayFocus ? "重点任务" : "今日待办" })),
     ...eventsInDays(events, today, today).filter((event) => !event.isCompleted)
       .map((event) => ({ id: `event:${event.id}`, title: event.title, category: event.category, group: "今日日程" })),
     ...boards.filter((board) => !board.archived).flatMap((board) => board.tasks.filter((task) => task.status !== "done")

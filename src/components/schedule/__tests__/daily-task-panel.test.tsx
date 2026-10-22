@@ -48,7 +48,7 @@ describe("DailyTaskPanel completion archive", () => {
     expect(props.onToggleTask).not.toHaveBeenCalled();
   });
 
-  it("reschedules a today-focus task to an arbitrary date two weeks later", () => {
+  it("retains focus when rescheduling a task two weeks later", () => {
     const { onUpdateTask, rerender, item, props } = renderDateEditor();
     expect(screen.getAllByText("准备汇报")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "修改 准备汇报 的时间" }));
@@ -57,10 +57,11 @@ describe("DailyTaskPanel completion archive", () => {
     fireEvent.change(dialog.getByLabelText("任务日期"), { target: { value: "2026-08-10" } });
     fireEvent.change(dialog.getByLabelText("计划时间（可选）"), { target: { value: "10:30" } });
     fireEvent.click(dialog.getByRole("button", { name: "保存时间" }));
-    expect(onUpdateTask).toHaveBeenCalledWith("task", { dueDate: "2026-08-10", plannedTime: "10:30", isTodayFocus: false });
+    expect(onUpdateTask).toHaveBeenCalledWith("task", { dueDate: "2026-08-10", plannedTime: "10:30" });
     expect(screen.queryByRole("dialog")).toBeNull();
     rerender(<DailyTaskPanel {...props} tasks={[{ ...item, ...onUpdateTask.mock.calls[0][1] }]} />);
-    expect(screen.queryByText("今日三件事")).toBeNull();
+    expect(screen.getByText("重点任务")).toBeTruthy();
+    expect(screen.getByText("准备汇报").closest("article")?.getAttribute("data-focus")).toBe("true");
     expect(screen.getByText("2026-08-10 10:30")).toBeTruthy();
   });
 
@@ -68,7 +69,7 @@ describe("DailyTaskPanel completion archive", () => {
     const { onUpdateTask } = renderDateEditor();
     fireEvent.click(screen.getAllByRole("button", { name: "修改 准备汇报 的时间" })[0]);
     fireEvent.click(screen.getByRole("button", { name: "保存时间" }));
-    expect(onUpdateTask).toHaveBeenCalledWith("task", { dueDate: "2026-07-27", plannedTime: "", isTodayFocus: true });
+    expect(onUpdateTask).toHaveBeenCalledWith("task", { dueDate: "2026-07-27", plannedTime: "" });
   });
 
   it("offers arbitrary rescheduling in the context menu and cancels without saving", () => {
@@ -98,7 +99,31 @@ describe("DailyTaskPanel completion archive", () => {
     expect((screen.getByLabelText("计划时间（可选）") as HTMLInputElement).value).toBe("23:59");
     fireEvent.click(screen.getByRole("button", { name: "清除时间" }));
     fireEvent.click(screen.getByRole("button", { name: "保存时间" }));
-    expect(onUpdateTask).toHaveBeenCalledWith("task", { dueDate: "2026-07-27", plannedTime: "", isTodayFocus: false });
+    expect(onUpdateTask).toHaveBeenCalledWith("task", { dueDate: "2026-07-27", plannedTime: "" });
+  });
+
+  it("marks and unmarks a future task even when three other tasks are already focused", () => {
+    const { props, rerender, onUpdateTask } = renderDateEditor(false);
+    const future = task({ id: "future", name: "下周汇报需提前准备", dueDate: "2026-08-03" });
+    const focused = [1, 2, 3].map((index) => task({ id: `focus-${index}`, name: `已有重点 ${index}`, isTodayFocus: true }));
+    rerender(<DailyTaskPanel {...props} tasks={[...focused, future]} />);
+    fireEvent.contextMenu(screen.getByText(future.name).closest("article")!, { clientX: 120, clientY: 120 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "设为重点" }));
+    expect(onUpdateTask).toHaveBeenCalledWith(future.id, { isTodayFocus: true });
+    rerender(<DailyTaskPanel {...props} tasks={[...focused, { ...future, isTodayFocus: true }]} />);
+    expect(screen.getByText("4 项")).toBeTruthy();
+    expect(screen.getByText(future.name).closest("article")?.getAttribute("data-focus")).toBe("true");
+    expect(screen.getByText(future.dueDate)).toBeTruthy();
+    fireEvent.contextMenu(screen.getByText(future.name).closest("article")!, { clientX: 120, clientY: 120 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "不设为重点" }));
+    expect(onUpdateTask).toHaveBeenLastCalledWith(future.id, { isTodayFocus: false });
+  });
+
+  it("keeps the focus flag when moving a task to tomorrow", () => {
+    const { onUpdateTask } = renderDateEditor();
+    fireEvent.contextMenu(screen.getByText("准备汇报").closest("article")!, { clientX: 120, clientY: 120 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "移到明天" }));
+    expect(onUpdateTask).toHaveBeenCalledWith("task", { dueDate: "2026-07-28" });
   });
 
   it("orders by the user-selected date and time even when old linked time blocks exist", () => {
