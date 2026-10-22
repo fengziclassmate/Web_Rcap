@@ -6,6 +6,7 @@ import {
   WeeklyTimeGrid,
 } from "@/components/schedule/weekly-time-grid";
 import type { ScheduleEvent } from "@/lib/types";
+import { createProjectBoard } from "@/lib/project-boards";
 
 type WeeklyTimeGridProps = ComponentProps<typeof WeeklyTimeGrid>;
 
@@ -167,6 +168,90 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("creates multiple independent child-task time blocks directly from the weekly grid", () => {
+    const board = createProjectBoard("research", "城市诊断");
+    const task = board.tasks[0];
+    const child = task.subtasks[0];
+    child.title = "AOI 数据处理";
+    child.notes = "核对坐标系";
+    const onCreateEvent = vi.fn();
+    const onCreateDailyTask = vi.fn(() => null);
+    const { rerenderGrid } = renderGrid({ onCreateDailyTask });
+    rerenderGrid({ projectBoards: [board], onCreateEvent });
+    fireEvent.click(screen.getByRole("button", { name: "新建日程" }));
+    let dialog = within(screen.getByRole("dialog"));
+    fireEvent.click(dialog.getByRole("button", { name: "选择科研与自学任务" }));
+    fireEvent.change(dialog.getByLabelText("搜索科研与自学任务"), { target: { value: "AOI" } });
+    fireEvent.click(within(dialog.getByRole("group", { name: "科研与自学任务选项" })).getByRole("button", { name: /AOI 数据处理/ }));
+    expect((dialog.getByPlaceholderText("输入行程标题") as HTMLInputElement).value).toBe(child.title);
+    expect(dialog.queryByRole("button", { name: "创建并加入当日任务" })).toBeNull();
+    expect(dialog.getByRole("switch", { name: "循环行程" }).getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(dialog.getByRole("switch", { name: "本时段已完成" }));
+    fireEvent.click(dialog.getByRole("button", { name: "创建行程" }));
+    const first = onCreateEvent.mock.calls[0][0] as ScheduleEvent;
+    expect(first).toMatchObject({ date: "2026-07-27", startHour: 9, title: child.title, notes: child.notes, category: "科研", isCompleted: true, linkedProjectTask: { boardId: board.id, taskId: task.id, subtaskId: child.id } });
+    expect(first.recurrence).toBeUndefined();
+    expect(child.status).toBe("todo");
+    expect(onCreateDailyTask).not.toHaveBeenCalled();
+    rerenderGrid({ projectBoards: [board], events: [first], onCreateEvent });
+    fireEvent.click(screen.getByRole("button", { name: "新建日程" }));
+    dialog = within(screen.getByRole("dialog"));
+    expect(dialog.queryByRole("button", { name: "解除科研与自学任务关联" })).toBeNull();
+    fireEvent.click(dialog.getByRole("button", { name: "选择科研与自学任务" }));
+    fireEvent.change(dialog.getByLabelText("搜索科研与自学任务"), { target: { value: "AOI" } });
+    fireEvent.click(within(dialog.getByRole("group", { name: "科研与自学任务选项" })).getByRole("button", { name: /AOI 数据处理/ }));
+    fireEvent.click(dialog.getByRole("button", { name: "创建行程" }));
+    const second = onCreateEvent.mock.calls[1][0] as ScheduleEvent;
+    expect(second.id).not.toBe(first.id);
+    expect(second.linkedProjectTask).toEqual(first.linkedProjectTask);
+    expect(second.isCompleted).toBe(false);
+  });
+
+  it("allows parent-task selection, preserves custom titles and clears the association", () => {
+    const board = createProjectBoard("learning", "算法学习");
+    const archived = { ...createProjectBoard("research", "已归档研究"), archived: true };
+    const onCreateEvent = vi.fn();
+    const { rerenderGrid } = renderGrid();
+    rerenderGrid({ projectBoards: [board, archived], onCreateEvent });
+    fireEvent.click(screen.getByRole("button", { name: "新建日程" }));
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByPlaceholderText("输入行程标题"), { target: { value: "算法专项训练" } });
+    fireEvent.click(dialog.getByRole("switch", { name: "循环行程" }));
+    fireEvent.click(dialog.getByRole("button", { name: "选择科研与自学任务" }));
+    const options = within(dialog.getByRole("group", { name: "科研与自学任务选项" }));
+    expect(options.queryByRole("button", { name: /已归档研究/ })).toBeNull();
+    fireEvent.click(options.getAllByRole("button")[0]);
+    expect((dialog.getByPlaceholderText("输入行程标题") as HTMLInputElement).value).toBe("算法专项训练");
+    expect(dialog.getByRole("combobox", { name: "分类" }).textContent).toContain("学习");
+    expect(dialog.getByRole("switch", { name: "循环行程" }).getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(dialog.getByRole("button", { name: "解除科研与自学任务关联" }));
+    expect((dialog.getByPlaceholderText("输入行程标题") as HTMLInputElement).value).toBe("算法专项训练");
+    fireEvent.click(dialog.getByRole("button", { name: "创建行程" }));
+    expect(onCreateEvent.mock.calls[0][0].linkedProjectTask).toBeUndefined();
+  });
+
+  it("keeps the create dialog open if the selected source is deleted or archived", () => {
+    const board = createProjectBoard("learning", "刷题计划");
+    const onCreateEvent = vi.fn();
+    const { rerenderGrid } = renderGrid();
+    rerenderGrid({ projectBoards: [board], onCreateEvent });
+    fireEvent.click(screen.getByRole("button", { name: "新建日程" }));
+    let dialog = within(screen.getByRole("dialog"));
+    fireEvent.click(dialog.getByRole("button", { name: "选择科研与自学任务" }));
+    fireEvent.click(within(dialog.getByRole("group", { name: "科研与自学任务选项" })).getAllByRole("button")[0]);
+    rerenderGrid({ projectBoards: [{ ...board, archived: true }], onCreateEvent });
+    fireEvent.click(dialog.getByRole("button", { name: "创建行程" }));
+    expect(onCreateEvent).not.toHaveBeenCalled();
+    rerenderGrid({ projectBoards: [], onCreateEvent });
+    dialog = within(screen.getByRole("dialog"));
+    fireEvent.click(dialog.getByRole("button", { name: "创建行程" }));
+    expect(onCreateEvent).not.toHaveBeenCalled();
+    fireEvent.click(dialog.getByRole("button", { name: "选择科研与自学任务" }));
+    fireEvent.keyDown(dialog.getByLabelText("搜索科研与自学任务"), { key: "Escape" });
+    expect(dialog.queryByRole("textbox", { name: "搜索科研与自学任务" })).toBeNull();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
   it("shows the daily completion mark when only a zero-minute phantom remains unfinished", () => {
     const { container } = renderGrid({ events: [scheduleEvent, {
       ...scheduleEvent, id: "zero-minute", title: "零分钟记录", isCompleted: false,

@@ -866,7 +866,10 @@ export function WorkbenchApp() {
   }
 
   function handleCreateEvent(event: ScheduleEvent) {
-    setEvents((prev) => [...prev, event]);
+    setProjectScheduleData((previous) => {
+      const nextEvents = [...previous.events, event];
+      return { events: nextEvents, projectBoards: reconcileProjectPlans(previous.projectBoards, previous.events, nextEvents) };
+    });
   }
 
   function handleCreateEvents(nextEvents: ScheduleEvent[]) {
@@ -1131,6 +1134,7 @@ export function WorkbenchApp() {
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(340px,380px)] gap-4">
               <section className="min-h-0">
                 <WeeklyTimeGrid
+                  projectBoards={projectBoards}
                   onOpenProjectTask={(link) => { setOpenBoardRequest({ ...link, intent: "reveal", token: Date.now() }); setDashboardUiPreferences((previous) => ({ ...previous, projectWorkspaceExpandedTasks: [...new Set([...(previous.projectWorkspaceExpandedTasks ?? []), JSON.stringify([link.boardId, link.taskId])])] })); }}
                   openEventRequest={openEventRequest}
                   onOpenRequestHandled={() => setOpenEventRequest(undefined)}

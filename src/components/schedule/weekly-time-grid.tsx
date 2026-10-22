@@ -39,7 +39,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { EventTag, ScheduleEvent } from "@/lib/types";
-import type { ProjectTaskLink } from "@/lib/project-boards";
+import type { ProjectBoard, ProjectTaskLink } from "@/lib/project-boards";
+import { resolveProjectTask } from "@/lib/project-schedule";
+import { ProjectTaskPicker } from "@/components/projects/project-task-picker";
 import { eventTagOptions, getEventTagInfo as getTagInfo, normalizeEventTag } from "@/lib/event-tags";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -182,6 +184,7 @@ type WeeklyTimeGridProps = {
   currentWeekStart: Date;
   weekRange: string;
   events: ScheduleEvent[];
+  projectBoards?: ProjectBoard[];
   onCreateEvent: (event: ScheduleEvent) => void;
   onCreateEvents?: (events: ScheduleEvent[]) => void;
   onCreateDailyTask: (name: string, dueDate: string) => string | null;
@@ -514,6 +517,7 @@ export function WeeklyTimeGrid({
   currentWeekStart,
   weekRange,
   events,
+  projectBoards = [],
   onCreateEvent,
   onCreateEvents,
   onCreateDailyTask,
@@ -541,6 +545,7 @@ export function WeeklyTimeGrid({
   const [editEndDate, setEditEndDate] = useState("");
   const [editStartDate, setEditStartDate] = useState("");
   const [createForm, setCreateForm] = useState<EventFormState>(defaultForm);
+  const [createProjectTask, setCreateProjectTask] = useState<ProjectTaskLink>();
   const [createDetailsOpen, setCreateDetailsOpen] = useState(false);
   const [editForm, setEditForm] = useState<EventFormState>(defaultForm);
   const [editDetailsOpen, setEditDetailsOpen] = useState(false);
@@ -990,6 +995,7 @@ export function WeeklyTimeGrid({
 
   function resetCreateDialog(cell: GridCell, allowOverlap = false) {
     setCreateEndDate("");
+    setCreateProjectTask(undefined);
     const { startHour, endHour } = allowOverlap
       ? resolveFormTimeRange(cell.startHour, Math.min(24, cell.startHour + (timeGridSlots.find((slot) => Math.abs(slot.startHour - cell.startHour) < 0.0001)?.durationMinutes ?? 60) / 60))
       : getDefaultCreateTimeRange(cell);
@@ -1184,8 +1190,26 @@ export function WeeklyTimeGrid({
   });
   useEffect(() => { if (openEventRequest) openRequestedEvent(); }, [openEventRequest]);
 
+  function selectCreateProjectTask(link?: ProjectTaskLink) {
+    const previous = createProjectTask ? resolveProjectTask(projectBoards, createProjectTask) : undefined;
+    const target = link ? resolveProjectTask(projectBoards, link) : undefined;
+    setCreateProjectTask(link);
+    if (!target) return;
+    setCreateForm((form) => ({ ...form,
+      title: !form.title.trim() || form.title === previous?.item.title ? target.item.title : form.title,
+      notes: !form.notes.trim() || form.notes === previous?.item.notes ? target.item.notes : form.notes,
+      category: normalizeCategoryName(target.board.kind === "learning" ? "学习" : target.board.kind === "research" ? "科研" : "其他"),
+    }));
+    setCreateRecurrence((previous) => ({ ...previous, enabled: false }));
+  }
+
   function handleCreateEvent(alsoCreateDailyTask = false) {
     if (!selectedCell || !createForm.title.trim()) return;
+    if (createProjectTask) {
+      const target = resolveProjectTask(projectBoards, createProjectTask);
+      if (!target || target.board.archived) { toast.error("关联任务已删除或归档，请重新选择。"); return; }
+      if (createRecurrence.enabled) { toast.error("关联任务请按独立时段安排。"); return; }
+    }
     if (createEndDate && (createEndDate < selectedCell.date || (createEndDate === selectedCell.date && createForm.endHour <= createForm.startHour))) {
       toast.error("结束时间必须晚于开始时间"); return;
     }
@@ -1200,7 +1224,7 @@ export function WeeklyTimeGrid({
       return;
     }
 
-    const linkedDailyTaskId = alsoCreateDailyTask
+    const linkedDailyTaskId = alsoCreateDailyTask && !createProjectTask
       ? onCreateDailyTask(createForm.title.trim(), selectedCell.date)
       : null;
 
@@ -1217,6 +1241,7 @@ export function WeeklyTimeGrid({
       category: createForm.category,
       tag: createForm.tag,
       ...(linkedDailyTaskId ? { linkedDailyTaskId } : {}),
+      ...(createProjectTask ? { linkedProjectTask: createProjectTask } : {}),
     };
 
     if (createRecurrence.enabled) {
@@ -2489,6 +2514,7 @@ export function WeeklyTimeGrid({
                       placeholder="输入行程标题"
                     />
                   </div>
+                  {(projectBoards.length > 0 || createProjectTask) && <ProjectTaskPicker boards={projectBoards} value={createProjectTask} onChange={selectCreateProjectTask} />}
                   <div className="event-create-meta flex flex-wrap items-end gap-3 [&>div:first-child]:w-44 [&>div:nth-child(2)]:w-32">
                     <div className="flex min-w-0 flex-col gap-2">
                       <Label>分类</Label>
@@ -2536,6 +2562,7 @@ export function WeeklyTimeGrid({
                         <div className="flex h-8 items-center justify-center rounded-md border border-stone-200 bg-stone-50/80 px-3">
                         <Switch
                           id="create-recurring"
+                          disabled={Boolean(createProjectTask)}
                           checked={createRecurrence.enabled}
                           onCheckedChange={(checked) =>
                             setCreateRecurrence((prev) => {
@@ -2551,7 +2578,7 @@ export function WeeklyTimeGrid({
                         </div>
                       </div>
                       <div className="flex flex-col gap-2">
-                        <Label htmlFor="create-completed" className="whitespace-nowrap">标记为已完成</Label>
+                        <Label htmlFor="create-completed" className="whitespace-nowrap">{createProjectTask ? "本时段已完成" : "标记为已完成"}</Label>
                         <div className="flex h-8 items-center justify-center rounded-md border border-stone-200 bg-stone-50/80 px-3">
                           <Switch id="create-completed" checked={createForm.isCompleted} onCheckedChange={(checked) => setCreateForm((prev) => ({ ...prev, isCompleted: checked }))} />
                         </div>
@@ -2724,14 +2751,14 @@ export function WeeklyTimeGrid({
                     </CollapsibleContent>
                   </Collapsible>
                   <div className="flex flex-wrap justify-end gap-2 border-t border-stone-100 pt-3">
-                    <Button
+                    {!createProjectTask && <Button
                       type="button"
                       variant="outline"
                       onClick={() => handleCreateEvent(true)}
                       disabled={!createForm.title.trim()}
                     >
                       创建并加入当日任务
-                    </Button>
+                    </Button>}
                     <Button type="button" onClick={() => handleCreateEvent()} disabled={!createForm.title.trim()}>
                       创建行程
                     </Button>
