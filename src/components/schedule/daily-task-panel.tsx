@@ -157,11 +157,13 @@ export function DailyTaskPanel({
     const activeTasks = tasks.filter(
       (task) => task.taskType === "daily" && !task.done && !task.abandonedAt,
     );
-    if (sortMode === "custom") return activeTasks;
+    if (sortMode === "custom") return activeTasks.sort((left, right) => Number(right.isTodayFocus) - Number(left.isTodayFocus));
 
     return activeTasks
       .map((task, index) => ({ task, index, schedule: dailyTaskScheduleTimes.get(task.id) }))
       .sort((left, right) => {
+        const focusOrder = Number(right.task.isTodayFocus) - Number(left.task.isTodayFocus);
+        if (focusOrder !== 0) return focusOrder;
         const leftDate = left.task.dueDate;
         const rightDate = right.task.dueDate;
         const dateOrder = leftDate.localeCompare(rightDate);
@@ -354,10 +356,12 @@ export function DailyTaskPanel({
     event.dataTransfer.setData("text/daily-task-id", taskId);
   }
 
-  function handleTaskDrop(event: React.DragEvent<HTMLElement>, targetTaskId: string) {
-    if (sortMode !== "custom" || !draggingTaskId || draggingTaskId === targetTaskId) return;
+  function handleTaskDrop(event: React.DragEvent<HTMLElement>, targetTask: LongTask) {
+    if (sortMode !== "custom" || !draggingTaskId || draggingTaskId === targetTask.id) return;
+    const sourceTask = dailyTasks.find((task) => task.id === draggingTaskId);
+    if (!sourceTask || sourceTask.isTodayFocus !== targetTask.isTodayFocus) return;
     event.preventDefault();
-    onReorderTask(draggingTaskId, targetTaskId);
+    onReorderTask(draggingTaskId, targetTask.id);
     setDraggingTaskId(null);
   }
 
@@ -369,7 +373,7 @@ export function DailyTaskPanel({
     const currentIndex = dailyTasks.findIndex((task) => task.id === taskId);
     const targetIndex = currentIndex + (event.key === "ArrowUp" ? -1 : 1);
     const targetTask = dailyTasks[targetIndex];
-    if (!targetTask) return;
+    if (!targetTask || targetTask.isTodayFocus !== dailyTasks[currentIndex].isTodayFocus) return;
     event.preventDefault();
     onReorderTask(taskId, targetTask.id);
   }
@@ -419,14 +423,14 @@ export function DailyTaskPanel({
               onDragOver={(event) => {
                 if (sortMode === "custom") event.preventDefault();
               }}
-              onDrop={(event) => handleTaskDrop(event, task.id)}
+              onDrop={(event) => handleTaskDrop(event, task)}
             >
               {sortMode === "custom" ? (
                 <button
                   type="button"
                   draggable
                   aria-label={`调整顺序 ${task.name}`}
-                  title="拖动排序，也可使用上下方向键"
+                  title="同组内拖动排序，也可使用上下方向键"
                   className="-ml-1 rounded-md p-0.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700 active:cursor-grabbing"
                   onDragStart={(event) => handleTaskDragStart(task.id, event)}
                   onDragEnd={() => setDraggingTaskId(null)}

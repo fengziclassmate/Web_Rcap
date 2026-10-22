@@ -138,6 +138,62 @@ describe("DailyTaskPanel completion archive", () => {
     expect(names).toEqual(["上午任务", "下午任务", "未指定时间", "未来任务"]);
   });
 
+  it.each(["time", "custom"] as const)("pins priority tasks and restores the original %s order when unmarked", (sortMode) => {
+    const { props, rerender, onUpdateTask } = renderDateEditor(false);
+    const original = [
+      task({ id: "late", name: "下午任务", plannedTime: "15:00" }),
+      task({ id: "future", name: "未来准备", dueDate: "2026-08-03" }),
+      task({ id: "early", name: "上午任务", plannedTime: "08:00" }),
+      task({ id: "next", name: "未来复核", dueDate: "2026-08-01" }),
+      task({ id: "done", name: "已完成重点", isTodayFocus: true, done: true }),
+      task({ id: "abandoned", name: "已放弃重点", isTodayFocus: true, abandonedAt: "2026-07-27T08:00:00Z" }),
+    ];
+    let items = original;
+    rerender(<DailyTaskPanel {...props} sortMode={sortMode} tasks={items} />);
+    const expected = sortMode === "time" ? [
+      ["未来准备", "上午任务", "下午任务", "未来复核"],
+      ["未来复核", "未来准备", "上午任务", "下午任务"],
+      ["未来复核", "上午任务", "下午任务", "未来准备"],
+      ["上午任务", "下午任务", "未来复核", "未来准备"],
+    ] : [
+      ["未来准备", "下午任务", "上午任务", "未来复核"],
+      ["未来准备", "未来复核", "下午任务", "上午任务"],
+      ["未来复核", "下午任务", "未来准备", "上午任务"],
+      ["下午任务", "未来准备", "上午任务", "未来复核"],
+    ];
+    for (const [index, id] of ["future", "next", "future", "next"].entries()) {
+      const item = items.find((entry) => entry.id === id)!;
+      fireEvent.contextMenu(screen.getByText(item.name).closest("article")!, { clientX: 120, clientY: 120 });
+      fireEvent.click(screen.getByRole("menuitem", { name: item.isTodayFocus ? "不设为重点" : "设为重点" }));
+      expect(onUpdateTask).toHaveBeenLastCalledWith(id, { isTodayFocus: !item.isTodayFocus });
+      items = items.map((entry) => entry.id === id ? { ...entry, isTodayFocus: !entry.isTodayFocus } : entry);
+      rerender(<DailyTaskPanel {...props} sortMode={sortMode} tasks={items} />);
+      expect(Array.from(screen.getByTestId("daily-task-scroll-list").querySelectorAll(".daily-task-name")).map((node) => node.textContent)).toEqual(expected[index]);
+    }
+    expect(props.onReorderTask).not.toHaveBeenCalled();
+    expect(original.map((item) => item.id)).toEqual(["late", "future", "early", "next", "done", "abandoned"]);
+    expect(original.slice(0, 4).every((item) => !item.isTodayFocus)).toBe(true);
+  });
+
+  it("allows custom drag and keyboard ordering within each priority group only", () => {
+    const { props, rerender } = renderDateEditor(false);
+    const items = [
+      task({ id: "normal-a", name: "普通 A" }), task({ id: "focus-a", name: "重点 A", isTodayFocus: true }),
+      task({ id: "normal-b", name: "普通 B" }), task({ id: "focus-b", name: "重点 B", isTodayFocus: true }),
+    ];
+    rerender(<DailyTaskPanel {...props} tasks={items} sortMode="custom" />);
+    fireEvent.dragStart(screen.getByRole("button", { name: "调整顺序 重点 B" }));
+    fireEvent.drop(screen.getByText("普通 A").closest("article")!);
+    fireEvent.keyDown(screen.getByRole("button", { name: "调整顺序 重点 B" }), { key: "ArrowDown" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "调整顺序 普通 A" }), { key: "ArrowUp" });
+    expect(props.onReorderTask).not.toHaveBeenCalled();
+    fireEvent.dragStart(screen.getByRole("button", { name: "调整顺序 重点 B" }));
+    fireEvent.drop(screen.getByText("重点 A").closest("article")!);
+    expect(props.onReorderTask).toHaveBeenLastCalledWith("focus-b", "focus-a");
+    fireEvent.keyDown(screen.getByRole("button", { name: "调整顺序 普通 A" }), { key: "ArrowDown" });
+    expect(props.onReorderTask).toHaveBeenLastCalledWith("normal-a", "normal-b");
+  });
+
   it("collapses daily tasks and deadline radar while keeping a scrollable task list", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 6, 27, 15, 0));
