@@ -773,6 +773,7 @@ export function WeeklyTimeGrid({
   const selectedEventIds = useMemo(() => eventSelection.rangeKey === visibleDateRangeKey
     ? new Set([...eventSelection.ids].filter((id) => visibleEventIds.has(id)))
     : emptySelectedEventIds, [eventSelection, visibleDateRangeKey, visibleEventIds]);
+  const selectedIncompleteEvents = expandedEvents.filter((event) => selectedEventIds.has(event.id) && !event.isCompleted);
 
   function setSelectedEventIds(action: React.SetStateAction<Set<string>>) {
     setEventSelection((previous) => {
@@ -1655,6 +1656,13 @@ export function WeeklyTimeGrid({
     }
   }
 
+  function handleBatchComplete() {
+    selectedIncompleteEvents.forEach((event) => {
+      onUpdateEvent(event.id, { isCompleted: true }, parseSyntheticEventId(event.id) ? { scope: "occurrence" } : undefined);
+    });
+    toast.success(`已完成 ${selectedIncompleteEvents.length} 个日程`);
+  }
+
   function handleBatchDelete() {
     const ids = [...selectedEventIds];
     ids.forEach((eventId) => {
@@ -1803,9 +1811,18 @@ export function WeeklyTimeGrid({
         </div>
 
         {selectedEventIds.size > 0 ? (
-          <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1">
             <span className="text-xs font-semibold text-sky-800">已选 {selectedEventIds.size} 项</span>
             {selectedEventIds.size > 1 ? <span className="text-xs text-sky-800" title="保持时长与相对间隔，Shift 精确到分钟">拖动任一所选卡片以整体移动</span> : null}
+            <Button
+              type="button"
+              size="xs"
+              disabled={selectedIncompleteEvents.length === 0}
+              onClick={handleBatchComplete}
+            >
+              <Check className="h-3 w-3" />
+              标记为已完成
+            </Button>
             <Button
               type="button"
               size="xs"

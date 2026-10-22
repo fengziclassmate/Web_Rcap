@@ -168,6 +168,54 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("completes only selected unfinished events and disables the action once all are done", () => {
+    const onUpdateEvent = vi.fn();
+    const events = [
+      { ...scheduleEvent, title: "所选待完成", isCompleted: false },
+      { ...scheduleEvent, id: "completed", title: "所选已完成", startHour: 11, endHour: 12 },
+      { ...scheduleEvent, id: "unselected", title: "未选日程", startHour: 13, endHour: 14, isCompleted: false },
+    ];
+    const { rerenderGrid } = renderGrid({ events, onUpdateEvent });
+    expect(screen.queryByRole("button", { name: "标记为已完成" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "打开 所选待完成 编辑窗口" }), { ctrlKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "打开 所选已完成 编辑窗口" }), { ctrlKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "标记为已完成" }));
+    expect(onUpdateEvent.mock.calls).toEqual([["event-1", { isCompleted: true }, undefined]]);
+
+    rerenderGrid({ events: events.map((event) => event.id === "event-1" ? { ...event, isCompleted: true } : event) });
+    expect((screen.getByRole("button", { name: "标记为已完成" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "标记为已完成" }));
+    expect(onUpdateEvent).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("已选 2 项")).toBeTruthy();
+  });
+
+  it("completes marquee-selected overnight events once even when both segments are selected", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [
+      { ...scheduleEvent, id: "overnight", startHour: 23, endHour: 2, isCompleted: false },
+      { ...scheduleEvent, id: "next-day", date: "2026-07-28", startHour: 10, endHour: 11, isCompleted: false },
+    ], onUpdateEvent });
+    marqueeSelectAll(container);
+    fireEvent.click(screen.getByRole("button", { name: "标记为已完成" }));
+    expect(onUpdateEvent.mock.calls).toEqual([
+      ["overnight", { isCompleted: true }, undefined],
+      ["next-day", { isCompleted: true }, undefined],
+    ]);
+  });
+
+  it("completes only the selected recurring occurrences", () => {
+    const onUpdateEvent = vi.fn();
+    renderGrid({ events: [{ ...scheduleEvent, recurrence: { kind: "daily" }, isCompleted: false }], onUpdateEvent });
+    const triggers = screen.getAllByRole("button", { name: `打开 ${scheduleEvent.title} 编辑窗口` });
+    fireEvent.click(triggers[0], { ctrlKey: true });
+    fireEvent.click(triggers[1], { ctrlKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "标记为已完成" }));
+    expect(onUpdateEvent.mock.calls).toEqual([
+      ["event-1__2026-07-27", { isCompleted: true }, { scope: "occurrence" }],
+      ["event-1__2026-07-28", { isCompleted: true }, { scope: "occurrence" }],
+    ]);
+  });
+
   it("creates multiple independent child-task time blocks directly from the weekly grid", () => {
     const board = createProjectBoard("research", "城市诊断");
     const task = board.tasks[0];
