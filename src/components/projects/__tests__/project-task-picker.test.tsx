@@ -1,0 +1,81 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { createProjectBoard } from "@/lib/project-boards";
+import { ProjectTaskPicker } from "../project-task-picker";
+
+describe("project task directory picker", () => {
+  it("browses projects, tasks and unfinished children before selecting a child", () => {
+    const board = createProjectBoard("research", "城市诊断");
+    const task = board.tasks[0];
+    task.title = "数据准备";
+    task.subtasks[0].title = "AOI 数据处理";
+    task.subtasks[1].title = "已完成处理";
+    task.subtasks[1].status = "done";
+    const archived = { ...createProjectBoard("learning", "归档学习"), archived: true };
+    const onChange = vi.fn();
+    const { rerender } = render(<ProjectTaskPicker boards={[board, archived]} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "选择科研与自学任务" }));
+    const options = within(screen.getByRole("group", { name: "科研与自学任务选项" }));
+    expect(options.getAllByRole("button")).toHaveLength(1);
+    expect(options.queryByText(task.title)).toBeNull();
+    expect(options.queryByText(archived.name)).toBeNull();
+    fireEvent.click(options.getByRole("button", { name: `打开项目：${board.name}` }));
+    expect(options.queryByText(task.subtasks[0].title)).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(options.getByRole("button", { name: `打开任务：${task.title}` }));
+    expect(options.queryByText("已完成处理")).toBeNull();
+    expect(options.getAllByRole("button")).toHaveLength(1);
+    expect(document.activeElement).toBe(screen.getByLabelText("搜索子任务"));
+    fireEvent.click(options.getByRole("button", { name: "选择子任务：AOI 数据处理" }));
+    const link = { boardId: board.id, taskId: task.id, subtaskId: task.subtasks[0].id };
+    expect(onChange).toHaveBeenCalledWith(link);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "选择科研与自学任务" }));
+    rerender(<ProjectTaskPicker boards={[board, archived]} value={link} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "选择科研与自学任务" }));
+    expect(screen.getByLabelText("搜索项目")).toBeTruthy();
+    expect(within(screen.getByRole("group", { name: "科研与自学任务选项" })).queryByRole("button", { name: "选择子任务：AOI 数据处理" })).toBeNull();
+  });
+
+  it("supports per-level search, breadcrumbs and going back without selecting", () => {
+    const board = createProjectBoard("research", "城市诊断");
+    const other = createProjectBoard("learning", "LeetCode");
+    const task = board.tasks[0];
+    task.title = "数据准备";
+    task.subtasks[0].title = "AOI 数据处理";
+    task.subtasks[1].title = "已经结束";
+    task.subtasks[1].status = "done";
+    const onChange = vi.fn();
+    render(<ProjectTaskPicker boards={[board, other]} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "选择科研与自学任务" }));
+    fireEvent.change(screen.getByLabelText("搜索项目"), { target: { value: "城市" } });
+    expect(screen.queryByRole("button", { name: `打开项目：${other.name}` })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: `打开项目：${board.name}` }));
+    expect((screen.getByLabelText("搜索任务") as HTMLInputElement).value).toBe("");
+    fireEvent.change(screen.getByLabelText("搜索任务"), { target: { value: "数据准备" } });
+    fireEvent.click(screen.getByRole("button", { name: `打开任务：${task.title}` }));
+    fireEvent.change(screen.getByLabelText("搜索子任务"), { target: { value: "已经结束" } });
+    expect(screen.getByText("没有匹配项")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "返回上一级" }));
+    expect((screen.getByLabelText("搜索任务") as HTMLInputElement).value).toBe("");
+    fireEvent.click(within(screen.getByRole("navigation", { name: "关联任务目录" })).getByRole("button", { name: "项目" }));
+    expect(screen.getByRole("button", { name: `打开项目：${other.name}` })).toBeTruthy();
+    fireEvent.keyDown(screen.getByLabelText("搜索项目"), { key: "Escape" });
+    expect(screen.queryByRole("group", { name: "科研与自学任务选项" })).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("can select the parent task when all its children have been completed", () => {
+    const board = createProjectBoard("research", "研究计划");
+    const task = board.tasks[0];
+    task.subtasks.forEach((child) => { child.status = "done"; });
+    const onChange = vi.fn();
+    render(<ProjectTaskPicker boards={[board]} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "选择科研与自学任务" }));
+    fireEvent.click(screen.getByRole("button", { name: `打开项目：${board.name}` }));
+    fireEvent.click(screen.getByRole("button", { name: `打开任务：${task.title}` }));
+    expect(screen.getByText("暂无未完成子任务")).toBeTruthy();
+    expect(within(screen.getByRole("group", { name: "科研与自学任务选项" })).queryByRole("button")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: `选择此任务：${task.title}` }));
+    expect(onChange).toHaveBeenCalledWith({ boardId: board.id, taskId: task.id });
+  });
+});

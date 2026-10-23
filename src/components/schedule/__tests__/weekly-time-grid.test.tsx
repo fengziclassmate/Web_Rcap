@@ -229,7 +229,9 @@ describe("WeeklyTimeGrid interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "新建日程" }));
     let dialog = within(screen.getByRole("dialog"));
     fireEvent.click(dialog.getByRole("button", { name: "选择科研与自学任务" }));
-    fireEvent.change(dialog.getByLabelText("搜索科研与自学任务"), { target: { value: "AOI" } });
+    fireEvent.click(dialog.getByRole("button", { name: `打开项目：${board.name}` }));
+    fireEvent.click(dialog.getByRole("button", { name: `打开任务：${task.title}` }));
+    fireEvent.change(dialog.getByLabelText("搜索子任务"), { target: { value: "AOI" } });
     fireEvent.click(within(dialog.getByRole("group", { name: "科研与自学任务选项" })).getByRole("button", { name: /AOI 数据处理/ }));
     expect((dialog.getByPlaceholderText("输入行程标题") as HTMLInputElement).value).toBe(child.title);
     expect(dialog.queryByRole("button", { name: "创建并加入当日任务" })).toBeNull();
@@ -246,7 +248,9 @@ describe("WeeklyTimeGrid interactions", () => {
     dialog = within(screen.getByRole("dialog"));
     expect(dialog.queryByRole("button", { name: "解除科研与自学任务关联" })).toBeNull();
     fireEvent.click(dialog.getByRole("button", { name: "选择科研与自学任务" }));
-    fireEvent.change(dialog.getByLabelText("搜索科研与自学任务"), { target: { value: "AOI" } });
+    fireEvent.click(dialog.getByRole("button", { name: `打开项目：${board.name}` }));
+    fireEvent.click(dialog.getByRole("button", { name: `打开任务：${task.title}` }));
+    fireEvent.change(dialog.getByLabelText("搜索子任务"), { target: { value: "AOI" } });
     fireEvent.click(within(dialog.getByRole("group", { name: "科研与自学任务选项" })).getByRole("button", { name: /AOI 数据处理/ }));
     fireEvent.click(dialog.getByRole("button", { name: "创建行程" }));
     const second = onCreateEvent.mock.calls[1][0] as ScheduleEvent;
@@ -269,6 +273,8 @@ describe("WeeklyTimeGrid interactions", () => {
     const options = within(dialog.getByRole("group", { name: "科研与自学任务选项" }));
     expect(options.queryByRole("button", { name: /已归档研究/ })).toBeNull();
     fireEvent.click(options.getAllByRole("button")[0]);
+    fireEvent.click(dialog.getByRole("button", { name: `打开任务：${board.tasks[0].title}` }));
+    fireEvent.click(dialog.getByRole("button", { name: `选择此任务：${board.tasks[0].title}` }));
     expect((dialog.getByPlaceholderText("输入行程标题") as HTMLInputElement).value).toBe("算法专项训练");
     expect(dialog.getByRole("combobox", { name: "分类" }).textContent).toContain("学习");
     expect(dialog.getByRole("switch", { name: "循环行程" }).getAttribute("aria-checked")).toBe("false");
@@ -287,6 +293,8 @@ describe("WeeklyTimeGrid interactions", () => {
     let dialog = within(screen.getByRole("dialog"));
     fireEvent.click(dialog.getByRole("button", { name: "选择科研与自学任务" }));
     fireEvent.click(within(dialog.getByRole("group", { name: "科研与自学任务选项" })).getAllByRole("button")[0]);
+    fireEvent.click(dialog.getByRole("button", { name: `打开任务：${board.tasks[0].title}` }));
+    fireEvent.click(dialog.getByRole("button", { name: `选择此任务：${board.tasks[0].title}` }));
     rerenderGrid({ projectBoards: [{ ...board, archived: true }], onCreateEvent });
     fireEvent.click(dialog.getByRole("button", { name: "创建行程" }));
     expect(onCreateEvent).not.toHaveBeenCalled();
@@ -295,8 +303,8 @@ describe("WeeklyTimeGrid interactions", () => {
     fireEvent.click(dialog.getByRole("button", { name: "创建行程" }));
     expect(onCreateEvent).not.toHaveBeenCalled();
     fireEvent.click(dialog.getByRole("button", { name: "选择科研与自学任务" }));
-    fireEvent.keyDown(dialog.getByLabelText("搜索科研与自学任务"), { key: "Escape" });
-    expect(dialog.queryByRole("textbox", { name: "搜索科研与自学任务" })).toBeNull();
+    fireEvent.keyDown(dialog.getByLabelText("搜索项目"), { key: "Escape" });
+    expect(dialog.queryByRole("textbox", { name: "搜索项目" })).toBeNull();
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
