@@ -52,15 +52,16 @@ export function InlineProjectText({ value, label, placeholder, required = false,
     }} />;
 }
 
-export function SubtaskTable({ title, subtasks, onChange, scheduleFor, onSchedule }: { title: string; subtasks: BoardSubtask[]; onChange: (update: (previous: BoardSubtask[]) => BoardSubtask[]) => void; scheduleFor?: (id: string) => ScheduleEvent[]; onSchedule?: (id: string) => void }) {
+export function SubtaskTable({ title, subtasks, onChange, scheduleFor, onSchedule, sortByPriority, onManualReorder }: { title: string; subtasks: BoardSubtask[]; onChange: (update: (previous: BoardSubtask[]) => BoardSubtask[]) => void; scheduleFor?: (id: string) => ScheduleEvent[]; onSchedule?: (id: string) => void; sortByPriority: boolean; onManualReorder: () => void }) {
   const [newTitle, setNewTitle] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
-  const rows = [...subtasks].sort(compareCompletion);
+  const rows = [...subtasks].sort((a, b) => compareCompletion(a, b) || (sortByPriority ? a.priority.localeCompare(b.priority) || (a.dueDate || "9999").localeCompare(b.dueDate || "9999") : 0));
   const sorting = useRowReorder(rows.map((item) => ({ id: item.id, group: item.status === "done" ? "done" : "active", label: `子任务：${item.title}` })), (sourceId, targetId) => {
     const source = rows.find((item) => item.id === sourceId);
     if (!source) return;
     const visibleIds = rows.filter((item) => !compareCompletion(item, source)).map((item) => item.id);
     onChange((previous) => reorderVisibleRecords(previous, sourceId, targetId, visibleIds));
+    onManualReorder();
   });
   function patch(id: string, changes: Partial<BoardSubtask>) { onChange((previous) => previous.map((item) => item.id === id ? { ...item, ...changes } : item)); }
   function add() {

@@ -22,7 +22,7 @@ function useUnsavedChanges(dirty: boolean) {
   }, [dirty]);
 }
 
-export function BoardTaskEditor({ task, projectName, onSave, onClose }: { task: BoardTask; projectName: string; onSave: (task: BoardTask) => void; onClose: () => void }) {
+export function BoardTaskEditor({ task, projectName, onSave, onClose, sortByPriority, onManualReorder }: { task: BoardTask; projectName: string; onSave: (task: BoardTask) => void; onClose: () => void; sortByPriority: boolean; onManualReorder: () => void }) {
   const [draft, setDraft] = useState(task);
   const [tab, setTab] = useState<"content" | "notes" | "review">("content");
   const [discard, setDiscard] = useState(false);
@@ -52,7 +52,7 @@ export function BoardTaskEditor({ task, projectName, onSave, onClose }: { task: 
               </div>
               <div role="tabpanel" id={`task-panel-${tab}`} aria-labelledby={`task-tab-${tab}`}>
                 <AnnotatedEditor key={tab} label={{ content: "任务内容", notes: "备注与资料", review: "成果与复盘" }[tab]} value={draft[tab]} onChange={(value) => patch({ [tab]: value })} allowChecklist={false} />
-                {tab === "content" && <SubtaskTable title={draft.title} subtasks={draft.subtasks} onChange={(update) => setDraft((previous) => ({ ...previous, subtasks: update(previous.subtasks) }))} />}
+                {tab === "content" && <SubtaskTable title={draft.title} subtasks={draft.subtasks} sortByPriority={sortByPriority} onManualReorder={onManualReorder} onChange={(update) => setDraft((previous) => ({ ...previous, subtasks: update(previous.subtasks) }))} />}
               </div>
             </div>
           <div className="mt-5 flex justify-end gap-2 border-t border-stone-200 pt-4"><Button type="button" variant="outline" onClick={close}>取消</Button><Button type="submit" disabled={!draft.title.trim()}>保存任务</Button></div>

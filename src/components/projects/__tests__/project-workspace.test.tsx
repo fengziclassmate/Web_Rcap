@@ -13,6 +13,61 @@ function Workspace({ initial = [] }: { initial?: ProjectBoard[] }) {
 }
 
 describe("research and learning workspace", () => {
+  it.each([false, true])("sorts subtasks by priority without overwriting manual order (details: %s)", async (details) => {
+    const board = createProjectBoard("research", "子任务优先级");
+    const task = board.tasks[0];
+    board.tasks = [task];
+    task.subtasks = [
+      { ...createBoardSubtask("稍后处理"), priority: "p3" },
+      { ...createBoardSubtask("重要事项甲"), priority: "p1", dueDate: "2026-10-25" },
+      { ...createBoardSubtask("重要事项乙"), priority: "p1", dueDate: "2026-10-24" },
+      { ...createBoardSubtask("常规事项"), priority: "p2" },
+      { ...createBoardSubtask("已完成事项"), priority: "p1", status: "done" },
+    ];
+    render(<Workspace initial={[board]} />);
+    fireEvent.change(screen.getByLabelText("任务排序"), { target: { value: "priority" } });
+    fireEvent.click(screen.getByRole("button", { name: details ? task.title : `展开任务：${task.title}` }));
+    const table = screen.getByRole("table", { name: `${task.title}的子任务表` });
+    const order = () => Array.from(table.querySelectorAll("[data-subtask-id]")).map((row) => row.getAttribute("data-subtask-id"));
+    expect(order()).toEqual([2, 1, 3, 0, 4].map((index) => task.subtasks[index].id));
+    fireEvent.change(screen.getByLabelText("子任务优先级：稍后处理"), { target: { value: "p1" } });
+    expect(order()).toEqual([2, 1, 0, 3, 4].map((index) => task.subtasks[index].id));
+    if (details) {
+      fireEvent.click(screen.getByRole("button", { name: "保存任务" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      fireEvent.click(screen.getByRole("button", { name: `展开任务：${task.title}` }));
+    }
+    fireEvent.change(screen.getByLabelText("任务排序"), { target: { value: "manual" } });
+    expect(Array.from(screen.getByRole("table", { name: `${task.title}的子任务表` }).querySelectorAll("[data-subtask-id]")).map((row) => row.getAttribute("data-subtask-id"))).toEqual(task.subtasks.map((item) => item.id));
+  });
+
+  it.each([false, true])("switches to manual order when moving a priority-sorted subtask (details: %s)", async (details) => {
+    const board = createProjectBoard("research", "子任务手动顺序");
+    const task = board.tasks[0];
+    board.tasks = [task];
+    task.subtasks = [
+      { ...createBoardSubtask("稍后处理"), priority: "p3" },
+      { ...createBoardSubtask("先处理"), priority: "p1" },
+      { ...createBoardSubtask("常规处理"), priority: "p2" },
+    ];
+    render(<Workspace initial={[board]} />);
+    fireEvent.change(screen.getByLabelText("任务排序"), { target: { value: "priority" } });
+    fireEvent.click(screen.getByRole("button", { name: details ? task.title : `展开任务：${task.title}` }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "移动子任务：稍后处理" }), { key: "ArrowUp" });
+    expect((screen.getByLabelText("任务排序") as HTMLSelectElement).value).toBe("manual");
+    if (details) {
+      fireEvent.click(screen.getByRole("button", { name: "保存任务" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      fireEvent.click(screen.getByRole("button", { name: `展开任务：${task.title}` }));
+    }
+    const table = screen.getByRole("table", { name: `${task.title}的子任务表` });
+    const order = () => Array.from(table.querySelectorAll("[data-subtask-id]")).map((row) => row.getAttribute("data-subtask-id"));
+    expect(order()).toEqual([1, 0, 2].map((index) => task.subtasks[index].id));
+    fireEvent.change(screen.getByLabelText("任务排序"), { target: { value: "priority" } });
+    fireEvent.change(screen.getByLabelText("任务排序"), { target: { value: "manual" } });
+    expect(order()).toEqual([1, 0, 2].map((index) => task.subtasks[index].id));
+  });
+
   it("adds, renames and removes tags inline and shares the result with task details", () => {
     const board = createProjectBoard("research", "标签编辑");
     const task = board.tasks[0];
