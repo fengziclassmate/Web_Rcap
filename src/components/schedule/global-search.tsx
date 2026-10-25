@@ -1,6 +1,7 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
+import { useShortcut, useShortcuts } from "@/components/shortcuts/shortcut-provider";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,15 +38,10 @@ export function GlobalSearch({ events, tasks, logs, annualTasks, projects, shopp
   const deferred = useDeferredValue(query.trim().toLocaleLowerCase());
   const index = useMemo(() => buildSearchIndex(events, tasks, logs, annualTasks, projects, shopping, boards), [events, tasks, logs, annualTasks, projects, shopping, boards]);
   const results = useMemo(() => deferred ? index.filter((item) => deferred.split(/\s+/).every((word) => `${item.title} ${item.detail} ${item.date ?? ""}`.toLocaleLowerCase().includes(word))) : [], [deferred, index]);
-  useEffect(() => {
-    function keydown(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setOpen((value) => !value); }
-    }
-    window.addEventListener("keydown", keydown);
-    return () => window.removeEventListener("keydown", keydown);
-  }, []);
+  const shortcuts = useShortcuts();
+  useShortcut("search", () => { setOpen(true); setSelected(null); });
   return <>
-    <Button variant="outline" size="sm" onClick={() => { setOpen(true); setSelected(null); }}><Search className="size-4" />全局搜索 <kbd className="ml-2 text-xs text-muted-foreground">Ctrl K</kbd></Button>
+    <Button variant="outline" size="sm" onClick={() => { setOpen(true); setSelected(null); }}><Search className="size-4" />全局搜索 {shortcuts?.bindings.search && <kbd className="ml-2 text-xs text-muted-foreground">{shortcuts.label("search")}</kbd>}</Button>
     <Dialog open={open} onOpenChange={(value) => { setOpen(value); if (!value) setSelected(null); }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader><DialogTitle>搜索工作台</DialogTitle><DialogDescription>搜索任务、日程、日志、目标、项目和购物清单。点击结果查看详情。</DialogDescription></DialogHeader>

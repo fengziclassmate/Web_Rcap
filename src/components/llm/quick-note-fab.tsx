@@ -7,11 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuickNotes } from "@/hooks/useQuickNotes";
+import { useShortcut } from "@/components/shortcuts/shortcut-provider";
 
 export function QuickNoteFab() {
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
   const { addNote } = useQuickNotes();
+  useShortcut("quickNote", () => setOpen(true));
 
   function save() {
     if (!content.trim()) return;

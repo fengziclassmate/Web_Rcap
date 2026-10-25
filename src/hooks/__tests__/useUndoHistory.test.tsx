@@ -2,13 +2,17 @@ import { useCallback, useMemo, useState } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useUndoHistory } from "../useUndoHistory";
+import { ShortcutProvider, useShortcut } from "@/components/shortcuts/shortcut-provider";
 
 function useFixture(scope: string | null) {
   const [tasks, setTasks] = useState(["task"]);
   const [events, setEvents] = useState(["linked event"]);
   const snapshot = useMemo(() => ({ tasks, events }), [tasks, events]);
   const restore = useCallback((value: typeof snapshot) => { setTasks(value.tasks); setEvents(value.events); }, []);
-  return { ...useUndoHistory(snapshot, restore, scope), tasks, events, setTasks, setEvents };
+  const history = useUndoHistory(snapshot, restore, scope);
+  useShortcut("undo", history.undo);
+  useShortcut("redo", history.redo);
+  return { ...history, tasks, events, setTasks, setEvents };
 }
 describe("undo transactions", () => {
   it("restores both sides of a linked mutation, supports redo, clears redo on new edits", () => {
@@ -42,7 +46,7 @@ describe("undo transactions", () => {
     expect(result.current.canUndo).toBe(false);
   });
   it("preserves native text undo", () => {
-    const { result } = renderHook(() => useFixture("account"));
+    const { result } = renderHook(() => useFixture("account"), { wrapper: ({ children }) => <ShortcutProvider userId="undo-test">{children}</ShortcutProvider> });
     act(() => result.current.setTasks([]));
     const input = document.createElement("input"); document.body.append(input);
     act(() => input.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true })));

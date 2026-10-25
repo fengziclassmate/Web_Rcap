@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 /** One render is one transaction, including linked task/event and bulk mutations. */
 export function useUndoHistory<T extends Record<string, unknown>>(value: T, restore: (value: T) => void, scope: string | null) {
@@ -35,15 +35,5 @@ export function useUndoHistory<T extends Record<string, unknown>>(value: T, rest
     setAvailability({ undo: !!state.past.length, redo: !!state.future.length });
   }, []);
 
-  useEffect(() => {
-    function keydown(event: KeyboardEvent) {
-      const target = event.target;
-      if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
-      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-      if (event.key.toLowerCase() === "z") { event.preventDefault(); move(event.shiftKey ? "redo" : "undo"); }
-    }
-    window.addEventListener("keydown", keydown);
-    return () => window.removeEventListener("keydown", keydown);
-  }, [move]);
   return { canUndo: availability.undo, canRedo: availability.redo, undo: () => move("undo"), redo: () => move("redo") };
 }

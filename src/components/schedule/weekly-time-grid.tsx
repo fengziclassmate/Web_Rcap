@@ -177,6 +177,8 @@ type SelectionDrag = {
 };
 
 type WeeklyTimeGridProps = {
+  createRequested?: boolean;
+  onCreateRequestHandled?: () => void;
   openEventRequest?: { id: string; token: number };
   onOpenRequestHandled?: () => void;
   savedCategoryDefs?: ScheduleCategoryDef[];
@@ -510,6 +512,8 @@ function buildRequirementLines(value: string) {
 }
 
 export function WeeklyTimeGrid({
+  createRequested,
+  onCreateRequestHandled,
   openEventRequest,
   onOpenRequestHandled,
   savedCategoryDefs,
@@ -1017,6 +1021,12 @@ export function WeeklyTimeGrid({
     setCreateDetailsOpen(false);
     setCreateDialogOpen(true);
   }
+
+  const openRequestedCreate = useEffectEvent(() => {
+    resetCreateDialog({ date: viewMode === "day" ? visibleRangeStart : (displayDateKeys.has(todayIso) ? todayIso : visibleRangeStart), startHour: 9 });
+    onCreateRequestHandled?.();
+  });
+  useEffect(() => { if (createRequested) openRequestedCreate(); }, [createRequested]);
 
   function handleApplyQuickEvent(template: ScheduleTemplate) {
     const category = categories.some((item) => item.name === template.category)

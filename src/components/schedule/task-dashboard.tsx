@@ -54,6 +54,8 @@ import type { LogComposerInput, LogPostRecord } from "@/lib/logs";
 import { cn } from "@/lib/utils";
 
 type TaskDashboardProps = {
+  createRequested?: boolean;
+  onCreateRequestHandled?: () => void;
   projectBoardsPanel?: React.ReactNode;
   executionPanel?: React.ReactNode;
   onStartTaskFocus?: (task: LongTask) => void;
@@ -304,6 +306,8 @@ function isValidTime(value: string) {
 }
 
 export function TaskDashboard({
+  createRequested,
+  onCreateRequestHandled,
   projectBoardsPanel,
   executionPanel,
   onStartTaskFocus,
@@ -655,6 +659,13 @@ export function TaskDashboard({
   function setTaskListPanel(panel: "long" | "annual" | "shopping" | null) {
     patchUiPreferences({ longTaskSectionOpen: panel === "long", annualSectionOpen: panel === "annual", shoppingSectionOpen: panel === "shopping" });
   }
+
+  const openRequestedCreate = useEffectEvent(() => {
+    setTaskListPanel("long");
+    setShowAddTaskDialog(true);
+    onCreateRequestHandled?.();
+  });
+  useEffect(() => { if (createRequested) openRequestedCreate(); }, [createRequested]);
 
   function setUtilityPanel(panel: "project" | "routine" | "achievement" | "footprint" | null) {
     patchUiPreferences({ projectSectionOpen: panel === "project", routineCheckinSectionOpen: panel === "routine", achievementSectionOpen: panel === "achievement", footprintSectionOpen: panel === "footprint" });

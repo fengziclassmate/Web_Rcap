@@ -19,6 +19,7 @@ import {
   type StoredChatMessage,
 } from "@/lib/llm/context-types";
 import { cn } from "@/lib/utils";
+import { useShortcut } from "@/components/shortcuts/shortcut-provider";
 
 function parseSSEChunk(chunk: string): string[] {
   return chunk
@@ -59,6 +60,7 @@ function formatSessionTime(value: string) {
 
 export function LLMChatSidebar() {
   const [open, setOpen] = useState(false);
+  useShortcut("assistant", () => setOpen(true));
   const [view, setView] = useState<"chat" | "history">("chat");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<StoredChatMessage[]>([]);

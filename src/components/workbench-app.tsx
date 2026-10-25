@@ -15,6 +15,8 @@ import { useUndoHistory } from "@/hooks/useUndoHistory";
 import { hydrateFocusState, useFocusTimer } from "@/hooks/useFocusTimer";
 import { projectFocusTarget, type FocusTarget } from "@/lib/execution-insights";
 import { expandScheduleEvents } from "@/lib/recurrence";
+import { ShortcutProvider, useShortcuts } from "@/components/shortcuts/shortcut-provider";
+import { ShortcutSettings } from "@/components/shortcuts/shortcut-settings";
 
 /**
  * 日程管理应用的工作台主组件
@@ -106,6 +108,14 @@ function getCurrentWeekStart() {
   return startOfWeek(new Date(), { weekStartsOn: 1 });
 }
 
+function HistoryButtons({ history }: { history: { canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void } }) {
+  const shortcuts = useShortcuts()!;
+  return <>
+    <Button variant="outline" size="icon-sm" disabled={!history.canUndo} onClick={history.undo} aria-label="撤销上一步" title={`撤销任务、日程与清单操作（${shortcuts.label("undo")}）`}><Undo2 /></Button>
+    <Button variant="outline" size="icon-sm" disabled={!history.canRedo} onClick={history.redo} aria-label="重做上一步" title={`重做（${shortcuts.label("redo")}）`}><Redo2 /></Button>
+  </>;
+}
+
 export function WorkbenchApp() {
   const [{ projectBoards, events }, setProjectScheduleData] = useState<{ projectBoards: ProjectBoard[]; events: ScheduleEvent[] }>({ projectBoards: [], events: defaultEvents });
   const setProjectBoards = useCallback((update: React.SetStateAction<ProjectBoard[]>) => setProjectScheduleData((previous) => ({ ...previous, projectBoards: typeof update === "function" ? update(previous.projectBoards) : update })), []);
@@ -115,6 +125,7 @@ export function WorkbenchApp() {
   const [openTaskRequest, setOpenTaskRequest] = useState<{ id: string; token: number }>();
   const [openEventRequest, setOpenEventRequest] = useState<{ id: string; token: number }>();
   const [openLogRequest, setOpenLogRequest] = useState<{ id: string; token: number }>();
+  const [createRequest, setCreateRequest] = useState<"event" | "task" | null>(null);
   const [isBooted, setIsBooted] = useState(false);
   const [activeModule, setActiveModule] = useState<MonitoringModuleId>("schedule");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getCurrentWeekStart);
@@ -1074,6 +1085,21 @@ export function WorkbenchApp() {
 
   return (
     <AccountScope.Provider key={user.id} value={user.id}>
+    <ShortcutProvider userId={user.id} handlers={{
+      undo: history.canUndo ? history.undo : undefined,
+      redo: history.canRedo ? history.redo : undefined,
+      schedule: () => setActiveModule("schedule"),
+      logs: () => setActiveModule("logs"),
+      projects: () => setOpenBoardRequest({ boardId: "", token: Date.now() }),
+      today: () => { setActiveModule("schedule"); setCurrentWeekStart(viewMode === "day" ? new Date() : viewMode === "month" ? startOfMonth(new Date()) : getCurrentWeekStart()); },
+      previous: () => { setActiveModule("schedule"); handleGoPrevWeek(); },
+      next: () => { setActiveModule("schedule"); handleGoNextWeek(); },
+      dayView: () => { setActiveModule("schedule"); handleViewModeChange("day"); },
+      weekView: () => { setActiveModule("schedule"); handleViewModeChange("week"); },
+      monthView: () => { setActiveModule("schedule"); handleViewModeChange("month"); },
+      newEvent: () => { setActiveModule("schedule"); setCreateRequest("event"); },
+      newTask: () => { setActiveModule("schedule"); setCreateRequest("task"); },
+    }}>
     <main data-workbench className={`${shellClass} pb-4`}>
       <div className="relative z-10 mx-auto flex max-w-[1880px] flex-wrap items-center justify-between gap-3 px-5 pt-4">
         <div className="flex min-w-0 items-center gap-4">
@@ -1090,8 +1116,8 @@ export function WorkbenchApp() {
         </div>
         <div className="flex items-center gap-2">
           <GlobalSearch events={events} tasks={tasks} logs={logPosts} annualTasks={annualTasks} projects={projectCheckins} shopping={shoppingItems} boards={projectBoards} logsReady={logReady} onLocate={locateSearchResult} />
-          <Button variant="outline" size="icon-sm" disabled={!history.canUndo} onClick={history.undo} aria-label="撤销上一步" title="撤销任务、日程与清单操作（Ctrl+Z）"><Undo2 /></Button>
-          <Button variant="outline" size="icon-sm" disabled={!history.canRedo} onClick={history.redo} aria-label="重做上一步" title="重做（Ctrl+Shift+Z）"><Redo2 /></Button>
+          <HistoryButtons history={history} />
+          <ShortcutSettings />
           <WeeklyReportDialog
             currentWeekStart={currentWeekStart}
             events={events}
@@ -1134,6 +1160,8 @@ export function WorkbenchApp() {
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(340px,380px)] gap-4">
               <section className="min-h-0">
                 <WeeklyTimeGrid
+                  createRequested={createRequest === "event"}
+                  onCreateRequestHandled={() => setCreateRequest(null)}
                   projectBoards={projectBoards}
                   onOpenProjectTask={(link) => { setOpenBoardRequest({ ...link, intent: "reveal", token: Date.now() }); setDashboardUiPreferences((previous) => ({ ...previous, projectWorkspaceExpandedTasks: [...new Set([...(previous.projectWorkspaceExpandedTasks ?? []), JSON.stringify([link.boardId, link.taskId])])] })); }}
                   openEventRequest={openEventRequest}
@@ -1170,6 +1198,8 @@ export function WorkbenchApp() {
               </section>
               <section className="min-h-0 space-y-4">
                 <TaskDashboard
+                  createRequested={createRequest === "task"}
+                  onCreateRequestHandled={() => setCreateRequest(null)}
                   projectBoardsPanel={(
                     <ProjectBoardsPanel boards={projectBoards} open={dashboardUiPreferences.projectBoardsSectionOpen !== false}
                       onOpenChange={(projectBoardsSectionOpen) => setDashboardUiPreferences((previous) => ({ ...previous, projectBoardsSectionOpen }))}
@@ -1285,6 +1315,7 @@ export function WorkbenchApp() {
       <LLMChatSidebar />
       <QuickNoteFab />
     </main>
+    </ShortcutProvider>
     </AccountScope.Provider>
   );
 }
