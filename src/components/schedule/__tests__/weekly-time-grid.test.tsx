@@ -168,6 +168,46 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("updates only the selected recurring occurrence's notes and disables time manipulation while editing", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, notes: "旧地点", recurrence: { kind: "daily" } }], onUpdateEvent });
+    fireEvent.click(screen.getAllByRole("button", { name: `编辑 ${scheduleEvent.title} 补充信息` })[0]);
+    const input = screen.getByRole("textbox", { name: `修改补充信息：${scheduleEvent.title}` });
+    expect(container.querySelector<HTMLDivElement>("[data-schedule-card]")!.draggable).toBe(false);
+    fireEvent.change(input, { target: { value: "地点：北楼304\n提前到场" } });
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
+    expect(onUpdateEvent.mock.calls).toEqual([["event-1__2026-07-27", { notes: "地点：北楼304\n提前到场" }, { scope: "occurrence" }]]);
+    expect(container.querySelector<HTMLDivElement>("[data-schedule-card]")!.draggable).toBe(true);
+  });
+
+  it.each([false, true])("sets and clears a tag from the context menu (recurring=%s)", async (recurring) => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [{ ...scheduleEvent, tag: "待定", recurrence: recurring ? { kind: "daily" } : undefined }], onUpdateEvent });
+    const card = container.querySelector("[data-schedule-card]")!;
+    fireEvent.contextMenu(card, { clientX: 120, clientY: 120 });
+    fireEvent.click(screen.getByRole("button", { name: "选择标记" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "固定时间" }));
+    const id = recurring ? "event-1__2026-07-27" : "event-1";
+    const scope = recurring ? { scope: "occurrence" } : undefined;
+    expect(onUpdateEvent).toHaveBeenLastCalledWith(id, { tag: "不可后退" }, scope);
+    fireEvent.contextMenu(card, { clientX: 120, clientY: 120 });
+    fireEvent.click(screen.getByRole("button", { name: "选择标记" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "无标记" }));
+    expect(onUpdateEvent).toHaveBeenLastCalledWith(id, { tag: null }, scope);
+  });
+
+  it("keeps the date header and timeline horizontally aligned", () => {
+    const { container } = renderGrid();
+    const header = screen.getByRole("region", { name: "日程日期横向滚动" });
+    const body = container.querySelectorAll<HTMLElement>(".schedule-timeline-scroll")[1];
+    header.scrollLeft = 80;
+    fireEvent.scroll(header);
+    expect(body.scrollLeft).toBe(80);
+    body.scrollLeft = 140;
+    fireEvent.scroll(body);
+    expect(header.scrollLeft).toBe(140);
+  });
+
   it("disables card dragging while a title is being edited and restores it on exit", () => {
     const onUpdateEvent = vi.fn();
     const { container } = renderGrid({ events: [scheduleEvent], onUpdateEvent });

@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Radix Gray 1/6/11/12, Blue 9/11 and Green 11 for schedule controls. */
-.schedule-event-card, .schedule-event-preview {
+.schedule-event-card, .schedule-event-preview, .schedule-mark-picker {
   --schedule-paper: #fcfcfc;
   --schedule-border: #d9d9d9;
   --schedule-muted: #646464;
@@ -14,14 +14,14 @@
   --schedule-link: #0d74ce;
   --schedule-success: #218358;
 }
-.schedule-event-card:has([data-inline-title-editor]) { overflow: visible; z-index: 90 !important; }
-.schedule-event-card:has([data-inline-title-editor]) :is([data-resize-handle], .schedule-overlap-add) { pointer-events: none; opacity: 0; }
+.schedule-event-card:has([data-inline-editor]) { overflow: visible; z-index: 90 !important; }
+.schedule-event-card:has([data-inline-editor]) :is([data-resize-handle], .schedule-overlap-add) { pointer-events: none; opacity: 0; }
 .schedule-event-selected { outline: 2px solid var(--schedule-focus); outline-offset: -1px; }
 .schedule-event-content { gap: 2px; padding: 5px 6px; overflow: hidden; line-height: 16px; }
-.schedule-event-content:has([data-inline-title-editor]) { overflow: visible; }
+.schedule-event-content:has([data-inline-editor]) { overflow: visible; }
 .schedule-event-open { cursor: grab; }
 .schedule-event-open:active { cursor: grabbing; }
-.schedule-event-open:focus-visible, .schedule-event-title:focus-visible, .schedule-event-time:focus-visible, .schedule-overlap-add:focus-visible, .schedule-preview-edit:focus-visible {
+.schedule-event-open:focus-visible, .schedule-event-title:focus-visible, .schedule-event-time:focus-visible, .schedule-event-notes:focus-visible, .schedule-overlap-add:focus-visible, .schedule-preview-edit:focus-visible, .schedule-mark-option:focus-visible {
   outline: 2px solid var(--schedule-focus);
   outline-offset: -2px;
 }
@@ -41,7 +41,17 @@
 .schedule-event-content[data-micro] .schedule-event-time-row { flex-shrink: 0; }
 .schedule-event-content[data-micro] .schedule-event-title { display: block; flex: 1; line-height: 14px; }
 .schedule-event-content[data-dense] { padding-inline: 4px; }
-.schedule-title-input { position: relative; z-index: 30; width: 100%; min-width: 180px; min-height: 28px; padding: 3px 5px; border: 0.5px solid var(--schedule-focus); border-radius: 3px; background: var(--schedule-paper); color: var(--schedule-ink); outline: none; line-height: 20px; }
+.schedule-title-input, .schedule-notes-input { position: relative; z-index: 30; width: 100%; min-width: 180px; min-height: 28px; padding: 3px 5px; border: 0.5px solid var(--schedule-focus); border-radius: 3px; background: var(--schedule-paper); color: var(--schedule-ink); outline: none; line-height: 20px; }
+.schedule-notes-input { min-width: 0; min-height: 96px; max-height: 280px; flex-shrink: 0; resize: vertical; }
+.schedule-event-content[data-editing-notes] { flex-direction: column; align-items: stretch; }
+.schedule-event-content[data-editing-notes] .schedule-event-title { flex: none; }
+.schedule-event-notes:hover, .schedule-preview-notes:hover { text-decoration: underline; text-underline-offset: 2px; }
+.schedule-add-notes { padding-inline: 3px; background: var(--schedule-paper); color: var(--schedule-muted); }
+.schedule-timeline-scroll { width: 100%; overflow-x: auto; }
+.schedule-timeline-scroll:focus-visible { outline: 2px solid #0090ff; outline-offset: -2px; }
+.schedule-mark-option { padding: 6px 8px; border: 0.5px solid var(--schedule-border); border-radius: 4px; background: var(--schedule-paper); color: var(--schedule-ink); font-size: 12px; }
+.schedule-mark-option:hover { background: #f0f0f0; }
+.schedule-mark-option[aria-pressed="true"] { background: #e6f4fe; border-color: #acd8fc; color: #113264; }
 .schedule-overlap-add { border: 0.5px solid var(--schedule-border); border-radius: 3px; background: var(--schedule-paper); color: var(--schedule-muted); }
 .schedule-event-preview { width: 320px; max-width: calc(100vw - 32px); max-height: min(420px, var(--available-height)); overflow-y: auto; padding: 12px; border: 0.5px solid var(--schedule-border); border-radius: 6px; background: var(--schedule-paper); color: var(--schedule-ink); line-height: 1.6; }
 .schedule-preview-time, .schedule-preview-meta { color: var(--schedule-muted); }

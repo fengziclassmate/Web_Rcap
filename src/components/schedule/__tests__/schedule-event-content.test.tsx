@@ -11,16 +11,73 @@ const event: ScheduleEvent = {
   category: "学习", tag: "不可后退", isCompleted: false,
 };
 
-function setup(patch: Partial<ScheduleEvent> = {}, durationHour = 1) {
+function setup(patch: Partial<ScheduleEvent> = {}, durationHour = 1, dense = false) {
   const onRename = vi.fn();
   const onOpenEdit = vi.fn();
   const timeLabel = durationHour === 0.25 ? "09:00-09:15" : durationHour === 0.5 ? "09:00-09:30" : "09:00-10:00";
-  const props = { event: { ...event, ...patch }, timeLabel, fullTimeLabel: timeLabel, categoryName: "学习", durationHour, dense: false, onRename, onOpenEdit, onToggleSelection: vi.fn(), onTitleEditingChange: vi.fn() };
+  const props = { event: { ...event, ...patch }, timeLabel, fullTimeLabel: timeLabel, categoryName: "学习", durationHour, dense, onRename, onNotesChange: vi.fn(), onOpenEdit, onToggleSelection: vi.fn(), onEditingChange: vi.fn() };
   const result = render(<ScheduleEventContent {...props} />);
-  return { ...result, onRename, onOpenEdit, onToggleSelection: props.onToggleSelection, rerenderMoving: (moving: boolean) => result.rerender(<ScheduleEventContent {...props} moving={moving} />), rerenderEvent: (patch: Partial<ScheduleEvent>) => result.rerender(<ScheduleEventContent {...props} event={{ ...props.event, ...patch }} />) };
+  return { ...result, onRename, onNotesChange: props.onNotesChange, onOpenEdit, onToggleSelection: props.onToggleSelection, rerenderMoving: (moving: boolean) => result.rerender(<ScheduleEventContent {...props} moving={moving} />), rerenderEvent: (patch: Partial<ScheduleEvent>) => result.rerender(<ScheduleEventContent {...props} event={{ ...props.event, ...patch }} />) };
 }
 
 describe("schedule card information", () => {
+  it.each([0.25, 0.5, 1])("shows the complete time range on an overlapping %s-hour card", (duration) => {
+    setup({}, duration, true);
+    expect(screen.getByRole("button", { name: `查看 ${event.title} 完整信息` }).textContent).toBe(duration === 0.25 ? "09:00-09:15" : duration === 0.5 ? "09:00-09:30" : "09:00-10:00");
+  });
+
+  it("edits multiline notes inline, keeps Enter for newlines and saves with Ctrl+Enter", () => {
+    const { onNotesChange, onRename } = setup();
+    fireEvent.click(screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` }));
+    const input = screen.getByRole("textbox", { name: `修改补充信息：${event.title}` });
+    fireEvent.change(input, { target: { value: "地点：科教北楼305\n带学生证" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onNotesChange).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
+    expect(onNotesChange).toHaveBeenCalledExactlyOnceWith("地点：科教北楼305\n带学生证");
+    expect(onRename).not.toHaveBeenCalled();
+  });
+
+  it("cancels notes edits and allows notes to be cleared", () => {
+    const { onNotesChange } = setup();
+    fireEvent.click(screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "取消的备注" } });
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Escape" });
+    expect(onNotesChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "" } });
+    fireEvent.blur(screen.getByRole("textbox"));
+    expect(onNotesChange).toHaveBeenCalledExactlyOnceWith("");
+  });
+
+  it("adds notes directly to an empty card", () => {
+    const { onNotesChange } = setup({ notes: "" });
+    fireEvent.click(screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "地点：北楼304" } });
+    fireEvent.blur(screen.getByRole("textbox"));
+    expect(onNotesChange).toHaveBeenCalledExactlyOnceWith("地点：北楼304");
+  });
+
+  it("opens the on-card notes editor from a short card preview without stealing focus", async () => {
+    setup({}, 0.25);
+    fireEvent.click(screen.getByRole("button", { name: `查看 ${event.title} 完整信息` }));
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: `在卡片上编辑 ${event.title} 补充信息` }));
+    const input = await screen.findByRole("textbox", { name: `修改补充信息：${event.title}` });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("retains a notes draft when the same field changes remotely", () => {
+    const { onNotesChange, rerenderEvent } = setup();
+    fireEvent.click(screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "本机地址" } });
+    rerenderEvent({ notes: "远端地址" });
+    fireEvent.blur(screen.getByRole("textbox"));
+    expect(onNotesChange).not.toHaveBeenCalled();
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("本机地址");
+  });
+
   it.each([0.25, 0.5])("keeps the full time range visible on a %s-hour card", (duration) => {
     setup({}, duration);
     expect(screen.getByRole("button", { name: `查看 ${event.title} 完整信息` }).textContent).toBe(duration === 0.25 ? "09:00-09:15" : "09:00-09:30");

@@ -541,7 +541,7 @@ export function WeeklyTimeGrid({
   const userId = useAccountId();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
-  const [editingTitleEventId, setEditingTitleEventId] = useState<string | null>(null);
+  const [editingCardEventId, setEditingCardEventId] = useState<string | null>(null);
   const [selectedCell, setSelectedCell] = useState<GridCell | null>(null);
   const [createEndDate, setCreateEndDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
@@ -562,6 +562,8 @@ export function WeeklyTimeGrid({
   const [resizePreview, setResizePreview] = useState<ResizePreview | null>(null);
   const resizePreviewRef = useRef<ResizePreview | null>(null);
   const timelineBodyRef = useRef<HTMLDivElement | null>(null);
+  const timelineHeaderScrollRef = useRef<HTMLDivElement | null>(null);
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const selectionDragRef = useRef<SelectionDrag | null>(null);
   const suppressSlotClickRef = useRef(false);
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
@@ -635,6 +637,7 @@ export function WeeklyTimeGrid({
   const [editingCategoryIcon, setEditingCategoryIcon] = useState<ScheduleCategoryIcon>("moon");
   const [confirmDeleteCategoryId, setConfirmDeleteCategoryId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [taggingEventId, setTaggingEventId] = useState<string | null>(null);
   const [createRecurrence, setCreateRecurrence] = useState<{
     enabled: boolean;
     kind: "daily" | "weekly";
@@ -860,10 +863,12 @@ export function WeeklyTimeGrid({
   }, [timelineDayLayouts, dragPreviewSegments, dragPreviewIds]);
 
   const visibleRangeStart = format(currentWeekStart, "yyyy-MM-dd");
-  const timelineGridTemplateColumns = useMemo(
-    () => `${viewMode === "day" ? 72 : 56}px repeat(${timelineDayLayouts.length}, minmax(0, 1fr))`,
-    [timelineDayLayouts.length, viewMode],
-  );
+  const timelineDayWidths = useMemo(() => timelineDayLayouts.map((day) => {
+    const lanes = day.events.reduce((count, event) => Math.max(count, event.laneCount), 1);
+    return lanes > 1 ? lanes * 112 : 88;
+  }), [timelineDayLayouts]);
+  const timelineMinWidth = (viewMode === "day" ? 72 : 56) + timelineDayWidths.reduce((sum, width) => sum + width, 0);
+  const timelineGridTemplateColumns = `${viewMode === "day" ? 72 : 56}px ${timelineDayWidths.map((width) => `minmax(${width}px, 1fr)`).join(" ")}`;
 
   const selectedEvent = useMemo(
     () => expandedEvents.find((event) => event.id === editingEventId) ?? null,
@@ -1930,11 +1935,10 @@ export function WeeklyTimeGrid({
               clearEventDrag();
               setSelectedEventIds(new Set());
             }}>
-              <div
-                className="sticky top-0 z-[80] grid border-b border-stone-200 bg-white shadow-[0_1px_0_rgba(0,0,0,0.03)]"
-                style={{ gridTemplateColumns: timelineGridTemplateColumns }}
-              >
-                <div className="border-r border-gray-200 bg-gray-50 px-1.5 py-2 text-[11px] font-medium text-gray-700">时间</div>
+              <div className="sticky top-0 z-[80] border-b border-stone-200 bg-white">
+                <div ref={timelineHeaderScrollRef} className="schedule-timeline-scroll" role="region" aria-label="日程日期横向滚动" tabIndex={0} onScroll={(event) => { timelineScrollRef.current!.scrollLeft = event.currentTarget.scrollLeft; }}>
+                  <div className="grid" style={{ gridTemplateColumns: timelineGridTemplateColumns, minWidth: timelineMinWidth }}>
+                <div className="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 px-1.5 py-2 text-[11px] font-medium text-gray-700">时间</div>
                 {timelineDayLayouts.map((day) => (
                   <div
                     key={day.dateIso}
@@ -1954,19 +1958,22 @@ export function WeeklyTimeGrid({
                     </div>
                   </div>
                 ))}
+                  </div>
+                </div>
               </div>
 
+              <div ref={timelineScrollRef} className="schedule-timeline-scroll" onScroll={(event) => { timelineHeaderScrollRef.current!.scrollLeft = event.currentTarget.scrollLeft; }}>
               <div
                 ref={timelineBodyRef}
                 className="relative isolate grid"
-                style={{ gridTemplateColumns: timelineGridTemplateColumns }}
+                style={{ gridTemplateColumns: timelineGridTemplateColumns, minWidth: timelineMinWidth }}
                 onPointerDown={handleSelectionPointerDown}
                 onPointerMove={handleSelectionPointerMove}
                 onPointerLeave={handleSelectionPointerLeave}
                 onPointerUp={finishSelection}
                 onPointerCancel={finishSelection}
               >
-                <div>
+                <div className="sticky left-0 z-[65] bg-white">
                   {timeGridSlots.map((slot) => {
                     const startsAtMainHour = isWholeHour(slot.startHour);
                     const endsAtMainHour = isWholeHour(
@@ -2069,7 +2076,7 @@ export function WeeklyTimeGrid({
                               data-schedule-card
                               data-schedule-event-id={event.id}
                               data-selected={selectedEventIds.has(event.id) || undefined}
-                              draggable={resizeState?.eventId !== event.id && editingTitleEventId !== event.id}
+                              draggable={resizeState?.eventId !== event.id && editingCardEventId !== event.id}
                               onPointerDown={(pointerEvent) => {
                                 if (pointerEvent.button !== 0 || (pointerEvent.target as HTMLElement).closest("[data-resize-handle]")) return;
                                 const column = pointerEvent.currentTarget.closest<HTMLElement>("[data-timeline-date]")!;
@@ -2077,7 +2084,7 @@ export function WeeklyTimeGrid({
                                 dragGrabRef.current = { segmentId: event.segmentId, offsetHour: pointerHour - event.startHour };
                               }}
                               onDragStart={(dragEvent) => {
-                                if (editingTitleEventId === event.id || (dragEvent.target as HTMLElement).closest("[data-inline-title-editor]")) { dragEvent.preventDefault(); return; }
+                                if (editingCardEventId === event.id || (dragEvent.target as HTMLElement).closest("[data-inline-editor]")) { dragEvent.preventDefault(); return; }
                                 const draggedEvents = selectedEventIds.has(event.id)
                                   ? [sourceEvent, ...expandedEvents.filter((item) => item.id !== event.id && selectedEventIds.has(item.id))]
                                   : [sourceEvent];
@@ -2103,8 +2110,9 @@ export function WeeklyTimeGrid({
                                 dense={denseCard}
                                 moving={dragPreview.length > 0 || resizeState !== null}
                                 onOpenEdit={() => handleOpenEdit(sourceEvent)}
-                                onTitleEditingChange={setEditingTitleEventId}
+                                onEditingChange={setEditingCardEventId}
                                 onRename={(title) => onUpdateEvent(event.id, { title }, parseSyntheticEventId(event.id) ? { scope: "occurrence" } : undefined)}
+                                onNotesChange={(notes) => onUpdateEvent(event.id, { notes }, parseSyntheticEventId(event.id) ? { scope: "occurrence" } : undefined)}
                                 onToggleSelection={() => setSelectedEventIds((previous) => {
                                   const next = new Set(previous);
                                   if (next.has(event.id)) next.delete(event.id);
@@ -2117,7 +2125,7 @@ export function WeeklyTimeGrid({
                                   <button
                                     type="button"
                                     data-resize-handle
-                                    disabled={editingTitleEventId === event.id}
+                                    disabled={editingCardEventId === event.id}
                                     className={`absolute z-30 cursor-ns-resize rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${
                                       microCard
                                         ? "left-1 top-0 h-1.5 w-[28%] min-w-3 max-w-8"
@@ -2136,7 +2144,7 @@ export function WeeklyTimeGrid({
                                   <button
                                     type="button"
                                     data-resize-handle
-                                    disabled={editingTitleEventId === event.id}
+                                    disabled={editingCardEventId === event.id}
                                     className={`absolute z-30 cursor-ns-resize rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${
                                       microCard
                                         ? "bottom-0 right-1 h-1.5 w-[28%] min-w-3 max-w-8"
@@ -2156,7 +2164,7 @@ export function WeeklyTimeGrid({
                                 <button
                                   type="button"
                                   className="schedule-overlap-add absolute bottom-1 right-1 z-20 p-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                                  disabled={editingTitleEventId === event.id}
+                                  disabled={editingCardEventId === event.id}
                                   onClick={(mouseEvent) => {
                                     mouseEvent.stopPropagation();
                                     setSelectedExpenseDateIso(event.displayDate);
@@ -2199,6 +2207,7 @@ export function WeeklyTimeGrid({
                     aria-hidden
                   />
                 ) : null}
+              </div>
               </div>
             </div>
           ) : (
@@ -3376,6 +3385,26 @@ export function WeeklyTimeGrid({
           onConfirm={handleBatchDelete}
         />
 
+        <Dialog open={taggingEventId !== null} onOpenChange={(open) => { if (!open) setTaggingEventId(null); }}>
+          <DialogContent className="schedule-mark-picker max-w-sm border-[0.5px]">
+            <DialogHeader><DialogTitle>选择标记</DialogTitle></DialogHeader>
+            <div className="grid grid-cols-2 gap-2" role="group" aria-label="日程标记">
+              {[{ value: null, label: "无标记" }, ...eventTagOptions].map((tag) => (
+                <button
+                  key={tag.value ?? "none"}
+                  type="button"
+                  className="schedule-mark-option"
+                  aria-pressed={(expandedEvents.find((event) => event.id === taggingEventId)?.tag ?? null) === tag.value}
+                  onClick={() => {
+                    onUpdateEvent(taggingEventId!, { tag: tag.value }, parseSyntheticEventId(taggingEventId!) ? { scope: "occurrence" } : undefined);
+                    setTaggingEventId(null);
+                  }}
+                >{tag.label}</button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {contextMenu && typeof document !== "undefined" ? createPortal(
           <div
             className="fixed z-[1000] w-52 max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl border border-stone-200 bg-white/95 p-1.5 shadow-[0_24px_60px_rgba(68,64,60,0.28)] backdrop-blur-md"
@@ -3383,8 +3412,7 @@ export function WeeklyTimeGrid({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="border-b border-stone-100 px-3 py-2">
-              <p className="truncate text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">Schedule Action</p>
-              <p className="mt-1 truncate text-sm font-semibold text-stone-900">{contextMenuEvent?.title ?? "行程操作"}</p>
+              <p className="truncate text-sm font-semibold text-stone-900">{contextMenuEvent?.title ?? "行程操作"}</p>
             </div>
             <button className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleReschedule(contextMenu.eventId)}>
               改约
@@ -3394,6 +3422,9 @@ export function WeeklyTimeGrid({
             </button>
             <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleToggleComplete(contextMenu.eventId)}>
               {contextMenuEvent?.linkedProjectTask ? (contextMenuEvent.isCompleted ? "标记此时段未完成" : "完成此时段") : contextMenuEvent?.isCompleted ? "标记为未完成" : "标记为已完成"}
+            </button>
+            <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-stone-100" onClick={() => { setTaggingEventId(contextMenu.eventId); closeContextMenu(); }}>
+              选择标记
             </button>
             <button
               className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent"
