@@ -168,23 +168,34 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
-  it("completes only selected unfinished events and disables the action once all are done", () => {
+  it("renames the selected recurring occurrence inline without resubmitting other fields", () => {
+    const onUpdateEvent = vi.fn();
+    renderGrid({ events: [{ ...scheduleEvent, recurrence: { kind: "daily" } }], onUpdateEvent });
+    fireEvent.click(screen.getAllByRole("button", { name: `修改 ${scheduleEvent.title} 标题` })[0]);
+    fireEvent.change(screen.getByRole("textbox", { name: `修改标题：${scheduleEvent.title}` }), { target: { value: "单次新标题" } });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: `修改标题：${scheduleEvent.title}` }), { key: "Enter" });
+    expect(onUpdateEvent.mock.calls).toEqual([["event-1__2026-07-27", { title: "单次新标题" }, { scope: "occurrence" }]]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it.each([true, false])("sets the selected completion state to %s and skips unchanged events", (completed) => {
+    const action = completed ? "标记为已完成" : "标记为未完成";
     const onUpdateEvent = vi.fn();
     const events = [
-      { ...scheduleEvent, title: "所选待完成", isCompleted: false },
-      { ...scheduleEvent, id: "completed", title: "所选已完成", startHour: 11, endHour: 12 },
-      { ...scheduleEvent, id: "unselected", title: "未选日程", startHour: 13, endHour: 14, isCompleted: false },
+      { ...scheduleEvent, title: "所选待完成", isCompleted: !completed },
+      { ...scheduleEvent, id: "completed", title: "所选已完成", startHour: 11, endHour: 12, isCompleted: completed },
+      { ...scheduleEvent, id: "unselected", title: "未选日程", startHour: 13, endHour: 14, isCompleted: !completed },
     ];
     const { rerenderGrid } = renderGrid({ events, onUpdateEvent });
-    expect(screen.queryByRole("button", { name: "标记为已完成" })).toBeNull();
+    expect(screen.queryByRole("button", { name: action })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "打开 所选待完成 编辑窗口" }), { ctrlKey: true });
     fireEvent.click(screen.getByRole("button", { name: "打开 所选已完成 编辑窗口" }), { ctrlKey: true });
-    fireEvent.click(screen.getByRole("button", { name: "标记为已完成" }));
-    expect(onUpdateEvent.mock.calls).toEqual([["event-1", { isCompleted: true }, undefined]]);
+    fireEvent.click(screen.getByRole("button", { name: action }));
+    expect(onUpdateEvent.mock.calls).toEqual([["event-1", { isCompleted: completed }, undefined]]);
 
-    rerenderGrid({ events: events.map((event) => event.id === "event-1" ? { ...event, isCompleted: true } : event) });
-    expect((screen.getByRole("button", { name: "标记为已完成" }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "标记为已完成" }));
+    rerenderGrid({ events: events.map((event) => event.id === "event-1" ? { ...event, isCompleted: completed } : event) });
+    expect((screen.getByRole("button", { name: action }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: action }));
     expect(onUpdateEvent).toHaveBeenCalledTimes(1);
     expect(screen.getByText("已选 2 项")).toBeTruthy();
   });
@@ -203,16 +214,16 @@ describe("WeeklyTimeGrid interactions", () => {
     ]);
   });
 
-  it("completes only the selected recurring occurrences", () => {
+  it.each([true, false])("sets only selected recurring occurrences to completed=%s", (completed) => {
     const onUpdateEvent = vi.fn();
-    renderGrid({ events: [{ ...scheduleEvent, recurrence: { kind: "daily" }, isCompleted: false }], onUpdateEvent });
+    renderGrid({ events: [{ ...scheduleEvent, recurrence: { kind: "daily" }, isCompleted: !completed }], onUpdateEvent });
     const triggers = screen.getAllByRole("button", { name: `打开 ${scheduleEvent.title} 编辑窗口` });
     fireEvent.click(triggers[0], { ctrlKey: true });
     fireEvent.click(triggers[1], { ctrlKey: true });
-    fireEvent.click(screen.getByRole("button", { name: "标记为已完成" }));
+    fireEvent.click(screen.getByRole("button", { name: completed ? "标记为已完成" : "标记为未完成" }));
     expect(onUpdateEvent.mock.calls).toEqual([
-      ["event-1__2026-07-27", { isCompleted: true }, { scope: "occurrence" }],
-      ["event-1__2026-07-28", { isCompleted: true }, { scope: "occurrence" }],
+      ["event-1__2026-07-27", { isCompleted: completed }, { scope: "occurrence" }],
+      ["event-1__2026-07-28", { isCompleted: completed }, { scope: "occurrence" }],
     ]);
   });
 
@@ -640,13 +651,13 @@ describe("WeeklyTimeGrid interactions", () => {
     expect(setPointerCapture).not.toHaveBeenCalled();
   });
 
-  it("uses a whole-card diagonal pattern instead of striking through the title", () => {
+  it("identifies completed cards without obscuring the title", () => {
     renderGrid({ events: [scheduleEvent] });
 
     const title = screen.getByText("完成态行程");
     expect(title.className).not.toContain("line-through");
     const card = title.closest("[data-schedule-card]");
-    expect(card?.querySelector('[class*="repeating-linear-gradient(45deg"]')).toBeTruthy();
+    expect(card?.querySelector('[aria-label="已完成"]')).toBeTruthy();
   });
 
   it("uses the same title font size for short and long events", () => {

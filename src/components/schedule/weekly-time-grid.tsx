@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   Stamp,
   Trash2,
+  Undo2,
   Utensils,
   Users,
   Video,
@@ -48,6 +49,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DailyExpensePanel } from "@/components/schedule/daily-expense-panel";
 import { DailyReflectionPanel } from "@/components/schedule/daily-reflection-panel";
+import { ScheduleEventContent } from "@/components/schedule/schedule-event-content";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -87,7 +89,6 @@ import {
   resolveCategoryVisual,
   categoryCardStyle,
   getCategoryVisualByName,
-  getScheduleCategoryAccentColor,
   getScheduleCategoryColor,
   isBuiltInCategory,
   isCategoryNameTaken,
@@ -364,10 +365,6 @@ function getCategoryColor(categories: Category[], categoryName: string) {
     categories.find((category) => category.name === normalized)?.color ??
     getScheduleCategoryColor(normalized)
   );
-}
-
-function getCategoryAccentColor(categoryName: string) {
-  return getScheduleCategoryAccentColor(normalizeCategoryName(categoryName));
 }
 
 function normalizeCategoryName(categoryName: string) {
@@ -778,6 +775,7 @@ export function WeeklyTimeGrid({
     ? new Set([...eventSelection.ids].filter((id) => visibleEventIds.has(id)))
     : emptySelectedEventIds, [eventSelection, visibleDateRangeKey, visibleEventIds]);
   const selectedIncompleteEvents = expandedEvents.filter((event) => selectedEventIds.has(event.id) && !event.isCompleted);
+  const selectedCompletedEvents = expandedEvents.filter((event) => selectedEventIds.has(event.id) && event.isCompleted);
 
   function setSelectedEventIds(action: React.SetStateAction<Set<string>>) {
     setEventSelection((previous) => {
@@ -1673,6 +1671,13 @@ export function WeeklyTimeGrid({
     toast.success(`已完成 ${selectedIncompleteEvents.length} 个日程`);
   }
 
+  function handleBatchReopen() {
+    selectedCompletedEvents.forEach((event) => {
+      onUpdateEvent(event.id, { isCompleted: false }, parseSyntheticEventId(event.id) ? { scope: "occurrence" } : undefined);
+    });
+    toast.success(`已将 ${selectedCompletedEvents.length} 个日程标记为未完成`);
+  }
+
   function handleBatchDelete() {
     const ids = [...selectedEventIds];
     ids.forEach((eventId) => {
@@ -1823,7 +1828,6 @@ export function WeeklyTimeGrid({
         {selectedEventIds.size > 0 ? (
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1">
             <span className="text-xs font-semibold text-sky-800">已选 {selectedEventIds.size} 项</span>
-            {selectedEventIds.size > 1 ? <span className="text-xs text-sky-800" title="保持时长与相对间隔，Shift 精确到分钟">拖动任一所选卡片以整体移动</span> : null}
             <Button
               type="button"
               size="xs"
@@ -1832,6 +1836,10 @@ export function WeeklyTimeGrid({
             >
               <Check className="h-3 w-3" />
               标记为已完成
+            </Button>
+            <Button type="button" size="xs" variant="outline" disabled={selectedCompletedEvents.length === 0} onClick={handleBatchReopen}>
+              <Undo2 className="h-3 w-3" />
+              标记为未完成
             </Button>
             <Button
               type="button"
@@ -2048,21 +2056,13 @@ export function WeeklyTimeGrid({
                           const denseCard = event.laneCount > 1;
                           const microCard = durationHour <= 0.25 + Number.EPSILON;
                           const compactCard = durationHour < 0.55;
-                          const mediumCard = durationHour < 1;
-                          const showDetails = durationHour >= 2 && !denseCard;
                           const timeLabel = formatTimelineSegmentTimeRange(visualEvent);
                           const fullTimeLabel = formatEventTimeRange(visualSourceEvent);
                           const categoryVisual = resolveCategoryVisual(categories.find((item) => item.name === normalizeCategoryName(event.category)) ?? { name: event.category, color: getScheduleCategoryColor(event.category) });
-                          const segmentLabel =
-                            event.segmentRole === "starts"
-                              ? "跨日"
-                              : event.segmentRole === "continues"
-                                ? "延续"
-                                : null;
                           return (
                             <div
                               key={event.segmentId}
-                              className={`pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden border text-left text-sm shadow-[0_3px_10px_rgba(68,64,60,0.08)] ring-1 ring-white/70 transition-[border-color,box-shadow,transform] duration-150 hover:z-40 hover:-translate-y-px hover:shadow-[0_8px_20px_rgba(68,64,60,0.12)] focus-within:z-40 ${microCard ? "rounded-[5px]" : "rounded-lg"} ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed saturate-[0.96]" : ""} ${selectedEventIds.has(event.id) ? "z-50 ring-2 ring-sky-500 shadow-[0_8px_20px_rgba(14,165,233,0.2)]" : ""}`}
+                              className={`schedule-event-card pointer-events-auto absolute group flex min-h-0 flex-col overflow-hidden rounded-md border-[0.5px] text-left text-xs ${getCategoryColor(categories, event.category)} ${event.isCompleted ? "border-dashed" : ""} ${selectedEventIds.has(event.id) ? "schedule-event-selected" : ""}`}
                               style={{ ...getEventStyle(visualEvent), ...categoryCardStyle(categoryVisual.hex), ...(dragPreviewIds.has(event.id) ? { opacity: 0.4 } : {}) }}
                               data-density={microCard ? "micro" : compactCard ? "compact" : "regular"}
                               data-schedule-card
@@ -2076,6 +2076,7 @@ export function WeeklyTimeGrid({
                                 dragGrabRef.current = { segmentId: event.segmentId, offsetHour: pointerHour - event.startHour };
                               }}
                               onDragStart={(dragEvent) => {
+                                if ((dragEvent.target as HTMLElement).closest("[data-inline-title-editor]")) { dragEvent.preventDefault(); return; }
                                 const draggedEvents = selectedEventIds.has(event.id)
                                   ? [sourceEvent, ...expandedEvents.filter((item) => item.id !== event.id && selectedEventIds.has(item.id))]
                                   : [sourceEvent];
@@ -2092,188 +2093,23 @@ export function WeeklyTimeGrid({
                               onDragEnd={clearEventDrag}
                               onContextMenu={(mouseEvent) => handleContextMenu(mouseEvent, event.id)}
                             >
-                              <div
-                                style={{ backgroundColor: categoryVisual.hex }}
-                                className={`pointer-events-none absolute rounded-full ${microCard ? "inset-y-0.5 left-0.5 w-0.5" : "inset-y-1 left-1 w-1"} ${getCategoryAccentColor(event.category)} ${event.isCompleted ? "opacity-80" : "opacity-95"}`}
+                              <ScheduleEventContent
+                                event={visualSourceEvent}
+                                timeLabel={timeLabel}
+                                fullTimeLabel={fullTimeLabel}
+                                categoryName={categoryVisual.name}
+                                durationHour={durationHour}
+                                dense={denseCard}
+                                moving={dragPreview.length > 0 || resizeState !== null}
+                                onOpenEdit={() => handleOpenEdit(sourceEvent)}
+                                onRename={(title) => onUpdateEvent(event.id, { title }, parseSyntheticEventId(event.id) ? { scope: "occurrence" } : undefined)}
+                                onToggleSelection={() => setSelectedEventIds((previous) => {
+                                  const next = new Set(previous);
+                                  if (next.has(event.id)) next.delete(event.id);
+                                  else next.add(event.id);
+                                  return next;
+                                })}
                               />
-                              {event.isCompleted ? (
-                                <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[repeating-linear-gradient(45deg,transparent_0px,transparent_7px,rgba(68,64,60,0.18)_7px,rgba(68,64,60,0.18)_8px)]" />
-                              ) : null}
-                              <button
-                                type="button"
-                                aria-label={`打开 ${event.title} 编辑窗口`}
-                                title={`${event.title}\n${fullTimeLabel}\n${categoryVisual.name}${event.isCompleted ? " · 已完成" : ""}`}
-                                className={`relative z-10 flex min-h-0 w-full min-w-0 flex-1 cursor-grab flex-col overflow-hidden rounded-[inherit] text-left outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-stone-900/20 ${
-                                  denseCard
-                                    ? microCard ? "justify-center py-0 pl-2.5 pr-1" : "justify-start py-1.5 pl-2.5 pr-1"
-                                    : microCard
-                                    ? "justify-center py-0 pl-3 pr-1.5"
-                                    : compactCard
-                                      ? "justify-start pb-1.5 pl-4 pr-6 pt-1.5"
-                                      : mediumCard
-                                        ? "justify-start py-1.5 pl-5 pr-7"
-                                        : "justify-start py-2 pl-5 pr-8"
-                                }`}
-                                onClick={(mouseEvent) => {
-                                  if (mouseEvent.ctrlKey || mouseEvent.metaKey) {
-                                    mouseEvent.stopPropagation();
-                                    setSelectedEventIds((previous) => {
-                                      const next = new Set(previous);
-                                      if (next.has(event.id)) next.delete(event.id);
-                                      else next.add(event.id);
-                                      return next;
-                                    });
-                                    return;
-                                  }
-                                  handleOpenEdit(sourceEvent);
-                                }}
-                              >
-                                <div className={`flex min-h-0 min-w-0 flex-col ${microCard ? "h-full justify-center" : compactCard ? "gap-0.5" : mediumCard ? "flex-1 gap-1" : "flex-1 gap-1.5"}`}>
-                                  {denseCard ? (
-                                    <>
-                                      {!microCard ? (
-                                        <div className="flex min-w-0 items-center gap-0.5 text-[10px] tabular-nums text-gray-700">
-                                          <span className="min-w-0 truncate" title={fullTimeLabel}>{formatHour(visualEvent.startHour)}</span>
-                                          {event.isCompleted ? <Check className="size-3 shrink-0 text-emerald-700" aria-label="已完成" /> : null}
-                                          {event.tag ? <span title={getTagInfo(event.tag).label} aria-label={getTagInfo(event.tag).label} className={`shrink-0 font-bold ${getTagInfo(event.tag).color}`}>{getTagInfo(event.tag).icon}</span> : null}
-                                        </div>
-                                      ) : null}
-                                      <p className={`min-w-0 overflow-hidden text-xs font-semibold leading-snug ${microCard ? "truncate" : "break-words [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"}`}>
-                                        {event.title}
-                                      </p>
-                                    </>
-                                  ) : microCard ? (
-                                    <div className="flex h-full min-w-0 items-center gap-1 overflow-hidden leading-none">
-                                      <span
-                                        className="shrink-0 whitespace-nowrap font-mono text-[10px] font-medium tracking-[-0.03em] text-gray-700 [font-variant-numeric:tabular-nums]"
-                                        title={fullTimeLabel}
-                                      >
-                                        {timeLabel}
-                                      </span>
-                                      <span className="h-2.5 w-px shrink-0 bg-current/20" aria-hidden />
-                                      <p
-                                        className="min-w-0 flex-1 truncate text-xs font-semibold leading-none"
-                                        title={`${event.title} (${fullTimeLabel})`}
-                                      >
-                                        {event.title}
-                                      </p>
-                                      {event.tag ? (
-                                        <span title={getTagInfo(event.tag).label} aria-label={getTagInfo(event.tag).label} className={`shrink-0 text-[10px] font-bold leading-none ${getTagInfo(event.tag).color}`}>
-                                          {getTagInfo(event.tag).icon}
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                  ) : compactCard ? (
-                                    <div className="flex min-w-0 items-start gap-1.5">
-                                      <span
-                                        className="shrink-0 whitespace-nowrap rounded-md border border-white/65 bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-gray-800 shadow-[0_1px_2px_rgba(68,64,60,0.05)] [font-variant-numeric:tabular-nums]"
-                                        title={fullTimeLabel}
-                                      >
-                                        {timeLabel}
-                                      </span>
-                                      <span
-                                        className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded bg-white/65"
-                                        title={categoryVisual.name}
-                                      >
-                                        <CategoryIcon visual={categoryVisual} className="h-2.5 w-2.5" />
-                                      </span>
-                                      {segmentLabel ? (
-                                        <span className="mt-0.5 shrink-0 rounded-full border border-white/60 bg-white/55 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-gray-600">
-                                          {segmentLabel}
-                                        </span>
-                                      ) : null}
-                                      {event.tag ? (
-                                        <span title={getTagInfo(event.tag).label} aria-label={getTagInfo(event.tag).label} className={`mt-0.5 shrink-0 text-xs font-bold leading-none ${getTagInfo(event.tag).color}`}>
-                                          {getTagInfo(event.tag).icon}
-                                        </span>
-                                      ) : null}
-                                      {parseSyntheticEventId(event.id) ? (
-                                        <Repeat className="mt-0.5 h-3 w-3 shrink-0 text-gray-600" aria-hidden />
-                                      ) : null}
-                                      <p
-                                        className="min-w-0 flex-1 truncate text-xs font-semibold leading-snug"
-                                        title={`${event.title} (${fullTimeLabel})`}
-                                      >
-                                        {event.title}
-                                      </p>
-                                      {event.isCompleted ? (
-                                        <span
-                                          className="inline-flex shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-white/80 p-0.5 text-emerald-700 shadow-sm"
-                                          title="已完成"
-                                          aria-label="已完成"
-                                        >
-                                          <Check className="h-2.5 w-2.5" aria-hidden />
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex min-w-0 items-center gap-1.5">
-                                        <span
-                                          className="shrink-0 whitespace-nowrap font-mono text-[10px] font-medium tracking-[-0.03em] text-gray-700 [font-variant-numeric:tabular-nums]"
-                                          title={fullTimeLabel}
-                                        >
-                                          {timeLabel}
-                                        </span>
-                                        <span
-                                          className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded bg-white/65"
-                                          title={categoryVisual.name}
-                                        >
-                                          <CategoryIcon visual={categoryVisual} className="h-2.5 w-2.5" />
-                                        </span>
-                                        {segmentLabel ? (
-                                          <span className="shrink-0 rounded-full border border-white/60 bg-white/55 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-gray-600">
-                                            {segmentLabel}
-                                          </span>
-                                        ) : null}
-                                        {event.tag ? (
-                                          <span title={getTagInfo(event.tag).label} aria-label={getTagInfo(event.tag).label} className={`shrink-0 text-xs font-bold leading-none ${getTagInfo(event.tag).color}`}>
-                                            {getTagInfo(event.tag).icon}
-                                          </span>
-                                        ) : null}
-                                        {parseSyntheticEventId(event.id) ? (
-                                          <Repeat className="h-3 w-3 shrink-0 text-gray-600" aria-hidden />
-                                        ) : null}
-                                        <span className="min-w-0 flex-1" />
-                                        {event.isCompleted ? (
-                                          <span
-                                            className="inline-flex shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-white/80 p-0.5 text-emerald-700 shadow-sm"
-                                            title="已完成"
-                                            aria-label="已完成"
-                                          >
-                                            <Check className="h-2.5 w-2.5" aria-hidden />
-                                          </span>
-                                        ) : null}
-                                      </div>
-
-                                      <p
-                                        className={`min-w-0 flex-1 overflow-hidden break-words text-xs font-semibold leading-snug ${
-                                          mediumCard || denseCard
-                                            ? "[display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
-                                            : ""
-                                        }`}
-                                        title={`${event.title} (${fullTimeLabel})`}
-                                      >
-                                        {event.title}
-                                      </p>
-
-                                      {showDetails && event.notes ? (
-                                        <p className="min-h-0 overflow-hidden text-[11px] leading-snug text-gray-700/80 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
-                                          {event.notes}
-                                        </p>
-                                      ) : null}
-
-                                      {durationHour >= 1.5 && event.requirements.length > 0 ? (
-                                        <div className="flex shrink-0 justify-end text-[10px] leading-tight text-gray-700">
-                                          <span className="truncate rounded-md border border-white/50 bg-white/45 px-1.5 py-0.5">
-                                            {event.requirements.length} 项准备
-                                          </span>
-                                        </div>
-                                      ) : null}
-                                    </>
-                                  )}
-                                </div>
-                              </button>
 
                               {event.continuesFromPreviousDay ? null : (
                                   <button
@@ -2312,10 +2148,10 @@ export function WeeklyTimeGrid({
                                   </button>
                               )}
 
-                              {microCard ? null : (
+                              {durationHour < 0.75 ? null : (
                                 <button
                                   type="button"
-                                  className="absolute right-1.5 top-1.5 z-20 rounded-full border border-white/80 bg-white/80 p-0.5 text-stone-700 opacity-0 shadow-sm transition hover:bg-white hover:text-black group-hover:opacity-100 focus-visible:opacity-100"
+                                  className="schedule-overlap-add absolute bottom-1 right-1 z-20 p-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                                   onClick={(mouseEvent) => {
                                     mouseEvent.stopPropagation();
                                     setSelectedExpenseDateIso(event.displayDate);
