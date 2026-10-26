@@ -168,6 +168,26 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("disables card dragging while a title is being edited and restores it on exit", () => {
+    const onUpdateEvent = vi.fn();
+    const { container } = renderGrid({ events: [scheduleEvent], onUpdateEvent });
+    const card = container.querySelector<HTMLDivElement>("[data-schedule-card]")!;
+    fireEvent.click(screen.getByRole("button", { name: `修改 ${scheduleEvent.title} 标题` }));
+    expect(card.draggable).toBe(false);
+    expect((screen.getByRole("button", { name: `调整 ${scheduleEvent.title} 的结束时间` }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.keyDown(screen.getByRole("textbox", { name: `修改标题：${scheduleEvent.title}` }), { key: "Escape" });
+    expect(card.draggable).toBe(true);
+    expect((screen.getByRole("button", { name: `调整 ${scheduleEvent.title} 的结束时间` }) as HTMLButtonElement).disabled).toBe(false);
+    expect(onUpdateEvent).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: `修改 ${scheduleEvent.title} 标题` }));
+    const editor = screen.getByRole("textbox", { name: `修改标题：${scheduleEvent.title}` });
+    fireEvent.change(editor, { target: { value: "新标题" } });
+    fireEvent.blur(editor);
+    expect(card.draggable).toBe(true);
+    expect(onUpdateEvent).toHaveBeenCalledExactlyOnceWith(scheduleEvent.id, { title: "新标题" }, undefined);
+  });
+
   it("renames the selected recurring occurrence inline without resubmitting other fields", () => {
     const onUpdateEvent = vi.fn();
     renderGrid({ events: [{ ...scheduleEvent, recurrence: { kind: "daily" } }], onUpdateEvent });

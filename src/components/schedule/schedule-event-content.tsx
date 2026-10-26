@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Popover } from "@base-ui/react/popover";
-import { Check, MoreHorizontal } from "lucide-react";
+import { Check } from "lucide-react";
 import { toast } from "sonner";
 import { getEventTagInfo } from "@/lib/event-tags";
 import type { ScheduleEvent } from "@/lib/types";
@@ -18,9 +18,10 @@ type ScheduleEventContentProps = {
   onOpenEdit: () => void;
   onRename: (title: string) => void;
   onToggleSelection: () => void;
+  onTitleEditingChange: Dispatch<SetStateAction<string | null>>;
 };
 
-export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, categoryName, durationHour, dense, moving = false, onOpenEdit, onRename, onToggleSelection }: ScheduleEventContentProps) {
+export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, categoryName, durationHour, dense, moving = false, onOpenEdit, onRename, onToggleSelection, onTitleEditingChange }: ScheduleEventContentProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const initialTitle = useRef(event.title);
   const cancelled = useRef(false);
@@ -29,6 +30,10 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
   const showNotes = Boolean(event.notes.trim()) && durationHour >= 1 && !dense;
   const showMetadata = durationHour >= 1.5 && !dense;
   const tagLabel = event.tag ? getEventTagInfo(event.tag).label : null;
+
+  useEffect(() => () => {
+    onTitleEditingChange((current) => current === event.id ? null : current);
+  }, [event.id, onTitleEditingChange]);
 
   function saveTitle(value: string) {
     if (cancelled.current) return;
@@ -40,6 +45,7 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
     }
     if (title !== event.title) onRename(title);
     setDraft(null);
+    onTitleEditingChange(null);
   }
 
   const titleControl = draft !== null ? (
@@ -61,6 +67,7 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
           event.preventDefault();
           cancelled.current = true;
           setDraft(null);
+          onTitleEditingChange(null);
         }
         if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); }
       }}
@@ -77,6 +84,7 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
         cancelled.current = false;
         setPreviewOpen(false);
         setDraft(event.title);
+        onTitleEditingChange(event.id);
       }}
     >
       {event.title}
@@ -111,11 +119,11 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
             openOnHover
             delay={250}
             closeDelay={150}
-            className="schedule-event-time relative z-20 min-w-0 truncate text-left text-xs tabular-nums"
+            className={`schedule-event-time relative z-20 text-left text-xs tabular-nums ${micro ? "shrink-0 whitespace-nowrap" : "min-w-0 truncate"}`}
             aria-label={`查看 ${event.title} 完整信息`}
             title="查看完整信息"
           >
-            {micro ? <MoreHorizontal className="size-3" aria-hidden /> : dense ? timeLabel.split("-")[0] : timeLabel}
+            {dense ? timeLabel.split("-")[0] : timeLabel}
           </Popover.Trigger>
           {event.isCompleted ? <Check className="schedule-event-completed size-3 shrink-0" aria-label="已完成" /> : null}
         </div>

@@ -14,12 +14,18 @@ const event: ScheduleEvent = {
 function setup(patch: Partial<ScheduleEvent> = {}, durationHour = 1) {
   const onRename = vi.fn();
   const onOpenEdit = vi.fn();
-  const props = { event: { ...event, ...patch }, timeLabel: "09:00-10:00", fullTimeLabel: "09:00-10:00", categoryName: "学习", durationHour, dense: false, onRename, onOpenEdit, onToggleSelection: vi.fn() };
+  const timeLabel = durationHour === 0.25 ? "09:00-09:15" : durationHour === 0.5 ? "09:00-09:30" : "09:00-10:00";
+  const props = { event: { ...event, ...patch }, timeLabel, fullTimeLabel: timeLabel, categoryName: "学习", durationHour, dense: false, onRename, onOpenEdit, onToggleSelection: vi.fn(), onTitleEditingChange: vi.fn() };
   const result = render(<ScheduleEventContent {...props} />);
   return { ...result, onRename, onOpenEdit, onToggleSelection: props.onToggleSelection, rerenderMoving: (moving: boolean) => result.rerender(<ScheduleEventContent {...props} moving={moving} />), rerenderEvent: (patch: Partial<ScheduleEvent>) => result.rerender(<ScheduleEventContent {...props} event={{ ...props.event, ...patch }} />) };
 }
 
 describe("schedule card information", () => {
+  it.each([0.25, 0.5])("keeps the full time range visible on a %s-hour card", (duration) => {
+    setup({}, duration);
+    expect(screen.getByRole("button", { name: `查看 ${event.title} 完整信息` }).textContent).toBe(duration === 0.25 ? "09:00-09:15" : "09:00-09:30");
+  });
+
   it("closes the preview during dragging so it cannot cover the drop target", async () => {
     const { rerenderMoving } = setup();
     fireEvent.click(screen.getByRole("button", { name: `查看 ${event.title} 完整信息` }));

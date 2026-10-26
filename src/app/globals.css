@@ -15,6 +15,7 @@
   --schedule-success: #218358;
 }
 .schedule-event-card:has([data-inline-title-editor]) { overflow: visible; z-index: 90 !important; }
+.schedule-event-card:has([data-inline-title-editor]) :is([data-resize-handle], .schedule-overlap-add) { pointer-events: none; opacity: 0; }
 .schedule-event-selected { outline: 2px solid var(--schedule-focus); outline-offset: -1px; }
 .schedule-event-content { gap: 2px; padding: 5px 6px; overflow: hidden; line-height: 16px; }
 .schedule-event-content:has([data-inline-title-editor]) { overflow: visible; }
@@ -37,7 +38,7 @@
 .schedule-event-tag { font-weight: 600; }
 .schedule-event-completed { color: var(--schedule-success); }
 .schedule-event-content[data-micro] { flex-direction: row; align-items: center; gap: 3px; padding: 0 3px; }
-.schedule-event-content[data-micro] .schedule-event-time-row { order: 2; margin-left: auto; }
+.schedule-event-content[data-micro] .schedule-event-time-row { flex-shrink: 0; }
 .schedule-event-content[data-micro] .schedule-event-title { display: block; flex: 1; line-height: 14px; }
 .schedule-event-content[data-dense] { padding-inline: 4px; }
 .schedule-title-input { position: relative; z-index: 30; width: 100%; min-width: 180px; min-height: 28px; padding: 3px 5px; border: 0.5px solid var(--schedule-focus); border-radius: 3px; background: var(--schedule-paper); color: var(--schedule-ink); outline: none; line-height: 20px; }

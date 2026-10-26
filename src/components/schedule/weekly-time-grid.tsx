@@ -541,6 +541,7 @@ export function WeeklyTimeGrid({
   const userId = useAccountId();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editingTitleEventId, setEditingTitleEventId] = useState<string | null>(null);
   const [selectedCell, setSelectedCell] = useState<GridCell | null>(null);
   const [createEndDate, setCreateEndDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
@@ -2068,7 +2069,7 @@ export function WeeklyTimeGrid({
                               data-schedule-card
                               data-schedule-event-id={event.id}
                               data-selected={selectedEventIds.has(event.id) || undefined}
-                              draggable={resizeState?.eventId !== event.id}
+                              draggable={resizeState?.eventId !== event.id && editingTitleEventId !== event.id}
                               onPointerDown={(pointerEvent) => {
                                 if (pointerEvent.button !== 0 || (pointerEvent.target as HTMLElement).closest("[data-resize-handle]")) return;
                                 const column = pointerEvent.currentTarget.closest<HTMLElement>("[data-timeline-date]")!;
@@ -2076,7 +2077,7 @@ export function WeeklyTimeGrid({
                                 dragGrabRef.current = { segmentId: event.segmentId, offsetHour: pointerHour - event.startHour };
                               }}
                               onDragStart={(dragEvent) => {
-                                if ((dragEvent.target as HTMLElement).closest("[data-inline-title-editor]")) { dragEvent.preventDefault(); return; }
+                                if (editingTitleEventId === event.id || (dragEvent.target as HTMLElement).closest("[data-inline-title-editor]")) { dragEvent.preventDefault(); return; }
                                 const draggedEvents = selectedEventIds.has(event.id)
                                   ? [sourceEvent, ...expandedEvents.filter((item) => item.id !== event.id && selectedEventIds.has(item.id))]
                                   : [sourceEvent];
@@ -2102,6 +2103,7 @@ export function WeeklyTimeGrid({
                                 dense={denseCard}
                                 moving={dragPreview.length > 0 || resizeState !== null}
                                 onOpenEdit={() => handleOpenEdit(sourceEvent)}
+                                onTitleEditingChange={setEditingTitleEventId}
                                 onRename={(title) => onUpdateEvent(event.id, { title }, parseSyntheticEventId(event.id) ? { scope: "occurrence" } : undefined)}
                                 onToggleSelection={() => setSelectedEventIds((previous) => {
                                   const next = new Set(previous);
@@ -2115,6 +2117,7 @@ export function WeeklyTimeGrid({
                                   <button
                                     type="button"
                                     data-resize-handle
+                                    disabled={editingTitleEventId === event.id}
                                     className={`absolute z-30 cursor-ns-resize rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${
                                       microCard
                                         ? "left-1 top-0 h-1.5 w-[28%] min-w-3 max-w-8"
@@ -2133,6 +2136,7 @@ export function WeeklyTimeGrid({
                                   <button
                                     type="button"
                                     data-resize-handle
+                                    disabled={editingTitleEventId === event.id}
                                     className={`absolute z-30 cursor-ns-resize rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${
                                       microCard
                                         ? "bottom-0 right-1 h-1.5 w-[28%] min-w-3 max-w-8"
@@ -2152,6 +2156,7 @@ export function WeeklyTimeGrid({
                                 <button
                                   type="button"
                                   className="schedule-overlap-add absolute bottom-1 right-1 z-20 p-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                                  disabled={editingTitleEventId === event.id}
                                   onClick={(mouseEvent) => {
                                     mouseEvent.stopPropagation();
                                     setSelectedExpenseDateIso(event.displayDate);
