@@ -55,6 +55,30 @@ function backend() {
 const input = () => ({ content: "正文", category: "life" as const, mood: "" as const, location: "", tagNames: ["标签"], links: [{ id: "task", type: "task", title: "关联" }], keepImageIds: [], newImages: [new File(["image"], "photo.png", { type: "image/png" })], createdAt: "2026-10-02T00:00:00Z" });
 beforeEach(() => localStorage.clear());
 describe("retryable log mutations", () => {
+  it("changes a log date with UPDATE while preserving its identity, source and attachments", async () => {
+    const db = backend();
+    await saveLogPost(db.client, "owner", "post", input());
+    Object.assign(db.tables.log_posts[0], { source_type: "daily_reflection", source_id: "origin", is_pinned: true });
+    const images = structuredClone(db.tables.log_post_images);
+    const links = structuredClone(db.tables.log_post_links);
+    const tagLinks = structuredClone(db.tables.log_post_tags);
+    const revisedTime = "2026-09-30T06:35:12.345Z";
+    await saveLogPost(db.client, "owner", "post", { ...input(), createdAt: undefined, recordedAt: revisedTime, newImages: [], keepImageIds: images.map((image) => String(image.id)) });
+    expect(db.tables.log_posts).toHaveLength(1);
+    expect(db.tables.log_posts[0]).toMatchObject({ id: "post", user_id: "owner", created_at: revisedTime, source_type: "daily_reflection", source_id: "origin", is_pinned: true });
+    expect(db.tables.log_post_images).toEqual(images);
+    expect(db.tables.log_post_links).toEqual(links);
+    expect(db.tables.log_post_tags).toEqual(tagLinks);
+    expect(db.files.size).toBe(1);
+  });
+
+  it("does not overwrite the recorded timestamp during a regular content edit", async () => {
+    const db = backend();
+    await saveLogPost(db.client, "owner", "post", input());
+    await saveLogPost(db.client, "owner", "post", { ...input(), createdAt: undefined, content: "新正文", newImages: [], keepImageIds: db.tables.log_post_images.map((image) => String(image.id)) });
+    expect(db.tables.log_posts[0]).toMatchObject({ content: "新正文", created_at: input().createdAt });
+  });
+
   it("preserves every attachment when the parent deletion fails", async () => {
     const db = backend(); await saveLogPost(db.client, "owner", "post", input());
     db.failures.set("log_posts:delete", 1);

@@ -1,6 +1,6 @@
 "use client";
 
-import { format, isToday, isYesterday, parseISO, startOfDay, subDays } from "date-fns";
+import { endOfDay, format, isToday, isYesterday, parseISO, startOfDay, subDays } from "date-fns";
 
 export type LogCategory =
   | "life"
@@ -111,6 +111,7 @@ export type LogComposerInput = {
 export type DailyLogKind = "life" | "research";
 
 export type LogPostEditorInput = {
+  recordedAt?: string;
   content: string;
   category: LogCategory;
   mood: LogMood | "";
@@ -233,7 +234,7 @@ export function filterLogPosts(posts: LogPostRecord[], filters: LogFilters) {
       if (parseISO(post.createdAt) < start) return false;
     }
     if (filters.endDate) {
-      const end = startOfDay(parseISO(filters.endDate));
+      const end = endOfDay(parseISO(filters.endDate));
       if (parseISO(post.createdAt) > end) return false;
     }
     return true;
@@ -252,7 +253,7 @@ export function buildLogStats(posts: LogPostRecord[], tags: LogTag[]): LogStats 
   const weekStart = subDays(startOfDay(now), 6);
   const monthPrefix = format(now, "yyyy-MM");
   const weekCount = posts.filter((post) => parseISO(post.createdAt) >= weekStart).length;
-  const monthCount = posts.filter((post) => post.createdAt.startsWith(monthPrefix)).length;
+  const monthCount = posts.filter((post) => format(parseISO(post.createdAt), "yyyy-MM") === monthPrefix).length;
 
   const categoryMap = new Map<LogCategory, number>();
   posts.forEach((post) => {
@@ -275,7 +276,7 @@ export function buildLogStats(posts: LogPostRecord[], tags: LogTag[]): LogStats 
     }));
 
   const uniqueDays = Array.from(
-    new Set(posts.filter((post) => !post.isArchived).map((post) => post.createdAt.slice(0, 10))),
+    new Set(posts.filter((post) => !post.isArchived).map((post) => format(parseISO(post.createdAt), "yyyy-MM-dd"))),
   ).sort((a, b) => b.localeCompare(a));
 
   let streakDays = 0;

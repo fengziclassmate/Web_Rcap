@@ -62,7 +62,7 @@ async function synchronizeLinks(client: SupabaseClient, owner: string, postId: s
   if (removed.length) message((await client.from("log_post_links").delete().eq("user_id", owner).eq("post_id", postId).in("id", removed)).error);
 }
 
-type SaveLogInput = Pick<LogPostEditorInput, "content" | "category" | "mood" | "location" | "tagNames" | "links"> & {
+type SaveLogInput = Pick<LogPostEditorInput, "content" | "category" | "mood" | "location" | "tagNames" | "links" | "recordedAt"> & {
   newImages: File[];
   keepImageIds: string[];
   createdAt?: string;
@@ -72,7 +72,7 @@ type SaveLogInput = Pick<LogPostEditorInput, "content" | "category" | "mood" | "
 export async function saveLogPost(client: SupabaseClient, owner: string, postId: string, input: SaveLogInput) {
   const existing = await client.from("log_post_images").select("*").eq("user_id", owner).eq("post_id", postId);
   message(existing.error);
-  const body = { content: input.content, category: input.category, mood: input.mood || null, location: input.location, updated_at: new Date().toISOString() };
+  const body = { content: input.content, category: input.category, mood: input.mood || null, location: input.location, updated_at: new Date().toISOString(), ...(input.recordedAt ? { created_at: input.recordedAt } : {}) };
   const post = input.createdAt
     ? await client.from("log_posts").upsert({ ...body, id: postId, user_id: owner, created_at: input.createdAt, visibility: "private", source_type: "manual" }, { onConflict: "id" }).select("id").single()
     : await client.from("log_posts").update(body).eq("user_id", owner).eq("id", postId).select("id").single();

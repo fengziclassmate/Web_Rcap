@@ -772,6 +772,7 @@ function LogPostEditorForm({
   onClose: () => void;
   onSubmit: (postId: string, input: LogPostEditorInput) => Promise<void>;
 }) {
+  const [recordDate, setRecordDate] = useState(() => format(new Date(post.createdAt), "yyyy-MM-dd"));
   const [draft, setDraft] = useState<LogPostEditorInput>({
     content: post.content,
     category: post.category,
@@ -787,6 +788,10 @@ function LogPostEditorForm({
 
   return (
     <fieldset disabled={uploading} className="min-w-0 space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="log-record-date">记录日期</Label>
+        <Input id="log-record-date" type="date" className="w-40 border-[0.5px]" value={recordDate} onChange={(event) => setRecordDate(event.target.value)} />
+      </div>
       <Textarea
         value={draft.content}
         onChange={(event) => setDraft((prev) => ({ ...prev, content: event.target.value }))}
@@ -905,9 +910,15 @@ function LogPostEditorForm({
         </Button>
         <Button
           type="button"
-          disabled={uploading || !draft.content.trim()}
+          disabled={uploading || !draft.content.trim() || !recordDate}
           onClick={async () => {
-            await onSubmit(post.id, draft);
+            const original = new Date(post.createdAt);
+            await onSubmit(post.id, {
+              ...draft,
+              ...(recordDate !== format(original, "yyyy-MM-dd")
+                ? { recordedAt: new Date(`${recordDate}T${format(original, "HH:mm:ss.SSS")}`).toISOString() }
+                : {}),
+            });
           }}
         >
           {uploading ? "保存中..." : "保存"}
