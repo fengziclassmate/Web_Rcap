@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/desktop/node_modules/
 /.local-tools/
 /.qa/
 /.pnp

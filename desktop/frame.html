@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>研究手札桌面工作台</title>
+  <link rel="stylesheet" href="frame.css">
+  <script src="frame.js" defer></script>
+</head>
+<body>
+  <header>
+    <span class="title">研究手札</span>
+    <span id="control-error" role="alert" hidden></span>
+    <div class="controls">
+      <label for="opacity">背景不透明度</label>
+      <input id="opacity" type="range" min="60" max="100" step="5" value="85">
+      <output for="opacity" id="opacity-value">85%</output>
+      <button id="fit" type="button">适应桌面</button>
+      <button id="login" type="button">粘贴登录链接</button>
+      <button id="browser" type="button">在浏览器打开</button>
+      <button id="hide" type="button" aria-label="隐藏到托盘" title="隐藏到托盘">−</button>
+      <button id="quit" type="button" aria-label="退出桌面版" title="退出桌面版">×</button>
+    </div>
+  </header>
+  <div id="load-error" hidden>
+    <p id="error-message" role="alert"></p>
+    <button id="retry" type="button">重新加载</button>
+  </div>
+  <button id="resize" type="button" aria-label="调整窗口大小" title="拖动调整大小，方向键微调">◢</button>
+</body>
+</html>

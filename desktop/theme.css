@@ -1,0 +1,18 @@
+/* Radix Gray surfaces; keep the existing category colours and opaque text. */
+html, body { background: transparent !important; }
+html { --desktop-opacity: 85%; --desktop-surface: color-mix(in srgb, #fcfcfc var(--desktop-opacity), transparent); --desktop-border: #d9d9d9; }
+.workbench-shell::before { display: none; }
+.workbench-shell { --background: transparent; --paper: var(--desktop-surface); --card: var(--desktop-surface); --border: var(--desktop-border); min-width: 0 !important; background: var(--desktop-surface) !important; }
+.workbench-shell > .mx-auto { width: 100%; max-width: none !important; padding-inline: 12px; }
+.workbench-shell > .mx-auto:first-child > .flex.items-center.gap-2 { flex-wrap: wrap; }
+.workbench-module > .grid { grid-template-columns: minmax(0,1fr) minmax(300px,340px); }
+@media (max-width: 1000px) {
+  .workbench-module > .grid { grid-template-columns: minmax(0,1fr); }
+  .calendar-grid { max-height: max(280px,calc(100vh - 300px)); overflow-y: auto; }
+}
+.workbench-shell :is(.calendar-panel, .task-console, .module-header, .dashboard-section-card, .utility-panel, .project-workspace, .glass-panel) { background: rgb(252 252 252 / 12%) !important; border-width: 0.5px; border-color: var(--desktop-border); box-shadow: none; backdrop-filter: none; }
+.workbench-shell :is(.calendar-grid, [data-timeline-date], .task-dashboard-section) { background: transparent !important; }
+.calendar-panel > header, .calendar-grid .sticky.top-0, .calendar-grid [data-day-header], .calendar-grid .sticky.left-0 { background: rgb(252 252 252 / 96%) !important; }
+.workbench-shell :is(input:not([type="checkbox"]), textarea, [data-slot="select-trigger"]) { background: #fcfcfc; color: #202020; border-width: 0.5px; }
+.workbench-shell :is(.text-stone-400, .text-stone-500, .text-gray-400, .text-gray-500, .text-muted-foreground) { color: #202020; }
+.workbench-module { animation: none; }
