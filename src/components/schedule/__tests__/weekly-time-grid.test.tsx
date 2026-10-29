@@ -24,6 +24,7 @@ vi.mock("sonner", () => ({
 
 beforeEach(() => {
   window.localStorage.clear();
+  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
 });
 
 describe("CenteredTimePartSelect", () => {

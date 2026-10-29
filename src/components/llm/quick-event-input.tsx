@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Popover } from "@base-ui/react/popover";
 import { CalendarCheck2, CalendarPlus, CheckCircle2, ListTodo, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ function formatHour(value: number) {
 export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: QuickEventInputProps) {
   const [input, setInput] = useState("");
   const [parsed, setParsed] = useState<QuickCreateResult | null>(null);
+  const [inputOpen, setInputOpen] = useState(false);
   const { loading, error, sendMessage } = useLLMChat();
 
   async function handleAnalyze() {
@@ -52,6 +54,7 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
     if (!result) return;
     try {
       setParsed(parseQuickCreateResponse(result));
+      setInputOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "无法识别要创建的内容");
     }
@@ -87,37 +90,42 @@ export function QuickEventInput({ onCreateEvent, onAddTask, onAddAnnualTask }: Q
 
   return (
     <>
-      <div className="flex min-w-0 items-center gap-2" role="group" aria-label="智能快速创建">
-        <span
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-stone-950 text-white shadow-sm"
-          role="img"
-          aria-label="智能快速创建"
-        >
+      <Popover.Root open={inputOpen} onOpenChange={setInputOpen}>
+        <Popover.Trigger render={<Button type="button" variant="outline" size="sm" className="h-8 border-[0.5px] px-2.5 text-xs" />}>
           <Sparkles className="h-3.5 w-3.5" />
-        </span>
-        <Input
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="输入日程、长期任务或年度计划"
-          aria-label="智能快速创建输入"
-          className="h-8 min-w-0 flex-1 rounded-lg border-stone-200 bg-white px-3 text-xs shadow-none"
-          onKeyDown={(event) => {
-            if (event.key === "Enter") void handleAnalyze();
-          }}
-        />
-        <Button
-          type="button"
-          size="sm"
-          onClick={handleAnalyze}
-          disabled={loading || !input.trim()}
-          className="h-8 shrink-0 rounded-lg px-2.5 text-xs"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          {loading ? "识别中" : "智能识别"}
-        </Button>
-      </div>
-
-      {error && <p role="alert" className="mt-1 text-xs text-red-700">{error}</p>}
+          智能识别
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Positioner side="bottom" align="end" sideOffset={8} className="z-[100]">
+            <Popover.Popup className="w-[min(480px,calc(100vw-32px))] rounded-md border-[0.5px] border-[#d9d9d9] bg-[#fcfcfc] p-3 text-[#202020]">
+              <Popover.Title className="sr-only">智能快速创建</Popover.Title>
+              <div className="flex min-w-0 items-center gap-2" role="group" aria-label="智能快速创建">
+                <Input
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  placeholder="输入日程、长期任务或年度计划"
+                  aria-label="智能快速创建输入"
+                  className="h-8 min-w-0 flex-1 rounded-md border-[0.5px] border-[#d9d9d9] bg-[#fcfcfc] px-3 text-xs shadow-none"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.nativeEvent.isComposing) void handleAnalyze();
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAnalyze}
+                  disabled={loading || !input.trim()}
+                  className="h-8 shrink-0 rounded-lg px-2.5 text-xs"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {loading ? "识别中" : "识别"}
+                </Button>
+              </div>
+              {error && <p role="alert" className="mt-1 text-xs text-red-700">{error}</p>}
+            </Popover.Popup>
+          </Popover.Positioner>
+        </Popover.Portal>
+      </Popover.Root>
       <Dialog open={Boolean(parsed)} onOpenChange={(open) => !open && setParsed(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

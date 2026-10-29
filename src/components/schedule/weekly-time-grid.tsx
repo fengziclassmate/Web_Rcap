@@ -1831,9 +1831,9 @@ export function WeeklyTimeGrid({
           <p className="mt-0.5 text-xs text-gray-600">{weekRange}</p>
         </div>
 
-        {selectedEventIds.size > 0 ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1">
-            <span className="text-xs font-semibold text-sky-800">已选 {selectedEventIds.size} 项</span>
+        <div className="min-w-0 flex-[1_1_28rem] overflow-x-auto">
+          <div role="toolbar" aria-label="所选日程操作" aria-hidden={selectedEventIds.size === 0} inert={selectedEventIds.size === 0} className={`flex w-max items-center gap-2 rounded-md border-[0.5px] border-[#c2e5ff] bg-[#f4faff] px-2 py-1 ${selectedEventIds.size === 0 ? "invisible" : ""}`}>
+            <span className="w-24 shrink-0 whitespace-nowrap text-xs font-semibold tabular-nums text-[#0d74ce]">已选 {selectedEventIds.size} 项</span>
             <Button
               type="button"
               size="xs"
@@ -1865,10 +1865,10 @@ export function WeeklyTimeGrid({
               清除
             </Button>
           </div>
-        ) : null}
+        </div>
 
         {toolbarContent ? (
-          <div className="min-w-[min(100%,18rem)] flex-[1_1_20rem]">
+          <div className="shrink-0">
             {toolbarContent}
           </div>
         ) : null}

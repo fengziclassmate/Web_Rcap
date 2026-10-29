@@ -26,10 +26,22 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
   const [editor, setEditor] = useState<{ field: "title" | "notes"; initial: string; value: string } | null>(null);
   const cancelled = useRef(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const notesSpaceRef = useRef<HTMLDivElement>(null);
   const micro = durationHour < 0.75;
   const showNotes = Boolean(event.notes.trim()) && durationHour >= 1;
   const showMetadata = durationHour >= 1.5;
   const tagLabel = event.tag ? getEventTagInfo(event.tag).label : null;
+
+  useEffect(() => {
+    const space = notesSpaceRef.current;
+    if (!space) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const lineHeight = parseFloat(getComputedStyle(space.firstElementChild!).lineHeight);
+      space.style.setProperty("--schedule-notes-lines", String(Math.max(1, Math.floor(entry.contentRect.height / lineHeight))));
+    });
+    observer.observe(space);
+    return () => observer.disconnect();
+  }, [showNotes, editor?.field]);
 
   useEffect(() => () => {
     onEditingChange((current) => current === event.id ? null : current);
@@ -158,7 +170,9 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
             onKeyDown={handleEditorKeyDown}
           />
         ) : showNotes ? (
-          <button type="button" className="schedule-event-notes relative z-20 min-h-0 overflow-hidden whitespace-pre-line break-words text-left text-xs" aria-label={`编辑 ${event.title} 补充信息`} onClick={() => beginEditing("notes")}>{event.notes}</button>
+          <div ref={notesSpaceRef} className="min-h-0 flex-1 overflow-hidden">
+            <button type="button" className="schedule-event-notes relative z-20 w-full overflow-hidden whitespace-pre-line break-words text-left text-xs" aria-label={`编辑 ${event.title} 补充信息`} onClick={() => beginEditing("notes")}>{event.notes}</button>
+          </div>
         ) : !event.notes.trim() && durationHour >= 1 ? (
           <button type="button" className="schedule-add-notes absolute bottom-1 left-1 z-20 text-xs opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => beginEditing("notes")} aria-label={`编辑 ${event.title} 补充信息`}>添加补充信息</button>
         ) : null}

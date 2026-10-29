@@ -1,9 +1,18 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ScheduleEventContent } from "../schedule-event-content";
 import type { ScheduleEvent } from "@/lib/types";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+
+let onResize: ResizeObserverCallback;
+beforeEach(() => {
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: ResizeObserverCallback) { onResize = callback; }
+    observe() {}
+    disconnect() {}
+  });
+});
 
 const event: ScheduleEvent = {
   id: "exam", date: "2026-10-26", startHour: 9, endHour: 10,
@@ -21,6 +30,17 @@ function setup(patch: Partial<ScheduleEvent> = {}, durationHour = 1, dense = fal
 }
 
 describe("schedule card information", () => {
+  it("uses the available notes height and updates the line limit when the card resizes", () => {
+    setup({ notes: "第一项\n第二项\n第三项\n第四项\n第五项" }, 3);
+    const notes = screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` });
+    notes.style.lineHeight = "16px";
+    const space = notes.parentElement!;
+    onResize([{ contentRect: { height: 95 } } as ResizeObserverEntry], {} as ResizeObserver);
+    expect(space.style.getPropertyValue("--schedule-notes-lines")).toBe("5");
+    onResize([{ contentRect: { height: 48 } } as ResizeObserverEntry], {} as ResizeObserver);
+    expect(space.style.getPropertyValue("--schedule-notes-lines")).toBe("3");
+  });
+
   it.each([0.25, 0.5, 1])("shows the complete time range on an overlapping %s-hour card", (duration) => {
     setup({}, duration, true);
     expect(screen.getByRole("button", { name: `查看 ${event.title} 完整信息` }).textContent).toBe(duration === 0.25 ? "09:00-09:15" : duration === 0.5 ? "09:00-09:30" : "09:00-10:00");
