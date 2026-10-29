@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'">
   <title>研究手札桌面工作台</title>
   <link rel="stylesheet" href="frame.css">
-  <script src="frame.js" defer></script>
+  <script src="frame.js" type="module"></script>
 </head>
 <body>
   <header>
@@ -26,6 +26,13 @@
     <p id="error-message" role="alert"></p>
     <button id="retry" type="button">重新加载</button>
   </div>
-  <button id="resize" type="button" aria-label="调整窗口大小" title="拖动调整大小，方向键微调">◢</button>
+  <button class="resize-edge resize-n" data-edge="n" type="button" aria-label="调整窗口上边缘" tabindex="-1"></button>
+  <button class="resize-edge resize-s" data-edge="s" type="button" aria-label="调整窗口下边缘" tabindex="-1"></button>
+  <button class="resize-edge resize-w" data-edge="w" type="button" aria-label="调整窗口左边缘" tabindex="-1"></button>
+  <button class="resize-edge resize-e" data-edge="e" type="button" aria-label="调整窗口右边缘" tabindex="-1"></button>
+  <button class="resize-edge resize-nw" data-edge="nw" type="button" aria-label="调整窗口左上角" tabindex="-1"></button>
+  <button class="resize-edge resize-ne" data-edge="ne" type="button" aria-label="调整窗口右上角" tabindex="-1"></button>
+  <button class="resize-edge resize-sw" data-edge="sw" type="button" aria-label="调整窗口左下角" tabindex="-1"></button>
+  <button class="resize-edge resize-se" data-edge="se" type="button" aria-label="调整窗口大小" title="拖动调整大小，方向键微调"></button>
 </body>
 </html>

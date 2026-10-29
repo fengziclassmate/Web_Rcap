@@ -1,9 +1,10 @@
 import { app, BrowserWindow, WebContentsView, Menu, Tray, clipboard, dialog, ipcMain, screen, shell } from 'electron';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allowedNavigation, loginLink, workbenchUrl } from './url-policy.mjs';
+import { allowedNavigation, desktopLoginCallback, loginLink, workbenchUrl } from './url-policy.mjs';
 import { connectDesktop } from './native-layer.mjs';
+import { clampWindowBounds } from './window-geometry.mjs';
 
 const folder = path.dirname(fileURLToPath(import.meta.url));
 const config = JSON.parse(readFileSync(path.join(folder, 'app-config.json'), 'utf8'));
@@ -24,6 +25,10 @@ let opacity = 85;
 let themeReady = false;
 let desktopBounds;
 let layer;
+let saveBoundsTimer;
+let completingLogin = false;
+let authFeedbackKind = 'idle';
+const boundsFile = path.join(app.getPath('userData'), 'window-bounds.json');
 const theme = readFileSync(path.join(folder, 'theme.css'), 'utf8');
 
 function placeWindow() {
@@ -36,6 +41,37 @@ function showWindow() {
 
 function status(message) {
   window.webContents.send('desktop:status', message);
+}
+
+function saveBounds() {
+  clearTimeout(saveBoundsTimer);
+  saveBoundsTimer = undefined;
+  try {
+    writeFileSync(`${boundsFile}.tmp`, JSON.stringify(desktopBounds));
+    renameSync(`${boundsFile}.tmp`, boundsFile);
+  } catch (error) {
+    console.error('Window settings write failed:', error.code);
+    status('无法保存窗口位置和大小，请检查磁盘空间或文件权限。');
+  }
+}
+
+function authStatus(kind, message) {
+  authFeedbackKind = kind;
+  window.webContents.send('desktop:auth-status', { kind, message });
+}
+
+async function completeDesktopLogin(link) {
+  const { code, state } = desktopLoginCallback(link, target.origin);
+  if (new URL(view.webContents.getURL()).origin !== target.origin) await load();
+  const pending = await view.webContents.executeJavaScriptInIsolatedWorld(1, [{ code: "localStorage.getItem('rcap-desktop-login-state')" }]);
+  if (pending !== state) throw new Error('此链接不是当前桌面版发起的登录，请重新发送并打开最新邮件。');
+  completingLogin = true;
+  showWindow();
+  const destination = new URL(target);
+  destination.searchParams.set('code', code);
+  const loading = load(destination.href);
+  authStatus('pending', '正在完成桌面登录…');
+  await loading;
 }
 
 async function updateOpacity() {
@@ -64,6 +100,8 @@ async function openExternal(url) {
 async function createWindow() {
   const area = screen.getPrimaryDisplay().workArea;
   desktopBounds = { x: area.x + 16, y: area.y + 16, width: area.width - 32, height: area.height - 32 };
+  try { desktopBounds = clampWindowBounds(JSON.parse(readFileSync(boundsFile, 'utf8')), area); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
   window = new BrowserWindow({
     title: '研究手札桌面工作台',
     ...desktopBounds,
@@ -73,12 +111,12 @@ async function createWindow() {
     icon: path.join(folder, 'icon.ico'),
     webPreferences: { preload: path.join(folder, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
-  view = new WebContentsView({ webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false } });
+  view = new WebContentsView({ webPreferences: { preload: path.join(folder, 'auth-preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false } });
   view.setBackgroundColor('#00000000');
   window.contentView.addChildView(view);
   function fitView() {
     const [width, height] = window.getContentSize();
-    view.setBounds({ x: 0, y: 36, width, height: height - 46 });
+    view.setBounds({ x: 6, y: 42, width: width - 12, height: height - 48 });
   }
   fitView();
   window.on('resize', fitView);
@@ -96,6 +134,12 @@ async function createWindow() {
     status('工作台已停止响应，请重新加载。');
   });
   function guardNavigation(event, url) {
+    const destination = new URL(url);
+    if (destination.origin === target.origin && destination.pathname === '/auth/desktop' && destination.searchParams.has('code')) {
+      event.preventDefault();
+      void completeDesktopLogin(url).catch((error) => authStatus('error', error.message));
+      return;
+    }
     if (allowedNavigation(new URL(url), target.origin, config.authOrigin)) return;
     event.preventDefault();
     void openExternal(url).catch((error) => dialog.showErrorBox('打开链接失败', error.message));
@@ -112,20 +156,26 @@ async function createWindow() {
   window.on('close', (event) => { if (!quitting) { event.preventDefault(); void layer.request('hide').catch((error) => status(error.message)); } });
   window.on('closed', () => view.webContents.close());
 
+  ipcMain.on('desktop:auth-state', (event, state) => {
+    if (event.sender !== view.webContents || event.senderFrame !== view.webContents.mainFrame || new URL(view.webContents.getURL()).origin !== target.origin) return;
+    if (!state || typeof state.signedIn !== 'boolean' || (state.error !== null && typeof state.error !== 'string')) return;
+    if (state.error) authStatus('error', state.error);
+    else if (state.signedIn) {
+      authStatus('success', '已登录');
+      if (completingLogin) void view.webContents.executeJavaScriptInIsolatedWorld(1, [{ code: "localStorage.removeItem('rcap-desktop-login-state')" }]);
+    } else if (!completingLogin && authFeedbackKind !== 'error') authStatus('idle', '未登录');
+    if (state.error || state.signedIn) completingLogin = false;
+  });
+
   const controls = {
-    bounds: () => desktopBounds,
+    bounds: () => ({ ...desktopBounds, workArea: screen.getPrimaryDisplay().workArea }),
     setBounds: async (bounds) => {
-      if (!bounds || ['x', 'y', 'width', 'height'].some((key) => !Number.isFinite(bounds[key]))) throw new Error('窗口尺寸无效。');
       const area = screen.getPrimaryDisplay().workArea;
-      const width = Math.round(Math.max(900, Math.min(area.width, bounds.width)));
-      const height = Math.round(Math.max(560, Math.min(area.height, bounds.height)));
-      desktopBounds = {
-        width, height,
-        x: Math.round(Math.max(area.x, Math.min(area.x + area.width - width, bounds.x))),
-        y: Math.round(Math.max(area.y, Math.min(area.y + area.height - height, bounds.y))),
-      };
+      desktopBounds = clampWindowBounds(bounds, area);
       await placeWindow();
       fitView();
+      clearTimeout(saveBoundsTimer);
+      saveBoundsTimer = setTimeout(saveBounds, 250);
       return desktopBounds;
     },
     fit: async () => {
@@ -133,6 +183,7 @@ async function createWindow() {
       desktopBounds = { x: area.x + 16, y: area.y + 16, width: area.width - 32, height: area.height - 32 };
       await placeWindow();
       fitView();
+      saveBounds();
     },
     opacity: async (value) => {
       if (!Number.isFinite(value) || value < 60 || value > 100) throw new Error('背景不透明度须在 60% 到 100% 之间。');
@@ -140,7 +191,11 @@ async function createWindow() {
       await updateOpacity();
     },
     browser: () => shell.openExternal(target.href),
-    login: () => load(loginLink(clipboard.readText(), target.origin, config.authOrigin)),
+    login: () => {
+      const text = loginLink(clipboard.readText(), target.origin, config.authOrigin);
+      const url = new URL(text);
+      return url.protocol === 'rcap-desktop:' || url.pathname === '/auth/desktop' ? completeDesktopLogin(text) : load(text);
+    },
     retry: () => load(),
     hide: () => layer.request('hide'),
     show: () => layer.request('show'),
@@ -169,15 +224,26 @@ async function createWindow() {
   ]));
   tray.on('double-click', showWindow);
   await load();
+  if (app.isPackaged && !argument('data-dir') && !app.setAsDefaultProtocolClient('rcap-desktop')) {
+    authStatus('error', '无法设置桌面登录入口，请使用“粘贴登录链接”。');
+  }
 }
 
 if (process.platform !== 'win32') throw new Error('桌面版当前仅支持 Windows。');
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
-  app.on('second-instance', () => { if (layer) showWindow(); });
-  app.on('before-quit', () => { quitting = true; layer?.close(); });
+  app.on('second-instance', (_event, argv) => {
+    const link = argv.find((value) => value.startsWith('rcap-desktop://'));
+    void ready.then(() => link ? completeDesktopLogin(link) : showWindow()).catch((error) => authStatus('error', error.message));
+  });
+  app.on('before-quit', () => { quitting = true; if (saveBoundsTimer) saveBounds(); layer?.close(); });
   Menu.setApplicationMenu(null);
-  app.whenReady().then(createWindow).catch((error) => {
+  const ready = app.whenReady().then(async () => {
+    await createWindow();
+    const link = process.argv.find((value) => value.startsWith('rcap-desktop://'));
+    if (link) await completeDesktopLogin(link).catch((error) => authStatus('error', error.message));
+  });
+  ready.catch((error) => {
     console.error(error);
     dialog.showErrorBox('无法打开桌面工作台', error.message);
     app.quit();

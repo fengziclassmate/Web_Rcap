@@ -70,6 +70,7 @@ import {
   fromLogTagRow,
 } from "@/lib/log-mappers";
 import { supabase } from "@/lib/supabase";
+import { desktopLoginStateKey, loginErrorMessage } from "@/lib/desktop-auth";
 import { saveLogPost, deleteLogPost, retryLogImageCleanup } from "@/lib/log-mutations";
 import { toast } from "sonner";
 import { todayISO } from "@/lib/date-utils";
@@ -150,6 +151,8 @@ export function WorkbenchApp() {
   const focus = useFocusTimer(user?.id ?? "");
   const [authEmail, setAuthEmail] = useState("");
   const [sendingLink, setSendingLink] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [confirmDangerousActions, setConfirmDangerousActions] = useState(true);
   const weekRange = useMemo(() => {
@@ -337,16 +340,35 @@ export function WorkbenchApp() {
     let mounted = true;
 
     async function initAuth() {
-      const { data } = await supabase.auth.getSession();
-      if (!mounted) return;
-      setUser(data.session?.user ?? null);
-      setIsBooted(true);
+      const callback = new URL(window.location.href);
+      try {
+        const initialized = await supabase.auth.initialize();
+        const { data, error } = await supabase.auth.getSession();
+        if (!mounted) return;
+        const failure = initialized.error ?? error;
+        const message = failure ? loginErrorMessage(failure) : callback.searchParams.has("code") && !data.session ? "请在发送邮件的桌面版重新登录，并打开最新链接。" : null;
+        setUser(data.session?.user ?? null);
+        setAuthError(message);
+        window.rcapDesktopAuth?.report({ signedIn: Boolean(data.session), error: message });
+      } catch (error) {
+        if (!mounted) return;
+        const message = loginErrorMessage(error instanceof Error ? error : new Error("无法读取登录状态，请重试。"));
+        setAuthError(message);
+        window.rcapDesktopAuth?.report({ signedIn: false, error: message });
+      } finally {
+        if (mounted) setIsBooted(true);
+      }
     }
 
     initAuth();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
       setUser(session?.user ?? null);
+      if (event !== "INITIAL_SESSION") {
+        setAuthError(null);
+        window.rcapDesktopAuth?.report({ signedIn: Boolean(session), error: null });
+      }
     });
 
     return () => {
@@ -488,29 +510,23 @@ export function WorkbenchApp() {
   async function handleSendMagicLink() {
     if (!authEmail.trim()) return;
     setSendingLink(true);
-    const appUrl =
-      typeof process !== "undefined" && process.env.NEXT_PUBLIC_APP_URL
-        ? process.env.NEXT_PUBLIC_APP_URL
-        : undefined;
-    const redirectTo =
-      appUrl && appUrl.length > 0
-        ? appUrl
-        : typeof window !== "undefined"
-          ? window.location.origin
-          : undefined;
-
-    const { error } = await supabase.auth.signInWithOtp({
-      email: authEmail.trim(),
-      options: {
-        emailRedirectTo: redirectTo,
-      },
-    });
-    setSendingLink(false);
-    if (error) {
-      toast.error(`发送登录链接失败：${error.message}`);
-      return;
+    setAuthError(null);
+    setAuthMessage(null);
+    try {
+      const redirect = new URL(window.rcapDesktopAuth ? "/auth/desktop" : "/", window.location.origin);
+      if (window.rcapDesktopAuth) {
+        const state = crypto.randomUUID();
+        localStorage.setItem(desktopLoginStateKey, state);
+        redirect.searchParams.set("state", state);
+      }
+      const { error } = await supabase.auth.signInWithOtp({ email: authEmail.trim(), options: { emailRedirectTo: redirect.href } });
+      if (error) throw error;
+      setAuthMessage(window.rcapDesktopAuth ? "链接已发送，点击最新邮件中的链接后，选择打开桌面版完成登录。" : "登录链接已发送，请在邮箱中打开最新链接。");
+    } catch (error) {
+      setAuthError(loginErrorMessage(error instanceof Error ? error : new Error("无法发送登录链接，请重试。")));
+    } finally {
+      setSendingLink(false);
     }
-    toast.success("登录链接已发送，请检查邮箱。");
   }
 
   async function handleSignOut() {
@@ -1049,6 +1065,8 @@ export function WorkbenchApp() {
             <div className="mt-4 space-y-3">
               <Input
                 type="email"
+                aria-label="登录邮箱"
+                autoComplete="email"
                 value={authEmail}
                 onChange={(event) => setAuthEmail(event.target.value)}
                 placeholder="you@example.com"
@@ -1057,11 +1075,12 @@ export function WorkbenchApp() {
               <Button
                 type="button"
                 onClick={handleSendMagicLink}
-                disabled={sendingLink}
+                disabled={sendingLink || !authEmail.trim()}
                 className="w-full rounded-sm bg-black text-white hover:bg-black/90"
               >
                 {sendingLink ? "发送中..." : "发送登录链接"}
               </Button>
+              {authError ? <p role="alert" className="text-xs text-[#ce2c31]">{authError}</p> : authMessage ? <p role="status" className="text-xs text-[#646464]">{authMessage}</p> : null}
             </div>
           </section>
         </div>

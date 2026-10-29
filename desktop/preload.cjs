@@ -14,4 +14,5 @@ contextBridge.exposeInMainWorld('desktopControls', {
   show: () => ipcRenderer.invoke('desktop:show'),
   quit: () => ipcRenderer.invoke('desktop:quit'),
   onStatus: (callback) => { ipcRenderer.on('desktop:status', (_event, message) => callback(message)); },
+  onAuthStatus: (callback) => { ipcRenderer.on('desktop:auth-status', (_event, message) => callback(message)); },
 });

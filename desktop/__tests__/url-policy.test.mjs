@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { allowedNavigation, loginLink, workbenchUrl } from '../url-policy.mjs';
+import { allowedNavigation, desktopLoginCallback, loginLink, workbenchUrl } from '../url-policy.mjs';
 
 const app = 'https://web-rcap.vercel.app';
 const auth = 'https://eihdfjdqywmfnmhqojut.supabase.co';
 
 describe('desktop URL boundary', () => {
+  it('accepts only desktop authorization code callbacks, without session tokens', () => {
+    expect(desktopLoginCallback('rcap-desktop://auth?code=test-code&state=test-state', app)).toEqual({ code: 'test-code', state: 'test-state' });
+    expect(desktopLoginCallback(`${app}/auth/desktop?code=test-code&state=test-state`, app)).toEqual({ code: 'test-code', state: 'test-state' });
+    expect(() => desktopLoginCallback('rcap-desktop://other?code=test&state=test', app)).toThrow();
+    expect(() => desktopLoginCallback('rcap-desktop://auth#access_token=test', app)).toThrow();
+    expect(() => desktopLoginCallback('https://other.example/auth/desktop?code=test&state=test', app)).toThrow();
+  });
   it('accepts the configured HTTPS app and a local development server', () => {
     expect(workbenchUrl(app, undefined, true).origin).toBe(app);
     expect(workbenchUrl(app, 'http://127.0.0.1:3116', false).origin).toBe('http://127.0.0.1:3116');
