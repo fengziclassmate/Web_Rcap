@@ -99,6 +99,19 @@ export function getSplitTailSlot(granularity: SplitScheduleGranularity) {
     : { offsetMinutes: 45, durationMinutes: 15 };
 }
 
+export function migrateScheduleTemplates(saved: ScheduleTemplate[] | undefined, userId: string): ScheduleTemplate[] {
+  const key = `${scheduleTemplateStorageKey}:${userId}`;
+  const migrationKey = `${key}:cloud-migrated`;
+  const cloud = normalizeScheduleTemplates(saved);
+  if (localStorage.getItem(migrationKey) === "1") return cloud;
+  const raw = localStorage.getItem(key);
+  const local = raw ? normalizeScheduleTemplates(JSON.parse(raw)) : [];
+  const ids = new Set(cloud.map((template) => template.id));
+  const result = [...cloud, ...local.filter((template) => !ids.has(template.id))];
+  localStorage.setItem(migrationKey, "1");
+  return result;
+}
+
 export function buildSplitTailPlacements({
   dates,
   weekdays,

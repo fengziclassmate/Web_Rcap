@@ -70,6 +70,7 @@ import {
   fromLogTagRow,
 } from "@/lib/log-mappers";
 import { supabase } from "@/lib/supabase";
+import { migrateScheduleTemplates } from "@/lib/schedule-templates";
 import { desktopLoginStateKey, loginErrorMessage } from "@/lib/desktop-auth";
 import { saveLogPost, deleteLogPost, retryLogImageCleanup } from "@/lib/log-mutations";
 import { toast } from "sonner";
@@ -203,6 +204,12 @@ export function WorkbenchApp() {
   }, [user?.id, setEvents, setProjectBoards]);
   const sync = useScheduleSync(user?.id ?? null, persistedPayload, hydrateSchedule);
   const dataReady = sync.ready;
+  const templateOwner = user?.id;
+  useEffect(() => {
+    if (!dataReady || !templateOwner) return;
+    const templates = migrateScheduleTemplates(dashboardUiPreferences.scheduleTemplates, templateOwner);
+    setDashboardUiPreferences((previous) => JSON.stringify(previous.scheduleTemplates) === JSON.stringify(templates) ? previous : { ...previous, scheduleTemplates: templates });
+  }, [dataReady, templateOwner, dashboardUiPreferences.scheduleTemplates]);
   const currentUserId = useRef<string | null>(null);
   useEffect(() => { currentUserId.current = user?.id ?? null; }, [user?.id]);
 
@@ -1186,6 +1193,8 @@ export function WorkbenchApp() {
                   openEventRequest={openEventRequest}
                   onOpenRequestHandled={() => setOpenEventRequest(undefined)}
                   savedCategoryDefs={dashboardUiPreferences.categoryDefs}
+                  savedScheduleTemplates={dashboardUiPreferences.scheduleTemplates}
+                  onScheduleTemplatesChange={(scheduleTemplates) => setDashboardUiPreferences((previous) => ({ ...previous, scheduleTemplates }))}
                   onCategoryDefsChange={(categoryDefs) => setDashboardUiPreferences((previous) => ({ ...previous, categoryDefs }))}
                   currentWeekStart={currentWeekStart}
                   weekRange={displayRangeLabel}

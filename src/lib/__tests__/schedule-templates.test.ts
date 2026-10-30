@@ -3,9 +3,33 @@ import {
   buildSplitTailPlacements,
   getSplitTailSlot,
   normalizeScheduleTemplates,
+  migrateScheduleTemplates,
 } from "../schedule-templates";
+import { normalizePersistedSchedulePayload } from "../schedule-persistence";
+import { mergeScheduleChanges } from "../schedule-merge";
 
 describe("schedule templates", () => {
+  it("imports account-local templates once without resurrecting deleted cloud templates", () => {
+    localStorage.clear();
+    const local = normalizeScheduleTemplates([{ id: "local", title: "本地模板", notes: "地点", requirements: ["材料"], tag: "深度专注" }]);
+    localStorage.setItem("schedule-event-templates-v1:owner", JSON.stringify(local));
+    const migrated = migrateScheduleTemplates(undefined, "owner");
+    expect(migrated.map((item) => item.title)).toEqual(["休息", "本地模板"]);
+    expect(migrateScheduleTemplates([], "owner")).toEqual([]);
+    expect(migrateScheduleTemplates(undefined, "another").map((item) => item.title)).toEqual(["休息"]);
+  });
+  it("retains template content/order in the sync payload and merges additions from two devices", () => {
+    const base = normalizePersistedSchedulePayload({})!;
+    const first = normalizeScheduleTemplates([{ id: "a", title: "科研", notes: "地点", requirements: ["材料"] }])[0];
+    const second = { ...first, id: "b", title: "读书" };
+    const local = normalizePersistedSchedulePayload({ ...base, ui_preferences: { ...base.ui_preferences, scheduleTemplates: [first, ...base.ui_preferences.scheduleTemplates!] } })!;
+    const remote = normalizePersistedSchedulePayload({ ...base, ui_preferences: { ...base.ui_preferences, scheduleTemplates: [...base.ui_preferences.scheduleTemplates!, second] } })!;
+    const result = mergeScheduleChanges(base, local, remote);
+    expect(result.conflicts).toEqual([]);
+    expect(result.value.ui_preferences.scheduleTemplates).toContainEqual(first);
+    expect(result.value.ui_preferences.scheduleTemplates).toContainEqual(second);
+    expect(normalizePersistedSchedulePayload(JSON.parse(JSON.stringify(local)))!.ui_preferences.scheduleTemplates?.[0]).toEqual(first);
+  });
   it("retains lifestyle tags when loading saved templates", () => {
     const tags = ["深度专注", "充电一下", "小挑战", "期待已久", "顺路办", "一起完成"];
     expect(normalizeScheduleTemplates(tags.map((tag) => ({ title: "活动", tag }))).map((template) => template.tag)).toEqual(tags);

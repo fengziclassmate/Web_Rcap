@@ -208,6 +208,8 @@ type WeeklyTimeGridProps = {
   onOpenProjectTask?: (link: ProjectTaskLink) => void;
   logSaving?: boolean;
   toolbarContent?: React.ReactNode;
+  savedScheduleTemplates?: ScheduleTemplate[];
+  onScheduleTemplatesChange?: (templates: ScheduleTemplate[]) => void;
   viewMode?: ViewMode;
   timeGranularity?: TimeGranularity;
 };
@@ -535,6 +537,8 @@ export function WeeklyTimeGrid({
   onOpenProjectTask,
   logSaving = false,
   toolbarContent,
+  savedScheduleTemplates,
+  onScheduleTemplatesChange,
   viewMode = "week",
   timeGranularity = 60,
 }: WeeklyTimeGridProps) {
@@ -575,9 +579,15 @@ export function WeeklyTimeGrid({
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [returnToCreateAfterTemplate, setReturnToCreateAfterTemplate] = useState(false);
-  const [scheduleTemplates, setScheduleTemplates] = useState<ScheduleTemplate[]>(() =>
+  const [localScheduleTemplates, setLocalScheduleTemplates] = useState<ScheduleTemplate[]>(() =>
     loadScheduleTemplates(userId),
   );
+  const scheduleTemplates = savedScheduleTemplates ?? localScheduleTemplates;
+  function setScheduleTemplates(update: ScheduleTemplate[] | ((previous: ScheduleTemplate[]) => ScheduleTemplate[])) {
+    const next = typeof update === "function" ? update(scheduleTemplates) : update;
+    if (onScheduleTemplatesChange) onScheduleTemplatesChange(next);
+    else setLocalScheduleTemplates(next);
+  }
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [templateForm, setTemplateForm] = useState({
     title: "",
@@ -664,8 +674,9 @@ export function WeeklyTimeGrid({
   }, [categoryDefs, userId]);
 
   useEffect(() => {
+    if (savedScheduleTemplates !== undefined) return;
     saveScheduleTemplates(scheduleTemplates, userId);
-  }, [scheduleTemplates, userId]);
+  }, [scheduleTemplates, userId, savedScheduleTemplates]);
 
   const displayDates = useMemo(() => {
     if (viewMode === "day") return [currentWeekStart];
@@ -2573,7 +2584,6 @@ export function WeeklyTimeGrid({
                             aria-label={`快捷填写：${template.title}`}
                             title={template.title}
                           >
-                            {template.category === "休息" ? <Coffee className="h-3 w-3" aria-hidden /> : null}
                             <span className="min-w-0 truncate">{template.title}</span>
                           </Button>
                         ))}

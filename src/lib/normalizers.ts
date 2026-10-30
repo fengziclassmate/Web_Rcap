@@ -1,4 +1,5 @@
 import { normalizeEventTag } from "@/lib/event-tags";
+import { normalizeScheduleTemplates } from "./schedule-templates";
 import { normalizeProjectTaskLink } from "./project-schedule";
 import { getScheduleEventDurationHour } from "./schedule-layout";
 import { defaultDashboardSectionOrder, normalizeDashboardSectionOrder } from "@/lib/dashboard-sections";
@@ -31,6 +32,7 @@ export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   followUpSectionOpen: true,
   capacityStartHour: 9,
   capacityEndHour: 22,
+  scheduleTemplates: normalizeScheduleTemplates(undefined),
   timeGranularity: 60,
   dailyTaskSortMode: "time",
   annualSectionOpen: false,
@@ -297,6 +299,7 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
     capacityStartHour,
     capacityEndHour: Number.isInteger(value.capacityEndHour) && value.capacityEndHour! > capacityStartHour && value.capacityEndHour! <= 24 ? value.capacityEndHour : Math.max(22, capacityStartHour + 1),
     ...(Array.isArray(value.categoryDefs) ? { categoryDefs: normalizeCategoryDefList(value.categoryDefs) } : {}),
+    scheduleTemplates: normalizeScheduleTemplates(value.scheduleTemplates),
     timeGranularity: validTimeGranularities.has(value.timeGranularity as DashboardUiPreferences["timeGranularity"])
       ? value.timeGranularity as DashboardUiPreferences["timeGranularity"]
       : 60,

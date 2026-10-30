@@ -141,6 +141,7 @@ export type FootprintItem = {
 };
 
 export type DashboardUiPreferences = {
+  scheduleTemplates?: import("./schedule-templates").ScheduleTemplate[];
   dashboardSectionOrder?: import("./dashboard-sections").DashboardSectionId[];
   projectBoardsSectionOpen?: boolean;
   projectWorkspaceExpandedTasks?: string[];
