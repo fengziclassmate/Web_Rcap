@@ -12,9 +12,12 @@
     <span class="title">研究手札</span>
     <span id="control-error" role="alert" hidden></span>
     <div class="controls">
-      <label for="opacity">背景不透明度</label>
-      <input id="opacity" type="range" min="60" max="100" step="5" value="85">
+      <label for="opacity" title="背景不透明度">背景</label>
+      <input id="opacity" aria-label="背景不透明度" type="range" min="20" max="100" step="5" value="85">
       <output for="opacity" id="opacity-value">85%</output>
+      <label for="card-opacity" title="卡片不透明度">卡片</label>
+      <input id="card-opacity" aria-label="卡片不透明度" type="range" min="20" max="100" step="5" value="85">
+      <output for="card-opacity" id="card-opacity-value">85%</output>
       <button id="fit" type="button">适应桌面</button>
       <button id="login" type="button">粘贴登录链接</button>
       <button id="browser" type="button">网页登录</button>

@@ -141,6 +141,8 @@ export type FootprintItem = {
 };
 
 export type DashboardUiPreferences = {
+  taskConsoleCollapsed: boolean;
+  confirmDangerousActions: boolean;
   scheduleTemplates?: import("./schedule-templates").ScheduleTemplate[];
   dashboardSectionOrder?: import("./dashboard-sections").DashboardSectionId[];
   projectBoardsSectionOpen?: boolean;

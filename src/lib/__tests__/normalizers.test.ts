@@ -169,6 +169,8 @@ describe("normalizers", () => {
   });
 
   it("normalizes dashboard preferences safely", () => {
+    expect(normalizeDashboardUiPreferences({ taskConsoleCollapsed: true, confirmDangerousActions: false })).toMatchObject({ taskConsoleCollapsed: true, confirmDangerousActions: false });
+    expect(normalizeDashboardUiPreferences({ taskConsoleCollapsed: "true", confirmDangerousActions: null })).toMatchObject({ taskConsoleCollapsed: false, confirmDangerousActions: true });
     expect(normalizeDashboardUiPreferences({
       timeGranularity: "45-15",
       dailyTaskSortMode: "custom",

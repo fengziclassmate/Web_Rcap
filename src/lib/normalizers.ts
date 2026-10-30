@@ -25,6 +25,8 @@ import type { Achievement } from "@/lib/achievements";
 import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/categories";
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
+  taskConsoleCollapsed: false,
+  confirmDangerousActions: true,
   dashboardSectionOrder: defaultDashboardSectionOrder,
   projectBoardsSectionOpen: true,
   projectWorkspaceExpandedTasks: [],
@@ -289,6 +291,8 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
   const utilityPanels = (["projectSectionOpen", "routineCheckinSectionOpen", "achievementSectionOpen", "footprintSectionOpen"] as const).filter((key) => value[key] === true);
   const capacityStartHour = Number.isInteger(value.capacityStartHour) && value.capacityStartHour! >= 0 && value.capacityStartHour! < 24 ? value.capacityStartHour! : 9;
   return {
+    taskConsoleCollapsed: value.taskConsoleCollapsed === true,
+    confirmDangerousActions: value.confirmDangerousActions !== false,
     dashboardSectionOrder: normalizeDashboardSectionOrder(value.dashboardSectionOrder),
     projectBoardsSectionOpen: value.projectBoardsSectionOpen !== false,
     projectWorkspaceExpandedTasks: Array.isArray(value.projectWorkspaceExpandedTasks)

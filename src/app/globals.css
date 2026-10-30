@@ -1649,3 +1649,50 @@
     scroll-behavior: auto !important;
   }
 }
+/* Radix Gray and Jade chrome; category colours carry the schedule. */
+.workbench-header { min-width: 0; border: 0.5px solid #d9d9d9; border-radius: 8px; background: #fcfcfc; color: #202020; }
+.workbench-header-main { display: flex; align-items: center; gap: 20px; min-height: 48px; padding: 8px 12px; }
+.workbench-brand { display: flex; flex-shrink: 0; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; }
+.workbench-brand > svg { color: #208368; }
+.workbench-navigation { display: flex; align-items: center; gap: 4px; }
+.workbench-nav-item { display: inline-flex; height: 32px; align-items: center; gap: 6px; padding: 0 10px; border-radius: 4px; color: #646464; font-size: 14px; white-space: nowrap; }
+.workbench-nav-item:hover, .workbench-nav-item.is-active { background: #f0f0f0; color: #202020; }
+.workbench-nav-item.is-active { font-weight: 600; }
+.workbench-header-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.workbench-header-actions > button { border-width: 0.5px; box-shadow: none; }
+.workbench-header-secondary { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 0.5px solid #e8e8e8; padding: 4px 12px; }
+.workbench-header-secondary .workbench-reminder { max-width: 520px; height: 28px; padding: 0; border-color: transparent; border-radius: 4px; box-shadow: none; background: transparent; font-size: 12px; }
+.workbench-header-secondary [role=status] { flex-shrink: 0; max-width: 65%; padding: 0; color: #646464; }
+.workbench-settings { width: min(300px, calc(100vw - 24px)); max-height: var(--available-height); overflow-y: auto; padding: 12px; border: 0.5px solid #d9d9d9; border-radius: 8px; background: #fcfcfc; color: #202020; }
+.workbench-tool-list { display: grid; gap: 4px; margin: 10px 0; }
+.workbench-tool-list > button { width: 100%; justify-content: flex-start; border: none; border-radius: 4px; background: transparent; box-shadow: none; font-size: 14px; }
+.workbench-tool-list > button:hover { background: #f0f0f0; }
+.workbench-account { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 0.5px solid #e8e8e8; padding-top: 8px; font-size: 12px; }
+.workbench-account > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #646464; }
+.schedule-workspace { display: grid; grid-template-columns: minmax(0,1fr) minmax(340px,380px); gap: 12px; align-items: start; }
+.schedule-workspace[data-console-collapsed=true] { grid-template-columns: minmax(0,1fr) 40px; }
+.schedule-workspace > section { min-width: 0; }
+.workbench-task-sidebar { align-self: stretch; }
+.task-console .dashboard-layout-toolbar[data-arranging=false] { right: 52px; }
+.task-console-rail { position: sticky; top: 12px; display: flex; width: 40px; min-height: 148px; flex-direction: column; align-items: center; gap: 12px; padding: 12px 8px; border: 0.5px solid #d9d9d9; border-radius: 6px; background: #fcfcfc; color: #646464; font-size: 12px; }
+.task-console-rail > span { writing-mode: vertical-rl; letter-spacing: 2px; }
+.task-console-rail:hover { background: #f0f0f0; color: #202020; }
+.workbench-header button:focus-visible, .task-console-rail:focus-visible { outline: 2px solid #208368; outline-offset: 2px; }
+@media (max-width: 1000px) {
+  .schedule-workspace { grid-template-columns: minmax(0,1fr) minmax(280px,320px); }
+  .workbench-header-main { gap: 12px; }
+  .workbench-header-actions kbd { display: none; }
+}
+@media (max-width: 760px) {
+  .workbench-content { padding-inline: 8px; }
+  .workbench-header-main { flex-wrap: wrap; gap: 8px; padding: 8px; }
+  .workbench-brand { width: 100%; font-size: 14px; }
+  .workbench-navigation { gap: 0; }
+  .workbench-nav-item { gap: 4px; padding-inline: 6px; font-size: 12px; }
+  .workbench-header-actions > button:first-child { font-size: 12px; padding-inline: 6px; }
+  .workbench-header-secondary { flex-wrap: wrap; gap: 4px; padding: 4px 8px; }
+  .workbench-header-secondary [role=status] { max-width: 100%; }
+  .schedule-workspace, .schedule-workspace[data-console-collapsed=true] { grid-template-columns: minmax(0,1fr); }
+  .task-console-rail { width: 100%; min-height: 36px; flex-direction: row; justify-content: center; padding: 6px 8px; }
+  .task-console-rail > span { writing-mode: horizontal-tb; letter-spacing: 0; }
+}

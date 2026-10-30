@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { Popover } from "@base-ui/react/popover";
 import { AccountScope } from "@/components/account-scope";
-import { Check, CloudOff, Loader2, RefreshCw, Undo2, Redo2 } from "lucide-react";
+import { Check, CloudOff, Loader2, RefreshCw, Undo2, Redo2, Settings2, PanelRightOpen } from "lucide-react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { GlobalSearch, type SearchResult } from "@/components/schedule/global-search";
 import { ExecutionPanel } from "@/components/schedule/execution-panel";
@@ -155,7 +156,7 @@ export function WorkbenchApp() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [confirmDangerousActions, setConfirmDangerousActions] = useState(true);
+  const { confirmDangerousActions, taskConsoleCollapsed } = dashboardUiPreferences;
   const weekRange = useMemo(() => {
     const start = format(currentWeekStart, "yyyy/MM/dd", { locale: zhCN });
     const end = format(addDays(currentWeekStart, 6), "yyyy/MM/dd", { locale: zhCN });
@@ -232,6 +233,7 @@ export function WorkbenchApp() {
       setActiveModule("schedule");
     } else if (result.task) {
       setActiveModule("schedule");
+      setDashboardUiPreferences((previous) => ({ ...previous, taskConsoleCollapsed: false }));
       setOpenTaskRequest({ id: result.id, token });
     } else if (result.event) {
       const event = result.event;
@@ -244,6 +246,7 @@ export function WorkbenchApp() {
       setActiveModule("schedule");
       const kind = result.collection;
       setDashboardUiPreferences((previous) => ({ ...previous,
+        taskConsoleCollapsed: false,
         ...(kind === "annual" ? { annualSectionOpen: true, longTaskSectionOpen: false, shoppingSectionOpen: false } : {}),
         ...(kind === "shopping" ? { shoppingSectionOpen: true, annualSectionOpen: false, longTaskSectionOpen: false } : {}),
         ...(kind === "project" ? { projectSectionOpen: true, routineCheckinSectionOpen: false, achievementSectionOpen: false, footprintSectionOpen: false, expandedProjects: [...new Set([...previous.expandedProjects, result.id])] } : {}),
@@ -299,7 +302,7 @@ export function WorkbenchApp() {
   function startTaskFocus(target: FocusTarget) {
     if (focus.state.active) toast.info("当前专注尚未结束");
     else if (!focus.start({ ...target, goalMinutes: 25 })) return;
-    setDashboardUiPreferences((previous) => ({ ...previous, executionSectionOpen: true }));
+    setDashboardUiPreferences((previous) => ({ ...previous, executionSectionOpen: true, taskConsoleCollapsed: false }));
     setActiveModule("schedule");
     setOpenBoardRequest(undefined);
     requestAnimationFrame(() => document.querySelector('[aria-label="时间与专注"]')?.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" }));
@@ -1146,25 +1149,30 @@ export function WorkbenchApp() {
       weekView: () => { setActiveModule("schedule"); handleViewModeChange("week"); },
       monthView: () => { setActiveModule("schedule"); handleViewModeChange("month"); },
       newEvent: () => { setActiveModule("schedule"); setCreateRequest("event"); },
-      newTask: () => { setActiveModule("schedule"); setCreateRequest("task"); },
+      newTask: () => { setActiveModule("schedule"); setDashboardUiPreferences((previous) => ({ ...previous, taskConsoleCollapsed: false })); setCreateRequest("task"); },
     }}>
     <main data-workbench className={`${shellClass} pb-4`}>
-      <div className="relative z-10 mx-auto flex max-w-[1880px] flex-wrap items-center justify-between gap-3 px-5 pt-4">
-        <div className="flex min-w-0 items-center gap-4">
-        <div className="min-w-0 px-1 py-1">
-          <p className="truncate text-[11px] tracking-wide text-stone-500">当前账号</p>
-          <p className="mt-0.5 min-w-0 truncate text-sm font-medium text-stone-900">{user.email}</p>
-        </div>
+      <div className="workbench-content relative z-10 mx-auto flex max-w-[1880px] flex-col gap-3 px-4 py-3">
+        <MonitoringSidebar active={activeModule} onChange={setActiveModule}
+          status={(
         <div role="status" aria-live="polite" className={`flex flex-wrap items-center gap-2 rounded-xl px-2 py-1 text-xs ${["error", "offline", "conflict"].includes(sync.status) ? "border border-amber-200 bg-amber-50 text-amber-900" : "text-stone-500"}`}>
           {sync.status === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : sync.status === "saved" ? <Check className="size-3.5 text-emerald-700" /> : <CloudOff className="size-3.5" />}
           <span>{sync.message || ({ loading: "正在读取日程…", saved: "已同步到云端", pending: "已保存在本机，等待同步…", saving: "正在同步…", offline: "离线修改已保存在本机", error: "同步失败", conflict: "需要处理同步冲突" })[sync.status]}</span>
           {["error", "offline"].includes(sync.status) && <Button variant="ghost" size="xs" onClick={() => void sync.retry()}><RefreshCw />重试同步</Button>}
           {sync.status === "conflict" && <><Button variant="outline" size="xs" onClick={() => sync.resolve("local")}>冲突处保留本机</Button><Button variant="outline" size="xs" onClick={() => sync.resolve("remote")}>冲突处保留云端</Button></>}
         </div>
-        </div>
-        <div className="flex items-center gap-2">
+          )}
+          actions={(
+            <>
           <GlobalSearch events={events} tasks={tasks} logs={logPosts} annualTasks={annualTasks} projects={projectCheckins} shopping={shoppingItems} boards={projectBoards} logsReady={logReady} onLocate={locateSearchResult} />
           <HistoryButtons history={history} />
+          <Popover.Root>
+            <Popover.Trigger render={<Button variant="ghost" size="icon-sm" aria-label="工作台设置" title="工作台设置" />}><Settings2 /></Popover.Trigger>
+            <Popover.Portal keepMounted>
+              <Popover.Positioner side="bottom" align="end" sideOffset={8} className="z-[100]">
+                <Popover.Popup className="workbench-settings">
+                  <Popover.Title className="text-sm font-semibold">工作台设置</Popover.Title>
+                  <div className="workbench-tool-list">
           <ShortcutSettings />
           <WeeklyReportDialog
             currentWeekStart={currentWeekStart}
@@ -1183,29 +1191,34 @@ export function WorkbenchApp() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => setConfirmDangerousActions((prev) => !prev)}
-            className="shrink-0 rounded-xl border-stone-200/80 bg-white/65 text-stone-700 shadow-sm backdrop-blur hover:bg-white"
+            onClick={() => setDashboardUiPreferences((previous) => ({ ...previous, confirmDangerousActions: !previous.confirmDangerousActions }))}
+            className="justify-start"
           >
             任务删除确认：{confirmDangerousActions ? "开" : "关"}
           </Button>
+                  </div>
+                  <div className="workbench-account"><span title={user.email}>{user.email}</span>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={handleSignOut}
-            className="shrink-0 rounded-xl border-stone-200/80 bg-white/65 text-stone-700 shadow-sm backdrop-blur hover:bg-white"
+            className="justify-start"
           >
             退出登录
           </Button>
-        </div>
-      </div>
-
-      <div className="relative z-10 mx-auto flex max-w-[1880px] flex-col gap-4 px-4 py-3">
-        <MonitoringSidebar active={activeModule} onChange={setActiveModule} />
+                  </div>
+                </Popover.Popup>
+              </Popover.Positioner>
+            </Popover.Portal>
+          </Popover.Root>
+            </>
+          )}
+        />
 
         <div key={activeModule} className="workbench-module min-h-0 w-full">
           {activeModule === "schedule" ? (
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(340px,380px)] gap-4">
+            <div className="schedule-workspace" data-console-collapsed={taskConsoleCollapsed}>
               <section className="min-h-0">
                 <WeeklyTimeGrid
                   createRequested={createRequest === "event"}
@@ -1246,8 +1259,11 @@ export function WorkbenchApp() {
                   timeGranularity={timeGranularity}
                 />
               </section>
-              <section className="min-h-0 space-y-4">
+              <section className="workbench-task-sidebar min-h-0">
+                {taskConsoleCollapsed && <button type="button" className="task-console-rail" aria-label="展开任务控制台" aria-expanded={false} aria-controls="workbench-task-console" title="展开任务控制台" onClick={() => setDashboardUiPreferences((previous) => ({ ...previous, taskConsoleCollapsed: false }))}><PanelRightOpen className="size-4" aria-hidden /><span>任务控制台</span></button>}
+                <div id="workbench-task-console" hidden={taskConsoleCollapsed}>
                 <TaskDashboard
+                  onCollapse={() => setDashboardUiPreferences((previous) => ({ ...previous, taskConsoleCollapsed: true }))}
                   createRequested={createRequest === "task"}
                   onCreateRequestHandled={() => setCreateRequest(null)}
                   projectBoardsPanel={(
@@ -1309,6 +1325,7 @@ export function WorkbenchApp() {
                   uiPreferences={dashboardUiPreferences}
                   onUiPreferencesChange={setDashboardUiPreferences}
                 />
+                </div>
               </section>
             </div>
           ) : (
@@ -1358,6 +1375,7 @@ export function WorkbenchApp() {
         }}
         onOpenTask={(task) => {
           setActiveModule("schedule");
+          setDashboardUiPreferences((previous) => ({ ...previous, taskConsoleCollapsed: false }));
           setOpenTaskRequest({ id: task.id, token: Date.now() });
         }}
         onToggleTask={handleToggleTask}

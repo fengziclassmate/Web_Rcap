@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('desktopControls', {
   setBounds: (bounds) => ipcRenderer.invoke('desktop:setBounds', bounds),
   fit: () => ipcRenderer.invoke('desktop:fit'),
   setOpacity: (value) => ipcRenderer.invoke('desktop:opacity', value),
+  setCardOpacity: (value) => ipcRenderer.invoke('desktop:cardOpacity', value),
   openBrowser: () => ipcRenderer.invoke('desktop:browser'),
   pasteLogin: () => ipcRenderer.invoke('desktop:login'),
   retry: () => ipcRenderer.invoke('desktop:retry'),

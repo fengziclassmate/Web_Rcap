@@ -40,7 +40,7 @@ export function ShortcutProvider({ userId, handlers = {}, children }: { userId: 
     if (event.defaultPrevented || event.repeat || event.isComposing || event.getModifierState("AltGraph")) return;
     const target = event.target;
     if (target instanceof Element && target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]')) return;
-    if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return;
+    if (Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')).some((element) => !element.closest('[data-closed], [hidden]'))) return;
     const binding = shortcutFromEvent(event);
     const action = shortcutDefinitions.find(({ id }) => bindings[id] === binding && binding !== null)?.id;
     if (!action) return;

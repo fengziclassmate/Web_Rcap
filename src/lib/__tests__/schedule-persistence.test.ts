@@ -16,6 +16,8 @@ describe("schedule UI preference persistence", () => {
   it("restores time granularity and every task dashboard expansion state", () => {
     const preferences = {
       ...defaultDashboardUiPreferences,
+      taskConsoleCollapsed: true,
+      confirmDangerousActions: false,
       timeGranularity: "50-10" as const,
       annualSectionOpen: false,
       shoppingSectionOpen: false,

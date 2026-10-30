@@ -431,7 +431,7 @@ export function resolveCategoryVisual(def: Pick<ScheduleCategoryDef, "name" | "c
 
 export function categoryCardStyle(hex: string) {
   return {
-    backgroundColor: `color-mix(in srgb, ${hex} 32%, white)`,
+    backgroundColor: `color-mix(in srgb, color-mix(in srgb, ${hex} 32%, white) var(--schedule-card-opacity, 100%), transparent)`,
     borderColor: `color-mix(in srgb, ${hex} 72%, white)`,
     color: `color-mix(in srgb, ${hex} 28%, black)`,
   };

@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   GripVertical,
   Pencil,
+  PanelRightClose,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ import type { LogComposerInput, LogPostRecord } from "@/lib/logs";
 import { cn } from "@/lib/utils";
 
 type TaskDashboardProps = {
+  onCollapse?: () => void;
   createRequested?: boolean;
   onCreateRequestHandled?: () => void;
   projectBoardsPanel?: React.ReactNode;
@@ -306,6 +308,7 @@ function isValidTime(value: string) {
 }
 
 export function TaskDashboard({
+  onCollapse,
   createRequested,
   onCreateRequestHandled,
   projectBoardsPanel,
@@ -1161,11 +1164,12 @@ export function TaskDashboard({
 
   return (
     <aside className="module-shell task-console">
-      <div className="module-header px-6 py-5">
+      <div className="module-header flex items-center justify-between gap-2 px-4 py-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-stone-900">
           <ListTodo className="h-5 w-5 text-primary" />
           任务控制台
         </h2>
+        {onCollapse && <Button type="button" variant="ghost" size="icon-sm" onClick={onCollapse} aria-label="收起任务控制台" aria-expanded={true} aria-controls="workbench-task-console" title="收起任务控制台"><PanelRightClose /></Button>}
       </div>
 
 

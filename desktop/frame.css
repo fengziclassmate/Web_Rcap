@@ -24,3 +24,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid #0090ff; outline-
 #control-error[data-kind="pending"], #control-error[data-kind="idle"] { color: #646464; }
 #load-error:not([hidden]) { position: absolute; inset: 36px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fcfcfc; }
 #error-message { max-width: 60ch; color: #646464; line-height: 1.6; }
+.controls label { white-space: nowrap; }
+.controls input { width: 64px; }
+@media (max-width: 1050px) {
+  header { gap: 8px; padding-inline: 8px; }
+  .controls { gap: 4px; }
+  .controls input { width: 48px; }
+  #login { display: none; }
+}

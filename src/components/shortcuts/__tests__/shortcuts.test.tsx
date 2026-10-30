@@ -19,6 +19,15 @@ beforeEach(() => localStorage.clear());
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("workspace shortcuts", () => {
+  it("keeps shortcuts available when a mounted settings popover is closed", () => {
+    const onSearch = vi.fn();
+    const { rerender } = render(<ShortcutProvider userId="account" handlers={{ search: onSearch }}><div role="dialog" data-closed="" /></ShortcutProvider>);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    expect(onSearch).toHaveBeenCalledOnce();
+    rerender(<ShortcutProvider userId="account" handlers={{ search: onSearch }}><div role="dialog" /></ShortcutProvider>);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    expect(onSearch).toHaveBeenCalledOnce();
+  });
   it("uses remapped keys, exact modifiers and the latest handler without duplicate listeners", () => {
     localStorage.setItem(storageKey, JSON.stringify({ search: "Mod+Shift+KeyJ" }));
     const first = vi.fn(), latest = vi.fn();

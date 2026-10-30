@@ -21,6 +21,7 @@ let view;
 let tray;
 let quitting = false;
 let opacity = 85;
+let cardOpacity = 85;
 let themeReady = false;
 let desktopBounds;
 let layer;
@@ -100,7 +101,7 @@ async function startBrowserLogin() {
 
 async function updateOpacity() {
   if (!themeReady) return;
-  await view.webContents.executeJavaScriptInIsolatedWorld(1, [{ code: `document.documentElement.style.setProperty('--desktop-opacity', '${opacity}%')` }]);
+  await view.webContents.executeJavaScriptInIsolatedWorld(1, [{ code: `document.documentElement.style.setProperty('--desktop-opacity', '${opacity}%'); document.documentElement.style.setProperty('--schedule-card-opacity', '${cardOpacity}%')` }]);
 }
 
 async function load(url = target.href) {
@@ -230,8 +231,13 @@ async function createWindow() {
       saveBounds();
     },
     opacity: async (value) => {
-      if (!Number.isFinite(value) || value < 60 || value > 100) throw new Error('背景不透明度须在 60% 到 100% 之间。');
+      if (!Number.isFinite(value) || value < 20 || value > 100) throw new Error('背景不透明度须在 20% 到 100% 之间。');
       opacity = value;
+      await updateOpacity();
+    },
+    cardOpacity: async (value) => {
+      if (!Number.isFinite(value) || value < 20 || value > 100) throw new Error('卡片不透明度须在 20% 到 100% 之间。');
+      cardOpacity = value;
       await updateOpacity();
     },
     browser: startBrowserLogin,

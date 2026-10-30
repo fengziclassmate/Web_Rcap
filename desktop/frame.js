@@ -25,6 +25,18 @@ function applyOpacity() {
 opacity.addEventListener('input', applyOpacity);
 applyOpacity();
 
+const cardOpacity = document.getElementById('card-opacity');
+const cardValue = document.getElementById('card-opacity-value');
+cardOpacity.value = localStorage.getItem('card-opacity') ?? '85';
+function applyCardOpacity() {
+  cardValue.textContent = `${cardOpacity.value}%`;
+  window.desktopControls.setCardOpacity(Number(cardOpacity.value)).then(() => {
+    localStorage.setItem('card-opacity', cardOpacity.value);
+  }).catch(showError);
+}
+cardOpacity.addEventListener('input', applyCardOpacity);
+applyCardOpacity();
+
 document.getElementById('login').addEventListener('click', () => window.desktopControls.pasteLogin().catch(showError));
 document.getElementById('browser').addEventListener('click', () => window.desktopControls.openBrowser().catch(showError));
 document.getElementById('hide').addEventListener('click', () => window.desktopControls.hide().catch(showError));
