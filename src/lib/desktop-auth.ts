@@ -2,7 +2,11 @@ export const desktopLoginStateKey = "rcap-desktop-login-state";
 
 declare global {
   interface Window {
-    rcapDesktopAuth?: { report: (state: { signedIn: boolean; error: string | null }) => void };
+    rcapDesktopAuth?: {
+      report: (state: { signedIn: boolean; error: string | null }) => void;
+      openBrowserLogin?: () => Promise<void>;
+      onAuthorization?: (callback: (token: string) => void) => () => void;
+    };
   }
 }
 

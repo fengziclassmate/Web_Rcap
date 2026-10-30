@@ -5,17 +5,16 @@ import { fileURLToPath } from 'node:url';
 import { allowedNavigation, desktopLoginCallback, loginLink, workbenchUrl } from './url-policy.mjs';
 import { connectDesktop } from './native-layer.mjs';
 import { clampWindowBounds } from './window-geometry.mjs';
+import { createBrowserLogin, receiveBrowserLogin } from './browser-login.mjs';
 
 const folder = path.dirname(fileURLToPath(import.meta.url));
 const config = JSON.parse(readFileSync(path.join(folder, 'app-config.json'), 'utf8'));
 const argument = (name) => process.argv.find((item) => item.startsWith(`--${name}=`))?.slice(name.length + 3);
 const target = workbenchUrl(config.url, argument('url'), app.isPackaged);
 app.setName('RCAP Desktop');
-if (argument('data-dir')) {
-  const dataDir = path.resolve(argument('data-dir'));
-  mkdirSync(dataDir, { recursive: true });
-  app.setPath('userData', dataDir);
-}
+const dataDir = path.resolve(argument('data-dir') ?? path.join(app.getPath('appData'), 'RCAP Desktop'));
+mkdirSync(dataDir, { recursive: true });
+app.setPath('userData', dataDir);
 
 let window;
 let view;
@@ -28,6 +27,9 @@ let layer;
 let saveBoundsTimer;
 let completingLogin = false;
 let authFeedbackKind = 'idle';
+let browserLogin;
+let pendingAuthorization;
+let authPageReady = false;
 const boundsFile = path.join(app.getPath('userData'), 'window-bounds.json');
 const theme = readFileSync(path.join(folder, 'theme.css'), 'utf8');
 
@@ -61,6 +63,22 @@ function authStatus(kind, message) {
 }
 
 async function completeDesktopLogin(link) {
+  if (new URL(link).hostname === 'authorize') {
+    pendingAuthorization = receiveBrowserLogin(browserLogin, link);
+    browserLogin = null;
+    completingLogin = true;
+    showWindow();
+    if (authPageReady) {
+      authStatus('pending', '正在恢复桌面登录…');
+      view.webContents.send('desktop:authorize-token', pendingAuthorization);
+      pendingAuthorization = null;
+    } else {
+      const loading = load();
+      authStatus('pending', '正在恢复桌面登录…');
+      await loading;
+    }
+    return;
+  }
   const { code, state } = desktopLoginCallback(link, target.origin);
   if (new URL(view.webContents.getURL()).origin !== target.origin) await load();
   const pending = await view.webContents.executeJavaScriptInIsolatedWorld(1, [{ code: "localStorage.getItem('rcap-desktop-login-state')" }]);
@@ -72,6 +90,12 @@ async function completeDesktopLogin(link) {
   const loading = load(destination.href);
   authStatus('pending', '正在完成桌面登录…');
   await loading;
+}
+
+async function startBrowserLogin() {
+  browserLogin = createBrowserLogin(target.origin);
+  await shell.openExternal(browserLogin.url);
+  authStatus('pending', '请在已登录的网页中确认授权，无需发送邮件。');
 }
 
 async function updateOpacity() {
@@ -121,7 +145,7 @@ async function createWindow() {
   fitView();
   window.on('resize', fitView);
 
-  view.webContents.on('did-start-navigation', (_event, _url, inPlace, mainFrame) => { if (mainFrame && !inPlace) themeReady = false; });
+  view.webContents.on('did-start-navigation', (_event, _url, inPlace, mainFrame) => { if (mainFrame && !inPlace) { themeReady = false; authPageReady = false; } });
   view.webContents.on('dom-ready', () => {
     themeReady = true;
     void view.webContents.insertCSS(theme).then(updateOpacity).catch((error) => {
@@ -159,12 +183,22 @@ async function createWindow() {
   ipcMain.on('desktop:auth-state', (event, state) => {
     if (event.sender !== view.webContents || event.senderFrame !== view.webContents.mainFrame || new URL(view.webContents.getURL()).origin !== target.origin) return;
     if (!state || typeof state.signedIn !== 'boolean' || (state.error !== null && typeof state.error !== 'string')) return;
+    authPageReady = true;
+    if (pendingAuthorization) {
+      view.webContents.send('desktop:authorize-token', pendingAuthorization);
+      pendingAuthorization = null;
+      return;
+    }
     if (state.error) authStatus('error', state.error);
     else if (state.signedIn) {
       authStatus('success', '已登录');
       if (completingLogin) void view.webContents.executeJavaScriptInIsolatedWorld(1, [{ code: "localStorage.removeItem('rcap-desktop-login-state')" }]);
     } else if (!completingLogin && authFeedbackKind !== 'error') authStatus('idle', '未登录');
     if (state.error || state.signedIn) completingLogin = false;
+  });
+  ipcMain.handle('desktop:browser-login', (event) => {
+    if (event.sender !== view.webContents || event.senderFrame !== view.webContents.mainFrame || new URL(view.webContents.getURL()).origin !== target.origin) throw new Error('不允许此页面发起授权。');
+    return startBrowserLogin();
   });
 
   const controls = {
@@ -190,7 +224,7 @@ async function createWindow() {
       opacity = value;
       await updateOpacity();
     },
-    browser: () => shell.openExternal(target.href),
+    browser: startBrowserLogin,
     login: () => {
       const text = loginLink(clipboard.readText(), target.origin, config.authOrigin);
       const url = new URL(text);
@@ -236,7 +270,7 @@ else {
     const link = argv.find((value) => value.startsWith('rcap-desktop://'));
     void ready.then(() => link ? completeDesktopLogin(link) : showWindow()).catch((error) => authStatus('error', error.message));
   });
-  app.on('before-quit', () => { quitting = true; if (saveBoundsTimer) saveBounds(); layer?.close(); });
+  app.on('before-quit', () => { quitting = true; view?.webContents.session.flushStorageData(); if (saveBoundsTimer) saveBounds(); layer?.close(); });
   Menu.setApplicationMenu(null);
   const ready = app.whenReady().then(async () => {
     await createWindow();

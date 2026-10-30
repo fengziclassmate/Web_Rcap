@@ -345,6 +345,21 @@ export function WorkbenchApp() {
 
   useEffect(() => {
     let mounted = true;
+    const unsubscribe = window.rcapDesktopAuth?.onAuthorization?.((token) => {
+      void supabase.auth.verifyOtp({ token_hash: token, type: "email" }).then(({ error }) => {
+        if (!mounted) return;
+        if (error) {
+          const message = loginErrorMessage(error);
+          setAuthError(message);
+          window.rcapDesktopAuth?.report({ signedIn: false, error: message });
+        }
+      });
+    });
+    return () => { mounted = false; unsubscribe?.(); };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
 
     async function initAuth() {
       const callback = new URL(window.location.href);
@@ -1051,6 +1066,7 @@ export function WorkbenchApp() {
   }
 
   const shellClass = "workbench-shell min-h-screen min-w-[1180px] text-stone-950";
+  const browserLoginAvailable = typeof window !== "undefined" && Boolean(window.rcapDesktopAuth?.openBrowserLogin);
 
   if (!isBooted) {
     return (
@@ -1068,8 +1084,12 @@ export function WorkbenchApp() {
       <main className={shellClass}>
         <div className="mx-auto max-w-lg px-4 py-16">
           <section className="rounded-sm border border-gray-200 bg-white p-6">
-            <h1 className="text-lg font-semibold">邮箱登录</h1>
+            <h1 className="text-lg font-semibold">{browserLoginAvailable ? "登录工作台" : "邮箱登录"}</h1>
             <div className="mt-4 space-y-3">
+              {browserLoginAvailable ? <Button type="button" className="w-full" onClick={() => {
+                setAuthError(null); setAuthMessage("请在已登录的网页中确认授权，无需发送邮件。");
+                void window.rcapDesktopAuth!.openBrowserLogin!().catch((error: Error) => setAuthError(error.message));
+              }}>使用网页登录（免邮件）</Button> : null}
               <Input
                 type={typeof window !== "undefined" && window.rcapDesktopAuth ? "text" : "email"}
                 inputMode="email"
@@ -1083,6 +1103,7 @@ export function WorkbenchApp() {
               <Button
                 type="button"
                 onClick={handleSendMagicLink}
+                variant={browserLoginAvailable ? "outline" : "default"}
                 disabled={sendingLink || !authEmail.trim()}
                 className="w-full rounded-sm bg-black text-white hover:bg-black/90"
               >

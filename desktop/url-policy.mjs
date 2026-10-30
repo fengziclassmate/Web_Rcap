@@ -15,7 +15,7 @@ export function loginLink(text, appOrigin, authOrigin) {
   let url;
   try { url = new URL(text.trim()); }
   catch { throw new Error('请先复制邮箱中的登录链接。'); }
-  if (url.protocol === 'rcap-desktop:') { desktopLoginCallback(url.href, appOrigin); return url.href; }
+  if (url.protocol === 'rcap-desktop:') { if (url.hostname !== 'authorize') desktopLoginCallback(url.href, appOrigin); return url.href; }
   const redirect = url.searchParams.get('redirect_to');
   if (!allowedNavigation(url, appOrigin, authOrigin) || (redirect && new URL(redirect).origin !== appOrigin)) {
     throw new Error('请复制当前工作台的邮箱登录链接。');

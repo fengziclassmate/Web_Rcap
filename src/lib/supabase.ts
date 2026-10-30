@@ -8,5 +8,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: { flowType: typeof window !== "undefined" && window.rcapDesktopAuth ? "pkce" : "implicit" },
+  auth: { persistSession: true, autoRefreshToken: true, flowType: typeof window !== "undefined" && window.rcapDesktopAuth ? "pkce" : "implicit" },
 });
