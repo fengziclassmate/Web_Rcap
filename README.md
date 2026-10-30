@@ -19,7 +19,7 @@
 - 网页已经登录时，优先在桌面版选择「使用网页登录（免邮件）」或顶部「网页登录」，在浏览器确认当前账号，再打开桌面版完成授权。此过程不发送邮件，桌面获得独立会话；浏览器退出不会注销桌面，桌面重启自动恢复并刷新登录。资料固定保存于当前用户的 `RCAP Desktop` 目录。
 - 邮箱登录仍可用：从桌面发送邮件，点击最新链接后选择「打开桌面版并登录」。旧会话已被服务器撤销时可重新使用网页授权，无需反复消耗邮件额度。
 - 开发需 Node.js 22.12+：先执行 `npm --prefix desktop install`，再执行 `npm run desktop`。默认加载 `desktop/app-config.json` 中的正式站点，不需要额外本地服务器；本地调试可使用 `npm --prefix desktop start -- --url=http://127.0.0.1:3000`。便携版无需安装 Node.js。
-- 执行 `npm run desktop:package` 生成 `build/desktop/RCAP-Desktop-0.1.2/RCAP-Desktop.exe` 便携版。复制时须保留整个文件夹；构建使用 Electron 官方运行时，无需安装服务或改动系统壁纸。首次启动便携版会注册当前用户的 `rcap-desktop://` 登录返回入口，网页后续更新在重新加载后生效。
+- 执行 `npm run desktop:package` 生成 `build/desktop/RCAP-Desktop-0.1.3/RCAP-Desktop.exe` 便携版。复制时须保留整个文件夹；构建使用 Electron 官方运行时，无需安装服务或改动系统壁纸。首次启动便携版会注册当前用户的 `rcap-desktop://` 登录返回入口，网页后续更新在重新加载后生效。
 - 免邮件授权使用 `supabase/functions/desktop-authorize`：服务端验证网页当前登录用户，仅为该用户生成不发送邮件的一次性凭据，并使用本次桌面请求的公钥加密。服务端密钥保留在 Edge Function 默认环境中；回传链接不包含网页登录令牌。函数自行校验 JWT，部署时关闭网关重复校验，并仅允许正式网站来源。
 - 「隐藏到托盘」后可从系统托盘恢复；顶部 × 或托盘菜单「退出」关闭桌面版。透明样式仅作用于桌面版。
 

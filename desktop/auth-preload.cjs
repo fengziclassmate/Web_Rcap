@@ -1,6 +1,8 @@
 // Sandboxed Electron preload scripts require CommonJS.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { contextBridge, ipcRenderer } = require('electron');
+window.addEventListener('focusin', () => ipcRenderer.send('desktop:focus-content'), true);
+window.addEventListener('pointerup', () => ipcRenderer.send('desktop:focus-content'), true);
 
 contextBridge.exposeInMainWorld('rcapDesktopAuth', {
   openBrowserLogin: () => ipcRenderer.invoke('desktop:browser-login'),

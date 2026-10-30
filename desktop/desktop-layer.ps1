@@ -15,7 +15,6 @@ using System.Text;
 public static class RcapDesktopLayer {
   private delegate bool EnumProc(IntPtr window, IntPtr data);
   [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }
-  [StructLayout(LayoutKind.Sequential)] private struct Point { public int X, Y; }
   [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc callback, IntPtr data);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string name, string title);
   [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr window);
@@ -24,9 +23,7 @@ public static class RcapDesktopLayer {
   [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr window);
   [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
   [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
-  [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr SetParent(IntPtr window, IntPtr parent);
   [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out Rect rect);
-  [DllImport("user32.dll")] private static extern bool ScreenToClient(IntPtr window, ref Point point);
   [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder name, int length);
   [DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
@@ -49,7 +46,7 @@ public static class RcapDesktopLayer {
 
   public static object Attach(IntPtr window) {
     IntPtr desktop = IntPtr.Zero;
-    // Use the existing desktop surface above the icons; do not replace the wallpaper or spawn WorkerW.
+    // Desktop ownership preserves a normal top-level keyboard and IME activation path.
     EnumWindows((candidate, data) => {
       if (FindWindowEx(candidate, IntPtr.Zero, "SHELLDLL_DefView", null) == IntPtr.Zero) return true;
       desktop = candidate;
@@ -60,13 +57,13 @@ public static class RcapDesktopLayer {
     SetThreadDpiAwarenessContext(new IntPtr(-4));
     Rect bounds;
     if (!GetWindowRect(window, out bounds)) throw new Win32Exception(Marshal.GetLastWin32Error());
-    Point position = new Point { X = bounds.Left, Y = bounds.Top };
-    if (!ScreenToClient(desktop, ref position)) throw new Win32Exception(Marshal.GetLastWin32Error());
     long style = GetWindowLongPtr(window, -16).ToInt64() & 0xffffffffL;
-    SetWindowLongPtr(window, -16, new IntPtr((style & ~0x80000000L) | 0x40000000L));
-    SetParent(window, desktop);
+    SetWindowLongPtr(window, -16, new IntPtr((style & ~0x40000000L) | 0x80000000L));
+    SetWindowLongPtr(window, -8, desktop);
+    long extended = GetWindowLongPtr(window, -20).ToInt64();
+    SetWindowLongPtr(window, -20, new IntPtr((extended & ~0x40000L) | 0x80L));
     if (GetParent(window) != desktop) throw new Win32Exception(Marshal.GetLastWin32Error());
-    if (!SetWindowPos(window, IntPtr.Zero, position.X, position.Y, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top, 0x0470)) {
+    if (!SetWindowPos(window, new IntPtr(1), bounds.Left, bounds.Top, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top, 0x0470)) {
       throw new Win32Exception(Marshal.GetLastWin32Error());
     }
     return Inspect(window);
@@ -74,14 +71,16 @@ public static class RcapDesktopLayer {
 
   public static object Place(IntPtr window, int x, int y, int width, int height) {
     SetThreadDpiAwarenessContext(new IntPtr(-4));
-    Point point = new Point { X = x, Y = y };
-    if (!ScreenToClient(GetParent(window), ref point)) throw new Win32Exception(Marshal.GetLastWin32Error());
-    if (!SetWindowPos(window, IntPtr.Zero, point.X, point.Y, width, height, 0x0410)) throw new Win32Exception(Marshal.GetLastWin32Error());
+    if (!SetWindowPos(window, new IntPtr(1), x, y, width, height, 0x0410)) throw new Win32Exception(Marshal.GetLastWin32Error());
     return Inspect(window);
   }
 
   public static object Visibility(IntPtr window, bool visible) {
-    if (!SetWindowPos(window, IntPtr.Zero, 0, 0, 0, 0, visible ? 0x0453u : 0x0493u)) throw new Win32Exception(Marshal.GetLastWin32Error());
+    if (!SetWindowPos(window, new IntPtr(1), 0, 0, 0, 0, visible ? 0x0453u : 0x0493u)) throw new Win32Exception(Marshal.GetLastWin32Error());
+    return Inspect(window);
+  }
+  public static object Lower(IntPtr window) {
+    if (!SetWindowPos(window, new IntPtr(1), 0, 0, 0, 0, 0x0413)) throw new Win32Exception(Marshal.GetLastWin32Error());
     return Inspect(window);
   }
 }
@@ -98,6 +97,7 @@ if ($Action -eq 'Serve') {
         'place' { [RcapDesktopLayer]::Place($handle, $command.bounds.x, $command.bounds.y, $command.bounds.width, $command.bounds.height) }
         'show' { [RcapDesktopLayer]::Visibility($handle, $true) }
         'hide' { [RcapDesktopLayer]::Visibility($handle, $false) }
+        'lower' { [RcapDesktopLayer]::Lower($handle) }
         default { throw 'Unknown desktop command' }
       }
       @{ id = $command.id; result = $result } | ConvertTo-Json -Compress -Depth 6

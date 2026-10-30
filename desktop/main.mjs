@@ -179,6 +179,16 @@ async function createWindow() {
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.on('close', (event) => { if (!quitting) { event.preventDefault(); void layer.request('hide').catch((error) => status(error.message)); } });
   window.on('closed', () => view.webContents.close());
+  const lowerWindow = () => { if (layer && !quitting) void layer.request('lower').catch((error) => status(error.message)); };
+  window.on('focus', lowerWindow);
+  window.on('blur', lowerWindow);
+  ipcMain.on('desktop:focus-content', (event) => {
+    if (quitting) return;
+    if (event.sender !== view.webContents || event.senderFrame !== view.webContents.mainFrame || new URL(view.webContents.getURL()).origin !== target.origin) return;
+    view.webContents.focus();
+    if (!window.isFocused()) window.focus();
+    lowerWindow();
+  });
 
   ipcMain.on('desktop:auth-state', (event, state) => {
     if (event.sender !== view.webContents || event.senderFrame !== view.webContents.mainFrame || new URL(view.webContents.getURL()).origin !== target.origin) return;
