@@ -12,4 +12,11 @@ contextBridge.exposeInMainWorld('rcapDesktopAuth', {
     return () => ipcRenderer.removeListener('desktop:authorize-token', listener);
   },
   report: (state) => ipcRenderer.send('desktop:auth-state', state),
+  getAppearance: () => ipcRenderer.invoke('desktop:get-appearance'),
+  applyAppearance: (value) => ipcRenderer.invoke('desktop:apply-appearance', value),
+  onAppearanceChange: (callback) => {
+    const listener = (_event, value) => callback(value);
+    ipcRenderer.on('desktop:appearance-change', listener);
+    return () => ipcRenderer.removeListener('desktop:appearance-change', listener);
+  },
 });

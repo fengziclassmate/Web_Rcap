@@ -140,7 +140,10 @@ export type FootprintItem = {
   lastDate: string;
 };
 
+export type DesktopAppearance = { backgroundOpacity: number; cardOpacity: number };
+
 export type DashboardUiPreferences = {
+  desktopAppearance?: DesktopAppearance;
   taskConsoleCollapsed: boolean;
   confirmDangerousActions: boolean;
   scheduleTemplates?: import("./schedule-templates").ScheduleTemplate[];

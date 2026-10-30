@@ -1,3 +1,5 @@
+import type { DesktopAppearance } from "./types";
+
 export const desktopLoginStateKey = "rcap-desktop-login-state";
 
 declare global {
@@ -6,6 +8,9 @@ declare global {
       report: (state: { signedIn: boolean; error: string | null }) => void;
       openBrowserLogin?: () => Promise<void>;
       onAuthorization?: (callback: (token: string) => void) => () => void;
+      getAppearance?: () => Promise<DesktopAppearance>;
+      applyAppearance?: (value: DesktopAppearance) => Promise<void>;
+      onAppearanceChange?: (callback: (value: DesktopAppearance) => void) => () => void;
     };
   }
 }

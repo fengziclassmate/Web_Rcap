@@ -18,6 +18,7 @@ describe("schedule UI preference persistence", () => {
       ...defaultDashboardUiPreferences,
       taskConsoleCollapsed: true,
       confirmDangerousActions: false,
+      desktopAppearance: { backgroundOpacity: 40, cardOpacity: 55 },
       timeGranularity: "50-10" as const,
       annualSectionOpen: false,
       shoppingSectionOpen: false,

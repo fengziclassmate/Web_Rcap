@@ -37,6 +37,18 @@ function applyCardOpacity() {
 cardOpacity.addEventListener('input', applyCardOpacity);
 applyCardOpacity();
 
+window.desktopControls.onAppearance((appearance) => {
+  opacity.value = String(appearance.backgroundOpacity);
+  cardOpacity.value = String(appearance.cardOpacity);
+  value.textContent = `${opacity.value}%`;
+  cardValue.textContent = `${cardOpacity.value}%`;
+  opacity.disabled = cardOpacity.disabled = !appearance.ready;
+  if (appearance.ready) {
+    localStorage.setItem('background-opacity', opacity.value);
+    localStorage.setItem('card-opacity', cardOpacity.value);
+  }
+});
+
 document.getElementById('login').addEventListener('click', () => window.desktopControls.pasteLogin().catch(showError));
 document.getElementById('browser').addEventListener('click', () => window.desktopControls.openBrowser().catch(showError));
 document.getElementById('hide').addEventListener('click', () => window.desktopControls.hide().catch(showError));

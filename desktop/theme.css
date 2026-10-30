@@ -15,6 +15,11 @@ html { --desktop-opacity: 85%; --desktop-surface: color-mix(in srgb, #fcfcfc var
 .workbench-shell .workbench-reminder { background: transparent; }
 .workbench-shell :is(.text-stone-400, .text-stone-500, .text-gray-400, .text-gray-500, .text-muted-foreground) { color: #202020; }
 .workbench-module { animation: none; }
+.calendar-panel :is(.weekly-reflection, .expense-panel) { background: var(--desktop-surface) !important; border-width: 0.5px; }
+.calendar-panel :is(.weekly-reflection, .expense-panel) :is(.bg-white, [class*="bg-white/"], .bg-stone-50, [class*="bg-stone-50/"], .expense-day-card) { background: transparent !important; }
+.calendar-panel :is(.weekly-reflection, .expense-panel) .expense-day-card[aria-pressed=true] { background: color-mix(in srgb, #e9f6e9 var(--desktop-opacity), transparent) !important; color: #1d3b31; }
+.calendar-panel .weekly-reflection [class*="bg-rose-50"] { background: color-mix(in srgb, #fff0f1 var(--desktop-opacity), transparent) !important; }
+.calendar-panel .weekly-reflection [class*="bg-sky-50"] { background: color-mix(in srgb, #e1f6fd var(--desktop-opacity), transparent) !important; }
 @media (max-width: 760px) {
   .calendar-grid { max-height: max(280px,calc(100vh - 300px)); overflow-y: auto; }
 }

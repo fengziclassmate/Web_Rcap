@@ -22,6 +22,7 @@ let tray;
 let quitting = false;
 let opacity = 85;
 let cardOpacity = 85;
+let appearanceReady = false;
 let themeReady = false;
 let desktopBounds;
 let layer;
@@ -104,6 +105,9 @@ async function updateOpacity() {
   await view.webContents.executeJavaScriptInIsolatedWorld(1, [{ code: `document.documentElement.style.setProperty('--desktop-opacity', '${opacity}%'); document.documentElement.style.setProperty('--schedule-card-opacity', '${cardOpacity}%')` }]);
 }
 
+function appearance() { return { backgroundOpacity: opacity, cardOpacity }; }
+function reportAppearance() { window.webContents.send('desktop:appearance', { ...appearance(), ready: appearanceReady }); }
+
 async function load(url = target.href) {
   status('');
   view.setVisible(true);
@@ -146,7 +150,7 @@ async function createWindow() {
   fitView();
   window.on('resize', fitView);
 
-  view.webContents.on('did-start-navigation', (_event, _url, inPlace, mainFrame) => { if (mainFrame && !inPlace) { themeReady = false; authPageReady = false; } });
+  view.webContents.on('did-start-navigation', (_event, _url, inPlace, mainFrame) => { if (mainFrame && !inPlace) { themeReady = false; authPageReady = false; appearanceReady = false; reportAppearance(); } });
   view.webContents.on('dom-ready', () => {
     themeReady = true;
     void view.webContents.insertCSS(theme).then(updateOpacity).catch((error) => {
@@ -194,6 +198,12 @@ async function createWindow() {
   ipcMain.on('desktop:auth-state', (event, state) => {
     if (event.sender !== view.webContents || event.senderFrame !== view.webContents.mainFrame || new URL(view.webContents.getURL()).origin !== target.origin) return;
     if (!state || typeof state.signedIn !== 'boolean' || (state.error !== null && typeof state.error !== 'string')) return;
+    if (!state.signedIn) {
+      appearanceReady = false;
+      opacity = cardOpacity = 85;
+      reportAppearance();
+      void updateOpacity().catch((error) => status(error.message));
+    }
     authPageReady = true;
     if (pendingAuthorization) {
       view.webContents.send('desktop:authorize-token', pendingAuthorization);
@@ -210,6 +220,20 @@ async function createWindow() {
   ipcMain.handle('desktop:browser-login', (event) => {
     if (event.sender !== view.webContents || event.senderFrame !== view.webContents.mainFrame || new URL(view.webContents.getURL()).origin !== target.origin) throw new Error('不允许此页面发起授权。');
     return startBrowserLogin();
+  });
+
+  ipcMain.handle('desktop:get-appearance', (event) => {
+    if (event.sender !== view.webContents || event.senderFrame !== view.webContents.mainFrame || new URL(view.webContents.getURL()).origin !== target.origin) throw new Error('不允许此页面读取桌面外观。');
+    return appearance();
+  });
+  ipcMain.handle('desktop:apply-appearance', async (event, value) => {
+    if (event.sender !== view.webContents || event.senderFrame !== view.webContents.mainFrame || new URL(view.webContents.getURL()).origin !== target.origin) throw new Error('不允许此页面更改桌面外观。');
+    if (!value || ![value.backgroundOpacity, value.cardOpacity].every((number) => Number.isFinite(number) && number >= 20 && number <= 100)) throw new Error('桌面不透明度须在 20% 到 100% 之间。');
+    opacity = value.backgroundOpacity;
+    cardOpacity = value.cardOpacity;
+    appearanceReady = true;
+    await updateOpacity();
+    reportAppearance();
   });
 
   const controls = {
@@ -234,11 +258,13 @@ async function createWindow() {
       if (!Number.isFinite(value) || value < 20 || value > 100) throw new Error('背景不透明度须在 20% 到 100% 之间。');
       opacity = value;
       await updateOpacity();
+      if (appearanceReady) view.webContents.send('desktop:appearance-change', appearance());
     },
     cardOpacity: async (value) => {
       if (!Number.isFinite(value) || value < 20 || value > 100) throw new Error('卡片不透明度须在 20% 到 100% 之间。');
       cardOpacity = value;
       await updateOpacity();
+      if (appearanceReady) view.webContents.send('desktop:appearance-change', appearance());
     },
     browser: startBrowserLogin,
     login: () => {

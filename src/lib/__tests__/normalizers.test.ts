@@ -169,6 +169,8 @@ describe("normalizers", () => {
   });
 
   it("normalizes dashboard preferences safely", () => {
+    expect(normalizeDashboardUiPreferences({ desktopAppearance: { backgroundOpacity: 40, cardOpacity: 55, extra: "discard" } }).desktopAppearance).toEqual({ backgroundOpacity: 40, cardOpacity: 55 });
+    expect(normalizeDashboardUiPreferences({ desktopAppearance: { backgroundOpacity: 0, cardOpacity: 101 } }).desktopAppearance).toBeUndefined();
     expect(normalizeDashboardUiPreferences({ taskConsoleCollapsed: true, confirmDangerousActions: false })).toMatchObject({ taskConsoleCollapsed: true, confirmDangerousActions: false });
     expect(normalizeDashboardUiPreferences({ taskConsoleCollapsed: "true", confirmDangerousActions: null })).toMatchObject({ taskConsoleCollapsed: false, confirmDangerousActions: true });
     expect(normalizeDashboardUiPreferences({

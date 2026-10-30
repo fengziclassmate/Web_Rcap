@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Popover } from "@base-ui/react/popover";
 import { AccountScope } from "@/components/account-scope";
+import { useDesktopAppearance } from "@/hooks/useDesktopAppearance";
 import { Check, CloudOff, Loader2, RefreshCw, Undo2, Redo2, Settings2, PanelRightOpen } from "lucide-react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { GlobalSearch, type SearchResult } from "@/components/schedule/global-search";
@@ -205,6 +206,7 @@ export function WorkbenchApp() {
   }, [user?.id, setEvents, setProjectBoards]);
   const sync = useScheduleSync(user?.id ?? null, persistedPayload, hydrateSchedule);
   const dataReady = sync.ready;
+  useDesktopAppearance(user?.id ?? null, dataReady && (Boolean(dashboardUiPreferences.desktopAppearance) || sync.status === "saved"), dashboardUiPreferences.desktopAppearance, setDashboardUiPreferences);
   const templateOwner = user?.id;
   useEffect(() => {
     if (!dataReady || !templateOwner) return;
