@@ -1071,7 +1071,8 @@ export function WorkbenchApp() {
             <h1 className="text-lg font-semibold">邮箱登录</h1>
             <div className="mt-4 space-y-3">
               <Input
-                type="email"
+                type={typeof window !== "undefined" && window.rcapDesktopAuth ? "text" : "email"}
+                inputMode="email"
                 aria-label="登录邮箱"
                 autoComplete="email"
                 value={authEmail}
