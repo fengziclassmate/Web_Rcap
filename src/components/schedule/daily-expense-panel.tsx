@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 
 type BudgetPeriodType = "week" | "month";
 
@@ -321,21 +321,6 @@ function createEmptySummary(date: string): DaySummaryResponse {
   };
 }
 
-async function getAuthHeaders() {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session?.access_token) {
-    throw new Error("登录状态已过期，请重新登录。");
-  }
-
-  return {
-    Authorization: `Bearer ${session.access_token}`,
-    "Content-Type": "application/json",
-  };
-}
-
 async function readErrorMessage(response: Response) {
   try {
     const body = (await response.json()) as { error?: string };
@@ -427,10 +412,9 @@ export function DailyExpensePanel({
   const loadSummary = useCallback(async (targetDate: string, signal?: AbortSignal) => {
     setLoadingDates((prev) => ({ ...prev, [targetDate]: true }));
     try {
-      const headers = await getAuthHeaders();
       if (signal?.aborted) return;
-      const response = await fetch(`/api/day-summary?date=${encodeURIComponent(targetDate)}`, {
-        headers,
+      const response = await authenticatedFetch(`/api/day-summary?date=${encodeURIComponent(targetDate)}`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
         signal,
       });
@@ -508,10 +492,9 @@ export function DailyExpensePanel({
 
     setSavingExpense(true);
     try {
-      const headers = await getAuthHeaders();
-      const response = await fetch("/api/expenses", {
+      const response = await authenticatedFetch("/api/expenses", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: expenseAmount,
           category: buildCategoryLabel(expenseCategoryMain, expenseCategorySub, expenseCategoryDetail),
@@ -549,10 +532,9 @@ export function DailyExpensePanel({
 
     setSavingBudget("day");
     try {
-      const headers = await getAuthHeaders();
-      const response = await fetch("/api/daily-budget", {
+      const response = await authenticatedFetch("/api/daily-budget", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: dailyBudgetAmount, budget_date: date }),
       });
 
@@ -578,10 +560,9 @@ export function DailyExpensePanel({
 
     setSavingBudget(type);
     try {
-      const headers = await getAuthHeaders();
-      const response = await fetch("/api/period-budget", {
+      const response = await authenticatedFetch("/api/period-budget", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type, amount, date }),
       });
 
@@ -628,10 +609,9 @@ export function DailyExpensePanel({
 
     setUpdatingExpenseId(expenseId);
     try {
-      const headers = await getAuthHeaders();
-      const response = await fetch(`/api/expenses/${expenseId}`, {
+      const response = await authenticatedFetch(`/api/expenses/${expenseId}`, {
         method: "PATCH",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: editExpenseAmount,
           category: buildCategoryLabel(editExpenseCategoryMain, editExpenseCategorySub, editExpenseCategoryDetail),
@@ -662,8 +642,7 @@ export function DailyExpensePanel({
   async function handleDeleteExpense(expenseId: string) {
     setDeletingExpenseId(expenseId);
     try {
-      const headers = await getAuthHeaders();
-      const response = await fetch(`/api/expenses/${expenseId}`, { method: "DELETE", headers });
+      const response = await authenticatedFetch(`/api/expenses/${expenseId}`, { method: "DELETE" });
 
       if (!response.ok) {
         throw new Error(await readErrorMessage(response));

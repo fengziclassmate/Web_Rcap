@@ -537,7 +537,7 @@ export function WorkbenchApp() {
   }
 
   async function handleSignOut() {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) {
       toast.error(`退出登录失败：${error.message}`);
       return;

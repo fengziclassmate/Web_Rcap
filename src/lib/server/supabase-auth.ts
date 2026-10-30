@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
+import { createClient, isAuthRetryableFetchError, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 type AuthenticatedSupabase = {
@@ -19,7 +19,7 @@ function authError(message: string, status: number) {
 export async function getAuthenticatedSupabase(request: Request): Promise<AuthenticatedSupabaseResult> {
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
-  if (!token) return { error: authError("Authentication required.", 401) };
+  if (!token) return { error: authError("请先登录。", 401) };
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -37,7 +37,8 @@ export async function getAuthenticatedSupabase(request: Request): Promise<Authen
   });
 
   const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data.user) return { error: authError("Invalid or expired session.", 401) };
+  if (error && (isAuthRetryableFetchError(error) || (error.status ?? 0) >= 500)) return { error: authError("登录服务暂时不可用，请稍后重试。", 503) };
+  if (error || !data.user) return { error: authError("登录状态已失效，请重新登录。", 401) };
 
   return { supabase, user: data.user };
 }
