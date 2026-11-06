@@ -2,7 +2,9 @@
 html, body { background: transparent !important; }
 html { --desktop-opacity: 85%; --desktop-surface: color-mix(in srgb, #fcfcfc var(--desktop-opacity), transparent); --desktop-border: #d9d9d9; }
 .workbench-shell::before { display: none; }
-.workbench-shell { --background: transparent; --paper: var(--desktop-surface); --card: var(--desktop-surface); --border: var(--desktop-border); min-width: 0 !important; background: transparent !important; }
+.workbench-shell { --background: transparent; --paper: var(--desktop-surface); --card: var(--desktop-surface); --border: var(--desktop-border); min-width: 0 !important; padding-bottom: 0 !important; background: transparent !important; }
+/* Keep the desktop footer compact without covering its leftmost controls. */
+.workbench-shell > button[aria-label="打开速记"] { left: 4px; bottom: 4px; width: 32px; height: 32px; }
 .workbench-shell > .mx-auto { width: 100%; max-width: none !important; padding-inline: 12px; }
 .workbench-shell :is(.calendar-panel, .task-console, .module-header, .dashboard-section-card, .utility-panel, .project-workspace, .workbench-header, .glass-panel) { border-width: 0.5px; border-color: var(--desktop-border); box-shadow: none; backdrop-filter: none; }
 .workbench-shell :is(.calendar-panel, .task-console, .module-header, .task-dashboard-section) { background: transparent !important; }
