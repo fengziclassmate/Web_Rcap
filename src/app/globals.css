@@ -1280,15 +1280,15 @@
 .expense-day-card[data-over-budget="true"]:not([aria-pressed="true"]) .expense-day-value { color: #a33d48; }
 .reflection-entry { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 10px; }
 .reflection-attachments { grid-column: 1 / -1; }
-.task-console { position: relative; }
+.task-console { position: relative; container-type: inline-size; font-size: 14px; line-height: 1.5; }
 .workbench-shell { padding-bottom: 72px; }
 .task-console .text-stone-400, .task-console .text-stone-500 { color: #5c6e61; }
-.task-console .dashboard-section-card { margin: 8px 10px; border-color: #e3eae5; border-radius: 9px; padding: 12px; }
-.task-console .dashboard-section-heading { min-height: 28px; flex-wrap: nowrap; gap: 6px; font-size: 13px; }
-.task-console .dashboard-section-heading[data-expanded="true"] { min-height: 37px; margin-bottom: 10px; border-bottom: 1px solid #edf1ee; padding-bottom: 8px; }
-.task-console .dashboard-section-heading h3 { font-size: 13px; line-height: 20px; }
-.task-console .dashboard-section-heading > button[data-slot="button"][aria-label] { width: 26px; height: 26px; padding: 0; }
-.task-console :where(input:not([type="checkbox"]), [data-slot="select-trigger"]) { height: 30px; border-radius: 6px; font-size: 12px; }
+.task-console .dashboard-section-card { margin: 0; border-width: 0.5px; border-color: #e3eae5; border-radius: 8px; padding: 12px; }
+.task-console .dashboard-section-heading { min-height: 36px; flex-wrap: wrap; gap: 8px; font-size: 14px; }
+.task-console .dashboard-section-heading[data-expanded="true"] { min-height: 44px; margin-bottom: 12px; border-bottom: 0.5px solid #edf1ee; padding-bottom: 8px; }
+.task-console .dashboard-section-heading h3 { font-size: 14px; line-height: 22px; }
+.task-console .dashboard-section-heading > button[data-slot="button"][aria-label] { width: 32px; height: 32px; padding: 0; }
+.task-console :where(input:not([type="checkbox"]), [data-slot="select-trigger"]) { height: 36px; border-radius: 6px; font-size: 12px; }
 .console-count { display: inline-flex; min-width: 18px; align-items: center; justify-content: center; border-radius: 4px; background: #f0f4f1; padding: 1px 4px; color: #617369; font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .console-draft { border-radius: 4px; background: #f8f2e8; padding: 2px 4px; color: #816538; font-size: 10px; }
 .console-storage-error { display: block; margin-top: 6px; color: #92400e; font-size: 11px; }
@@ -1314,41 +1314,82 @@
 .research-footer { display: flex; align-items: center; gap: 8px; }
 .research-footer button { height: 28px; padding: 0 10px; font-size: 12px; }
 .daily-panel-heading, .daily-panel-tools, .daily-panel-title { display: flex; align-items: center; }
-.daily-panel-heading { justify-content: space-between; }
-.daily-panel-title { min-width: 0; gap: 7px; border-radius: 4px; font-size: 13px; font-weight: 600; }
-.daily-panel-tools { gap: 5px; }
-.daily-panel-tools > button { width: 26px; height: 26px; }
-.daily-sort-switch { display: flex; gap: 1px; border-radius: 5px; background: #f3f6f3; padding: 2px; }
-.daily-sort-switch button { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 4px; color: #77877b; }
+.daily-panel-heading { justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.daily-panel-title { min-width: 0; min-height: 36px; gap: 8px; border-radius: 6px; font-size: 14px; font-weight: 600; }
+.daily-panel-tools { gap: 8px; margin-left: auto; }
+.daily-panel-tools > button { width: 32px; height: 32px; }
+.daily-sort-switch { display: flex; gap: 4px; border-radius: 8px; background: #f3f6f3; padding: 2px; }
+.daily-sort-switch button { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 6px; color: #77877b; }
 .daily-sort-switch button[aria-pressed="true"] { background: #fff; color: #315d45; box-shadow: 0 1px 2px #263b2d0b; }
-.daily-task-entry { display: grid; grid-template-columns: minmax(0, 1fr) 124px 28px; gap: 6px; align-items: center; }
+.daily-task-entry { display: grid; grid-template-columns: minmax(0, 1fr) 128px 36px; gap: 8px; align-items: center; }
 .daily-task-entry input { padding-inline: 7px; font-size: 12px; }
 .daily-task-entry input[type="date"] { font-size: 11px; }
-.daily-task-entry > button { width: 28px; height: 30px; }
+.daily-task-entry > button { width: 36px; height: 36px; }
 .daily-focus-summary { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; color: #4d755d; font-size: 11px; }
 .daily-focus-summary > span:first-child { display: inline-flex; align-items: center; gap: 5px; }
-.task-console .daily-task-row { min-height: 40px; gap: 8px; border: 0; border-bottom: 1px solid #edf1ee; border-radius: 0; background: transparent; padding: 8px 0; }
-.daily-task-content { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; }
-.daily-task-name { min-width: 0; flex: 1; overflow-wrap: anywhere; color: #35473b; font-size: 13px; line-height: 20px; }
-.daily-task-content > button { flex-shrink: 0; margin: 0; font-size: 10px; }
+.task-console .daily-task-row { min-height: 44px; gap: 8px; border: 0; border-bottom: 1px solid #edf1ee; border-radius: 0; background: transparent; padding: 8px 0; }
+.daily-task-content { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.daily-task-name { min-width: 0; flex: 1 1 120px; overflow-wrap: anywhere; color: #35473b; font-size: 14px; line-height: 22px; }
+.daily-task-content > button { min-height: 32px; flex-shrink: 0; margin: 0; font-size: 12px; }
 .daily-task-archive { margin-top: 8px; border-top: 1px solid #edf1ee; padding-top: 8px; }
 .task-console .deadline-radar { margin-top: 10px; border-top: 1px solid #edf1ee; padding-top: 8px; }
-.task-console .task-row-card, .task-console .annual-task-row, .task-console .shopping-item-row { border-radius: 5px; padding: 6px 4px; font-size: 12px; box-shadow: none; }
+.task-console .task-row-card, .task-console .annual-task-row, .task-console .shopping-item-row { border-radius: 6px; padding: 8px; font-size: 14px; line-height: 22px; box-shadow: none; }
 .task-console .task-row-card::before { display: none; }
-.task-console .dashboard-panel-switch { gap: 2px; border-radius: 6px; background: #f3f6f3; padding: 3px; }
-.task-console .dashboard-panel-switch button { min-height: 28px; font-size: 12px; }
+.task-console .dashboard-panel-switch { gap: 4px; border-radius: 8px; background: #f3f6f3; padding: 4px; }
+.task-console .dashboard-panel-switch button { min-height: 36px; gap: 8px; border-radius: 6px; font-size: 12px; }
 .task-console .dashboard-panel-switch button[aria-expanded="true"] { background: #fff; color: #245a40; box-shadow: 0 1px 2px #263b2d0b; }
-.task-console .utility-panel-grid > .utility-panel:not([hidden]) { margin-top: 8px; }
-.task-console .utility-panel-content { padding: 6px 0 0; }
-.task-console .section-trigger { min-height: 30px; border-radius: 5px; background: #f3f6f3; padding-block: 6px; }
-.task-console .project-summary-row { gap: 8px; padding: 7px 2px; }
+.task-console .utility-panel-grid > .utility-panel:not([hidden]) { margin-top: 12px; }
+.task-console .utility-panel-content { padding: 8px 0 0; }
+.task-console .section-trigger { min-height: 36px; gap: 8px; border-radius: 6px; background: #f3f6f3; padding-block: 8px; }
+.task-console .project-summary-row { min-height: 44px; gap: 8px; padding: 8px; }
 .task-console .project-summary-icon { width: 26px; height: 26px; border-radius: 6px; }
 .task-console .focus-clock-block { min-height: 104px; padding: 16px 0 12px; }
 .task-console .focus-clock { font-size: 38px; }
 .task-console .focus-presets { margin-top: 10px; }
-.task-console .focus-controls button { height: 34px; }
+.task-console .focus-controls button { height: 36px; }
 .dashboard-layout-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--border); padding: 8px 16px; }
 .dashboard-layout-toolbar[data-arranging=false] { position: absolute; top: 12px; right: 12px; justify-content: flex-end; border: 0; padding: 0; }
+/* Sidebar rhythm: 12px panel gutters, 8px within groups, 12px between panels. */
+.task-console > .module-header { padding: 12px; }
+.task-console > .module-header h2 { gap: 8px; font-size: 16px; line-height: 24px; }
+.task-console > .module-header h2 > svg { width: 14px; height: 14px; }
+.task-console [data-testid="dashboard-section-list"] { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+.task-console [data-dashboard-section] { min-width: 0; margin: 0; border-radius: 8px; }
+.task-console :is([class*="text-[10px]"], [class*="text-[11px]"], .console-count, .console-draft, .console-storage-error, .research-gap-count, .daily-focus-summary, .focus-clock-state) { font-size: 12px; line-height: 18px; }
+.task-console :is([class*="text-[13px]"], [class*="text-[15px]"]) { font-size: 14px; line-height: 22px; }
+.task-console :is([data-slot="button"], .research-datebar button, .research-footer button) { min-height: 32px; gap: 8px; border-radius: 6px; padding-block: 6px; font-size: 12px; line-height: 18px; }
+.task-console [data-slot="button"]:is([class~="size-6"], [class~="size-7"], [class~="size-8"]) { width: 32px; height: 32px; padding: 0; }
+.task-console :is(.dashboard-section-heading, .dashboard-panel-switch, .daily-panel-title, .daily-panel-tools, .section-trigger, .project-summary-icon, [data-slot="button"], .daily-task-content) svg { width: 12px; height: 12px; flex-shrink: 0; }
+.task-console :is(input:not([type="checkbox"]), select, [data-slot="select-trigger"]) { min-height: 36px; border-radius: 6px; font-size: 12px; line-height: 18px; }
+.task-console :is(input, textarea, select, [data-slot="select-trigger"], .task-row-card, .annual-task-row, .shopping-item-row) { border-width: 0.5px; }
+.task-console .research-week { gap: 4px; }
+.task-console .research-week button { height: auto; min-height: 40px; padding: 6px 0; }
+.task-console .research-datebar { flex-wrap: wrap; gap: 8px; }
+.task-console .research-datebar input[type="date"] { width: 128px; font-size: 12px; }
+.task-console .research-note-rows { gap: 8px; }
+.task-console .research-note-rows > label { grid-template-columns: 48px minmax(0,1fr); gap: 8px; }
+.task-console .research-note-rows .research-note-input { min-height: 44px; padding: 8px; }
+.task-console .research-footer { flex-wrap: wrap; gap: 8px; }
+.task-console .research-footer > label { display: inline-flex; align-items: center; min-height: 32px; }
+.task-console .daily-task-entry input[type="date"] { font-size: 12px; }
+.task-console .daily-task-archive button:not([data-slot="checkbox"]) { min-height: 32px; }
+.task-console .dashboard-panel-toolbar { flex-wrap: wrap; gap: 8px; }
+.task-console .dashboard-panel-switch { flex: 1 1 232px; }
+.task-console .dashboard-panel-actions { margin-left: auto; gap: 8px; }
+.task-console .focus-presets { gap: 4px; border-radius: 8px; padding: 4px; }
+.task-console .focus-presets button { height: 32px; border-radius: 6px; }
+.task-console .focus-controls { gap: 8px; }
+.task-console .focus-current-target { gap: 4px; font-size: 14px; line-height: 22px; }
+.task-console .focus-today-summary { margin-top: 12px; font-size: 12px; line-height: 18px; }
+.task-console .focus-capacity > summary { min-height: 36px; gap: 8px; font-size: 12px; line-height: 18px; }
+.task-console .dashboard-section-heading h3 > button { min-height: 36px; gap: 8px; }
+.task-console button[aria-label^="编辑跟进事项"] { min-height: 32px; }
+.task-console button[draggable="true"] { min-width: 32px; min-height: 32px; }
+.task-console :is(.task-row-card, .annual-task-row, .shopping-item-row, .dashboard-layout-toolbar) svg { width: 12px; height: 12px; flex-shrink: 0; }
+@container (max-width: 340px) {
+  .task-console .daily-task-entry { grid-template-columns: minmax(0,1fr) 36px; }
+  .task-console .daily-task-entry > input:first-child { grid-column: 1 / -1; }
+}
 .focus-current-target { display: flex; min-height: 36px; flex-direction: column; gap: 3px; padding: 3px 2px; font-size: 13px; }
 .focus-target-select, .focus-range-select { width: 100%; height: 36px; border: 1px solid #e4e9e5; border-radius: 7px; background: #fff; padding: 0 10px; color: #4f6155; font-size: 12px; outline-color: var(--primary); }
 .focus-range-select { display: block; height: 30px; }
