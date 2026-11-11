@@ -1259,6 +1259,8 @@ export function WorkbenchApp() {
                   )}
                   viewMode={viewMode}
                   timeGranularity={timeGranularity}
+                  scheduleDensity={dashboardUiPreferences.scheduleDensity}
+                  onScheduleDensityChange={(scheduleDensity) => setDashboardUiPreferences((previous) => ({ ...previous, scheduleDensity }))}
                 />
               </section>
               <section className="workbench-task-sidebar min-h-0">

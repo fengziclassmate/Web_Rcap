@@ -4,6 +4,18 @@ import { mergeScheduleChanges } from "../schedule-merge";
 
 const snapshot = (tasks: unknown[]) => normalizePersistedSchedulePayload({ tasks })!;
 describe("concurrent schedule changes", () => {
+  it("keeps a density choice and an independent sidebar preference from different devices", () => {
+    const base = snapshot([]);
+    const densityEdit = { ...base, ui_preferences: { ...base.ui_preferences, scheduleDensity: "detailed" as const } };
+    const sidebarEdit = { ...base, ui_preferences: { ...base.ui_preferences, taskConsoleCollapsed: true } };
+    for (const [local, remote] of [[densityEdit, sidebarEdit], [sidebarEdit, densityEdit]]) {
+      const merged = mergeScheduleChanges(base, local, remote);
+      expect(merged.conflicts).toEqual([]);
+      expect(merged.value.ui_preferences).toMatchObject({ scheduleDensity: "detailed", taskConsoleCollapsed: true, timeGranularity: 60 });
+      expect(normalizePersistedSchedulePayload(merged.value)!.ui_preferences.scheduleDensity).toBe("detailed");
+    }
+  });
+
   it("merges each panel row as one choice when devices open different panels", () => {
     const base = snapshot([]);
     const local = { ...base, ui_preferences: { ...base.ui_preferences, shoppingSectionOpen: true } };

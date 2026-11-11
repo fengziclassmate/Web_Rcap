@@ -39,7 +39,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { EventTag, ScheduleEvent } from "@/lib/types";
+import type { EventTag, ScheduleDensity, ScheduleEvent } from "@/lib/types";
 import type { ProjectBoard, ProjectTaskLink } from "@/lib/project-boards";
 import { resolveProjectTask } from "@/lib/project-schedule";
 import { ProjectTaskPicker } from "@/components/projects/project-task-picker";
@@ -212,6 +212,8 @@ type WeeklyTimeGridProps = {
   onScheduleTemplatesChange?: (templates: ScheduleTemplate[]) => void;
   viewMode?: ViewMode;
   timeGranularity?: TimeGranularity;
+  scheduleDensity?: ScheduleDensity;
+  onScheduleDensityChange?: (density: ScheduleDensity) => void;
 };
 
 type ContextMenuState = {
@@ -252,7 +254,6 @@ type DailyBudgetSummaryRow = {
   budget_date: string;
 };
 
-const hourCellHeight = 72;
 const minutesPerHour = 60;
 const hoursPerDay = 24;
 const minutesPerDay = hoursPerDay * minutesPerHour;
@@ -541,7 +542,10 @@ export function WeeklyTimeGrid({
   onScheduleTemplatesChange,
   viewMode = "week",
   timeGranularity = 60,
+  scheduleDensity = "standard",
+  onScheduleDensityChange,
 }: WeeklyTimeGridProps) {
+  const hourCellHeight = scheduleDensity === "detailed" ? 160 : 72;
   const userId = useAccountId();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -1808,7 +1812,7 @@ export function WeeklyTimeGrid({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [onUpdateEvent, resizeState]);
+  }, [onUpdateEvent, resizeState, hourCellHeight]);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -1911,6 +1915,16 @@ export function WeeklyTimeGrid({
                   <SelectItem value="60">60 分钟</SelectItem>
                   <SelectItem value="45-15">45 + 15 分钟</SelectItem>
                   <SelectItem value="50-10">50 + 10 分钟</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-gray-600">显示</span>
+              <Select value={scheduleDensity} onValueChange={(value) => { if (value === "standard" || value === "detailed") onScheduleDensityChange?.(value); }}>
+                <SelectTrigger aria-label="显示密度" className="h-8 w-20 rounded-md border-gray-300 text-xs">
+                  <SelectValue>{scheduleDensity === "detailed" ? "详细" : "常规"}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard">常规</SelectItem>
+                  <SelectItem value="detailed">详细</SelectItem>
                 </SelectContent>
               </Select>
             </div>

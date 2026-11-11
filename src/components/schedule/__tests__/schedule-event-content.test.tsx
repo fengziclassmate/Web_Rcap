@@ -30,6 +30,34 @@ function setup(patch: Partial<ScheduleEvent> = {}, durationHour = 1, dense = fal
 }
 
 describe("schedule card information", () => {
+  it("uses available space for 45-minute notes and hides partial lines in the overview", () => {
+    setup({}, 0.75);
+    const notes = screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` });
+    notes.style.lineHeight = "16px";
+    const space = notes.parentElement!;
+    onResize([{ contentRect: { height: 68 } } as ResizeObserverEntry], {} as ResizeObserver);
+    expect(space.style.getPropertyValue("--schedule-notes-lines")).toBe("4");
+    expect(space.style.getPropertyValue("--schedule-notes-visibility")).toBe("visible");
+    onResize([{ contentRect: { height: 8 } } as ResizeObserverEntry], {} as ResizeObserver);
+    expect(space.style.getPropertyValue("--schedule-notes-visibility")).toBe("hidden");
+  });
+
+  it("keeps sub-45-minute cards compact and permits adding notes to a 45-minute block", () => {
+    const short = setup({}, 0.25);
+    expect(screen.queryByRole("button", { name: `编辑 ${event.title} 补充信息` })).toBeNull();
+    short.unmount();
+    const { onNotesChange } = setup({ notes: "" }, 0.75);
+    const addNotes = screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` });
+    addNotes.style.lineHeight = "16px";
+    onResize([{ contentRect: { height: 8 } } as ResizeObserverEntry], {} as ResizeObserver);
+    expect(addNotes.parentElement!.style.getPropertyValue("--schedule-notes-visibility")).toBe("hidden");
+    onResize([{ contentRect: { height: 64 } } as ResizeObserverEntry], {} as ResizeObserver);
+    expect(addNotes.parentElement!.style.getPropertyValue("--schedule-notes-visibility")).toBe("visible");
+    fireEvent.click(addNotes);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "地点：科教北楼304" } });
+    fireEvent.blur(screen.getByRole("textbox"));
+    expect(onNotesChange).toHaveBeenCalledWith("地点：科教北楼304");
+  });
   it("uses the available notes height and updates the line limit when the card resizes", () => {
     setup({ notes: "第一项\n第二项\n第三项\n第四项\n第五项" }, 3);
     const notes = screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` });
