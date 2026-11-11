@@ -30,8 +30,9 @@ function setup(patch: Partial<ScheduleEvent> = {}, durationHour = 1, dense = fal
 }
 
 describe("schedule card information", () => {
-  it("uses available space for 45-minute notes and hides partial lines in the overview", () => {
-    setup({}, 0.75);
+  it.each([0.75, 80 / 60 - 35 / 60])("uses available space for a %s-hour block and handles minute rounding", (duration) => {
+    const { container } = setup({}, duration);
+    expect(container.querySelector("[data-micro]")).toBeNull();
     const notes = screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` });
     notes.style.lineHeight = "16px";
     const space = notes.parentElement!;

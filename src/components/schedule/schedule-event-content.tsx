@@ -27,10 +27,11 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
   const cancelled = useRef(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const notesSpaceRef = useRef<HTMLDivElement>(null);
-  const micro = durationHour < 0.75;
-  const notesEligible = durationHour >= 0.75;
+  const durationMinutes = Math.round(durationHour * 60);
+  const micro = durationMinutes < 45;
+  const notesEligible = durationMinutes >= 45;
   const showNotes = Boolean(event.notes.trim()) && notesEligible;
-  const showMetadata = durationHour >= 1.5;
+  const showMetadata = durationMinutes >= 90;
   const tagLabel = event.tag ? getEventTagInfo(event.tag).label : null;
 
   useEffect(() => {
@@ -124,11 +125,11 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
       <div
         className="schedule-event-content relative flex min-h-0 min-w-0 flex-1 flex-col text-xs"
         data-micro={micro || undefined}
-        data-compact={durationHour < 1 || undefined}
+        data-compact={durationMinutes < 60 || undefined}
         data-dense={dense || undefined}
         data-notes={showNotes || undefined}
         data-editing-notes={editor?.field === "notes" || undefined}
-        data-tall={durationHour >= 2 || undefined}
+        data-tall={durationMinutes >= 120 || undefined}
         onClickCapture={(mouseEvent) => {
           if (!(mouseEvent.ctrlKey || mouseEvent.metaKey) || (mouseEvent.target as HTMLElement).closest("[data-inline-editor]")) return;
           mouseEvent.preventDefault();
