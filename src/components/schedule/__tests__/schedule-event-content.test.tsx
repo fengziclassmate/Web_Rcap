@@ -43,9 +43,10 @@ describe("schedule card information", () => {
     expect(space.style.getPropertyValue("--schedule-notes-visibility")).toBe("hidden");
   });
 
-  it("keeps sub-45-minute cards compact and permits adding notes to a 45-minute block", () => {
+  it("does not gate notes by duration and permits adding notes to a 45-minute block", () => {
     const short = setup({}, 0.25);
-    expect(screen.queryByRole("button", { name: `编辑 ${event.title} 补充信息` })).toBeNull();
+    expect(screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` }).textContent).toBe(event.notes);
+    expect(short.container.querySelector("[data-micro]")).toBeTruthy();
     short.unmount();
     const { onNotesChange } = setup({ notes: "" }, 0.75);
     const addNotes = screen.getByRole("button", { name: `编辑 ${event.title} 补充信息` });
@@ -164,7 +165,7 @@ describe("schedule card information", () => {
 
   it("keeps full information accessible for a fifteen-minute card", async () => {
     setup({}, 0.25);
-    expect(screen.queryByText(/地点：岳麓山校区科教北楼304/)).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: `查看 ${event.title} 完整信息` }));
     expect((await screen.findByRole("dialog")).textContent).toContain("地点：岳麓山校区科教北楼304");
   });

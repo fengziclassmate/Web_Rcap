@@ -13,12 +13,6 @@ describe("schedule UI preference persistence", () => {
     localStorage.clear();
   });
 
-  it.each(["standard", "detailed"] as const)("restores an explicit %s density without replacing the saved time granularity", (scheduleDensity) => {
-    const preferences = { ...defaultDashboardUiPreferences, timeGranularity: "45-15" as const, scheduleDensity };
-    writeDashboardUiPreferencesToLocal(preferences);
-    expect(readDashboardUiPreferencesFromLocal()).toEqual(preferences);
-  });
-
   it("restores time granularity and every task dashboard expansion state", () => {
     const preferences = {
       ...defaultDashboardUiPreferences,

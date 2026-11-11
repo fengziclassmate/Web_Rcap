@@ -39,6 +39,10 @@
 .schedule-event-content[data-micro] { flex-direction: row; align-items: center; gap: 3px; padding: 0 3px; }
 .schedule-event-content[data-micro] .schedule-event-time-row { flex-shrink: 0; }
 .schedule-event-content[data-micro] .schedule-event-title { display: block; flex: 1; line-height: 14px; }
+.schedule-event-content[data-micro] .schedule-notes-space { display: none; }
+.schedule-event-content[data-compact]:not([data-micro]):not([data-dense]):not(:has([data-inline-editor])) { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 14px minmax(0, 1fr); gap: 2px 4px; }
+.schedule-event-content[data-compact]:not([data-micro]):not([data-dense]):not(:has([data-inline-editor])) .schedule-event-title { line-height: 14px; }
+.schedule-event-content[data-compact]:not([data-micro]):not([data-dense]) .schedule-notes-space { grid-column: 1 / -1; }
 .schedule-event-content[data-dense] { padding-inline: 4px; }
 .schedule-title-input, .schedule-notes-input { position: relative; z-index: 30; width: 100%; min-width: 180px; min-height: 28px; padding: 3px 5px; border: 0.5px solid var(--schedule-focus); border-radius: 3px; background: var(--schedule-paper); color: var(--schedule-ink); outline: none; line-height: 20px; }
 .schedule-notes-input { min-width: 0; min-height: 96px; max-height: 280px; flex-shrink: 0; resize: vertical; }

@@ -29,8 +29,7 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
   const notesSpaceRef = useRef<HTMLDivElement>(null);
   const durationMinutes = Math.round(durationHour * 60);
   const micro = durationMinutes < 45;
-  const notesEligible = durationMinutes >= 45;
-  const showNotes = Boolean(event.notes.trim()) && notesEligible;
+  const showNotes = Boolean(event.notes.trim());
   const showMetadata = durationMinutes >= 90;
   const tagLabel = event.tag ? getEventTagInfo(event.tag).label : null;
 
@@ -44,7 +43,7 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
     });
     observer.observe(space);
     return () => observer.disconnect();
-  }, [notesEligible, editor?.field]);
+  }, [editor?.field]);
 
   useEffect(() => () => {
     onEditingChange((current) => current === event.id ? null : current);
@@ -172,15 +171,15 @@ export function ScheduleEventContent({ event, timeLabel, fullTimeLabel, category
             onBlur={(blurEvent) => saveEditor(blurEvent.currentTarget.value)}
             onKeyDown={handleEditorKeyDown}
           />
-        ) : notesEligible ? (
-          <div ref={notesSpaceRef} className="min-h-0 flex-1 overflow-hidden">
+        ) : (
+          <div ref={notesSpaceRef} className="schedule-notes-space min-h-0 flex-1 overflow-hidden">
             {showNotes ? (
               <button type="button" className="schedule-event-notes relative z-20 w-full overflow-hidden whitespace-pre-line break-words text-left text-xs" aria-label={`编辑 ${event.title} 补充信息`} onClick={() => beginEditing("notes")}>{event.notes}</button>
             ) : (
               <button type="button" className="schedule-add-notes absolute bottom-1 left-1 z-20 text-xs opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => beginEditing("notes")} aria-label={`编辑 ${event.title} 补充信息`}>添加补充信息</button>
             )}
           </div>
-        ) : null}
+        )}
         {showMetadata ? (
           <div className="schedule-event-metadata mt-auto flex min-w-0 items-center gap-1.5 text-xs">
             <span className="min-w-0 truncate">{categoryName}</span>

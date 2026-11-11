@@ -169,35 +169,6 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
-  it.each([["standard", 72], ["detailed", 160]] as const)("keeps 45-minute card geometry and drag/resize time accurate at %s density", (scheduleDensity, hourHeight) => {
-    const onUpdateEvent = vi.fn();
-    const event = { ...scheduleEvent, endHour: 9.75, isCompleted: false };
-    const { container, rerenderGrid } = renderGrid({ events: [event], onUpdateEvent });
-    rerenderGrid({ scheduleDensity });
-    const card = container.querySelector<HTMLElement>('[data-schedule-event-id="event-1"]')!;
-    expect(card.style.height).toBe(`${hourHeight * 0.75 - 8}px`);
-    const column = card.closest<HTMLElement>("[data-timeline-date]")!;
-    Object.defineProperty(column, "getBoundingClientRect", { value: () => ({ top: 100, height: 24 * hourHeight }) });
-    fireEvent.dragStart(card);
-    fireEvent(column, new MouseEvent("drop", { bubbles: true, cancelable: true, clientY: 100 + 11 * hourHeight }));
-    expect(onUpdateEvent).toHaveBeenCalledWith(event.id, { date: event.date, startHour: 11, endHour: 11.75 }, undefined);
-    onUpdateEvent.mockClear();
-    fireEvent.mouseDown(screen.getByRole("button", { name: `调整 ${event.title} 的结束时间` }), { button: 0, clientY: 100 });
-    fireEvent.mouseMove(window, { clientY: 100 + hourHeight * 0.25 });
-    fireEvent.mouseUp(window);
-    expect(onUpdateEvent).toHaveBeenCalledWith(event.id, { startHour: 9, endHour: 10 }, undefined);
-  });
-
-  it("reports density changes separately from time granularity", async () => {
-    const onScheduleDensityChange = vi.fn();
-    const { rerenderGrid } = renderGrid();
-    rerenderGrid({ timeGranularity: "45-15", onScheduleDensityChange });
-    fireEvent.click(screen.getByRole("combobox", { name: "显示密度" }));
-    const detailed = await screen.findByRole("option", { name: "详细" });
-    fireEvent.mouseMove(detailed);
-    fireEvent.click(detailed);
-    expect(onScheduleDensityChange).toHaveBeenCalledWith("detailed");
-  });
   it("updates only the selected recurring occurrence's notes and disables time manipulation while editing", () => {
     const onUpdateEvent = vi.fn();
     const { container } = renderGrid({ events: [{ ...scheduleEvent, notes: "旧地点", recurrence: { kind: "daily" } }], onUpdateEvent });

@@ -25,7 +25,6 @@ import type { Achievement } from "@/lib/achievements";
 import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/categories";
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
-  scheduleDensity: "standard",
   taskConsoleCollapsed: false,
   confirmDangerousActions: true,
   dashboardSectionOrder: defaultDashboardSectionOrder,
@@ -293,8 +292,6 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
   const utilityPanels = (["projectSectionOpen", "routineCheckinSectionOpen", "achievementSectionOpen", "footprintSectionOpen"] as const).filter((key) => value[key] === true);
   const capacityStartHour = Number.isInteger(value.capacityStartHour) && value.capacityStartHour! >= 0 && value.capacityStartHour! < 24 ? value.capacityStartHour! : 9;
   return {
-    scheduleDensity: value.scheduleDensity === "standard" || value.scheduleDensity === "detailed"
-      ? value.scheduleDensity : value.timeGranularity === "45-15" || value.timeGranularity === "50-10" ? "detailed" : "standard",
     taskConsoleCollapsed: value.taskConsoleCollapsed === true,
     ...(appearance && [appearance.backgroundOpacity, appearance.cardOpacity].every((number) => typeof number === "number" && Number.isFinite(number) && number >= 20 && number <= 100)
       ? { desktopAppearance: { backgroundOpacity: appearance.backgroundOpacity, cardOpacity: appearance.cardOpacity } } : {}),

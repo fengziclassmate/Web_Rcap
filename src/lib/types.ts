@@ -141,10 +141,8 @@ export type FootprintItem = {
 };
 
 export type DesktopAppearance = { backgroundOpacity: number; cardOpacity: number };
-export type ScheduleDensity = "standard" | "detailed";
 
 export type DashboardUiPreferences = {
-  scheduleDensity: ScheduleDensity;
   desktopAppearance?: DesktopAppearance;
   taskConsoleCollapsed: boolean;
   confirmDangerousActions: boolean;

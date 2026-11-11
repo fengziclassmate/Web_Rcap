@@ -168,23 +168,6 @@ describe("normalizers", () => {
     expect(normalizeDashboardUiPreferences({ annualSectionOpen: true, longTaskSectionOpen: true, shoppingSectionOpen: true, projectSectionOpen: true, routineCheckinSectionOpen: true, achievementSectionOpen: true, footprintSectionOpen: true })).toMatchObject({ annualSectionOpen: false, longTaskSectionOpen: false, shoppingSectionOpen: false, projectSectionOpen: false, routineCheckinSectionOpen: false, achievementSectionOpen: false, footprintSectionOpen: false });
   });
 
-  it.each([
-    [{}, "standard"],
-    [{ timeGranularity: "45-15" }, "detailed"],
-    [{ timeGranularity: "50-10" }, "detailed"],
-    [{ timeGranularity: "45-15", scheduleDensity: "invalid" }, "detailed"],
-    [{ timeGranularity: "50-10", scheduleDensity: 7 }, "detailed"],
-    [{ timeGranularity: 60, scheduleDensity: "invalid" }, "standard"],
-    [{ timeGranularity: "45-15", scheduleDensity: "standard" }, "standard"],
-    [{ timeGranularity: 60, scheduleDensity: "detailed" }, "detailed"],
-  ])("restores explicit density or migrates legacy preference %j to %s", (preferences, expected) => {
-    expect(normalizeDashboardUiPreferences(preferences).scheduleDensity).toBe(expected);
-  });
-
-  it("uses standard density when no preferences have been saved", () => {
-    expect(normalizeDashboardUiPreferences(undefined).scheduleDensity).toBe("standard");
-  });
-
   it("normalizes dashboard preferences safely", () => {
     expect(normalizeDashboardUiPreferences({ desktopAppearance: { backgroundOpacity: 40, cardOpacity: 55, extra: "discard" } }).desktopAppearance).toEqual({ backgroundOpacity: 40, cardOpacity: 55 });
     expect(normalizeDashboardUiPreferences({ desktopAppearance: { backgroundOpacity: 0, cardOpacity: 101 } }).desktopAppearance).toBeUndefined();
