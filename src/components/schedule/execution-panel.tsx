@@ -79,7 +79,7 @@ export function ExecutionPanel({ userId, events, tasks, boards = emptyBoards, pr
       <Button size="icon-sm" variant="ghost" aria-label="复盘统计" title="专注记录与统计" onClick={() => setReviewOpen(true)}><BarChart3 className="size-3.5" /></Button>
     </div>
 
-    <div hidden={!open}>
+    <div className="focus-body" hidden={!open}>
       {active ? <div className="focus-current-target"><span className="truncate font-medium" title={active.title}>{active.title}</span><span className="truncate text-xs text-stone-500">{active.category}</span></div> :
         <select aria-label="专注任务或日程" value={selected.id} onChange={(event) => setTargetId(event.target.value)} className="focus-target-select">
           <option value="free">自由专注</option>

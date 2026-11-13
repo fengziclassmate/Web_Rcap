@@ -1729,7 +1729,32 @@
 .schedule-workspace[data-console-position=bottom] .task-console-rail { position: static; width: 100%; min-height: 40px; flex-direction: row; justify-content: center; padding: 8px 12px; }
 .schedule-workspace[data-console-position=bottom] .task-console-rail > span { writing-mode: horizontal-tb; letter-spacing: 0; }
 .schedule-workspace[data-console-position=bottom] :is(.task-console-rail > svg, [aria-label="收起任务控制台"] > svg) { transform: rotate(90deg); }
-.schedule-workspace[data-console-position=bottom] .task-console .dashboard-layout-toolbar[data-arranging=false] + [data-testid="dashboard-section-list"] { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(300px,100%),1fr)); align-items: start; }
+/* Bottom console: preserve module order while packing natural panel heights. */
+.schedule-workspace[data-console-position=bottom] .task-console { overflow: visible; border: 0; background: transparent; box-shadow: none; }
+.schedule-workspace[data-console-position=bottom] .task-console > .module-header { background: transparent; }
+.schedule-workspace[data-console-position=bottom] .task-console [data-testid="dashboard-section-list"][data-layout=masonry][data-arranging=false] { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); grid-auto-rows: 1px; align-items: start; gap: 0 12px; padding: 12px 0 0; }
+.schedule-workspace[data-console-position=bottom] [data-layout=masonry][data-arranging=false] > [data-dashboard-section=execution] { grid-column: 1 / -1; }
+.schedule-workspace[data-console-position=bottom] .focus-body:not([hidden]) { display: grid; grid-template-columns: minmax(220px,1.3fr) minmax(140px,.8fr) minmax(112px,.55fr) minmax(220px,1fr); grid-template-areas: "target clock controls summary" "presets clock controls capacity"; align-items: start; gap: 8px 24px; }
+.schedule-workspace[data-console-position=bottom] .focus-body > :is(.focus-target-select, .focus-current-target) { grid-area: target; }
+.schedule-workspace[data-console-position=bottom] .focus-presets { grid-area: presets; margin-top: 0; }
+.schedule-workspace[data-console-position=bottom] .focus-clock-block { grid-area: clock; min-height: 80px; align-self: center; padding: 8px 0; }
+.schedule-workspace[data-console-position=bottom] .focus-controls { grid-area: controls; align-self: center; flex-direction: column; margin: 0; }
+.schedule-workspace[data-console-position=bottom] .focus-controls > button { width: 100%; flex: none; }
+.schedule-workspace[data-console-position=bottom] .focus-today-summary { grid-area: summary; margin-top: 0; }
+.schedule-workspace[data-console-position=bottom] .focus-capacity { grid-area: capacity; margin-top: 0; padding-top: 8px; }
+.schedule-workspace[data-console-position=bottom] .focus-capacity > summary .ml-auto { margin-left: 0; }
+@container (max-width: 900px) {
+  .schedule-workspace[data-console-position=bottom] .focus-body:not([hidden]) { grid-template-columns: repeat(2,minmax(0,1fr)); grid-template-areas: "target clock" "presets controls" "summary capacity"; gap: 12px 20px; }
+}
+@container (max-width: 500px) {
+  .schedule-workspace[data-console-position=bottom] .focus-body:not([hidden]) { grid-template-columns: minmax(0,1fr); grid-template-areas: "target" "presets" "clock" "controls" "summary" "capacity"; }
+}
+@container (max-width: 1100px) {
+  .schedule-workspace[data-console-position=bottom] .task-console [data-testid="dashboard-section-list"][data-layout=masonry][data-arranging=false] { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@container (max-width: 700px) {
+  .schedule-workspace[data-console-position=bottom] .task-console [data-testid="dashboard-section-list"][data-layout=masonry][data-arranging=false] { grid-template-columns: minmax(0,1fr); }
+}
 .schedule-workspace[data-console-position=bottom] .dashboard-section-card { container-type: inline-size; }
 .task-console-rail:hover { background: #f0f0f0; color: #202020; }
 .workbench-header button:focus-visible, .task-console-rail:focus-visible { outline: 2px solid #208368; outline-offset: 2px; }

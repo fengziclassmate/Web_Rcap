@@ -1,15 +1,15 @@
 import { useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SortableDashboardSections } from "../sortable-dashboard-sections";
 import { defaultDashboardSectionOrder, moveDashboardSection, normalizeDashboardSectionOrder, type DashboardSectionId } from "@/lib/dashboard-sections";
 import { normalizeDashboardUiPreferences } from "@/lib/normalizers";
 import { getScheduleBackupStorageKey, readScheduleBackupFromLocal, normalizePersistedSchedulePayload } from "@/lib/schedule-persistence";
 import { mergeScheduleChanges } from "@/lib/schedule-merge";
 
-function Console() {
+function Console({ layout = "list" }: { layout?: "list" | "masonry" }) {
   const [order, setOrder] = useState<DashboardSectionId[]>();
-  return <SortableDashboardSections order={order} onOrderChange={setOrder} sections={[
+  return <SortableDashboardSections layout={layout} order={order} onOrderChange={setOrder} sections={[
     { id: "daily", content: <input aria-label="未提交的任务" defaultValue="" /> },
     { id: "research", content: <p>科研记录</p> },
     { id: "boards", content: <p>项目表入口</p> },
@@ -18,7 +18,59 @@ function Console() {
 
 const visibleOrder = () => Array.from(screen.getByTestId("dashboard-section-list").children).map((node) => node.getAttribute("data-dashboard-section"));
 
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
 describe("task console module layout", () => {
+  it("packs natural content heights, updates on resize and preserves drafts when layout or sorting changes", async () => {
+    let contentHeight = 112;
+    let notify!: ResizeObserverCallback;
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: ResizeObserverCallback) { notify = callback; }
+      observe = observe;
+      disconnect = disconnect;
+    });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return new DOMRect(0, 0, 320, this.hasAttribute("data-dashboard-content") ? contentHeight : 900);
+    });
+
+    const { rerender } = render(<Console layout="masonry" />);
+    const wrapper = screen.getByTestId("dashboard-section-list").querySelector<HTMLElement>('[data-dashboard-section="daily"]')!;
+    const naturalContent = wrapper.querySelector<HTMLElement>("[data-dashboard-content]")!;
+    const draft = screen.getByLabelText("未提交的任务") as HTMLInputElement;
+    fireEvent.change(draft, { target: { value: "切换布局时保留我的草稿" } });
+    await waitFor(() => expect(wrapper.style.gridRowEnd).toBe("span 124"));
+    expect(observe).toHaveBeenCalledWith(naturalContent);
+    expect(observe).not.toHaveBeenCalledWith(wrapper);
+
+    contentHeight = 188;
+    act(() => notify([{
+      target: naturalContent,
+      contentRect: new DOMRect(0, 0, 320, contentHeight),
+      borderBoxSize: [],
+      contentBoxSize: [],
+      devicePixelContentBoxSize: [],
+    }], {} as ResizeObserver));
+    await waitFor(() => expect(wrapper.style.gridRowEnd).toBe("span 200"));
+    expect(visibleOrder()).toEqual(["daily", "research", "boards"]);
+
+    rerender(<Console layout="list" />);
+    expect(wrapper.style.gridRowEnd).toBe("");
+    expect(screen.getByLabelText("未提交的任务")).toBe(draft);
+    expect(draft.value).toBe("切换布局时保留我的草稿");
+    expect(disconnect).toHaveBeenCalled();
+
+    rerender(<Console layout="masonry" />);
+    await waitFor(() => expect(wrapper.style.gridRowEnd).toBe("span 200"));
+    fireEvent.click(screen.getByRole("button", { name: "调整顺序" }));
+    expect(wrapper.style.gridRowEnd).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "完成排序" }));
+    await waitFor(() => expect(wrapper.style.gridRowEnd).toBe("span 200"));
+    expect(screen.getByLabelText("未提交的任务")).toBe(draft);
+    expect(draft.value).toBe("切换布局时保留我的草稿");
+  });
+
   it("restores valid saved IDs, removes duplicates and appends newly available modules", () => {
     expect(normalizeDashboardSectionOrder(["research", "retired", "research", null, "daily"])).toEqual(["research", "daily", ...defaultDashboardSectionOrder.filter((id) => id !== "research" && id !== "daily")]);
     expect(normalizeDashboardSectionOrder(null)).toEqual(defaultDashboardSectionOrder);

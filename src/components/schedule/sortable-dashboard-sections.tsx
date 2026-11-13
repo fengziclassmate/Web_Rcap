@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Check, GripVertical, RotateCcw, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { dashboardSections, defaultDashboardSectionOrder, moveDashboardSection, normalizeDashboardSectionOrder, type DashboardSectionId } from "@/lib/dashboard-sections";
 
-export function SortableDashboardSections({ sections, order, onOrderChange }: {
+export function SortableDashboardSections({ sections, order, onOrderChange, layout = "list" }: {
+  layout?: "list" | "masonry";
   sections: { id: DashboardSectionId; content: ReactNode }[];
   order?: DashboardSectionId[];
   onOrderChange: (order: DashboardSectionId[]) => void;
@@ -14,8 +15,27 @@ export function SortableDashboardSections({ sections, order, onOrderChange }: {
   const dragging = useRef<DashboardSectionId | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: DashboardSectionId; after: boolean } | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
   const normalized = normalizeDashboardSectionOrder(order);
   const available = normalized.filter((id) => sections.some((section) => section.id === id && section.content != null));
+  const layoutKey = available.join("|");
+
+  useLayoutEffect(() => {
+    const items = Array.from(listRef.current!.children) as HTMLElement[];
+    if (layout !== "masonry" || arranging) {
+      items.forEach((item) => item.style.removeProperty("grid-row-end"));
+      return;
+    }
+    const measure = () => items.forEach((item) => {
+      const content = item.querySelector<HTMLElement>("[data-dashboard-content]")!;
+      const span = `span ${Math.ceil(content.getBoundingClientRect().height + 12)}`;
+      if (item.style.gridRowEnd !== span) item.style.gridRowEnd = span;
+    });
+    const observer = new ResizeObserver(measure);
+    items.forEach((item) => observer.observe(item.querySelector<HTMLElement>("[data-dashboard-content]")!));
+    measure();
+    return () => observer.disconnect();
+  }, [layout, arranging, layoutKey]);
 
   function move(source: DashboardSectionId, target: DashboardSectionId, after = false) {
     const next = moveDashboardSection(normalized, source, target, after);
@@ -33,7 +53,7 @@ export function SortableDashboardSections({ sections, order, onOrderChange }: {
         <Button size="sm" variant={arranging ? "secondary" : "ghost"} aria-pressed={arranging} onClick={() => { setArranging(!arranging); dragging.current = null; setDropTarget(null); }}>{arranging ? <Check className="size-3.5" /> : <Settings2 className="size-3.5" />}{arranging ? "完成排序" : "调整顺序"}</Button>
       </div>
     </div>
-    <div className={arranging ? "space-y-2 p-3" : ""} data-testid="dashboard-section-list">
+    <div ref={listRef} className={arranging ? "space-y-2 p-3" : ""} data-testid="dashboard-section-list" data-layout={layout} data-arranging={arranging}>
       {available.map((id, index) => {
         const title = dashboardSections.find((section) => section.id === id)!.title;
         const target = dropTarget?.id === id ? dropTarget : null;
@@ -61,7 +81,7 @@ export function SortableDashboardSections({ sections, order, onOrderChange }: {
             <Button size="icon-sm" variant="ghost" aria-label={`上移${title}`} disabled={index === 0} onClick={() => move(id, available[index - 1])}><ArrowUp className="size-3.5" /></Button>
             <Button size="icon-sm" variant="ghost" aria-label={`下移${title}`} disabled={index === available.length - 1} onClick={() => move(id, available[index + 1], true)}><ArrowDown className="size-3.5" /></Button>
           </div>}
-          <div hidden={arranging}>{sections.find((section) => section.id === id)?.content}</div>
+          <div data-dashboard-content hidden={arranging}>{sections.find((section) => section.id === id)?.content}</div>
         </div>;
       })}
     </div>

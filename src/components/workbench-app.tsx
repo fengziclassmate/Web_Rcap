@@ -1275,6 +1275,7 @@ export function WorkbenchApp() {
                 {taskConsoleCollapsed && <button type="button" className="task-console-rail" aria-label="展开任务控制台" aria-expanded={false} aria-controls="workbench-task-console" title="展开任务控制台" onClick={() => setDashboardUiPreferences((previous) => ({ ...previous, taskConsoleCollapsed: false }))}><PanelRightOpen className="size-4" aria-hidden /><span>任务控制台</span></button>}
                 <div id="workbench-task-console" hidden={taskConsoleCollapsed}>
                 <TaskDashboard
+                  layout={taskConsolePosition === "bottom" ? "masonry" : "list"}
                   onCollapse={() => setDashboardUiPreferences((previous) => ({ ...previous, taskConsoleCollapsed: true }))}
                   createRequested={createRequest === "task"}
                   onCreateRequestHandled={() => setCreateRequest(null)}

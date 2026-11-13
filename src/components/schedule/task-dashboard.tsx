@@ -55,6 +55,7 @@ import type { LogComposerInput, LogPostRecord } from "@/lib/logs";
 import { cn } from "@/lib/utils";
 
 type TaskDashboardProps = {
+  layout?: "list" | "masonry";
   onCollapse?: () => void;
   createRequested?: boolean;
   onCreateRequestHandled?: () => void;
@@ -308,6 +309,7 @@ function isValidTime(value: string) {
 }
 
 export function TaskDashboard({
+  layout = "list",
   onCollapse,
   createRequested,
   onCreateRequestHandled,
@@ -1384,6 +1386,7 @@ export function TaskDashboard({
       </Dialog>
 
       <SortableDashboardSections
+        layout={layout}
         order={uiPreferences.dashboardSectionOrder}
         onOrderChange={(dashboardSectionOrder) => patchUiPreferences({ dashboardSectionOrder })}
         sections={[
