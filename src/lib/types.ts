@@ -145,6 +145,8 @@ export type DesktopAppearance = { backgroundOpacity: number; cardOpacity: number
 export type DashboardUiPreferences = {
   desktopAppearance?: DesktopAppearance;
   taskConsoleCollapsed: boolean;
+  taskConsolePosition: "right" | "bottom";
+  visibleWeekdays: number[];
   confirmDangerousActions: boolean;
   scheduleTemplates?: import("./schedule-templates").ScheduleTemplate[];
   dashboardSectionOrder?: import("./dashboard-sections").DashboardSectionId[];

@@ -169,6 +169,36 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it("filters arbitrary week columns by their actual dates and leaves day view available", () => {
+    const onDeleteEvent = vi.fn();
+    const events = [scheduleEvent, { ...scheduleEvent, id: "wednesday", date: "2026-07-29" }];
+    const { container, rerenderGrid } = renderGrid({ events, onDeleteEvent });
+    rerenderGrid({ visibleWeekdays: [3, 5, 0] });
+    expect(Array.from(container.querySelectorAll<HTMLElement>("[data-day-header]")).map((day) => day.dataset.dayHeader)).toEqual(["2026-07-29", "2026-07-31", "2026-08-02"]);
+    expect(Array.from(container.querySelectorAll<HTMLElement>("[data-timeline-date]")).map((day) => day.dataset.timelineDate)).toEqual(["2026-07-29", "2026-07-31", "2026-08-02"]);
+    expect(container.querySelector('[data-schedule-event-id="event-1"]')).toBeNull();
+    expect(container.querySelector('[data-schedule-event-id="wednesday"]')).toBeTruthy();
+    expect(onDeleteEvent).not.toHaveBeenCalled();
+    rerenderGrid({ visibleWeekdays: [3, 5, 0], viewMode: "day" });
+    expect(container.querySelector('[data-schedule-event-id="event-1"]')).toBeTruthy();
+  });
+
+  it("clears the selected set after hiding a date column", () => {
+    const { container, rerenderGrid } = renderGrid({ events: [scheduleEvent] });
+    marqueeSelectAll(container);
+    expect(screen.getByText("已选 1 项")).toBeTruthy();
+    rerenderGrid({ visibleWeekdays: [3] });
+    expect(screen.queryByRole("button", { name: "删除所选" })).toBeNull();
+    rerenderGrid({ visibleWeekdays: [1, 2, 3, 4, 5, 6, 0] });
+    expect(screen.queryByText("已选 1 项")).toBeNull();
+  });
+
+  it("creates on the first visible day instead of a hidden Monday", () => {
+    const { rerenderGrid } = renderGrid();
+    rerenderGrid({ visibleWeekdays: [3] });
+    fireEvent.click(screen.getByRole("button", { name: "新建日程" }));
+    expect(within(screen.getByRole("dialog")).getByText("2026-07-29", { selector: "time" })).toBeTruthy();
+  });
   it("updates only the selected recurring occurrence's notes and disables time manipulation while editing", () => {
     const onUpdateEvent = vi.fn();
     const { container } = renderGrid({ events: [{ ...scheduleEvent, notes: "旧地点", recurrence: { kind: "daily" } }], onUpdateEvent });

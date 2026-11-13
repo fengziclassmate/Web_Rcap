@@ -4,6 +4,17 @@ import { mergeScheduleChanges } from "../schedule-merge";
 
 const snapshot = (tasks: unknown[]) => normalizePersistedSchedulePayload({ tasks })!;
 describe("concurrent schedule changes", () => {
+  it("merges weekday columns and console placement changed by different devices without losing other preferences", () => {
+    const base = snapshot([]);
+    const local = { ...base, ui_preferences: { ...base.ui_preferences, visibleWeekdays: [5, 6, 0], taskConsoleCollapsed: true } };
+    const remote = { ...base, ui_preferences: { ...base.ui_preferences, taskConsolePosition: "bottom" as const, confirmDangerousActions: false } };
+    for (const [ours, theirs] of [[local, remote], [remote, local]]) {
+      const merged = mergeScheduleChanges(base, ours, theirs);
+      expect(merged.conflicts).toEqual([]);
+      expect(merged.value.ui_preferences).toMatchObject({ visibleWeekdays: [5, 6, 0], taskConsolePosition: "bottom", taskConsoleCollapsed: true, confirmDangerousActions: false });
+      expect(JSON.stringify(merged.value.ui_preferences)).toBe(JSON.stringify(normalizePersistedSchedulePayload(merged.value)!.ui_preferences));
+    }
+  });
   it("merges each panel row as one choice when devices open different panels", () => {
     const base = snapshot([]);
     const local = { ...base, ui_preferences: { ...base.ui_preferences, shoppingSectionOpen: true } };

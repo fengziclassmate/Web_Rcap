@@ -26,6 +26,8 @@ import { DEFAULT_SCHEDULE_CATEGORY, normalizeScheduleCategory } from "@/lib/cate
 
 export const defaultDashboardUiPreferences: DashboardUiPreferences = {
   taskConsoleCollapsed: false,
+  taskConsolePosition: "right",
+  visibleWeekdays: [1, 2, 3, 4, 5, 6, 0],
   confirmDangerousActions: true,
   dashboardSectionOrder: defaultDashboardSectionOrder,
   projectBoardsSectionOpen: true,
@@ -287,12 +289,15 @@ export function normalizeDashboardUiPreferences(payload: unknown): DashboardUiPr
   if (!payload || typeof payload !== "object") return defaultDashboardUiPreferences;
   const value = payload as Partial<DashboardUiPreferences>;
   const appearance = value.desktopAppearance;
+  const visibleWeekdays = [1, 2, 3, 4, 5, 6, 0].filter((day) => Array.isArray(value.visibleWeekdays) && value.visibleWeekdays.includes(day));
   // Only a single open panel represents a saved choice; older layouts opened all panels.
   const taskPanels = (["longTaskSectionOpen", "annualSectionOpen", "shoppingSectionOpen"] as const).filter((key) => value[key] === true);
   const utilityPanels = (["projectSectionOpen", "routineCheckinSectionOpen", "achievementSectionOpen", "footprintSectionOpen"] as const).filter((key) => value[key] === true);
   const capacityStartHour = Number.isInteger(value.capacityStartHour) && value.capacityStartHour! >= 0 && value.capacityStartHour! < 24 ? value.capacityStartHour! : 9;
   return {
     taskConsoleCollapsed: value.taskConsoleCollapsed === true,
+    taskConsolePosition: value.taskConsolePosition === "bottom" ? "bottom" : "right",
+    visibleWeekdays: visibleWeekdays.length ? visibleWeekdays : defaultDashboardUiPreferences.visibleWeekdays,
     ...(appearance && [appearance.backgroundOpacity, appearance.cardOpacity].every((number) => typeof number === "number" && Number.isFinite(number) && number >= 20 && number <= 100)
       ? { desktopAppearance: { backgroundOpacity: appearance.backgroundOpacity, cardOpacity: appearance.cardOpacity } } : {}),
     confirmDangerousActions: value.confirmDangerousActions !== false,

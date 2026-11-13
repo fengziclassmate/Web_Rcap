@@ -157,7 +157,7 @@ export function WorkbenchApp() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const { confirmDangerousActions, taskConsoleCollapsed } = dashboardUiPreferences;
+  const { confirmDangerousActions, taskConsoleCollapsed, taskConsolePosition } = dashboardUiPreferences;
   const weekRange = useMemo(() => {
     const start = format(currentWeekStart, "yyyy/MM/dd", { locale: zhCN });
     const end = format(addDays(currentWeekStart, 6), "yyyy/MM/dd", { locale: zhCN });
@@ -1174,6 +1174,14 @@ export function WorkbenchApp() {
               <Popover.Positioner side="bottom" align="end" sideOffset={8} className="z-[100]">
                 <Popover.Popup className="workbench-settings">
                   <Popover.Title className="text-sm font-semibold">工作台设置</Popover.Title>
+                  <fieldset className="workbench-console-position">
+                    <legend>任务控制台位置</legend>
+                    <div>
+                      {([['right', '右侧'], ['bottom', '底部']] as const).map(([position, label]) => (
+                        <Button key={position} type="button" size="sm" variant={taskConsolePosition === position ? "secondary" : "ghost"} aria-pressed={taskConsolePosition === position} onClick={() => setDashboardUiPreferences((previous) => ({ ...previous, taskConsolePosition: position }))}>{label}</Button>
+                      ))}
+                    </div>
+                  </fieldset>
                   <div className="workbench-tool-list">
           <ShortcutSettings />
           <WeeklyReportDialog
@@ -1220,7 +1228,7 @@ export function WorkbenchApp() {
 
         <div key={activeModule} className="workbench-module min-h-0 w-full">
           {activeModule === "schedule" ? (
-            <div className="schedule-workspace" data-console-collapsed={taskConsoleCollapsed}>
+            <div className="schedule-workspace" data-console-collapsed={taskConsoleCollapsed} data-console-position={taskConsolePosition}>
               <section className="min-h-0">
                 <WeeklyTimeGrid
                   createRequested={createRequest === "event"}
@@ -1259,6 +1267,8 @@ export function WorkbenchApp() {
                   )}
                   viewMode={viewMode}
                   timeGranularity={timeGranularity}
+                  visibleWeekdays={dashboardUiPreferences.visibleWeekdays}
+                  onVisibleWeekdaysChange={(visibleWeekdays) => setDashboardUiPreferences((previous) => ({ ...previous, visibleWeekdays }))}
                 />
               </section>
               <section className="workbench-task-sidebar min-h-0">

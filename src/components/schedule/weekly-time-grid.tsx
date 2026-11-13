@@ -50,6 +50,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DailyExpensePanel } from "@/components/schedule/daily-expense-panel";
 import { DailyReflectionPanel } from "@/components/schedule/daily-reflection-panel";
 import { ScheduleEventContent } from "@/components/schedule/schedule-event-content";
+import { WeekColumnPicker } from "@/components/schedule/week-column-picker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -212,6 +213,8 @@ type WeeklyTimeGridProps = {
   onScheduleTemplatesChange?: (templates: ScheduleTemplate[]) => void;
   viewMode?: ViewMode;
   timeGranularity?: TimeGranularity;
+  visibleWeekdays?: number[];
+  onVisibleWeekdaysChange?: (weekdays: number[]) => void;
 };
 
 type ContextMenuState = {
@@ -267,6 +270,7 @@ const minuteOptions = Array.from({ length: 60 }, (_, minute) => minute);
 const quickMinuteOptions = Array.from({ length: 12 }, (_, index) => index * 5);
 const emptySelectedEventIds = new Set<string>();
 const emptyLogPosts: LogPostRecord[] = [];
+const allWeekdays = [1, 2, 3, 4, 5, 6, 0];
 const compactMoneyFormatter = new Intl.NumberFormat("zh-CN", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
@@ -541,6 +545,8 @@ export function WeeklyTimeGrid({
   onScheduleTemplatesChange,
   viewMode = "week",
   timeGranularity = 60,
+  visibleWeekdays = allWeekdays,
+  onVisibleWeekdaysChange,
 }: WeeklyTimeGridProps) {
   const userId = useAccountId();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -685,10 +691,16 @@ export function WeeklyTimeGrid({
     }
     return Array.from({ length: 35 }, (_, index) => addDays(currentWeekStart, index));
   }, [currentWeekStart, viewMode]);
+  const timelineDates = useMemo(() => viewMode === "week"
+    ? displayDates.filter((date) => visibleWeekdays.includes(date.getDay())) : displayDates, [displayDates, viewMode, visibleWeekdays]);
+  const timelineDateKeys = useMemo(() => new Set(timelineDates.map((date) => format(date, "yyyy-MM-dd"))), [timelineDates]);
   const visibleDateRangeKey = useMemo(
-    () => displayDates.map((date) => format(date, "yyyy-MM-dd")).join("|"),
-    [displayDates],
+    () => timelineDates.map((date) => format(date, "yyyy-MM-dd")).join("|"),
+    [timelineDates],
   );
+  if (eventSelection.rangeKey !== visibleDateRangeKey) {
+    setEventSelection({ rangeKey: visibleDateRangeKey, ids: new Set() });
+  }
   useEffect(() => {
     if ((viewMode !== "month" && viewMode !== "week") || displayDates.length === 0) {
       return;
@@ -785,7 +797,7 @@ export function WeeklyTimeGrid({
         .filter((segment) => displayDateKeys.has(segment.displayDate)),
     [displayDateKeys, expandedEvents],
   );
-  const visibleEventIds = useMemo(() => new Set(displayEventSegments.map((event) => event.id)), [displayEventSegments]);
+  const visibleEventIds = useMemo(() => new Set(displayEventSegments.filter((event) => timelineDateKeys.has(event.displayDate)).map((event) => event.id)), [displayEventSegments, timelineDateKeys]);
   const selectedEventIds = useMemo(() => eventSelection.rangeKey === visibleDateRangeKey
     ? new Set([...eventSelection.ids].filter((id) => visibleEventIds.has(id)))
     : emptySelectedEventIds, [eventSelection, visibleDateRangeKey, visibleEventIds]);
@@ -848,7 +860,7 @@ export function WeeklyTimeGrid({
       eventsByDate.set(event.displayDate, dayEvents);
     });
 
-    return displayDates.map((date) => {
+    return timelineDates.map((date) => {
       const dateIso = format(date, "yyyy-MM-dd");
       const positionedEvents = layoutOverlappingScheduleEvents(eventsByDate.get(dateIso) ?? []);
       return {
@@ -858,10 +870,10 @@ export function WeeklyTimeGrid({
         completedCount: positionedEvents.filter((event) => event.isCompleted).length,
       };
     });
-  }, [displayDates, displayDateKeys, displayEventSegments, expandedEvents, resizePreview, viewMode]);
+  }, [timelineDates, displayDateKeys, displayEventSegments, expandedEvents, resizePreview, viewMode]);
 
   const dragPreviewSegments = useMemo(() => dragPreview.flatMap((event) => splitScheduleEventByDay(event)), [dragPreview]);
-  const dragAnchorPreview = dragPreviewSegments.find((segment) => segment.id === dragPreview[0]?.id && displayDateKeys.has(segment.displayDate));
+  const dragAnchorPreview = dragPreviewSegments.find((segment) => segment.id === dragPreview[0]?.id && timelineDateKeys.has(segment.displayDate));
   const dragPreviewIds = useMemo(() => new Set(dragPreview.map((event) => event.id)), [dragPreview]);
   const positionedDragPreviews = useMemo(() => {
     if (dragPreviewIds.size === 0) return new Map<string, PositionedScheduleEvent<TimelineEventSegment>[]>();
@@ -873,7 +885,6 @@ export function WeeklyTimeGrid({
     ]));
   }, [timelineDayLayouts, dragPreviewSegments, dragPreviewIds]);
 
-  const visibleRangeStart = format(currentWeekStart, "yyyy-MM-dd");
   const timelineDayWidths = useMemo(() => timelineDayLayouts.map((day) => {
     const lanes = day.events.reduce((count, event) => Math.max(count, event.laneCount), 1);
     return lanes > 1 ? lanes * 112 : 88;
@@ -886,6 +897,7 @@ export function WeeklyTimeGrid({
     [editingEventId, expandedEvents],
   );
   const [todayIso, setTodayIso] = useState("");
+  const defaultCreateDate = timelineDateKeys.has(todayIso) ? todayIso : format(timelineDates[0], "yyyy-MM-dd");
   useEffect(() => {
     let midnightTimer: ReturnType<typeof setTimeout>;
     const refreshToday = () => {
@@ -1038,7 +1050,7 @@ export function WeeklyTimeGrid({
   }
 
   const openRequestedCreate = useEffectEvent(() => {
-    resetCreateDialog({ date: viewMode === "day" ? visibleRangeStart : (displayDateKeys.has(todayIso) ? todayIso : visibleRangeStart), startHour: 9 });
+    resetCreateDialog({ date: defaultCreateDate, startHour: 9 });
     onCreateRequestHandled?.();
   });
   useEffect(() => { if (createRequested) openRequestedCreate(); }, [createRequested]);
@@ -1916,6 +1928,8 @@ export function WeeklyTimeGrid({
             </div>
           ) : null}
 
+          {viewMode === "week" && onVisibleWeekdaysChange && <WeekColumnPicker dates={displayDates} visibleWeekdays={visibleWeekdays} today={todayIso} onChange={onVisibleWeekdaysChange} />}
+
           {onToday && <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={onToday}>今天</Button>}
           <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" aria-label={viewMode === "day" ? "前一天" : viewMode === "week" ? "前一周" : "前一月"} title="上一时段" onClick={onPrevWeek}>
             <ChevronLeft className="h-3.5 w-3.5" />
@@ -1934,7 +1948,7 @@ export function WeeklyTimeGrid({
           <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={() => setShowCategoryManager(true)}>
             分类管理
           </Button>
-          <Button type="button" size="sm" className="h-8 px-3 text-xs" onClick={() => resetCreateDialog({ date: viewMode === "day" ? visibleRangeStart : (displayDateKeys.has(todayIso) ? todayIso : visibleRangeStart), startHour: 9 })}><Plus className="size-3.5" />新建日程</Button>
+          <Button type="button" size="sm" className="h-8 px-3 text-xs" onClick={() => resetCreateDialog({ date: defaultCreateDate, startHour: 9 })}><Plus className="size-3.5" />新建日程</Button>
         </div>
       </header>
 
@@ -2198,7 +2212,7 @@ export function WeeklyTimeGrid({
                             style={{ ...getEventStyle(segment), zIndex: 60 }}
                           >
                             {segment.segmentId === dragAnchorPreview?.segmentId ? (
-                              <div role="status" aria-label="拖动落点" className={`absolute -top-7 whitespace-nowrap rounded-md bg-sky-700 px-2 py-1 text-[11px] font-semibold text-white shadow-md ${dayLayout.dateIso === format(displayDates.at(-1)!, "yyyy-MM-dd") ? "right-0" : "left-0"}`}>
+                              <div role="status" aria-label="拖动落点" className={`absolute -top-7 whitespace-nowrap rounded-md bg-sky-700 px-2 py-1 text-[11px] font-semibold text-white shadow-md ${dayLayout.dateIso === format(timelineDates.at(-1)!, "yyyy-MM-dd") ? "right-0" : "left-0"}`}>
                                 {dragPreview.length > 1 ? <span className="mr-2">移动 {dragPreview.length} 项</span> : null}
                                 {segment.sourceDate} {formatHour(segment.sourceStartHour)} - {segment.endDate && segment.endDate !== segment.sourceDate ? `${segment.endDate} ` : segment.sourceEndHour < segment.sourceStartHour ? "次日 " : ""}{formatHour(segment.sourceEndHour)}
                                 <span className="ml-2 font-normal opacity-85">Shift 精确到分钟</span>

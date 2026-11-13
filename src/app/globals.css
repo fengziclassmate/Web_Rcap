@@ -1712,6 +1712,10 @@
 .workbench-tool-list { display: grid; gap: 4px; margin: 10px 0; }
 .workbench-tool-list > button { width: 100%; justify-content: flex-start; border: none; border-radius: 4px; background: transparent; box-shadow: none; font-size: 14px; }
 .workbench-tool-list > button:hover { background: #f0f0f0; }
+.workbench-console-position { margin-top: 12px; border: 0; padding: 0; font-size: 12px; }
+.workbench-console-position legend { margin-bottom: 8px; }
+.workbench-console-position > div { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; border: 0.5px solid #e8e8e8; border-radius: 6px; padding: 4px; }
+.workbench-console-position button { min-height: 32px; border-radius: 4px; }
 .workbench-account { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 0.5px solid #e8e8e8; padding-top: 8px; font-size: 12px; }
 .workbench-account > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #646464; }
 .schedule-workspace { display: grid; grid-template-columns: minmax(0,1fr) minmax(340px,380px); gap: 12px; align-items: start; }
@@ -1721,6 +1725,12 @@
 .task-console .dashboard-layout-toolbar[data-arranging=false] { right: 52px; }
 .task-console-rail { position: sticky; top: 12px; display: flex; width: 40px; min-height: 148px; flex-direction: column; align-items: center; gap: 12px; padding: 12px 8px; border: 0.5px solid #d9d9d9; border-radius: 6px; background: #fcfcfc; color: #646464; font-size: 12px; }
 .task-console-rail > span { writing-mode: vertical-rl; letter-spacing: 2px; }
+.schedule-workspace[data-console-position=bottom], .schedule-workspace[data-console-position=bottom][data-console-collapsed=true] { grid-template-columns: minmax(0,1fr); }
+.schedule-workspace[data-console-position=bottom] .task-console-rail { position: static; width: 100%; min-height: 40px; flex-direction: row; justify-content: center; padding: 8px 12px; }
+.schedule-workspace[data-console-position=bottom] .task-console-rail > span { writing-mode: horizontal-tb; letter-spacing: 0; }
+.schedule-workspace[data-console-position=bottom] :is(.task-console-rail > svg, [aria-label="收起任务控制台"] > svg) { transform: rotate(90deg); }
+.schedule-workspace[data-console-position=bottom] .task-console .dashboard-layout-toolbar[data-arranging=false] + [data-testid="dashboard-section-list"] { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(300px,100%),1fr)); align-items: start; }
+.schedule-workspace[data-console-position=bottom] .dashboard-section-card { container-type: inline-size; }
 .task-console-rail:hover { background: #f0f0f0; color: #202020; }
 .workbench-header button:focus-visible, .task-console-rail:focus-visible { outline: 2px solid #208368; outline-offset: 2px; }
 @media (max-width: 1000px) {

@@ -8,6 +8,22 @@ import {
 } from "../normalizers";
 
 describe("normalizers", () => {
+  it("preserves selected weekdays and the task console position while removing invalid duplicate days", () => {
+    expect(normalizeDashboardUiPreferences({ visibleWeekdays: [5, 5, "6", true, -1, 7, null, 0], taskConsolePosition: "bottom" })).toMatchObject({ visibleWeekdays: [5, 0], taskConsolePosition: "bottom" });
+    expect(normalizeDashboardUiPreferences({ visibleWeekdays: [0], taskConsolePosition: "right" })).toMatchObject({ visibleWeekdays: [0], taskConsolePosition: "right" });
+  });
+
+  it.each([{ value: undefined }, { value: null }, { value: [] }, { value: [7, -1, 1.5, "5"] }, { value: "all" }])("restores all weekday columns when the stored selection is unusable: %j", ({ value: visibleWeekdays }) => {
+    expect(normalizeDashboardUiPreferences({ visibleWeekdays }).visibleWeekdays).toEqual([1, 2, 3, 4, 5, 6, 0]);
+  });
+
+  it.each([undefined, null, "left", "", 0])("restores the right task console for an invalid position: %j", (taskConsolePosition) => {
+    expect(normalizeDashboardUiPreferences({ taskConsolePosition }).taskConsolePosition).toBe("right");
+  });
+
+  it("provides the original seven columns and right console for an older account", () => {
+    expect(normalizeDashboardUiPreferences(undefined)).toMatchObject({ visibleWeekdays: [1, 2, 3, 4, 5, 6, 0], taskConsolePosition: "right" });
+  });
   it("removes zero-minute remnants while keeping minute-long, overnight and full-day events", () => {
     const restored = normalizeEvents([
       { id: "phantom", date: "2026-10-20", startHour: 20.416666666666664, endHour: 20.416666666666668 },

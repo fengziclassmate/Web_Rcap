@@ -13,6 +13,15 @@ describe("schedule UI preference persistence", () => {
     localStorage.clear();
   });
 
+  it.each([
+    { visibleWeekdays: [5, 6, 0], taskConsolePosition: "bottom" as const },
+    { visibleWeekdays: [0], taskConsolePosition: "right" as const },
+  ])("restores weekday visibility and console placement from the local preference cache: %j", (layout) => {
+    const preferences = { ...defaultDashboardUiPreferences, ...layout };
+    writeDashboardUiPreferencesToLocal(preferences);
+    expect(readDashboardUiPreferencesFromLocal()).toEqual(preferences);
+  });
+
   it("restores time granularity and every task dashboard expansion state", () => {
     const preferences = {
       ...defaultDashboardUiPreferences,
