@@ -169,6 +169,127 @@ function marqueeSelectAll(container: HTMLElement) {
 }
 
 describe("WeeklyTimeGrid interactions", () => {
+  it.each([true, false])("applies context completion=%s to a marquee selection without reversing mixed states", (completed) => {
+    const onUpdateEvent = vi.fn();
+    const events = [
+      { ...scheduleEvent, title: "框选日程一", isCompleted: !completed },
+      { ...scheduleEvent, id: "second", title: "框选日程二", startHour: 11, endHour: 12, isCompleted: completed },
+      { ...scheduleEvent, id: "third", title: "框选日程三", startHour: 13, endHour: 14, isCompleted: !completed },
+    ];
+    const { container } = renderGrid({ events, onUpdateEvent });
+    marqueeSelectAll(container);
+    fireEvent.contextMenu(container.querySelector('[data-schedule-event-id="event-1"]')!, { clientX: 120, clientY: 120 });
+    const menu = within(screen.getByRole("group", { name: "日程右键操作" }));
+    expect(menu.queryByRole("button", { name: "改约" })).toBeNull();
+    expect(menu.queryByRole("button", { name: "加时" })).toBeNull();
+    expect(menu.queryByRole("button", { name: "加入日常任务" })).toBeNull();
+    fireEvent.click(menu.getByRole("button", { name: completed ? "标记所选为已完成" : "标记所选为未完成" }));
+    expect(onUpdateEvent).toHaveBeenCalledTimes(2);
+    expect(onUpdateEvent).toHaveBeenCalledWith("event-1", { isCompleted: completed }, undefined);
+    expect(onUpdateEvent).toHaveBeenCalledWith("third", { isCompleted: completed }, undefined);
+    expect(screen.getByText("已选 3 项")).toBeTruthy();
+  });
+
+  it("keeps the context delete snapshot after the selected columns change", () => {
+    const onDeleteEvent = vi.fn();
+    const { container, rerenderGrid } = renderGrid({ events: [
+      { ...scheduleEvent, isCompleted: false },
+      { ...scheduleEvent, id: "second", title: "周三日程", date: "2026-07-29" },
+    ], onDeleteEvent });
+    marqueeSelectAll(container);
+    fireEvent.contextMenu(container.querySelector('[data-schedule-event-id="event-1"]')!, { clientX: 120, clientY: 120 });
+    fireEvent.click(within(screen.getByRole("group", { name: "日程右键操作" })).getByRole("button", { name: "删除所选 2 项" }));
+    expect(onDeleteEvent).not.toHaveBeenCalled();
+    rerenderGrid({ visibleWeekdays: [3] });
+    const confirm = within(screen.getByRole("dialog"));
+    fireEvent.click(confirm.getByRole("button", { name: "删除所选" }));
+    expect(onDeleteEvent).toHaveBeenCalledTimes(2);
+    expect(onDeleteEvent).toHaveBeenCalledWith("event-1", { mode: "all" });
+    expect(onDeleteEvent).toHaveBeenCalledWith("second", { mode: "all" });
+  });
+
+  it("limits a right click outside the selection to that single card", () => {
+    const onDeleteEvent = vi.fn();
+    const events = [scheduleEvent, { ...scheduleEvent, id: "second", title: "已选二", startHour: 11, endHour: 12 }];
+    const { container, rerenderGrid } = renderGrid({ events, onDeleteEvent });
+    marqueeSelectAll(container);
+    rerenderGrid({ events: [...events, { ...scheduleEvent, id: "outside", title: "未选第三项", startHour: 14, endHour: 15 }] });
+    fireEvent.contextMenu(container.querySelector('[data-schedule-event-id="outside"]')!, { clientX: 120, clientY: 120 });
+    const menu = within(screen.getByRole("group", { name: "日程右键操作" }));
+    expect(menu.queryByRole("button", { name: "标记所选为已完成" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "删除所选" })).toBeNull();
+    fireEvent.click(menu.getByRole("button", { name: "删除该行程" }));
+    expect(onDeleteEvent.mock.calls).toEqual([["outside", { mode: "all" }]]);
+  });
+
+  it("sets and clears tags for all selected cards and does not claim a common tag for mixed values", async () => {
+    const onUpdateEvent = vi.fn();
+    const events: ScheduleEvent[] = [
+      { ...scheduleEvent, tag: "待定" },
+      { ...scheduleEvent, id: "second", title: "不同标记", startHour: 11, endHour: 12, tag: "不可后退" },
+    ];
+    const { container, rerenderGrid } = renderGrid({ events, onUpdateEvent });
+    marqueeSelectAll(container);
+    const openTags = () => {
+      fireEvent.contextMenu(container.querySelector('[data-schedule-event-id="event-1"]')!, { clientX: 120, clientY: 120 });
+      fireEvent.click(within(screen.getByRole("group", { name: "日程右键操作" })).getByRole("button", { name: "选择标记" }));
+    };
+    openTags();
+    let dialog = within(await screen.findByRole("dialog"));
+    expect(dialog.getByRole("button", { name: "待确认" }).getAttribute("aria-pressed")).toBe("false");
+    expect(dialog.getByRole("button", { name: "固定时间" }).getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(dialog.getByRole("button", { name: "深度专注" }));
+    expect(onUpdateEvent).toHaveBeenCalledTimes(2);
+    expect(onUpdateEvent).toHaveBeenCalledWith("event-1", { tag: "深度专注" }, undefined);
+    expect(onUpdateEvent).toHaveBeenCalledWith("second", { tag: "深度专注" }, undefined);
+    onUpdateEvent.mockClear();
+    rerenderGrid({ events: events.map((event) => ({ ...event, tag: "深度专注" })) });
+    openTags();
+    dialog = within(await screen.findByRole("dialog"));
+    expect(dialog.getByRole("button", { name: "深度专注" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(dialog.getByRole("button", { name: "无标记" }));
+    expect(onUpdateEvent).toHaveBeenCalledTimes(2);
+    expect(onUpdateEvent).toHaveBeenCalledWith("event-1", { tag: null }, undefined);
+    expect(onUpdateEvent).toHaveBeenCalledWith("second", { tag: null }, undefined);
+  });
+
+  it("keeps recurring context group operations scoped to selected occurrences", () => {
+    const onUpdateEvent = vi.fn();
+    const onDeleteEvent = vi.fn();
+    const { container } = renderGrid({ events: [
+      { ...scheduleEvent, id: "series", title: "循环事项", recurrence: { kind: "daily" }, recurrenceEndExclusive: "2026-07-29", isCompleted: false },
+      { ...scheduleEvent, id: "ordinary", title: "普通事项", startHour: 11, endHour: 12, isCompleted: false },
+    ], onUpdateEvent, onDeleteEvent });
+    marqueeSelectAll(container);
+    const card = container.querySelector('[data-schedule-event-id="series__2026-07-27"]')!;
+    fireEvent.contextMenu(card, { clientX: 120, clientY: 120 });
+    fireEvent.click(within(screen.getByRole("group", { name: "日程右键操作" })).getByRole("button", { name: "标记所选为已完成" }));
+    expect(onUpdateEvent).toHaveBeenCalledTimes(3);
+    for (const id of ["series__2026-07-27", "series__2026-07-28"]) expect(onUpdateEvent).toHaveBeenCalledWith(id, { isCompleted: true }, { scope: "occurrence" });
+    expect(onUpdateEvent).toHaveBeenCalledWith("ordinary", { isCompleted: true }, undefined);
+    fireEvent.contextMenu(card, { clientX: 120, clientY: 120 });
+    fireEvent.click(within(screen.getByRole("group", { name: "日程右键操作" })).getByRole("button", { name: "删除所选 3 项" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "删除所选" }));
+    expect(onDeleteEvent).toHaveBeenCalledTimes(3);
+    for (const id of ["series__2026-07-27", "series__2026-07-28"]) expect(onDeleteEvent).toHaveBeenCalledWith(id, { mode: "single" });
+    expect(onDeleteEvent).toHaveBeenCalledWith("ordinary", { mode: "all" });
+  });
+
+  it("deletes a selected overnight event once even when its two visible segments are selected", () => {
+    const onDeleteEvent = vi.fn();
+    const { container } = renderGrid({ events: [
+      { ...scheduleEvent, id: "overnight", startHour: 23, endHour: 2 },
+      { ...scheduleEvent, id: "next-day", date: "2026-07-28", startHour: 10, endHour: 11 },
+    ], onDeleteEvent });
+    marqueeSelectAll(container);
+    fireEvent.contextMenu(container.querySelector('[data-schedule-event-id="overnight"]')!, { clientX: 120, clientY: 120 });
+    fireEvent.click(within(screen.getByRole("group", { name: "日程右键操作" })).getByRole("button", { name: "删除所选 2 项" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "删除所选" }));
+    expect(onDeleteEvent).toHaveBeenCalledTimes(2);
+    expect(onDeleteEvent).toHaveBeenCalledWith("overnight", { mode: "all" });
+    expect(onDeleteEvent).toHaveBeenCalledWith("next-day", { mode: "all" });
+  });
+
   it("filters arbitrary week columns by their actual dates and leaves day view available", () => {
     const onDeleteEvent = vi.fn();
     const events = [scheduleEvent, { ...scheduleEvent, id: "wednesday", date: "2026-07-29" }];

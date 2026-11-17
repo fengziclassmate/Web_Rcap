@@ -221,6 +221,7 @@ type ContextMenuState = {
   x: number;
   y: number;
   eventId: string;
+  eventIds: string[];
 };
 
 type TimelineDayLayout = {
@@ -581,7 +582,7 @@ export function WeeklyTimeGrid({
     rangeKey: string | null;
     ids: Set<string>;
   }>(() => ({ rangeKey: null, ids: new Set() }));
-  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [returnToCreateAfterTemplate, setReturnToCreateAfterTemplate] = useState(false);
@@ -653,7 +654,7 @@ export function WeeklyTimeGrid({
   const [editingCategoryIcon, setEditingCategoryIcon] = useState<ScheduleCategoryIcon>("moon");
   const [confirmDeleteCategoryId, setConfirmDeleteCategoryId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [taggingEventId, setTaggingEventId] = useState<string | null>(null);
+  const [taggingEventIds, setTaggingEventIds] = useState<string[]>([]);
   const [createRecurrence, setCreateRecurrence] = useState<{
     enabled: boolean;
     kind: "daily" | "weekly";
@@ -1443,6 +1444,8 @@ export function WeeklyTimeGrid({
 
   function handleContextMenu(event: React.MouseEvent, eventId: string) {
     event.preventDefault();
+    const eventIds = selectedEventIds.has(eventId) ? [...selectedEventIds] : [eventId];
+    if (!selectedEventIds.has(eventId)) setSelectedEventIds(new Set());
     const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
     const maxX = viewportWidth - contextMenuWidth - contextMenuViewportPadding;
@@ -1451,6 +1454,7 @@ export function WeeklyTimeGrid({
       x: Math.max(contextMenuViewportPadding, Math.min(event.clientX, maxX)),
       y: Math.max(contextMenuViewportPadding, Math.min(event.clientY, maxY)),
       eventId,
+      eventIds,
     });
   }
 
@@ -1693,26 +1697,21 @@ export function WeeklyTimeGrid({
     }
   }
 
-  function handleBatchComplete() {
-    selectedIncompleteEvents.forEach((event) => {
-      onUpdateEvent(event.id, { isCompleted: true }, parseSyntheticEventId(event.id) ? { scope: "occurrence" } : undefined);
+  function markEventsCompleted(ids: ReadonlySet<string>, isCompleted: boolean) {
+    const targets = expandedEvents.filter((event) => ids.has(event.id) && event.isCompleted !== isCompleted);
+    targets.forEach((event) => {
+      onUpdateEvent(event.id, { isCompleted }, parseSyntheticEventId(event.id) ? { scope: "occurrence" } : undefined);
     });
-    toast.success(`已完成 ${selectedIncompleteEvents.length} 个日程`);
-  }
-
-  function handleBatchReopen() {
-    selectedCompletedEvents.forEach((event) => {
-      onUpdateEvent(event.id, { isCompleted: false }, parseSyntheticEventId(event.id) ? { scope: "occurrence" } : undefined);
-    });
-    toast.success(`已将 ${selectedCompletedEvents.length} 个日程标记为未完成`);
+    toast.success(isCompleted ? `已完成 ${targets.length} 个日程` : `已将 ${targets.length} 个日程标记为未完成`);
   }
 
   function handleBatchDelete() {
-    const ids = [...selectedEventIds];
+    const ids = pendingDeleteIds;
     ids.forEach((eventId) => {
       onDeleteEvent(eventId, { mode: parseSyntheticEventId(eventId) ? "single" : "all" });
     });
     setSelectedEventIds(new Set());
+    setPendingDeleteIds([]);
     toast.success(`已删除 ${ids.length} 个行程`);
   }
 
@@ -1828,20 +1827,28 @@ export function WeeklyTimeGrid({
     function handleGlobalClose() {
       setContextMenu(null);
     }
+    function handleMenuKey(event: KeyboardEvent) {
+      if (event.key === "Escape") handleGlobalClose();
+    }
 
     window.addEventListener("click", handleGlobalClose);
     window.addEventListener("resize", handleGlobalClose);
     window.addEventListener("scroll", handleGlobalClose, true);
+    window.addEventListener("keydown", handleMenuKey);
     return () => {
       window.removeEventListener("click", handleGlobalClose);
       window.removeEventListener("resize", handleGlobalClose);
       window.removeEventListener("scroll", handleGlobalClose, true);
+      window.removeEventListener("keydown", handleMenuKey);
     };
   }, [contextMenu]);
 
   const contextMenuEvent = contextMenu
     ? expandedEvents.find((event) => event.id === contextMenu.eventId) ?? null
     : null;
+  const contextTargets = expandedEvents.filter((event) => contextMenu?.eventIds.includes(event.id));
+  const contextIsBatch = (contextMenu?.eventIds.length ?? 0) > 1;
+  const taggingTargets = expandedEvents.filter((event) => taggingEventIds.includes(event.id));
 
   return (
     <section className="calendar-panel overflow-clip rounded-2xl border border-stone-200 bg-white shadow-sm">
@@ -1861,12 +1868,12 @@ export function WeeklyTimeGrid({
               type="button"
               size="xs"
               disabled={selectedIncompleteEvents.length === 0}
-              onClick={handleBatchComplete}
+              onClick={() => markEventsCompleted(selectedEventIds, true)}
             >
               <Check className="h-3 w-3" />
               标记为已完成
             </Button>
-            <Button type="button" size="xs" variant="outline" disabled={selectedCompletedEvents.length === 0} onClick={handleBatchReopen}>
+            <Button type="button" size="xs" variant="outline" disabled={selectedCompletedEvents.length === 0} onClick={() => markEventsCompleted(selectedEventIds, false)}>
               <Undo2 className="h-3 w-3" />
               标记为未完成
             </Button>
@@ -1874,7 +1881,7 @@ export function WeeklyTimeGrid({
               type="button"
               size="xs"
               variant="destructive"
-              onClick={() => setBatchDeleteOpen(true)}
+              onClick={() => setPendingDeleteIds([...selectedEventIds])}
             >
               <Trash2 className="h-3 w-3" />
               删除所选
@@ -3401,27 +3408,27 @@ export function WeeklyTimeGrid({
         </div>
 
         <ConfirmDialog
-          open={batchDeleteOpen}
-          onOpenChange={setBatchDeleteOpen}
-          title={`删除选中的 ${selectedEventIds.size} 个行程？`}
+          open={pendingDeleteIds.length > 0}
+          onOpenChange={(open) => { if (!open) setPendingDeleteIds([]); }}
+          title={`删除选中的 ${pendingDeleteIds.length} 个行程？`}
           description="普通行程会直接删除；框选到的循环行程只删除当前日期，不会影响整个循环系列。"
           confirmLabel="删除所选"
           onConfirm={handleBatchDelete}
         />
 
-        <Dialog open={taggingEventId !== null} onOpenChange={(open) => { if (!open) setTaggingEventId(null); }}>
+        <Dialog open={taggingEventIds.length > 0} onOpenChange={(open) => { if (!open) setTaggingEventIds([]); }}>
           <DialogContent className="schedule-mark-picker max-w-sm border-[0.5px]">
-            <DialogHeader><DialogTitle>选择标记</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{taggingEventIds.length > 1 ? `为 ${taggingEventIds.length} 项选择标记` : "选择标记"}</DialogTitle></DialogHeader>
             <div className="grid grid-cols-2 gap-2" role="group" aria-label="日程标记">
               {[{ value: null, label: "无标记" }, ...eventTagOptions].map((tag) => (
                 <button
                   key={tag.value ?? "none"}
                   type="button"
                   className="schedule-mark-option"
-                  aria-pressed={(expandedEvents.find((event) => event.id === taggingEventId)?.tag ?? null) === tag.value}
+                  aria-pressed={taggingTargets.length > 0 && taggingTargets.every((event) => event.tag === tag.value)}
                   onClick={() => {
-                    onUpdateEvent(taggingEventId!, { tag: tag.value }, parseSyntheticEventId(taggingEventId!) ? { scope: "occurrence" } : undefined);
-                    setTaggingEventId(null);
+                    taggingTargets.forEach((event) => onUpdateEvent(event.id, { tag: tag.value }, parseSyntheticEventId(event.id) ? { scope: "occurrence" } : undefined));
+                    setTaggingEventIds([]);
                   }}
                 >{tag.label}</button>
               ))}
@@ -3431,13 +3438,19 @@ export function WeeklyTimeGrid({
 
         {contextMenu && typeof document !== "undefined" ? createPortal(
           <div
+            role="group"
+            aria-label="日程右键操作"
             className="fixed z-[1000] w-52 max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl border border-stone-200 bg-white/95 p-1.5 shadow-[0_24px_60px_rgba(68,64,60,0.28)] backdrop-blur-md"
             style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="border-b border-stone-100 px-3 py-2">
-              <p className="truncate text-sm font-semibold text-stone-900">{contextMenuEvent?.title ?? "行程操作"}</p>
+              <p className="truncate text-sm font-semibold text-stone-900">{contextIsBatch ? `已选 ${contextMenu.eventIds.length} 项日程` : contextMenuEvent?.title ?? "行程操作"}</p>
             </div>
+            {contextIsBatch ? <>
+              <button type="button" className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-400" disabled={contextTargets.every((event) => event.isCompleted)} onClick={() => { markEventsCompleted(new Set(contextMenu.eventIds), true); closeContextMenu(); }}>标记所选为已完成</button>
+              <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-400" disabled={contextTargets.every((event) => !event.isCompleted)} onClick={() => { markEventsCompleted(new Set(contextMenu.eventIds), false); closeContextMenu(); }}>标记所选为未完成</button>
+            </> : <>
             <button className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleReschedule(contextMenu.eventId)}>
               改约
             </button>
@@ -3447,19 +3460,20 @@ export function WeeklyTimeGrid({
             <button className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100" onClick={() => handleToggleComplete(contextMenu.eventId)}>
               {contextMenuEvent?.linkedProjectTask ? (contextMenuEvent.isCompleted ? "标记此时段未完成" : "完成此时段") : contextMenuEvent?.isCompleted ? "标记为未完成" : "标记为已完成"}
             </button>
-            <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-stone-100" onClick={() => { setTaggingEventId(contextMenu.eventId); closeContextMenu(); }}>
+            </>}
+            <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-stone-100" onClick={() => { setTaggingEventIds(contextMenu.eventIds); closeContextMenu(); }}>
               选择标记
             </button>
-            <button
+            {!contextIsBatch && <button
               className="block w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent"
               disabled={Boolean(contextMenuEvent?.linkedDailyTaskId)}
               onClick={() => handleAddEventToDailyTask(contextMenu.eventId)}
             >
               {contextMenuEvent?.linkedProjectTask ? "打开科研与自学任务" : contextMenuEvent?.linkedDailyTaskId ? "已加入日常任务" : "加入日常任务"}
-            </button>
+            </button>}
             <div className="my-1 border-t border-stone-100" />
-            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50" onClick={() => handleDeleteFromContext(contextMenu.eventId)}>
-              删除该行程
+            <button className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50" onClick={() => { if (contextIsBatch) { setPendingDeleteIds(contextMenu.eventIds); closeContextMenu(); } else handleDeleteFromContext(contextMenu.eventId); }}>
+              {contextIsBatch ? `删除所选 ${contextMenu.eventIds.length} 项` : "删除该行程"}
             </button>
           </div>,
           document.body,
