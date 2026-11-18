@@ -60,3 +60,56 @@ alter table public.schedule_data
 执行 `supabase/migrations/20261016102614_sync_focus_state.sql`，增加 `schedule_data.focus_state` 非空 JSONB 列及数据形状约束，默认值为 `{"active":null,"sessions":[]}`。计时与历史使用原有账号 RLS 和同步版本检查，不需要新的密钥或 Vercel 环境变量。
 
 该迁移已应用到线上 `webRcap`，版本为 `20261016102614`。已核对结构约束、原有读写策略，并用匿名角色及无对应数据的登录角色验证无法读取其他账号的数据。旧浏览器历史只会在打开新版工作台后上传；未上传的本机记录无法从另一台电脑读取。
+
+## Notion 双向同步
+
+1. 应用 `add_notion_sync_state` 迁移，部署 `notion-sync` Edge Function。函数用 Vault 中生成的调用密钥自行授权，部署时使用 `--no-verify-jwt`。在 Edge Function Secrets 中设置 `NOTION_SYNC_TOKEN`，来自 Notion 内部连接。该连接需要读取、新增和更新权限，并加入 TodoLists 和每日打卡的原始数据库。
+2. 在 TodoLists 添加文本属性 `RCAP 任务 ID`，供创建请求重试时定位同一条记录。可以在工作视图中隐藏这一列。
+3. 使用 SQL Editor 为已确认的 RCAP 账号登记同步。替换下方账号 UUID、数据源 UUID 和项目 ID。属性可先填名称，首次预览会返回稳定的属性 ID，将 `resolvedConfig` 保存到 `configuration` 后，现有绑定可以跟随 Notion 属性改名。
+
+```sql
+do $$
+declare
+  account_id uuid := '<RCAP 账号 UUID>';
+  key_name text := 'rcap-notion-' || account_id::text;
+  invocation_key text;
+begin
+  select decrypted_secret into invocation_key
+  from vault.decrypted_secrets where name = key_name;
+
+  if invocation_key is null then
+    invocation_key := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
+    perform vault.create_secret(invocation_key, key_name, 'RCAP Notion 定时同步');
+  end if;
+
+  insert into public.notion_sync_state (user_id, invocation_digest, configuration)
+  values (account_id, encode(sha256(convert_to(invocation_key, 'UTF8')), 'hex'), jsonb_build_object(
+    'enabledAt', clock_timestamp(),
+    'todo', jsonb_build_object(
+      'dataSourceId', '<TodoLists 数据源 UUID>',
+      'title', '任务名称', 'date', '计划执行日', 'notes', '备注',
+      'status', '状态', 'rcapId', 'RCAP 任务 ID'
+    ),
+    'daily', jsonb_build_object(
+      'dataSourceId', '<每日打卡数据源 UUID>', 'date', '日期', 'title', '记录',
+      'bindings', jsonb_build_array(jsonb_build_object(
+        'projectId', '<RCAP 项目 ID>', 'checkbox', '力扣2题'
+      ))
+    )
+  ));
+end $$;
+```
+
+4. 启用 `pg_net` 后，先运行单次预览。替换 URL 项目标识和 Vault 密钥名称。预览只读，返回拟同步数量、待核对记录和冲突。用返回的请求 ID 查询 `net._http_response` 的 `status_code` 和 `content`。
+
+```sql
+select net.http_post(
+  url := 'https://<project-ref>.supabase.co/functions/v1/notion-sync?mode=preview',
+  headers := jsonb_build_object('x-rcap-notion-secret', decrypted_secret),
+  timeout_milliseconds := 95000
+) from vault.decrypted_secrets where name = 'rcap-notion-<RCAP 账号 UUID>';
+```
+
+5. 验证预览和单次运行后，启用 `pg_cron`，以 `*/2 * * * *` 调度同一 SQL，URL 改为 `?mode=sync`。网页及桌面版可在「工作台设置 → Notion 同步」查看运行结果。暂停时停用 Cron job。
+
+默认从启用后创建的任务和新绑定当天起的项目打卡开始。打卡按上海日期归属，同一天复用原有 Notion 记录。已有任务可通过配置 `existingTaskPairs: [{ "rcapId": "任务 ID", "pageId": "Notion 页面 UUID" }]` 逐条配对并预览。打卡状态由 `bindings[].checkbox` 映射，需同步描述时再配置一个语义对应的文本列 `bindings[].note`。

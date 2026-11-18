@@ -1,5 +1,7 @@
 import { addDays, differenceInCalendarDays } from "date-fns";
 
+export { updateEventsLinkedToDailyTask } from "../../supabase/functions/_shared/linked-daily-task-events";
+
 type RecurrenceKind = "daily" | "weekly";
 
 export type RecurrenceConfig = {
@@ -361,35 +363,6 @@ export function updateTasksLinkedToScheduleEvent<T extends LinkedScheduleTask>(
               : null,
           }
         : {}),
-    } as T;
-  });
-}
-
-export function updateEventsLinkedToDailyTask<T extends ExpandableScheduleEvent>(
-  events: T[],
-  taskId: string,
-  isCompleted: boolean,
-): T[] {
-  return events.map((event) => {
-    const baseChanged =
-      event.linkedDailyTaskId === taskId && event.isCompleted !== isCompleted;
-    let overridesChanged = false;
-    const nextOverrides = Object.fromEntries(
-      Object.entries(event.recurrenceOverrides ?? {}).map(([date, override]) => {
-        const effectiveTaskId = override.linkedDailyTaskId ?? event.linkedDailyTaskId;
-        if (effectiveTaskId !== taskId || override.isCompleted === isCompleted) {
-          return [date, override];
-        }
-        overridesChanged = true;
-        return [date, { ...override, isCompleted }];
-      }),
-    );
-
-    if (!baseChanged && !overridesChanged) return event;
-    return {
-      ...event,
-      ...(baseChanged ? { isCompleted } : {}),
-      ...(overridesChanged ? { recurrenceOverrides: nextOverrides } : {}),
     } as T;
   });
 }

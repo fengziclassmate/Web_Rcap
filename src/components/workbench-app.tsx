@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
@@ -86,6 +86,7 @@ import { LLMChatSidebar } from "@/components/llm/chat-sidebar";
 import { QuickEventInput } from "@/components/llm/quick-event-input";
 import { QuickNoteFab } from "@/components/llm/quick-note-fab";
 import { LLMSettingsButton } from "@/components/llm/settings-button";
+import { NotionSyncStatus } from "@/components/notion-sync-status";
 import { WeeklyReportDialog } from "@/components/llm/weekly-report-dialog";
 import {
   type LogComposerInput,
@@ -1197,6 +1198,7 @@ export function WorkbenchApp() {
             logs={logPosts}
           />
           <LLMSettingsButton />
+          <NotionSyncStatus key={user.id} userId={user.id} tasks={tasks} projects={projectCheckins} />
           <Button
             type="button"
             variant="outline"
